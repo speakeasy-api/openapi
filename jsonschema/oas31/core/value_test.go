@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 type TestEitherValue[L any, R any] struct {
@@ -25,11 +25,7 @@ func TestEitherValue_SyncChanges_Success(t *testing.T) {
 	var target EitherValue[string, string]
 	outNode, err := marshaller.SyncValue(ctx, source, &target, nil)
 	require.NoError(t, err)
-	assert.Equal(t, &yaml.Node{
-		Value: "some-value",
-		Kind:  yaml.ScalarNode,
-		Tag:   "!!str",
-	}, outNode)
+	assert.Equal(t, testutils.CreateStringYamlNode("some-value", 0, 0), outNode)
 	assert.Equal(t, "some-value", *target.Left)
 	assert.Nil(t, target.Right)
 }

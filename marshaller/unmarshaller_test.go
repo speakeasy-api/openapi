@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/stretchr/testify/assert"
@@ -78,16 +79,10 @@ x-test-2: some-value-2
 	assertNodeField(t, "slicePrimitiveField", 4, []string{"where", "are", "you"}, 4, out.NestedModelField.Value.SlicePrimitiveField)
 	assertNodeField(t, "sliceRequiredPrimitiveField", 5, []string{"I", "am", "here"}, 5, out.NestedModelField.Value.SliceRequiredPrimitiveField)
 	assertNodeField(t, "mapPrimitiveField", 6, sequencedmap.New(sequencedmap.NewElem("a", 1), sequencedmap.NewElem("b", 2)), 7, out.NestedModelField.Value.MapPrimitiveField)
-	xTestExtensionNodeNestedModelField := &yaml.Node{
-		Value:  "some-value",
-		Kind:   yaml.ScalarNode,
-		Tag:    "!!str",
-		Line:   9,
-		Column: 11,
-	}
+	xTestExtensionNodeNestedModelField := testutils.CreateStringYamlNode("some-value", 9, 11)
 	assert.Equal(t, sequencedmap.New(sequencedmap.NewElem("x-test", Node[extensions.Extension]{
 		Key:       "x-test",
-		KeyNode:   &yaml.Node{Value: "x-test", Kind: yaml.ScalarNode, Tag: "!!str", Line: 9, Column: 3},
+		KeyNode:   testutils.CreateStringYamlNode("x-test", 9, 3),
 		Value:     xTestExtensionNodeNestedModelField,
 		ValueNode: xTestExtensionNodeNestedModelField,
 	})), out.NestedModelField.Value.Extensions)
@@ -105,32 +100,20 @@ x-test-2: some-value-2
 	assertModelNodeField(t, "mapRequiredNestedModelField", 18, 19, out.MapRequiredNestedModelField)
 	assertNodeField(t, "slicePrimitiveField", 20, []string{"p", "q", "r"}, 20, out.MapRequiredNestedModelField.Value.GetOrZero("z").SlicePrimitiveField)
 	assertNodeField(t, "sliceRequiredPrimitiveField", 21, []string{"s", "t", "u"}, 21, out.MapRequiredNestedModelField.Value.GetOrZero("z").SliceRequiredPrimitiveField)
-	xTestExtensionNodeMapRequiredNestedModelField := &yaml.Node{
-		Value:  "some-value",
-		Kind:   yaml.ScalarNode,
-		Tag:    "!!str",
-		Line:   22,
-		Column: 13,
-	}
+	xTestExtensionNodeMapRequiredNestedModelField := testutils.CreateStringYamlNode("some-value", 22, 13)
 	assert.Equal(t, sequencedmap.New(sequencedmap.NewElem("x-test", Node[extensions.Extension]{
 		Key:       "x-test",
-		KeyNode:   &yaml.Node{Value: "x-test", Kind: yaml.ScalarNode, Tag: "!!str", Line: 22, Column: 5},
+		KeyNode:   testutils.CreateStringYamlNode("x-test", 22, 5),
 		Value:     xTestExtensionNodeMapRequiredNestedModelField,
 		ValueNode: xTestExtensionNodeMapRequiredNestedModelField,
 	})), out.MapRequiredNestedModelField.Value.GetOrZero("z").Extensions)
 	assertNodeField(t, "slicePrimitiveField", 24, []string{"w", "x", "y"}, 24, out.MapRequiredNestedModelField.Value.GetOrZero("x").SlicePrimitiveField)
 	assertNodeField(t, "sliceRequiredPrimitiveField", 25, []string{"1", "2", "3"}, 25, out.MapRequiredNestedModelField.Value.GetOrZero("x").SliceRequiredPrimitiveField)
 
-	xTestExtensionNode := &yaml.Node{
-		Value:  "some-value-2",
-		Kind:   yaml.ScalarNode,
-		Tag:    "!!str",
-		Line:   26,
-		Column: 11,
-	}
+	xTestExtensionNode := testutils.CreateStringYamlNode("some-value-2", 26, 11)
 	assert.Equal(t, sequencedmap.New(sequencedmap.NewElem("x-test-2", Node[extensions.Extension]{
 		Key:       "x-test-2",
-		KeyNode:   &yaml.Node{Value: "x-test-2", Kind: yaml.ScalarNode, Tag: "!!str", Line: 26, Column: 1},
+		KeyNode:   testutils.CreateStringYamlNode("x-test-2", 26, 1),
 		Value:     xTestExtensionNode,
 		ValueNode: xTestExtensionNode,
 	})), out.Extensions)

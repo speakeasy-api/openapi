@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,11 +17,7 @@ func TestSyncValue_String(t *testing.T) {
 	target := ""
 	outNode, err := SyncValue(context.Background(), "some-value", &target, nil)
 	require.NoError(t, err)
-	assert.Equal(t, &yaml.Node{
-		Value: "some-value",
-		Kind:  yaml.ScalarNode,
-		Tag:   "!!str",
-	}, outNode)
+	assert.Equal(t, testutils.CreateStringYamlNode("some-value", 0, 0), outNode)
 	assert.Equal(t, "some-value", target)
 }
 
@@ -28,11 +25,7 @@ func TestSyncValue_StringPtrSet(t *testing.T) {
 	target := pointer.From("")
 	outNode, err := SyncValue(context.Background(), pointer.From("some-value"), &target, nil)
 	require.NoError(t, err)
-	assert.Equal(t, &yaml.Node{
-		Value: "some-value",
-		Kind:  yaml.ScalarNode,
-		Tag:   "!!str",
-	}, outNode)
+	assert.Equal(t, testutils.CreateStringYamlNode("some-value", 0, 0), outNode)
 	assert.Equal(t, "some-value", *target)
 }
 
@@ -40,11 +33,7 @@ func TestSyncValue_StringPtrNil(t *testing.T) {
 	var target *string
 	outNode, err := SyncValue(context.Background(), pointer.From("some-value"), &target, nil)
 	require.NoError(t, err)
-	assert.Equal(t, &yaml.Node{
-		Value: "some-value",
-		Kind:  yaml.ScalarNode,
-		Tag:   "!!str",
-	}, outNode)
+	assert.Equal(t, testutils.CreateStringYamlNode("some-value", 0, 0), outNode)
 	assert.Equal(t, "some-value", *target)
 }
 
@@ -79,11 +68,7 @@ func TestSyncValue_StructPtr_CustomSyncer(t *testing.T) {
 
 	outNode, err := SyncValue(context.Background(), source, &target, nil)
 	require.NoError(t, err)
-	node := &yaml.Node{
-		Kind:  yaml.ScalarNode,
-		Tag:   "!!int",
-		Value: "1",
-	}
+	node := testutils.CreateIntYamlNode(1, 0, 0)
 	assert.Equal(t, node, outNode)
 	assert.Equal(t, node, target.RootNode)
 	assert.Equal(t, 1, *target.Val)
@@ -96,11 +81,7 @@ func TestSyncValue_Struct_CustomSyncer(t *testing.T) {
 
 	outNode, err := SyncValue(context.Background(), source, &target, nil)
 	require.NoError(t, err)
-	node := &yaml.Node{
-		Kind:  yaml.ScalarNode,
-		Tag:   "!!int",
-		Value: "1",
-	}
+	node := testutils.CreateIntYamlNode(1, 0, 0)
 	assert.Equal(t, node, outNode)
 	assert.Equal(t, node, target.RootNode)
 }
@@ -134,52 +115,16 @@ func TestSyncChanges_Struct(t *testing.T) {
 	outNode, err := SyncValue(context.Background(), source, &target, nil)
 	require.NoError(t, err)
 
-	node := &yaml.Node{
-		Kind: yaml.MappingNode,
-		Tag:  "!!map",
-		Content: []*yaml.Node{
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!str",
-				Value: "int",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!int",
-				Value: "1",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!str",
-				Value: "str",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!str",
-				Value: "some-string",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!str",
-				Value: "strPtr",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!str",
-				Value: "some-string-ptr",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!str",
-				Value: "boolPtr",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!bool",
-				Value: "true",
-			},
-		},
-	}
+	node := testutils.CreateMapYamlNode([]*yaml.Node{
+		testutils.CreateStringYamlNode("int", 0, 0),
+		testutils.CreateIntYamlNode(1, 0, 0),
+		testutils.CreateStringYamlNode("str", 0, 0),
+		testutils.CreateStringYamlNode("some-string", 0, 0),
+		testutils.CreateStringYamlNode("strPtr", 0, 0),
+		testutils.CreateStringYamlNode("some-string-ptr", 0, 0),
+		testutils.CreateStringYamlNode("boolPtr", 0, 0),
+		testutils.CreateBoolYamlNode(true, 0, 0),
+	}, 0, 0)
 
 	assert.Equal(t, node, outNode)
 	assert.Equal(t, node, target.RootNode)
@@ -202,52 +147,16 @@ func TestSyncChanges_StructPtr(t *testing.T) {
 	outNode, err := SyncValue(context.Background(), source, &target, nil)
 	require.NoError(t, err)
 
-	node := &yaml.Node{
-		Kind: yaml.MappingNode,
-		Tag:  "!!map",
-		Content: []*yaml.Node{
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!str",
-				Value: "int",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!int",
-				Value: "1",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!str",
-				Value: "str",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!str",
-				Value: "some-string",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!str",
-				Value: "strPtr",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!str",
-				Value: "some-string-ptr",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!str",
-				Value: "boolPtr",
-			},
-			{
-				Kind:  yaml.ScalarNode,
-				Tag:   "!!bool",
-				Value: "true",
-			},
-		},
-	}
+	node := testutils.CreateMapYamlNode([]*yaml.Node{
+		testutils.CreateStringYamlNode("int", 0, 0),
+		testutils.CreateIntYamlNode(1, 0, 0),
+		testutils.CreateStringYamlNode("str", 0, 0),
+		testutils.CreateStringYamlNode("some-string", 0, 0),
+		testutils.CreateStringYamlNode("strPtr", 0, 0),
+		testutils.CreateStringYamlNode("some-string-ptr", 0, 0),
+		testutils.CreateStringYamlNode("boolPtr", 0, 0),
+		testutils.CreateBoolYamlNode(true, 0, 0),
+	}, 0, 0)
 
 	assert.Equal(t, node, outNode)
 	assert.Equal(t, node, target.RootNode)

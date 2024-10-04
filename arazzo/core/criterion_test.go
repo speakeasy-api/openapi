@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
-	"github.com/speakeasy-api/openapi/testutils"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -135,33 +135,29 @@ type:
 				Type: marshaller.Node[CriterionTypeUnion]{
 					Key:     "type",
 					KeyNode: testutils.CreateStringYamlNode("type", 3, 1),
-					Value: CriterionTypeUnion{ExpressionType: &CriterionExpressionType{
-						Type: marshaller.Node[string]{
-							Key:       "type",
-							KeyNode:   testutils.CreateStringYamlNode("type", 4, 3),
-							Value:     "jsonpath",
-							ValueNode: testutils.CreateStringYamlNode("jsonpath", 4, 9),
-							Present:   true,
-						},
-						Version: marshaller.Node[string]{
-							Key:       "version",
-							KeyNode:   testutils.CreateStringYamlNode("version", 5, 3),
-							Value:     "draft-goessner-dispatch-jsonpath-00",
-							ValueNode: testutils.CreateStringYamlNode("draft-goessner-dispatch-jsonpath-00", 5, 12),
-							Present:   true,
-						},
-					}, RootNode: &yaml.Node{
-						Kind: yaml.MappingNode,
-						Tag:  "!!map",
-						Content: []*yaml.Node{
+					Value: CriterionTypeUnion{
+						ExpressionType: &CriterionExpressionType{
+							Type: marshaller.Node[string]{
+								Key:       "type",
+								KeyNode:   testutils.CreateStringYamlNode("type", 4, 3),
+								Value:     "jsonpath",
+								ValueNode: testutils.CreateStringYamlNode("jsonpath", 4, 9),
+								Present:   true,
+							},
+							Version: marshaller.Node[string]{
+								Key:       "version",
+								KeyNode:   testutils.CreateStringYamlNode("version", 5, 3),
+								Value:     "draft-goessner-dispatch-jsonpath-00",
+								ValueNode: testutils.CreateStringYamlNode("draft-goessner-dispatch-jsonpath-00", 5, 12),
+								Present:   true,
+							},
+						}, RootNode: testutils.CreateMapYamlNode([]*yaml.Node{
 							testutils.CreateStringYamlNode("type", 4, 3),
 							testutils.CreateStringYamlNode("jsonpath", 4, 9),
 							testutils.CreateStringYamlNode("version", 5, 3),
 							testutils.CreateStringYamlNode("draft-goessner-dispatch-jsonpath-00", 5, 12),
-						},
-						Line:   4,
-						Column: 3,
-					}},
+						}, 4, 3),
+					},
 					ValueNode: testutils.CreateMapYamlNode([]*yaml.Node{
 						testutils.CreateStringYamlNode("type", 4, 3),
 						testutils.CreateStringYamlNode("jsonpath", 4, 9),
