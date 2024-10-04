@@ -10,6 +10,7 @@ import (
 	"github.com/speakeasy-api/openapi/pointer"
 )
 
+// The below examples should be copied into the README.md file if every changed TODO: automate this
 func Example_readAndMutate() {
 	ctx := context.Background()
 
@@ -42,24 +43,6 @@ func Example_readAndMutate() {
 	}
 
 	fmt.Println(buf.String())
-}
-
-// The below examples should be copied into the README.md file if every changed TODO: automate this
-func Example_reading() {
-	ctx := context.Background()
-
-	f, err := os.Open("arazzo.yaml")
-	if err != nil {
-		panic(err)
-	}
-
-	arazzo, validationErrs, err := arazzo.Unmarshal(ctx, f)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("%+v\n", arazzo)
-	fmt.Printf("%+v\n", validationErrs)
 }
 
 func Example_creating() {

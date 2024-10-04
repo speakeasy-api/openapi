@@ -22,18 +22,35 @@ import (
 func main() {
     ctx := context.Background()
 
-    f, err := os.Open("arazzo.yaml")
+    r, err := os.Open("testdata/speakeasybar.arazzo.yaml")
+    if err != nil {
+        panic(err)
+    }
+    defer r.Close()
+
+    // Unmarshal the Arazzo document which will also validate it against the Arazzo Specification
+    a, validationErrs, err := arazzo.Unmarshal(ctx, r)
     if err != nil {
         panic(err)
     }
 
-    arazzo, validationErrs, err := arazzo.Unmarshal(ctx, f)
-    if err != nil {
+    // Validation errors are returned separately from any errors that block the document from being unmarshalled
+    // allowing an invalid document to be mutated and fixed before being marshalled again
+    for _, err := range validationErrs {
+        fmt.Println(err.Error())
+    }
+
+    // Mutate the document by just modifying the returned Arazzo object
+    a.Info.Title = "Speakeasy Bar Workflows"
+
+    buf := bytes.NewBuffer([]byte{})
+
+    // Marshal the document to a writer
+    if err := arazzo.Marshal(ctx, a, buf); err != nil {
         panic(err)
     }
 
-    fmt.Printf("%+v\n", arazzo)
-    fmt.Printf("%+v\n", validationErrs)
+    fmt.Println(buf.String())
 }
 ```
 
