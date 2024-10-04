@@ -1,0 +1,72 @@
+arazzo: 1.0.0
+info:
+  title: My Workflow
+  summary: A summary
+  version: 1.0.0
+  x-test: some-value
+sourceDescriptions:
+  - name: openapi
+    url: https://openapi.com
+    type: openapi
+    x-test: some-value
+workflows:
+  - workflowId: workflow1
+    summary: A summary
+    description: A description
+    parameters:
+      - name: parameter1
+        in: query
+        value: "123"
+    inputs:
+      type: object
+      properties:
+        input1:
+          type: string
+      required:
+        - input1
+    steps:
+      - stepId: step1
+        description: A description
+        operationId: operation1
+        parameters:
+          - reference: $components.parameters.userId
+            value: "456"
+        requestBody:
+          contentType: application/json
+          payload: {"a": 1, "b": 2}
+          replacements:
+            - target: /b
+              value: 3
+        successCriteria:
+          - condition: $statusCode == 200
+        onSuccess:
+          - reference: $components.successActions.success
+        onFailure:
+          - reference: $components.failureActions.failure
+        outputs:
+          name: $response.body#/name
+    outputs:
+      name: $steps.step1.outputs.name
+components:
+  parameters:
+    userId:
+      name: userId
+      in: query
+      value: "123"
+  successActions:
+    success:
+      name: success
+      type: end
+      criteria:
+        - context: $statusCode
+          condition: $statusCode == 200
+          type: simple
+  failureActions:
+    failure:
+      name: failure
+      type: retry
+      retryAfter: 10
+      retryLimit: 3
+      criteria:
+        - condition: $statusCode == 500%s
+x-test: some-value

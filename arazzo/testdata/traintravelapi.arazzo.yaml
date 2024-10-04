@@ -1,0 +1,262 @@
+arazzo: 1.0.0
+info:
+  title: Train Travel API - Book & Pay
+  version: 1.0.0
+  description: >-
+    This API allows you to book and pay for train travel. It is a simple API
+    that allows you to search for trains, book a ticket, and pay for it, and
+    this workflow documentation shows how each step interacts with the others.
+sourceDescriptions:
+  - name: train-travel
+    url: ./openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: book-trip
+    summary: Find train trips to book between origin and destination stations.
+    description: >-
+      This is how you can book a train ticket and pay for it, once you've found
+      the stations to travel between and trip schedules.
+    inputs:
+      $ref: "#/components/inputs/book_trip_input"
+    steps:
+      - stepId: book-trip
+        description: Create a booking to reserve a ticket for that trip, pending payment.
+        operationId: create-booking
+        requestBody:
+          contentType: application/json
+          payload:
+            trip_id: $inputs.trip_id
+            passenger_name: $inputs.passenger_name
+            has_bicycle: false
+            has_dog: false
+        successCriteria:
+          - condition: $statusCode == 201
+        outputs:
+          booking_id: $response.body.id
+
+      - stepId: make-payment
+        description: Make a payment to confirm the booking.
+        operationId: create-booking-payment
+        parameters:
+          - name: bookingId
+            in: query
+            value: $steps.book-trip.outputs.booking_id
+        requestBody:
+          contentType: application/json
+          payload:
+            currency: gbp
+            source:
+              object: bank_account
+              name: $inputs.bank_details.account_name
+              number: $inputs.bank_details.account_number
+              sort_code: $inputs.bank_details.sort_code
+              account_type: $inputs.bank_details.account_type
+              bank_name: $inputs.bank_details.bank_name
+              country: $inputs.bank_details.country
+        successCriteria:
+          - condition: $statusCode == 200 && $response.body.status == "success"
+        outputs:
+          payment_status: $response.body.status
+    outputs:
+      workflow_payment_status: $steps.make-payment.outputs.payment_status
+
+  - workflowId: find-trip-between-stations
+    inputs:
+      $ref: "#/components/inputs/find_trip_input"
+    steps:
+      - stepId: find-trip
+        description: Find the trip between the origin and destination stations.
+        operationId: get-trips
+        parameters:
+          - name: origin
+            in: query
+            value: $inputs.origin_station_id
+          - name: destination
+            in: query
+            value: $inputs.destination_station_id
+          - name: date
+            in: query
+            value: $inputs.trip_date
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          trip_id: $response.body.data[0].id
+
+  - workflowId: plan-trip-by-coordinates
+    inputs:
+      $ref: "#/components/inputs/find_stations_by_coordinates_input"
+    steps:
+      - stepId: find-origin-station
+        description: Find the origin station for the trip.
+        operationId: get-stations
+        parameters:
+          - name: coordinates
+            in: query
+            value: "{$inputs.origin_coordinates}"
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          station_id: $outputs.data[0].id # grab the first station
+
+      - stepId: find-destination-station
+        description: Find the destination station for the trip.
+        operationId: get-stations
+        parameters:
+          - name: coordinates
+            in: query
+            value: "{$inputs.destination_coordinates}"
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          station_id: $outputs.data[0].id # grab the first station
+
+      - stepId: find-trip
+        workflowId: find-trip-between-stations
+        parameters:
+          - name: origin_station_id
+            value: $steps.find-origin-station.outputs.station_id
+          - name: destination_station_id
+            value: $steps.find-destination-station.outputs.station_id
+          - name: trip_date
+            value: "{$inputs.trip_date}"
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          trip_id: $outputs.trip_id
+
+      - stepId: book-trip
+        workflowId: book-trip
+        parameters:
+          - name: bank_details
+            value: "{$inputs.bank_details}"
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          payment_status: $outputs.workflow_payment_status
+
+  - workflowId: plan-trip-by-search-terms
+    inputs:
+      $ref: "#/components/inputs/find_stations_by_search_input"
+    steps:
+      - stepId: find-origin-station
+        description: Find the origin station for the trip.
+        operationId: get-stations
+        parameters:
+          - name: search
+            in: query
+            value: "{$inputs.origin_search_term}"
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          station_id: $outputs.data[0].id # grab the first station
+
+      - stepId: find-destination-station
+        description: Find the destination station for the trip.
+        operationId: get-stations
+        parameters:
+          - name: search
+            in: query
+            value: "{$inputs.destination_search_term}"
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          station_id: $outputs.data[0].id # grab the first station
+
+      - stepId: find-trip
+        workflowId: find-trip-between-stations
+        parameters:
+          - name: origin_station_id
+            value: $steps.find-origin-station.outputs.station_id
+          - name: destination_station_id
+            value: $steps.find-destination-station.outputs.station_id
+          - name: trip_date
+            value: "{$inputs.trip_date}"
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          trip_id: $outputs.trip_id
+
+      - stepId: book-trip
+        workflowId: book-trip
+        parameters:
+          - name: trip_id
+            value: "{$inputs.trip_id}"
+          - name: passenger_name
+            value: "{$inputs.passenger_name}"
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          payment_status: $outputs.workflow_payment_status
+
+components:
+  inputs:
+    find_stations_by_search_input:
+      type: object
+      properties:
+        origin_search_term:
+          type: string
+          description: The search term to use when searching for a station.
+        destination_search_term:
+          type: string
+          description: The search term to use when searching for a station.
+
+    find_stations_by_coordinates_input:
+      type: object
+      properties:
+        origin_coordinates:
+          type: string
+          description: The coordinates to use when searching for a station.
+        destination_coordinates:
+          type: string
+          description: The coordinates to use when searching for a station.
+
+    find_trip_input:
+      type: object
+      properties:
+        origin_station_id:
+          type: string
+          description: The ID of the origin station.
+        destination_station_id:
+          type: string
+          description: The ID of the destination station.
+        trip_date:
+          $ref: "#/components/inputs/trip_date"
+
+    book_trip_input:
+      allOf:
+        - $ref: "#/components/inputs/find_trip_input"
+        - $ref: "#/components/inputs/bank_details"
+
+    bank_details:
+      type: object
+      properties:
+        account_name:
+          type: string
+          description: The account name to use when making a payment.
+        account_number:
+          type: string
+          description: The account number to use when making a payment.
+        sort_code:
+          type: string
+          description: The sort code to use when making a payment.
+        account_type:
+          type: string
+          description: The account should be `individual` or `business`.
+        bank_name:
+          type: string
+          description: The bank name to use when making a payment.
+        country:
+          type: string
+          description: The ISO 3166-1 alpha-2 country code for the country of the issuing bank.
+    trip_date:
+      type: string
+      format: date-time
+      description: The date and time of the trip in ISO 8601 format.
+      examples:
+        - "2024-02-01T09:00:00Z"
+
+  parameters:
+    page:
+      name: page
+      in: query
+      value: 1

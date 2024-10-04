@@ -1,0 +1,184 @@
+arazzo: 1.0.0
+info:
+  title: Speakeasy Bar Workflows
+  summary: Workflows for managing the Speakeasy Bar API
+  description: >
+    This document defines workflows for managing the [Speakeasy Bar API](https://bar.example.com), including
+    creating new drinks, managing inventory, and processing orders.
+  version: 4.6.3
+sourceDescriptions:
+  - name: speakeasyBar
+    url: https://bar.example.com/openapi.yaml
+    type: openapi
+  - name: printsAndBeeps
+    url: https://output.example.com/workflows.yaml
+    type: arazzo
+workflows:
+  - workflowId: createDrink
+    summary: Create a new drink in the bar's menu
+    inputs:
+      allOf:
+        - $ref: "#/components/inputs/authenticate"
+        - type: object
+          properties:
+            drink_name:
+              type: string
+            drink_type:
+              type: string
+            drink_price_usd_cent:
+              type: integer
+            ingredients:
+              type: array
+              items:
+                type: string
+    steps:
+      - stepId: authenticate
+        operationId: authenticate
+        parameters:
+          - reference: $components.parameters.username
+          - reference: $components.parameters.password
+      - stepId: createDrink
+        operationId: createDrink
+        parameters:
+          - reference: $components.parameters.authorization
+          - name: name
+            in: query
+            value: $inputs.drink_name
+          - name: type
+            in: query
+            value: $inputs.drink_type
+          - name: price
+            in: query
+            value: $inputs.drink_price_usd_cent
+          - name: ingredients
+            in: query
+            value: $inputs.ingredients
+  - workflowId: makeDrink
+    summary: Order a drink and check the order status
+    inputs:
+      type: object
+      properties:
+        orderType:
+          description: The type of order
+          type: string
+        productCode:
+          description: The product code of the drink
+          type: string
+        quantity:
+          description: The quantity of the drink
+          type: integer
+      required:
+        - orderType
+        - productCode
+        - quantity
+    steps:
+      - stepId: orderDrink
+        operationId: createOrder
+        parameters:
+          - name: orderType
+            in: body
+            value: $inputs.orderType
+          - name: productCode
+            in: body
+            value: $inputs.productCode
+          - name: quantity
+            in: body
+            value: $inputs.quantity
+        outputs:
+          orderNumber: $response.body#/orderNumber
+      - stepId: checkStatus
+        operationId: getOrder
+        parameters:
+          - name: orderNumber
+            in: path
+            value: $steps.orderDrink.outputs.orderNumber
+        successCriteria:
+          - condition: $response.body#/status == 'completed'
+        onSuccess:
+          - name: printReceipt
+            type: goto
+            workflowId: $sourceDescriptions.printsAndBeeps.printReceipt
+            criteria:
+              - condition: $response.body#/status == 'completed'
+        onFailure:
+          - name: beepLoudly
+            type: goto
+            workflowId: $sourceDescriptions.printsAndBeeps.beepLoudly
+            criteria:
+              - condition: $response.body#/status == 'failed'
+  - workflowId: addIngredient
+    summary: Add a new ingredient to the bar's inventory
+    inputs:
+      type: object
+      properties:
+        username:
+          description: The username of the manager
+          type: string
+        password:
+          description: The password of the manager
+          type: string
+        ingredient_name:
+          description: The name of the ingredient
+          type: string
+        ingredient_type:
+          description: The type of the ingredient
+          type: string
+        ingredient_stock:
+          description: The stock of the ingredient
+          type: integer
+        productCode:
+          description: The product code of the ingredient
+          type: string
+      required:
+        - username
+        - password
+        - ingredient_name
+        - ingredient_type
+        - ingredient_stock
+    steps:
+      - stepId: authenticate
+        operationId: authenticate
+        parameters:
+          - reference: $components.parameters.username
+            value: admin
+          - reference: $components.parameters.password
+        outputs:
+          token: $response.body#/token
+      - stepId: addIngredient
+        operationId: createIngredient
+        parameters:
+          - reference: $components.parameters.authorization
+          - name: name
+            in: query
+            value: $inputs.ingredient_name
+          - name: type
+            in: query
+            value: $inputs.ingredient_type
+          - name: stock
+            in: query
+            value: $inputs.ingredient_stock
+          - name: productCode
+            in: query
+            value: $inputs.productCode
+components:
+  inputs:
+    authenticate:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+  parameters:
+    authorization:
+      name: Authorization
+      in: header
+      value: $steps.authenticate.outputs.token
+    username:
+      name: username
+      in: body
+      value: $inputs.username
+    password:
+      name: password
+      in: body
+      value: $inputs.password
