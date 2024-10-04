@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/speakeasy-api/openapi/arazzo"
+	"github.com/speakeasy-api/openapi/pointer"
 )
 
 func Example_readAndMutate() {
@@ -41,4 +42,113 @@ func Example_readAndMutate() {
 	}
 
 	fmt.Println(buf.String())
+}
+
+// The below examples should be copied into the README.md file if every changed TODO: automate this
+func Example_reading() {
+	ctx := context.Background()
+
+	f, err := os.Open("arazzo.yaml")
+	if err != nil {
+		panic(err)
+	}
+
+	arazzo, validationErrs, err := arazzo.Unmarshal(ctx, f)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("%+v\n", arazzo)
+	fmt.Printf("%+v\n", validationErrs)
+}
+
+func Example_creating() {
+	ctx := context.Background()
+
+	arazzo := &arazzo.Arazzo{
+		Arazzo: arazzo.Version,
+		Info: arazzo.Info{
+			Title:   "My Workflow",
+			Summary: pointer.From("A summary"),
+			Version: "1.0.0",
+		},
+		// ...
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+
+	err := arazzo.Marshal(ctx, buf)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("%s", buf.String())
+}
+
+func Example_mutating() {
+	ctx := context.Background()
+
+	f, err := os.Open("arazzo.yaml")
+	if err != nil {
+		panic(err)
+	}
+
+	arazzo, _, err := arazzo.Unmarshal(ctx, f)
+	if err != nil {
+		panic(err)
+	}
+
+	arazzo.Info.Title = "My updated workflow title"
+
+	buf := bytes.NewBuffer([]byte{})
+
+	if err := arazzo.Marshal(ctx, buf); err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("%s", buf.String())
+}
+
+func Example_walking() {
+	ctx := context.Background()
+
+	f, err := os.Open("arazzo.yaml")
+	if err != nil {
+		panic(err)
+	}
+
+	a, _, err := arazzo.Unmarshal(ctx, f)
+	if err != nil {
+		panic(err)
+	}
+
+	err = arazzo.Walk(ctx, a, func(ctx context.Context, node, parent arazzo.MatchFunc, a *arazzo.Arazzo) error {
+		return node(arazzo.Matcher{
+			Workflow: func(workflow *arazzo.Workflow) error {
+				fmt.Printf("Workflow: %s\n", workflow.WorkflowID)
+				return nil
+			},
+		})
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
+func Example_validating() {
+	ctx := context.Background()
+
+	f, err := os.Open("arazzo.yaml")
+	if err != nil {
+		panic(err)
+	}
+
+	_, validationErrs, err := arazzo.Unmarshal(ctx, f)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, err := range validationErrs {
+		fmt.Printf("%s\n", err.Error())
+	}
 }

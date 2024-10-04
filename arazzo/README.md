@@ -20,20 +20,20 @@ import (
 )
 
 func main() {
- ctx := context.Background()
+    ctx := context.Background()
 
- data, err := os.ReadFile("arazzo.yaml")
- if err != nil {
-  panic(err)
- }
+    f, err := os.Open("arazzo.yaml")
+    if err != nil {
+        panic(err)
+    }
 
- arazzo, validationErrs, err := arazzo.Unmarshal(ctx, data, "arazzo.yaml")
- if err != nil {
-  panic(err)
- }
+    arazzo, validationErrs, err := arazzo.Unmarshal(ctx, f)
+    if err != nil {
+        panic(err)
+    }
 
- fmt.Printf("%+v\n", arazzo)
- fmt.Printf("%+v\n", validationErrs)
+    fmt.Printf("%+v\n", arazzo)
+    fmt.Printf("%+v\n", validationErrs)
 }
 ```
 
@@ -47,29 +47,30 @@ import (
  "fmt"
 
  "github.com/speakeasy-api/openapi/arazzo"
+ "github.com/speakeasy-api/openapi/pointer"
 )
 
 func main() {
- ctx := context.Background()
+    ctx := context.Background()
 
- arazzo := &arazzo.Arazzo{
-  Arazzo: Version,
-  Info: arazzo.Info{
-   Title:   "My Workflow",
-   Summary: arazzo.pointer.From("A summary"),
-   Version: "1.0.0",
-  },
-  // ...
- }
+    arazzo := &arazzo.Arazzo{
+        Arazzo: arazzo.Version,
+        Info: arazzo.Info{
+            Title:   "My Workflow",
+            Summary: pointer.From("A summary"),
+            Version: "1.0.0",
+        },
+        // ...
+    }
 
- buf := bytes.NewBuffer([]byte{})
+    buf := bytes.NewBuffer([]byte{})
 
- err := arazzo.Marshal(ctx, buf)
- if err != nil {
-  panic(err)
- }
+    err := arazzo.Marshal(ctx, buf)
+    if err != nil {
+        panic(err)
+    }
 
- fmt.Printf("%s", buf.String())
+    fmt.Printf("%s", buf.String())
 }
 ```
 
@@ -86,28 +87,27 @@ import (
 )
 
 func main() {
- ctx := context.Background()
+    ctx := context.Background()
 
- data, err := os.ReadFile("arazzo.yaml")
- if err != nil {
-  panic(err)
- }
+    f, err := os.Open("arazzo.yaml")
+    if err != nil {
+        panic(err)
+    }
 
- arazzo, _, err := arazzo.Unmarshal(ctx, data, "arazzo.yaml")
- if err != nil {
-  panic(err)
- }
- 
- arazzo.Info.Title = "My updated workflow title"
+    arazzo, _, err := arazzo.Unmarshal(ctx, f)
+    if err != nil {
+        panic(err)
+    }
 
- buf := bytes.NewBuffer([]byte{})
+    arazzo.Info.Title = "My updated workflow title"
 
- err := arazzo.Marshal(ctx, buf)
- if err != nil {
-  panic(err)
- }
+    buf := bytes.NewBuffer([]byte{})
 
- fmt.Printf("%s", buf.String())
+    if err := arazzo.Marshal(ctx, buf); err != nil {
+        panic(err)
+    }
+
+    fmt.Printf("%s", buf.String())
 }
 ```
 
@@ -125,29 +125,29 @@ import (
 )
 
 func main() {
- ctx := context.Background()
+    ctx := context.Background()
 
- data, err := os.ReadFile("arazzo.yaml")
- if err != nil {
-  panic(err)
- }
+    f, err := os.Open("arazzo.yaml")
+    if err != nil {
+        panic(err)
+    }
 
- arazzo, _, err := arazzo.Unmarshal(ctx, data, "arazzo.yaml")
- if err != nil {
-  panic(err)
- }
+    a, _, err := arazzo.Unmarshal(ctx, f)
+    if err != nil {
+        panic(err)
+    }
 
- err = arazzo.Walk(ctx, func(ctx context.Context, node, parent arazzo.MatchFunc, arazzo *arazzo.Arazzo) error {
-  return node(arazzo.Matcher{
-   Workflow: func(workflow *arazzo.Workflow) error {
-    fmt.Printf("Workflow: %s\n", workflow.WorkflowID)
-    return nil
-   },
-  })
- })
- if err != nil {
-  panic(err)
- }
+    err = arazzo.Walk(ctx, a, func(ctx context.Context, node, parent arazzo.MatchFunc, a *arazzo.Arazzo) error {
+        return node(arazzo.Matcher{
+            Workflow: func(workflow *arazzo.Workflow) error {
+                fmt.Printf("Workflow: %s\n", workflow.WorkflowID)
+                return nil
+            },
+        })
+    })
+    if err != nil {
+        panic(err)
+    }
 }
 ```
 
@@ -165,20 +165,20 @@ import (
 )
 
 func main() {
- ctx := context.Background()
+    ctx := context.Background()
 
- data, err := os.ReadFile("arazzo.yaml")
- if err != nil {
-  panic(err)
- }
+    f, err := os.Open("arazzo.yaml")
+    if err != nil {
+        panic(err)
+    }
 
- arazzo, validationErrs, err := arazzo.Unmarshal(ctx, data, "arazzo.yaml")
- if err != nil {
-  panic(err)
- }
- 
- for _, err := range validationErrs {
-  fmt.Printf("%s\n", err.Error())
- }
+    _, validationErrs, err := arazzo.Unmarshal(ctx, f)
+    if err != nil {
+        panic(err)
+    }
+
+    for _, err := range validationErrs {
+        fmt.Printf("%s\n", err.Error())
+    }
 }
 ```
