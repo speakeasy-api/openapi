@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 
+	coreExtensions "github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"gopkg.in/yaml.v3"
@@ -19,7 +20,7 @@ type Workflow struct {
 	SuccessActions marshaller.Node[[]Reusable[SuccessAction]] `key:"successActions"`
 	FailureActions marshaller.Node[[]Reusable[FailureAction]] `key:"failureActions"`
 	Outputs        marshaller.Node[Outputs]                   `key:"outputs"`
-	Extensions     Extensions                                 `key:"extensions"`
+	Extensions     coreExtensions.Extensions                  `key:"extensions"`
 
 	RootNode *yaml.Node
 }
