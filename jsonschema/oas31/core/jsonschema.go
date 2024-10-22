@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 
+	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"gopkg.in/yaml.v3"
@@ -63,7 +64,7 @@ type Schema struct {
 	Deprecated            marshaller.Node[*bool]                                 `key:"deprecated"`
 	Schema                marshaller.Node[*string]                               `key:"$schema"`
 
-	Extensions Extensions `key:"extensions"`
+	Extensions core.Extensions `key:"extensions"`
 
 	RootNode *yaml.Node
 }

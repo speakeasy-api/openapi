@@ -73,7 +73,6 @@ func Unmarshal(ctx context.Context, doc io.Reader, opts ...Option[unmarshalOptio
 	if err := marshaller.PopulateModel(*c, arazzo); err != nil {
 		return nil, nil, err
 	}
-	arazzo.core = *c
 
 	var validationErrs []error
 	if !o.skipValidation {

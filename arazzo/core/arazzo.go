@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/json"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/yml"
@@ -17,7 +18,7 @@ type Arazzo struct {
 	SourceDescriptions marshaller.Node[[]SourceDescription] `key:"sourceDescriptions" required:"true"`
 	Workflows          marshaller.Node[[]Workflow]          `key:"workflows" required:"true"`
 	Components         marshaller.Node[*Components]         `key:"components"`
-	Extensions         Extensions                           `key:"extensions"`
+	Extensions         core.Extensions                      `key:"extensions"`
 
 	RootNode *yaml.Node
 	Config   *yml.Config

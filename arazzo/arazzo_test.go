@@ -191,10 +191,10 @@ func TestArazzo_Unmarshal_Success(t *testing.T) {
 	expected := testArazzoInstance
 
 	assert.EqualExportedValues(t, expected, a)
-	assert.Equal(t, expected.Extensions, a.Extensions)
-	assert.Equal(t, expected.Info.Extensions, a.Info.Extensions)
+	assert.EqualExportedValues(t, expected.Extensions, a.Extensions)
+	assert.EqualExportedValues(t, expected.Info.Extensions, a.Info.Extensions)
 	for i, sourceDescription := range expected.SourceDescriptions {
-		assert.Equal(t, sourceDescription.Extensions, a.SourceDescriptions[i].Extensions)
+		assert.EqualExportedValues(t, sourceDescription.Extensions, a.SourceDescriptions[i].Extensions)
 	}
 }
 
@@ -271,10 +271,10 @@ sourceDescriptions:
 	}
 
 	assert.EqualExportedValues(t, expected, a)
-	assert.Equal(t, expected.Extensions, a.Extensions)
-	assert.Equal(t, expected.Info.Extensions, a.Info.Extensions)
+	assert.EqualExportedValues(t, expected.Extensions, a.Extensions)
+	assert.EqualExportedValues(t, expected.Info.Extensions, a.Info.Extensions)
 	for i, sourceDescription := range expected.SourceDescriptions {
-		assert.Equal(t, sourceDescription.Extensions, a.SourceDescriptions[i].Extensions)
+		assert.EqualExportedValues(t, sourceDescription.Extensions, a.SourceDescriptions[i].Extensions)
 	}
 }
 

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 
+	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"gopkg.in/yaml.v3"
 )
@@ -12,7 +13,7 @@ type Info struct {
 	Summary     marshaller.Node[*string] `key:"summary"`
 	Description marshaller.Node[*string] `key:"description"`
 	Version     marshaller.Node[string]  `key:"version"`
-	Extensions  Extensions               `key:"extensions"`
+	Extensions  core.Extensions          `key:"extensions"`
 
 	RootNode *yaml.Node
 }

@@ -11,6 +11,19 @@ type ModelFromCore interface {
 }
 
 func PopulateModel(source any, target any) error {
+	t := reflect.ValueOf(target)
+
+	if t.Kind() == reflect.Ptr && t.IsNil() {
+		t.Set(reflect.New(t.Type().Elem()))
+	}
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	return populateValue(source, t)
+}
+
+func populateModel(source any, target any) error {
 	s := reflect.ValueOf(source)
 	t := reflect.ValueOf(target)
 
@@ -73,6 +86,8 @@ func PopulateModel(source any, target any) error {
 				tem.Set(key, value.Value)
 			}
 
+			tem.SetCore(fieldInt)
+
 			continue
 		}
 
@@ -89,7 +104,7 @@ func PopulateModel(source any, target any) error {
 			nodeValue = nodeAccessor.GetValue()
 		}
 
-		if err := populateValue(tField, nodeValue); err != nil {
+		if err := populateValue(nodeValue, tField); err != nil {
 			return err
 		}
 	}
@@ -97,8 +112,8 @@ func PopulateModel(source any, target any) error {
 	return nil
 }
 
-func populateValue(target reflect.Value, nodeValue any) error {
-	value := reflect.ValueOf(nodeValue)
+func populateValue(source any, target reflect.Value) error {
+	value := reflect.ValueOf(source)
 
 	if value.Kind() == reflect.Ptr && value.IsNil() && target.Kind() == reflect.Ptr {
 		target.Set(reflect.Zero(target.Type()))
@@ -127,7 +142,7 @@ func populateValue(target reflect.Value, nodeValue any) error {
 				return fmt.Errorf("populateValue expected core field to be of type %s, got %s", cf.Type, value.Type())
 			}
 
-			if err := PopulateModel(value.Interface(), target.Interface()); err != nil {
+			if err := populateModel(value.Interface(), target.Interface()); err != nil {
 				return err
 			}
 
@@ -152,7 +167,7 @@ func populateValue(target reflect.Value, nodeValue any) error {
 		target.Set(reflect.MakeSlice(target.Type(), value.Len(), value.Len()))
 
 		for i := 0; i < value.Len(); i++ {
-			if err := populateValue(target.Index(i), value.Index(i).Interface()); err != nil {
+			if err := populateValue(value.Index(i).Interface(), target.Index(i)); err != nil {
 				return err
 			}
 		}
@@ -184,7 +199,7 @@ func populateSequencedMap(source reflect.Value, target reflect.Value) error {
 
 	for key, value := range sm.AllUntyped() {
 		targetValue := reflect.New(tm.GetValueType()).Elem()
-		if err := populateValue(targetValue, value); err != nil {
+		if err := populateValue(value, targetValue); err != nil {
 			return err
 		}
 		if err := tm.SetUntyped(key, targetValue.Interface()); err != nil {

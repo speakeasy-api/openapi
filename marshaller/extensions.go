@@ -8,26 +8,28 @@ import (
 	"slices"
 
 	"github.com/speakeasy-api/openapi/errors"
-	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
 
+type Extension = *yaml.Node
+
 type ExtensionCoreMap interface {
-	Get(string) (Node[extensions.Extension], bool)
-	Set(string, Node[extensions.Extension])
+	Get(string) (Node[Extension], bool)
+	Set(string, Node[Extension])
 	Delete(string)
-	All() iter.Seq2[string, Node[extensions.Extension]]
+	All() iter.Seq2[string, Node[Extension]]
 	Init()
 }
 
 type ExtensionMap interface {
-	Set(string, extensions.Extension)
+	Set(string, Extension)
 	Init()
+	SetCore(any)
 }
 
 type ExtensionSourceIterator interface {
-	All() iter.Seq2[string, extensions.Extension]
+	All() iter.Seq2[string, Extension]
 }
 
 func unmarshalExtension(keyNode *yaml.Node, valueNode *yaml.Node, extensionsField reflect.Value) error {
@@ -46,7 +48,7 @@ func unmarshalExtension(keyNode *yaml.Node, valueNode *yaml.Node, extensionsFiel
 
 	exts.Init()
 
-	exts.Set(keyNode.Value, Node[extensions.Extension]{
+	exts.Set(keyNode.Value, Node[Extension]{
 		Key:       keyNode.Value,
 		KeyNode:   keyNode,
 		Value:     valueNode,
@@ -83,7 +85,7 @@ func syncExtensions(ctx context.Context, source any, target reflect.Value, mapNo
 		if !ok {
 			keyNode = yml.CreateOrUpdateKeyNode(ctx, key, nil)
 			valueNode = extNode
-			node = Node[extensions.Extension]{
+			node = Node[Extension]{
 				Key:       key,
 				KeyNode:   keyNode,
 				Value:     extNode,
