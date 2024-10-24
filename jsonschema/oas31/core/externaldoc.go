@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 
+	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"gopkg.in/yaml.v3"
 )
@@ -10,7 +11,7 @@ import (
 type ExternalDoc struct {
 	Description marshaller.Node[*string] `key:"description"`
 	URL         marshaller.Node[string]  `key:"url"`
-	Extensions  Extensions               `key:"extensions"`
+	Extensions  core.Extensions          `key:"extensions"`
 
 	RootNode *yaml.Node
 }

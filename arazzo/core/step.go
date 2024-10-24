@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 
+	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"gopkg.in/yaml.v3"
 )
@@ -19,7 +20,7 @@ type Step struct {
 	OnSuccess       marshaller.Node[[]Reusable[SuccessAction]] `key:"onSuccess"`
 	OnFailure       marshaller.Node[[]Reusable[FailureAction]] `key:"onFailure"`
 	Outputs         marshaller.Node[Outputs]                   `key:"outputs"`
-	Extensions      Extensions                                 `key:"extensions"`
+	Extensions      core.Extensions                            `key:"extensions"`
 
 	RootNode *yaml.Node
 }

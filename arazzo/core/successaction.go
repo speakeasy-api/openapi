@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 
+	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"gopkg.in/yaml.v3"
 )
@@ -13,7 +14,7 @@ type SuccessAction struct {
 	WorkflowID marshaller.Node[*Expression] `key:"workflowId"`
 	StepID     marshaller.Node[*string]     `key:"stepId"`
 	Criteria   marshaller.Node[[]Criterion] `key:"criteria"`
-	Extensions Extensions                   `key:"extensions"`
+	Extensions core.Extensions              `key:"extensions"`
 
 	RootNode *yaml.Node
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"gopkg.in/yaml.v3"
 )
@@ -86,7 +87,7 @@ type Criterion struct {
 	Context    marshaller.Node[*Expression]        `key:"context"`
 	Condition  marshaller.Node[string]             `key:"condition"`
 	Type       marshaller.Node[CriterionTypeUnion] `key:"type" required:"false"`
-	Extensions Extensions                          `key:"extensions"`
+	Extensions core.Extensions                     `key:"extensions"`
 
 	RootNode *yaml.Node
 }
