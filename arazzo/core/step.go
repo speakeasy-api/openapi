@@ -9,18 +9,18 @@ import (
 )
 
 type Step struct {
-	StepID          marshaller.Node[string]                    `key:"stepId"`
-	Description     marshaller.Node[*string]                   `key:"description"`
-	OperationID     marshaller.Node[*Expression]               `key:"operationId"`
-	OperationPath   marshaller.Node[*string]                   `key:"operationPath"`
-	WorkflowID      marshaller.Node[*Expression]               `key:"workflowId"`
-	Parameters      marshaller.Node[[]Reusable[Parameter]]     `key:"parameters"`
-	RequestBody     marshaller.Node[*RequestBody]              `key:"requestBody"`
-	SuccessCriteria marshaller.Node[[]Criterion]               `key:"successCriteria"`
-	OnSuccess       marshaller.Node[[]Reusable[SuccessAction]] `key:"onSuccess"`
-	OnFailure       marshaller.Node[[]Reusable[FailureAction]] `key:"onFailure"`
-	Outputs         marshaller.Node[Outputs]                   `key:"outputs"`
-	Extensions      core.Extensions                            `key:"extensions"`
+	StepID          marshaller.Node[string]                     `key:"stepId"`
+	Description     marshaller.Node[*string]                    `key:"description"`
+	OperationID     marshaller.Node[*Expression]                `key:"operationId"`
+	OperationPath   marshaller.Node[*string]                    `key:"operationPath"`
+	WorkflowID      marshaller.Node[*Expression]                `key:"workflowId"`
+	Parameters      marshaller.Node[[]*Reusable[Parameter]]     `key:"parameters"`
+	RequestBody     marshaller.Node[*RequestBody]               `key:"requestBody"`
+	SuccessCriteria marshaller.Node[[]*Criterion]               `key:"successCriteria"`
+	OnSuccess       marshaller.Node[[]*Reusable[SuccessAction]] `key:"onSuccess"`
+	OnFailure       marshaller.Node[[]*Reusable[FailureAction]] `key:"onFailure"`
+	Outputs         marshaller.Node[Outputs]                    `key:"outputs"`
+	Extensions      core.Extensions                             `key:"extensions"`
 
 	RootNode *yaml.Node
 }

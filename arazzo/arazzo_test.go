@@ -41,8 +41,9 @@ var testArazzoInstance = &arazzo.Arazzo{
 			Line:   6,
 			Column: 11,
 		})),
+		Valid: true,
 	},
-	SourceDescriptions: []arazzo.SourceDescription{
+	SourceDescriptions: []*arazzo.SourceDescription{
 		{
 			Name: "openapi",
 			URL:  "https://openapi.com",
@@ -54,38 +55,44 @@ var testArazzoInstance = &arazzo.Arazzo{
 				Line:   11,
 				Column: 13,
 			})),
+			Valid: true,
 		},
 	},
-	Workflows: []arazzo.Workflow{
+	Workflows: []*arazzo.Workflow{
 		{
 			WorkflowID:  "workflow1",
 			Summary:     pointer.From("A summary"),
 			Description: pointer.From("A description"),
-			Parameters: []arazzo.ReusableParameter{
+			Parameters: []*arazzo.ReusableParameter{
 				{
 					Object: &arazzo.Parameter{
 						Name:  "parameter1",
 						In:    pointer.From(arazzo.InQuery),
 						Value: &yaml.Node{Value: "123", Kind: yaml.ScalarNode, Tag: "!!str", Line: 19, Column: 16, Style: yaml.DoubleQuotedStyle},
+						Valid: true,
 					},
+					Valid: true,
 				},
 			},
 			Inputs: oas31.NewJSONSchemaFromSchema(&oas31.Schema{
 				Type: oas31.NewTypeFromString("object"),
 				Properties: sequencedmap.New(sequencedmap.NewElem("input1", oas31.NewJSONSchemaFromSchema(&oas31.Schema{
-					Type: oas31.NewTypeFromString("string"),
+					Type:  oas31.NewTypeFromString("string"),
+					Valid: true,
 				}))),
 				Required: []string{"input1"},
+				Valid:    true,
 			}),
-			Steps: []arazzo.Step{
+			Steps: []*arazzo.Step{
 				{
 					StepID:      "step1",
 					Description: pointer.From("A description"),
 					OperationID: pointer.From[expression.Expression]("operation1"),
-					Parameters: []arazzo.ReusableParameter{
+					Parameters: []*arazzo.ReusableParameter{
 						{
 							Reference: pointer.From[expression.Expression]("$components.parameters.userId"),
 							Value:     &yaml.Node{Value: "456", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle, Line: 33, Column: 20},
+							Valid:     true,
 						},
 					},
 					RequestBody: &arazzo.RequestBody{
@@ -122,44 +129,52 @@ var testArazzoInstance = &arazzo.Arazzo{
 								Column: 34,
 							},
 						}, Kind: yaml.MappingNode, Tag: "!!map", Style: yaml.FlowStyle, Line: 36, Column: 20},
-						Replacements: []arazzo.PayloadReplacement{
+						Replacements: []*arazzo.PayloadReplacement{
 							{
 								Target: jsonpointer.JSONPointer("/b"),
 								Value:  &yaml.Node{Value: "3", Kind: yaml.ScalarNode, Tag: "!!int", Line: 39, Column: 22},
+								Valid:  true,
 							},
 						},
+						Valid: true,
 					},
-					SuccessCriteria: []criterion.Criterion{{Condition: "$statusCode == 200", Type: criterion.CriterionTypeUnion{}}},
-					OnSuccess: []arazzo.ReusableSuccessAction{
+					SuccessCriteria: []*criterion.Criterion{{Condition: "$statusCode == 200", Type: criterion.CriterionTypeUnion{}, Valid: true}},
+					OnSuccess: []*arazzo.ReusableSuccessAction{
 						{
 							Reference: pointer.From[expression.Expression]("$components.successActions.success"),
+							Valid:     true,
 						},
 					},
-					OnFailure: []arazzo.ReusableFailureAction{
+					OnFailure: []*arazzo.ReusableFailureAction{
 						{
 							Reference: pointer.From[expression.Expression]("$components.failureActions.failure"),
+							Valid:     true,
 						},
 					},
 					Outputs: sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("name", "$response.body#/name")),
+					Valid:   true,
 				},
 			},
 			Outputs: sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("name", "$steps.step1.outputs.name")),
+			Valid:   true,
 		},
 	},
 	Components: &arazzo.Components{
-		Parameters: sequencedmap.New(sequencedmap.NewElem("userId", arazzo.Parameter{
+		Parameters: sequencedmap.New(sequencedmap.NewElem("userId", &arazzo.Parameter{
 			Name:  "userId",
 			In:    pointer.From(arazzo.InQuery),
 			Value: &yaml.Node{Value: "123", Kind: yaml.ScalarNode, Tag: "!!str"},
+			Valid: true,
 		})),
-		SuccessActions: sequencedmap.New(sequencedmap.NewElem("success", arazzo.SuccessAction{
+		SuccessActions: sequencedmap.New(sequencedmap.NewElem("success", &arazzo.SuccessAction{
 			Name: "success",
 			Type: arazzo.SuccessActionTypeEnd,
 			Criteria: []criterion.Criterion{{Context: pointer.From(expression.Expression("$statusCode")), Condition: "$statusCode == 200", Type: criterion.CriterionTypeUnion{
 				Type: pointer.From(criterion.CriterionTypeSimple),
 			}}},
+			Valid: true,
 		})),
-		FailureActions: sequencedmap.New(sequencedmap.NewElem("failure", arazzo.FailureAction{
+		FailureActions: sequencedmap.New(sequencedmap.NewElem("failure", &arazzo.FailureAction{
 			Name:       "failure",
 			Type:       arazzo.FailureActionTypeRetry,
 			RetryAfter: pointer.From(10.0),
@@ -167,7 +182,9 @@ var testArazzoInstance = &arazzo.Arazzo{
 			Criteria: []criterion.Criterion{{Condition: "$statusCode == 500", Type: criterion.CriterionTypeUnion{
 				Type: pointer.From(criterion.CriterionTypeSimple),
 			}}},
+			Valid: true,
 		})),
+		Valid: true,
 	},
 	Extensions: extensions.New(extensions.NewElem("x-test", &yaml.Node{
 		Value:  "some-value",
@@ -176,6 +193,7 @@ var testArazzoInstance = &arazzo.Arazzo{
 		Line:   72,
 		Column: 9,
 	})),
+	Valid: true,
 }
 
 func TestArazzo_Unmarshal_Success(t *testing.T) {
@@ -247,8 +265,9 @@ sourceDescriptions:
 		Info: arazzo.Info{
 			Title:   "My Workflow",
 			Version: "",
+			Valid:   true,
 		},
-		SourceDescriptions: []arazzo.SourceDescription{
+		SourceDescriptions: []*arazzo.SourceDescription{
 			{
 				Name: "openapi",
 				Type: "openapis",
@@ -406,7 +425,7 @@ workflows: []
 	a.Extensions = extensions.New()
 	a.Info.Summary = nil
 	a.Info.Extensions = extensions.New()
-	a.SourceDescriptions = []arazzo.SourceDescription{}
+	a.SourceDescriptions = []*arazzo.SourceDescription{}
 
 	outBuf := bytes.NewBuffer([]byte{})
 

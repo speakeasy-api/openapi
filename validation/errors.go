@@ -1,6 +1,8 @@
 package validation
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // Error represents a validation error and the line and column where it occurred
 // TODO allow getting the JSON path for line/column for validation errors

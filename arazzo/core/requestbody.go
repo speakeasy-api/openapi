@@ -9,10 +9,10 @@ import (
 )
 
 type RequestBody struct {
-	ContentType  marshaller.Node[*string]              `key:"contentType"`
-	Payload      marshaller.Node[ValueOrExpression]    `key:"payload"`
-	Replacements marshaller.Node[[]PayloadReplacement] `key:"replacements"`
-	Extensions   core.Extensions                       `key:"extensions"`
+	ContentType  marshaller.Node[*string]               `key:"contentType"`
+	Payload      marshaller.Node[ValueOrExpression]     `key:"payload"`
+	Replacements marshaller.Node[[]*PayloadReplacement] `key:"replacements"`
+	Extensions   core.Extensions                        `key:"extensions"`
 
 	RootNode *yaml.Node
 }

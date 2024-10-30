@@ -80,6 +80,8 @@ type Schema struct {
 	Schema                *string
 	Extensions            *extensions.Extensions
 
+	Valid bool
+
 	core core.Schema
 }
 

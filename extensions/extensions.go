@@ -3,10 +3,15 @@ package extensions
 import (
 	"context"
 
+	"github.com/speakeasy-api/openapi/errors"
 	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"gopkg.in/yaml.v3"
+)
+
+const (
+	ErrNotFound = errors.Error("not found")
 )
 
 // Extension represents a single extension to an object, in its raw form.
@@ -57,7 +62,16 @@ func (e *Extensions) SetCore(core any) {
 	e.core = c
 }
 
+// UnmarshalExtensionModel will unmarshal the extension into a model and its associated core model.
 func UnmarshalExtensionModel[H any, L any](ctx context.Context, e *Extensions, ext string, m *H) error {
+	if e == nil {
+		return ErrNotFound.Wrap(errors.New("extensions is nil"))
+	}
+
+	if !e.Has(ext) {
+		return ErrNotFound
+	}
+
 	c, err := core.UnmarshalExtensionModel[L](ctx, e.core, ext)
 	if err != nil {
 		return err
@@ -71,4 +85,25 @@ func UnmarshalExtensionModel[H any, L any](ctx context.Context, e *Extensions, e
 	*m = mV
 
 	return nil
+}
+
+// GetExtensionValue will return the value of the extension. Useful for scalar values or where a model without a core is required.
+func GetExtensionValue[T any](e *Extensions, ext string) (*T, error) {
+	var zero *T
+
+	if e == nil {
+		return zero, ErrNotFound.Wrap(errors.New("extensions is nil"))
+	}
+
+	node := e.GetOrZero(ext)
+	if node == nil {
+		return zero, ErrNotFound
+	}
+
+	var t T
+	if err := node.Decode(&t); err != nil {
+		return zero, err
+	}
+
+	return &t, nil
 }

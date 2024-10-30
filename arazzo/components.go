@@ -17,13 +17,16 @@ type Components struct {
 	// Inputs provides a list of reusable JSON Schemas that can be referenced from inputs and other JSON Schemas.
 	Inputs *sequencedmap.Map[string, oas31.JSONSchema]
 	// Parameters provides a list of reusable parameters that can be referenced from workflows and steps.
-	Parameters *sequencedmap.Map[string, Parameter]
+	Parameters *sequencedmap.Map[string, *Parameter]
 	// SuccessActions provides a list of reusable success actions that can be referenced from workflows and steps.
-	SuccessActions *sequencedmap.Map[string, SuccessAction]
+	SuccessActions *sequencedmap.Map[string, *SuccessAction]
 	// FailureActions provides a list of reusable failure actions that can be referenced from workflows and steps.
-	FailureActions *sequencedmap.Map[string, FailureAction]
+	FailureActions *sequencedmap.Map[string, *FailureAction]
 	// Extensions provides a list of extensions to the Components object.
 	Extensions *extensions.Extensions
+
+	// Valid indicates whether this model passed validation.
+	Valid bool
 
 	core core.Components
 }
@@ -102,6 +105,10 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 		failureActionOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
 
 		errs = append(errs, failureAction.Validate(ctx, failureActionOps...)...)
+	}
+
+	if len(errs) == 0 {
+		c.Valid = true
 	}
 
 	return errs

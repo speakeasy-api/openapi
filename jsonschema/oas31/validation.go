@@ -65,6 +65,8 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 		}
 	}
 
+	js.Valid = true
+
 	return nil
 }
 

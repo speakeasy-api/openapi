@@ -32,7 +32,7 @@ type CoreModelWithExtensions struct {
 
 type TestModel struct {
 	Name  string
-	Value *yaml.Node
+	Value yaml.Node
 
 	core TestCoreModel //nolint:unused
 }
@@ -47,16 +47,70 @@ type TestCoreModel struct {
 func TestUnmarshalExtensionModel_Success(t *testing.T) {
 	ctx := context.Background()
 
-	data, err := io.ReadAll(bytes.NewReader([]byte(`
+	m := getTestModelWithExtensions(ctx, t, `
 test: hello world
 x-speakeasy-test:
   name: test
-  value: 1
-`)))
+  value: 1`)
+
+	var testModel TestModel
+	err := extensions.UnmarshalExtensionModel[TestModel, TestCoreModel](ctx, m.Extensions, "x-speakeasy-test", &testModel)
+	require.NoError(t, err)
+
+	assert.Equal(t, "test", testModel.Name)
+	assert.Equal(t, *testutils.CreateIntYamlNode(1, 5, 10), testModel.Value)
+}
+
+func TestGetExtensionValue_Success(t *testing.T) {
+	ctx := context.Background()
+
+	m := getTestModelWithExtensions(ctx, t, `
+test: hello world
+x-int: 1
+x-string: hi
+x-bool: true
+x-simple-map:
+  key1: value1
+  key2: value2
+x-simple-model:
+  name: test
+  value: 1`)
+
+	intVal, err := extensions.GetExtensionValue[int](m.Extensions, "x-int")
+	require.NoError(t, err)
+	require.NotNil(t, intVal)
+	assert.Equal(t, 1, *intVal)
+
+	stringVal, err := extensions.GetExtensionValue[string](m.Extensions, "x-string")
+	require.NoError(t, err)
+	require.NotNil(t, stringVal)
+	assert.Equal(t, "hi", *stringVal)
+
+	boolVal, err := extensions.GetExtensionValue[bool](m.Extensions, "x-bool")
+	require.NoError(t, err)
+	require.NotNil(t, boolVal)
+	assert.Equal(t, true, *boolVal)
+
+	simpleMapVal, err := extensions.GetExtensionValue[map[string]string](m.Extensions, "x-simple-map")
+	require.NoError(t, err)
+	require.NotNil(t, simpleMapVal)
+	assert.Equal(t, map[string]string{"key1": "value1", "key2": "value2"}, *simpleMapVal)
+
+	simpleModelVal, err := extensions.GetExtensionValue[TestModel](m.Extensions, "x-simple-model")
+	require.NoError(t, err)
+	require.NotNil(t, simpleModelVal)
+	assert.Equal(t, "test", simpleModelVal.Name)
+	assert.Equal(t, *testutils.CreateIntYamlNode(1, 11, 10), simpleModelVal.Value)
+}
+
+func getTestModelWithExtensions(ctx context.Context, t *testing.T, data string) *ModelWithExtensions {
+	t.Helper()
+
+	d, err := io.ReadAll(bytes.NewReader([]byte(data)))
 	require.NoError(t, err)
 
 	var root yaml.Node
-	err = yaml.Unmarshal(data, &root)
+	err = yaml.Unmarshal(d, &root)
 	require.NoError(t, err)
 
 	var c CoreModelWithExtensions
@@ -67,10 +121,5 @@ x-speakeasy-test:
 	err = marshaller.PopulateModel(c, m)
 	require.NoError(t, err)
 
-	var testModel TestModel
-	err = extensions.UnmarshalExtensionModel[TestModel, TestCoreModel](ctx, m.Extensions, "x-speakeasy-test", &testModel)
-	require.NoError(t, err)
-
-	assert.Equal(t, "test", testModel.Name)
-	assert.Equal(t, testutils.CreateIntYamlNode(1, 5, 10), testModel.Value)
+	return m
 }
