@@ -38,6 +38,9 @@ type SuccessAction struct {
 	// Extensions provides a list of extensions to the SuccessAction object.
 	Extensions *extensions.Extensions
 
+	// Valid indicates whether this model passed validation.
+	Valid bool
+
 	core core.SuccessAction
 }
 
@@ -51,7 +54,7 @@ func (s *SuccessAction) GetCore() *core.SuccessAction {
 
 // Validate will validate the success action object against the Arazzo specification.
 // Requires an Arazzo object to be passed via validation options with validation.WithContextObject().
-func (s SuccessAction) Validate(ctx context.Context, opts ...validation.Option) []error {
+func (s *SuccessAction) Validate(ctx context.Context, opts ...validation.Option) []error {
 	o := validation.NewOptions(opts...)
 
 	a := validation.GetContextObject[Arazzo](o)
@@ -111,6 +114,10 @@ func (s SuccessAction) Validate(ctx context.Context, opts ...validation.Option) 
 
 	for _, criterion := range s.Criteria {
 		errs = append(errs, criterion.Validate(opts...)...)
+	}
+
+	if len(errs) == 0 {
+		s.Valid = true
 	}
 
 	return errs

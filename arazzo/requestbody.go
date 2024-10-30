@@ -19,9 +19,12 @@ type RequestBody struct {
 	// Payload is a static value or value containing expressions that will be used to populate the request body
 	Payload Value
 	// Replacements is a list of expressions that will be used to populate the request body in addition to any in the Payload field
-	Replacements []PayloadReplacement
+	Replacements []*PayloadReplacement
 	// Extensions is a list of extensions to apply to the request body object
 	Extensions *extensions.Extensions
+
+	// Valid indicates whether this model passed validation.
+	Valid bool
 
 	core core.RequestBody
 }
@@ -73,6 +76,10 @@ func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) [
 
 	for _, replacement := range r.Replacements {
 		errs = append(errs, replacement.Validate(ctx, opts...)...)
+	}
+
+	if len(errs) == 0 {
+		r.Valid = true
 	}
 
 	return errs

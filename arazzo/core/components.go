@@ -12,9 +12,9 @@ import (
 
 type Components struct {
 	Inputs         marshaller.Node[*sequencedmap.Map[string, core.JSONSchema]] `key:"inputs"`
-	Parameters     marshaller.Node[*sequencedmap.Map[string, Parameter]]       `key:"parameters"`
-	SuccessActions marshaller.Node[*sequencedmap.Map[string, SuccessAction]]   `key:"successActions"`
-	FailureActions marshaller.Node[*sequencedmap.Map[string, FailureAction]]   `key:"failureActions"`
+	Parameters     marshaller.Node[*sequencedmap.Map[string, *Parameter]]      `key:"parameters"`
+	SuccessActions marshaller.Node[*sequencedmap.Map[string, *SuccessAction]]  `key:"successActions"`
+	FailureActions marshaller.Node[*sequencedmap.Map[string, *FailureAction]]  `key:"failureActions"`
 	Extensions     coreExtensions.Extensions                                   `key:"extensions"`
 
 	RootNode *yaml.Node

@@ -12,13 +12,13 @@ import (
 )
 
 // SourceDescriptions represents a list of SourceDescription objects that describe the source of the data that the workflow is orchestrating.
-type SourceDescriptions []SourceDescription
+type SourceDescriptions []*SourceDescription
 
 // Find will return the first SourceDescription object with the provided name.
 func (s SourceDescriptions) Find(name string) *SourceDescription {
 	for _, sourceDescription := range s {
 		if sourceDescription.Name == name {
-			return &sourceDescription
+			return sourceDescription
 		}
 	}
 	return nil
@@ -44,6 +44,9 @@ type SourceDescription struct {
 	Type SourceDescriptionType
 	// Extensions provides a list of extensions to the SourceDescription object.
 	Extensions *extensions.Extensions
+
+	// Valid indicates whether this model passed validation.
+	Valid bool
 
 	core core.SourceDescription
 }
@@ -93,6 +96,10 @@ func (s *SourceDescription) Validate(ctx context.Context, opts ...validation.Opt
 			Line:    s.core.Type.GetValueNodeOrRoot(s.core.RootNode).Line,
 			Column:  s.core.Type.GetValueNodeOrRoot(s.core.RootNode).Column,
 		})
+	}
+
+	if len(errs) == 0 {
+		s.Valid = true
 	}
 
 	return errs

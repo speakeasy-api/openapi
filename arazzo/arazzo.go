@@ -1,4 +1,4 @@
-// package arazzo provides an API for working with Arazzo documents including reading, creating, mutating, walking and validating them.
+// Package arazzo provides an API for working with Arazzo documents including reading, creating, mutating, walking and validating them.
 //
 // The Arazzo Specification is a mechanism for orchestrating API calls, defining their sequences and dependencies, to achieve specific outcomes when working with API descriptions like OpenAPI.
 package arazzo
@@ -34,6 +34,9 @@ type Arazzo struct {
 	Components *Components
 	// Extensions provides a list of extensions to the Arazzo document.
 	Extensions *extensions.Extensions
+
+	// Valid indicates whether this model passed validation.
+	Valid bool
 
 	core core.Arazzo
 }
@@ -181,6 +184,10 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 
 	if a.Components != nil {
 		errs = append(errs, a.Components.Validate(ctx, opts...)...)
+	}
+
+	if len(errs) == 0 {
+		a.Valid = true
 	}
 
 	return errs

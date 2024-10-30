@@ -18,11 +18,11 @@ type Matcher struct {
 	Info                  func(*Info) error
 	SourceDescription     func(*SourceDescription) error
 	Workflow              func(*Workflow) error
-	ReusableParameter     func(ReusableParameter) error
+	ReusableParameter     func(*ReusableParameter) error
 	JSONSchema            func(oas31.JSONSchema) error
 	Step                  func(*Step) error
-	ReusableSuccessAction func(ReusableSuccessAction) error
-	ReusableFailureAction func(ReusableFailureAction) error
+	ReusableSuccessAction func(*ReusableSuccessAction) error
+	ReusableFailureAction func(*ReusableFailureAction) error
 	Components            func(*Components) error
 	Parameter             func(*Parameter) error
 	SuccessAction         func(*SuccessAction) error
@@ -59,7 +59,7 @@ func Walk(ctx context.Context, arazzo *Arazzo, visit VisitFunc) error {
 	}
 
 	for _, sd := range arazzo.SourceDescriptions {
-		if err := visit(ctx, getSourceDescriptionMatchFunc(&sd), getArazzoMatchFunc(arazzo), arazzo); err != nil {
+		if err := visit(ctx, getSourceDescriptionMatchFunc(sd), getArazzoMatchFunc(arazzo), arazzo); err != nil {
 			if errors.Is(err, ErrTerminate) {
 				return nil
 			}
@@ -68,7 +68,7 @@ func Walk(ctx context.Context, arazzo *Arazzo, visit VisitFunc) error {
 	}
 
 	for _, wf := range arazzo.Workflows {
-		if err := walkWorkflow(ctx, &wf, getArazzoMatchFunc(arazzo), arazzo, visit); err != nil {
+		if err := walkWorkflow(ctx, wf, getArazzoMatchFunc(arazzo), arazzo, visit); err != nil {
 			if errors.Is(err, ErrTerminate) {
 				return nil
 			}
@@ -87,6 +87,10 @@ func Walk(ctx context.Context, arazzo *Arazzo, visit VisitFunc) error {
 }
 
 func walkWorkflow(ctx context.Context, workflow *Workflow, parent MatchFunc, arazzo *Arazzo, visit VisitFunc) error {
+	if workflow == nil {
+		return nil
+	}
+
 	if err := visit(ctx, getWorkflowMatchFunc(workflow), parent, arazzo); err != nil {
 		return err
 	}
@@ -102,7 +106,7 @@ func walkWorkflow(ctx context.Context, workflow *Workflow, parent MatchFunc, ara
 	}
 
 	for _, step := range workflow.Steps {
-		if err := walkStep(ctx, &step, getWorkflowMatchFunc(workflow), arazzo, visit); err != nil {
+		if err := walkStep(ctx, step, getWorkflowMatchFunc(workflow), arazzo, visit); err != nil {
 			return err
 		}
 	}
@@ -123,6 +127,10 @@ func walkWorkflow(ctx context.Context, workflow *Workflow, parent MatchFunc, ara
 }
 
 func walkStep(ctx context.Context, step *Step, parent MatchFunc, arazzo *Arazzo, visit VisitFunc) error {
+	if step == nil {
+		return nil
+	}
+
 	if err := visit(ctx, getStepMatchFunc(step), parent, arazzo); err != nil {
 		return err
 	}
@@ -149,6 +157,10 @@ func walkStep(ctx context.Context, step *Step, parent MatchFunc, arazzo *Arazzo,
 }
 
 func walkComponents(ctx context.Context, components *Components, parent MatchFunc, arazzo *Arazzo, visit VisitFunc) error {
+	if components == nil {
+		return nil
+	}
+
 	if err := visit(ctx, getComponentsMatchFunc(components), parent, arazzo); err != nil {
 		return err
 	}
@@ -160,19 +172,19 @@ func walkComponents(ctx context.Context, components *Components, parent MatchFun
 	}
 
 	for _, parameter := range components.Parameters.All() {
-		if err := visit(ctx, getParameterMatchFunc(&parameter), getComponentsMatchFunc(components), arazzo); err != nil {
+		if err := visit(ctx, getParameterMatchFunc(parameter), getComponentsMatchFunc(components), arazzo); err != nil {
 			return err
 		}
 	}
 
 	for _, successAction := range components.SuccessActions.All() {
-		if err := visit(ctx, getSuccessActionMatchFunc(&successAction), getComponentsMatchFunc(components), arazzo); err != nil {
+		if err := visit(ctx, getSuccessActionMatchFunc(successAction), getComponentsMatchFunc(components), arazzo); err != nil {
 			return err
 		}
 	}
 
 	for _, failureAction := range components.FailureActions.All() {
-		if err := visit(ctx, getFailureActionMatchFunc(&failureAction), getComponentsMatchFunc(components), arazzo); err != nil {
+		if err := visit(ctx, getFailureActionMatchFunc(failureAction), getComponentsMatchFunc(components), arazzo); err != nil {
 			return err
 		}
 	}
@@ -216,7 +228,7 @@ func getWorkflowMatchFunc(workflow *Workflow) MatchFunc {
 	}
 }
 
-func getReusableParameterMatchFunc(reusable ReusableParameter) MatchFunc {
+func getReusableParameterMatchFunc(reusable *ReusableParameter) MatchFunc {
 	return func(m Matcher) error {
 		if m.ReusableParameter != nil {
 			return m.ReusableParameter(reusable)
@@ -243,7 +255,7 @@ func getStepMatchFunc(step *Step) MatchFunc {
 	}
 }
 
-func getReusableSuccessActionMatchFunc(successAction ReusableSuccessAction) MatchFunc {
+func getReusableSuccessActionMatchFunc(successAction *ReusableSuccessAction) MatchFunc {
 	return func(m Matcher) error {
 		if m.ReusableSuccessAction != nil {
 			return m.ReusableSuccessAction(successAction)
@@ -252,7 +264,7 @@ func getReusableSuccessActionMatchFunc(successAction ReusableSuccessAction) Matc
 	}
 }
 
-func getReusableFailureActionMatchFunc(failureAction ReusableFailureAction) MatchFunc {
+func getReusableFailureActionMatchFunc(failureAction *ReusableFailureAction) MatchFunc {
 	return func(m Matcher) error {
 		if m.ReusableFailureAction != nil {
 			return m.ReusableFailureAction(failureAction)

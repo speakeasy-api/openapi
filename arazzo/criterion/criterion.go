@@ -45,6 +45,9 @@ type CriterionExpressionType struct {
 	// Version is the version of the criterion type.
 	Version CriterionTypeVersion
 
+	// Valid indicates whether this model passed validation.
+	Valid bool
+
 	core core.CriterionExpressionType
 }
 
@@ -87,6 +90,10 @@ func (c *CriterionExpressionType) Validate(opts ...validation.Option) []error {
 			Line:    c.core.Type.GetValueNodeOrRoot(c.core.RootNode).Line,
 			Column:  c.core.Type.GetValueNodeOrRoot(c.core.RootNode).Column,
 		})
+	}
+
+	if len(errs) == 0 {
+		c.Valid = true
 	}
 
 	return errs
@@ -180,6 +187,9 @@ type Criterion struct {
 	// Extensions provides a list of extensions to the Criterion object.
 	Extensions *extensions.Extensions
 
+	// Valid indicates whether this model passed validation.
+	Valid bool
+
 	core core.Criterion
 }
 
@@ -187,6 +197,11 @@ type Criterion struct {
 // Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
 func (c *Criterion) GetCore() *core.Criterion {
 	return &c.core
+}
+
+// GetCondition will return the condition as a parsed condition object
+func (c *Criterion) GetCondition() (*Condition, error) {
+	return newCondition(c.Condition)
 }
 
 // Validate will validate the criterion object against the Arazzo specification.
@@ -238,6 +253,10 @@ func (c *Criterion) Validate(opts ...validation.Option) []error {
 
 	errs = append(errs, c.validateCondition(opts...)...)
 
+	if len(errs) == 0 {
+		c.Valid = true
+	}
+
 	return errs
 }
 
@@ -250,7 +269,7 @@ func (c *Criterion) validateCondition(opts ...validation.Option) []error {
 	switch c.Type.GetType() {
 	case CriterionTypeSimple:
 		cond, err := newCondition(c.Condition)
-		if err != nil {
+		if err != nil && c.Context == nil {
 			errs = append(errs, &validation.Error{
 				Message: err.Error(),
 				Line:    conditionLine,

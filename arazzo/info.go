@@ -21,6 +21,9 @@ type Info struct {
 	// Extensions provides a list of extensions to the Info object.
 	Extensions *extensions.Extensions
 
+	// Valid indicates whether this model passed validation.
+	Valid bool
+
 	core core.Info
 }
 
@@ -50,6 +53,10 @@ func (i *Info) Validate(ctx context.Context, opts ...validation.Option) []error 
 			Line:    i.core.Version.GetValueNodeOrRoot(i.core.RootNode).Line,
 			Column:  i.core.Version.GetValueNodeOrRoot(i.core.RootNode).Column,
 		})
+	}
+
+	if len(errs) == 0 {
+		i.Valid = true
 	}
 
 	return errs

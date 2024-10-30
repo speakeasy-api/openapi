@@ -18,6 +18,9 @@ type PayloadReplacement struct {
 	// Extensions provides a list of extensions to the PayloadReplacement object.
 	Extensions *extensions.Extensions
 
+	// Valid indicates whether this model passed validation.
+	Valid bool
+
 	core core.PayloadReplacement
 }
 
@@ -73,6 +76,10 @@ func (p *PayloadReplacement) Validate(ctx context.Context, opts ...validation.Op
 				})
 			}
 		}
+	}
+
+	if len(errs) == 0 {
+		p.Valid = true
 	}
 
 	return errs

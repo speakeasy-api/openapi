@@ -44,6 +44,9 @@ type FailureAction struct {
 	// Extensions provides a list of extensions to the FailureAction object.
 	Extensions *extensions.Extensions
 
+	// Valid indicates whether this model passed validation.
+	Valid bool
+
 	core core.FailureAction
 }
 
@@ -59,7 +62,7 @@ func (f *FailureAction) GetCore() *core.FailureAction {
 // Requires an Arazzo object to be passed via validation options with validation.WithContextObject().
 // If a Workflow object is provided via validation options with validation.WithContextObject() then
 // the FailureAction will be validated with the context of the workflow.
-func (f FailureAction) Validate(ctx context.Context, opts ...validation.Option) []error {
+func (f *FailureAction) Validate(ctx context.Context, opts ...validation.Option) []error {
 	o := validation.NewOptions(opts...)
 
 	a := validation.GetContextObject[Arazzo](o)
@@ -178,6 +181,10 @@ func (f FailureAction) Validate(ctx context.Context, opts ...validation.Option) 
 
 	for _, criterion := range f.Criteria {
 		errs = append(errs, criterion.Validate(opts...)...)
+	}
+
+	if len(errs) == 0 {
+		f.Valid = true
 	}
 
 	return errs

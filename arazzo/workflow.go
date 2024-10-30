@@ -14,13 +14,13 @@ import (
 )
 
 // Workflows provides a list of Workflow objects that describe the orchestration of API calls.
-type Workflows []Workflow
+type Workflows []*Workflow
 
 // Find will return the first workflow with the matching workflowId.
 func (w Workflows) Find(id string) *Workflow {
 	for _, workflow := range w {
 		if workflow.WorkflowID == id {
-			return &workflow
+			return workflow
 		}
 	}
 	return nil
@@ -35,7 +35,7 @@ type Workflow struct {
 	// Description is a longer description of the purpose of the workflow. May contain CommonMark syntax.
 	Description *string
 	// Parameters is a list of Parameters that will be passed to the referenced operation or workflow.
-	Parameters []ReusableParameter
+	Parameters []*ReusableParameter
 	// Inputs is a JSON Schema containing a set of inputs that will be passed to the referenced workflow.
 	Inputs oas31.JSONSchema
 	// DependsOn is a list of workflowIds (or expressions to workflows) that must succeed before this workflow can be executed.
@@ -43,13 +43,16 @@ type Workflow struct {
 	// Steps is a list of steps that will be executed in the order they are listed.
 	Steps Steps
 	// SuccessActions is a list of actions that will be executed by each step in the workflow if the step succeeds. Can be overridden by the step.
-	SuccessActions []ReusableSuccessAction
+	SuccessActions []*ReusableSuccessAction
 	// FailureActions is a list of actions that will be executed by each step in the workflow if the step fails. Can be overridden by the step.
-	FailureActions []ReusableFailureAction
+	FailureActions []*ReusableFailureAction
 	// Outputs is a set of outputs that will be returned by the workflow.
 	Outputs Outputs
 	// Extensions provides a list of extensions to the Workflow object.
 	Extensions *extensions.Extensions
+
+	// Valid indicates whether this model passed validation.
+	Valid bool
 
 	core core.Workflow
 }
@@ -164,6 +167,10 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	for _, parameter := range w.Parameters {
 		errs = append(errs, parameter.Validate(ctx, opts...)...)
+	}
+
+	if len(errs) == 0 {
+		w.Valid = true
 	}
 
 	return errs

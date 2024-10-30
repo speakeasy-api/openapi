@@ -13,12 +13,12 @@ import (
 )
 
 type Arazzo struct {
-	Arazzo             marshaller.Node[string]              `key:"arazzo"`
-	Info               marshaller.Node[Info]                `key:"info"`
-	SourceDescriptions marshaller.Node[[]SourceDescription] `key:"sourceDescriptions" required:"true"`
-	Workflows          marshaller.Node[[]Workflow]          `key:"workflows" required:"true"`
-	Components         marshaller.Node[*Components]         `key:"components"`
-	Extensions         core.Extensions                      `key:"extensions"`
+	Arazzo             marshaller.Node[string]               `key:"arazzo"`
+	Info               marshaller.Node[Info]                 `key:"info"`
+	SourceDescriptions marshaller.Node[[]*SourceDescription] `key:"sourceDescriptions" required:"true"`
+	Workflows          marshaller.Node[[]*Workflow]          `key:"workflows" required:"true"`
+	Components         marshaller.Node[*Components]          `key:"components"`
+	Extensions         core.Extensions                       `key:"extensions"`
 
 	RootNode *yaml.Node
 	Config   *yml.Config

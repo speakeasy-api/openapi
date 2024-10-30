@@ -22,8 +22,6 @@ const (
 	InHeader In = "header"
 	// InCookie indicates that the parameter is in the cookie of the request.
 	InCookie In = "cookie"
-	// InBody indicates that the parameter is in the body of the request.
-	InBody In = "body"
 )
 
 // Parameter represents parameters that will be passed to a workflow or operation referenced by a step.
@@ -36,6 +34,9 @@ type Parameter struct {
 	Value ValueOrExpression
 	// Extensions provides a list of extensions to the Parameter object.
 	Extensions *extensions.Extensions
+
+	// Valid indicates whether this model passed validation.
+	Valid bool
 
 	core core.Parameter
 }
@@ -51,7 +52,7 @@ func (p *Parameter) GetCore() *core.Parameter {
 // Validate will validate the parameter object against the Arazzo specification.
 // If an Workflow or Step object is provided via validation options with validation.WithContextObject() then
 // it will be validated in the context of that object.
-func (p Parameter) Validate(ctx context.Context, opts ...validation.Option) []error {
+func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []error {
 	errs := []error{}
 
 	o := validation.NewOptions(opts...)
@@ -77,7 +78,6 @@ func (p Parameter) Validate(ctx context.Context, opts ...validation.Option) []er
 	case InQuery:
 	case InHeader:
 	case InCookie:
-	case InBody:
 	default:
 		if p.In == nil || in == "" {
 			if w == nil && s != nil && s.WorkflowID == nil {
@@ -91,7 +91,7 @@ func (p Parameter) Validate(ctx context.Context, opts ...validation.Option) []er
 
 		if in != "" {
 			errs = append(errs, &validation.Error{
-				Message: fmt.Sprintf("in must be one of [%s]", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie), string(InBody)}, ", ")),
+				Message: fmt.Sprintf("in must be one of [%s]", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", ")),
 				Line:    p.core.In.GetValueNodeOrRoot(p.core.RootNode).Line,
 				Column:  p.core.In.GetValueNodeOrRoot(p.core.RootNode).Column,
 			})
@@ -122,6 +122,10 @@ func (p Parameter) Validate(ctx context.Context, opts ...validation.Option) []er
 				})
 			}
 		}
+	}
+
+	if len(errs) == 0 {
+		p.Valid = true
 	}
 
 	return errs

@@ -14,13 +14,13 @@ import (
 )
 
 // Steps represents a list of Step objects that describe the operations to be performed in the workflow.
-type Steps []Step
+type Steps []*Step
 
 // Find will return the first Step object with the provided id.
 func (s Steps) Find(id string) *Step {
 	for _, step := range s {
 		if step.StepID == id {
-			return &step
+			return step
 		}
 	}
 	return nil
@@ -39,19 +39,22 @@ type Step struct {
 	// WorkflowID is a workflowId or expression to a workflow in a SourceDescription that the step relates to. Mutually exclusive with OperationID & OperationPath.
 	WorkflowID *expression.Expression
 	// Parameters is a list of Parameters that will be passed to the referenced operation or workflow. These will override any matching parameters defined at the workflow level.
-	Parameters []ReusableParameter
+	Parameters []*ReusableParameter
 	// RequestBody is the request body to be passed to the referenced operation.
 	RequestBody *RequestBody
 	// SuccessCriteria is a list of criteria that must be met for the step to be considered successful.
-	SuccessCriteria []criterion.Criterion
+	SuccessCriteria []*criterion.Criterion
 	// OnSuccess is a list of SuccessActions that will be executed if the step is successful.
-	OnSuccess []ReusableSuccessAction
+	OnSuccess []*ReusableSuccessAction
 	// OnFailure is a list of FailureActions that will be executed if the step is unsuccessful.
-	OnFailure []ReusableFailureAction
+	OnFailure []*ReusableFailureAction
 	// Outputs is a list of outputs that will be returned by the step.
 	Outputs Outputs
 	// Extensions provides a list of extensions to the Step object.
 	Extensions *extensions.Extensions
+
+	// Valid indicates whether this model passed validation.
+	Valid bool
 
 	core core.Step
 }
@@ -395,6 +398,10 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 				Column:  s.core.Outputs.GetMapValueNodeOrRoot(name, s.core.RootNode).Column,
 			})
 		}
+	}
+
+	if len(errs) == 0 {
+		s.Valid = true
 	}
 
 	return errs
