@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"unsafe"
 
 	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
@@ -14,75 +15,71 @@ type Syncer interface {
 }
 
 type SyncerWithSyncFunc interface {
-	SyncChangesWithSyncFunc(ctx context.Context, model any, valueNode *yaml.Node, syncFunc func(context.Context, any, any, *yaml.Node) (*yaml.Node, error)) (*yaml.Node, error)
+	SyncChangesWithSyncFunc(ctx context.Context, model any, valueNode *yaml.Node, syncFunc func(context.Context, any, any, *yaml.Node, bool) (*yaml.Node, error)) (*yaml.Node, error)
 }
 
-func SyncValue(ctx context.Context, source any, target any, valueNode *yaml.Node) (node *yaml.Node, err error) {
+func SyncValue(ctx context.Context, source any, target any, valueNode *yaml.Node, skipCustomSyncer bool) (node *yaml.Node, err error) {
 	s := reflect.ValueOf(source)
-	st := reflect.TypeOf(source)
 	t := reflect.ValueOf(target)
-	tt := reflect.TypeOf(target)
 
-	if s.Kind() == reflect.Ptr {
-		if s.IsNil() {
+	if t.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("SyncValue expected target to be a pointer, got %s", t.Kind())
+	}
+
+	s = dereferenceToLastPtr(s)
+	t = dereferenceAndInitializeIfNeededToLastPtr(t, reflect.ValueOf(source))
+
+	if s.Kind() == reflect.Ptr && s.IsNil() {
+		if !t.IsZero() {
 			t.Elem().Set(reflect.Zero(t.Type().Elem()))
-			return nil, nil
 		}
-
-		s, st = fullyDereference(s, st)
+		return nil, nil
 	}
 
-	t, tt = dereferenceToLastPtr(t, tt)
+	sUnderlying := getUnderlyingValue(s)
+	tUnderlyingType := dereferenceType(t.Type())
 
-	if tt.Kind() != reflect.Ptr {
-		return nil, fmt.Errorf("SyncValue expected pointer, got %s", tt)
-	}
-
-	if tt.Elem().Kind() != st.Kind() {
-		return nil, fmt.Errorf("SyncValue expected target to be %s, got %s", st.Kind(), tt.Elem().Kind())
+	if sUnderlying.Kind() != tUnderlyingType.Kind() {
+		return nil, fmt.Errorf("SyncValue expected target to be %s, got %s", sUnderlying.Kind(), tUnderlyingType.Kind())
 	}
 
 	switch {
-	case s.Kind() == reflect.Struct && t.Type() == reflect.TypeOf((*yaml.Node)(nil)):
-		t.Elem().Set(s)
+	case sUnderlying.Kind() == reflect.Struct && t.Type() == reflect.TypeOf((*yaml.Node)(nil)):
+		t.Set(s)
 		return t.Interface().(*yaml.Node), nil
-	case s.Kind() == reflect.Struct:
-		syncer, ok := t.Interface().(Syncer)
-		if ok {
-			sv := s.Interface()
-			if s.CanAddr() {
-				sv = s.Addr().Interface()
+	case sUnderlying.Kind() == reflect.Struct:
+		if !skipCustomSyncer {
+			syncer, ok := t.Interface().(Syncer)
+			if ok {
+				sv := s.Interface()
+
+				return syncer.SyncChanges(ctx, sv, valueNode)
 			}
 
-			return syncer.SyncChanges(ctx, sv, valueNode)
-		}
+			syncerWithSyncFunc, ok := t.Interface().(SyncerWithSyncFunc)
+			if ok {
+				sv := s.Interface()
 
-		syncerWithSyncFunc, ok := t.Interface().(SyncerWithSyncFunc)
-		if ok {
-			sv := s.Interface()
-			if s.CanAddr() {
-				sv = s.Addr().Interface()
+				return syncerWithSyncFunc.SyncChangesWithSyncFunc(ctx, sv, valueNode, SyncValue)
 			}
-
-			return syncerWithSyncFunc.SyncChangesWithSyncFunc(ctx, sv, valueNode, SyncValue)
 		}
 
 		return syncChanges(ctx, s.Interface(), t.Interface(), valueNode)
-	case s.Kind() == reflect.Map:
+	case sUnderlying.Kind() == reflect.Map:
 		// TODO call sync changes on each value
 		panic("not implemented")
-	case s.Kind() == reflect.Slice, s.Kind() == reflect.Array:
-		return syncArraySlice(ctx, s.Interface(), t.Interface(), valueNode)
+	case sUnderlying.Kind() == reflect.Slice, sUnderlying.Kind() == reflect.Array:
+		return syncArraySlice(ctx, sUnderlying.Interface(), t.Interface(), valueNode)
 	default:
-		if st != tt.Elem() {
+		if sUnderlying.Type() != tUnderlyingType {
 			// Cast the value to the target type
-			s = s.Convert(tt.Elem())
+			sUnderlying = sUnderlying.Convert(tUnderlyingType)
 		}
 		if !t.Elem().IsValid() {
-			t.Set(reflect.New(tt.Elem()))
+			t.Set(reflect.New(tUnderlyingType))
 		}
-		t.Elem().Set(s)
-		out := yml.CreateOrUpdateScalarNode(ctx, s.Interface(), valueNode)
+		t.Elem().Set(sUnderlying)
+		out := yml.CreateOrUpdateScalarNode(ctx, sUnderlying.Interface(), valueNode)
 		return out, nil
 	}
 }
@@ -91,20 +88,26 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 	s := reflect.ValueOf(source)
 	t := reflect.ValueOf(target)
 
-	if s.Kind() == reflect.Ptr {
-		if s.IsNil() {
-			panic("not implemented")
-		}
-		s = s.Elem()
-	}
-	if t.Kind() == reflect.Ptr && t.IsNil() {
-		t.Set(reflect.New(t.Type().Elem()))
-	}
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
+	if s.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("syncChanges expected source to be a pointer, got %s", s.Kind())
 	}
 
-	if s.Kind() != reflect.Struct {
+	if t.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("syncChanges expected target to be a pointer, got %s", t.Kind())
+	}
+
+	if s.IsNil() {
+		panic("not implemented")
+	}
+
+	if t.IsNil() {
+		t.Set(reflect.New(t.Elem().Type()))
+	}
+
+	sUnderlying := getUnderlyingValue(s)
+	t = getUnderlyingValue(t)
+
+	if sUnderlying.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("syncChanges expected struct, got %s", s.Type())
 	}
 
@@ -113,7 +116,7 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 		if !field.IsExported() {
 			continue
 		}
-		sourceVal := s.FieldByName(field.Name)
+		sourceVal := sUnderlying.FieldByName(field.Name)
 
 		key := field.Tag.Get("key")
 		if key == "" {
@@ -144,7 +147,7 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 		}
 
 		targetInt := target.Interface()
-		sourceInt := sourceVal.Interface()
+		sourceInt := sourceVal.Addr().Interface()
 
 		nodeMutator, ok := targetInt.(NodeMutator)
 		if !ok {
@@ -163,12 +166,20 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 		}
 	}
 
+	// Populate the RootNode of the target with the result
 	rn, ok := t.Type().FieldByName("RootNode")
 	if !ok {
 		return nil, fmt.Errorf("SyncChanges expected a RootNode field on the target %s", t.Type())
 	}
 
 	t.FieldByIndex(rn.Index).Set(reflect.ValueOf(valueNode))
+
+	// Update the core of the source with the updated value
+	cf, ok := sUnderlying.Type().FieldByName("core")
+	if ok {
+		sf := sUnderlying.FieldByIndex(cf.Index)
+		reflect.NewAt(sf.Type(), unsafe.Pointer(sf.UnsafeAddr())).Elem().Set(t)
+	}
 
 	return valueNode, nil
 }
@@ -233,7 +244,15 @@ func syncArraySlice(ctx context.Context, source any, target any, valueNode *yaml
 		}
 
 		var err error
-		currentElementNode, err = SyncValue(ctx, sourceVal.Index(i).Interface(), targetVal.Index(i).Addr().Interface(), currentElementNode)
+
+		var sourceValAtIdx any
+		if sourceVal.Index(i).CanAddr() {
+			sourceValAtIdx = sourceVal.Index(i).Addr().Interface()
+		} else {
+			sourceValAtIdx = sourceVal.Index(i).Interface()
+		}
+
+		currentElementNode, err = SyncValue(ctx, sourceValAtIdx, targetVal.Index(i).Addr().Interface(), currentElementNode, false)
 		if err != nil {
 			return nil, err
 		}
@@ -248,22 +267,45 @@ func syncArraySlice(ctx context.Context, source any, target any, valueNode *yaml
 	return yml.CreateOrUpdateSliceNode(ctx, elements, valueNode), nil
 }
 
-func fullyDereference(val reflect.Value, typ reflect.Type) (reflect.Value, reflect.Type) {
-	if typ.Kind() == reflect.Ptr {
-		return fullyDereference(val.Elem(), typ.Elem())
+// will dereference the last ptr in the type while initializing any higher level pointers
+func dereferenceAndInitializeIfNeededToLastPtr(val reflect.Value, source reflect.Value) reflect.Value {
+	if val.Kind() == reflect.Ptr && val.IsNil() {
+		if (source.Kind() == reflect.Ptr && !source.IsNil()) || (source.Kind() != reflect.Ptr && source.IsValid()) {
+			val.Set(reflect.New(val.Type().Elem()))
+		}
+	}
+	if val.Kind() == reflect.Ptr && val.Elem().Kind() == reflect.Ptr {
+		sourceVal := source
+		if sourceVal.Kind() == reflect.Ptr {
+			sourceVal = sourceVal.Elem()
+		}
+
+		return dereferenceAndInitializeIfNeededToLastPtr(val.Elem(), sourceVal)
 	}
 
-	return val, typ
+	return val
 }
 
-// will dereference the last ptr in the type while initializing any higher level pointers
-func dereferenceToLastPtr(val reflect.Value, typ reflect.Type) (reflect.Value, reflect.Type) {
-	if typ.Kind() == reflect.Ptr && val.IsNil() {
-		val.Set(reflect.New(typ.Elem()))
-	}
-	if typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Ptr {
-		return dereferenceToLastPtr(val.Elem(), typ.Elem())
+// will dereference the last ptr in the type
+func dereferenceToLastPtr(val reflect.Value) reflect.Value {
+	if val.Kind() == reflect.Ptr && val.Elem().Kind() == reflect.Ptr {
+		return dereferenceToLastPtr(val.Elem())
 	}
 
-	return val, typ
+	return val
+}
+
+func getUnderlyingValue(v reflect.Value) reflect.Value {
+	for v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
+		v = v.Elem()
+	}
+	return v
+}
+
+func dereferenceType(typ reflect.Type) reflect.Type {
+	for typ.Kind() == reflect.Ptr {
+		return dereferenceType(typ.Elem())
+	}
+
+	return typ
 }

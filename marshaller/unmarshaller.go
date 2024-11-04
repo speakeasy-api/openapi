@@ -149,8 +149,12 @@ func UnmarshalStruct(ctx context.Context, node *yaml.Node, structPtr any) error 
 }
 
 func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) error {
-	if out.Type() == reflect.TypeOf((*yaml.Node)(nil)) {
+	switch {
+	case out.Type() == reflect.TypeOf((*yaml.Node)(nil)):
 		out.Set(reflect.ValueOf(node))
+		return nil
+	case out.Type() == reflect.TypeOf(yaml.Node{}):
+		out.Set(reflect.ValueOf(*node))
 		return nil
 	}
 

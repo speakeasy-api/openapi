@@ -23,7 +23,7 @@ func TestEitherValue_SyncChanges_Success(t *testing.T) {
 		Left: pointer.From("some-value"),
 	}
 	var target EitherValue[string, string]
-	outNode, err := marshaller.SyncValue(ctx, source, &target, nil)
+	outNode, err := marshaller.SyncValue(ctx, source, &target, nil, false)
 	require.NoError(t, err)
 	assert.Equal(t, testutils.CreateStringYamlNode("some-value", 0, 0), outNode)
 	assert.Equal(t, "some-value", *target.Left)

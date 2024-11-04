@@ -91,7 +91,7 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 
 		if in != "" {
 			errs = append(errs, &validation.Error{
-				Message: fmt.Sprintf("in must be one of [%s]", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", ")),
+				Message: fmt.Sprintf("in must be one of [%s] but was %s", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", "), in),
 				Line:    p.core.In.GetValueNodeOrRoot(p.core.RootNode).Line,
 				Column:  p.core.In.GetValueNodeOrRoot(p.core.RootNode).Column,
 			})

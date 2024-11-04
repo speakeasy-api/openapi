@@ -53,12 +53,12 @@ func (v *EitherValue[L, R]) SyncChanges(ctx context.Context, model any, valueNod
 	lf := mv.FieldByName("Left")
 	rf := mv.FieldByName("Right")
 
-	lv, err := marshaller.SyncValue(ctx, lf.Interface(), &v.Left, valueNode)
+	lv, err := marshaller.SyncValue(ctx, lf.Interface(), &v.Left, valueNode, false)
 	if err != nil {
 		return nil, err
 	}
 
-	rv, err := marshaller.SyncValue(ctx, rf.Interface(), &v.Right, valueNode)
+	rv, err := marshaller.SyncValue(ctx, rf.Interface(), &v.Right, valueNode, false)
 	if err != nil {
 		return nil, err
 	}

@@ -263,8 +263,8 @@ func (c *Criterion) Validate(opts ...validation.Option) []error {
 func (c *Criterion) validateCondition(opts ...validation.Option) []error {
 	errs := []error{}
 
-	conditionLine := c.core.Condition.GetValueNodeOrRoot(c.core.RootNode).Line
-	conditionColumn := c.core.Condition.GetValueNodeOrRoot(c.core.RootNode).Column
+	conditionLine := c.GetCore().Condition.GetValueNodeOrRoot(c.GetCore().RootNode).Line
+	conditionColumn := c.GetCore().Condition.GetValueNodeOrRoot(c.GetCore().RootNode).Column
 
 	switch c.Type.GetType() {
 	case CriterionTypeSimple:

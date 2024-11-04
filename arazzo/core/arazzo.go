@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -30,6 +31,10 @@ func Unmarshal(ctx context.Context, doc io.Reader) (*Arazzo, error) {
 	data, err := io.ReadAll(doc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read Arazzo document: %w", err)
+	}
+
+	if len(data) == 0 {
+		return nil, errors.New("empty document")
 	}
 
 	var root yaml.Node

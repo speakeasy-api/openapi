@@ -123,11 +123,19 @@ func (a *Arazzo) GetCore() *core.Arazzo {
 	return &a.core
 }
 
+// Sync will sync any changes made to the Arazzo document models back to the core models.
+func (a *Arazzo) Sync(ctx context.Context) error {
+	if _, err := marshaller.SyncValue(ctx, a, &a.core, nil, false); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Marshal will marshal the Arazzo document to the provided io.Writer.
 func (a *Arazzo) Marshal(ctx context.Context, w io.Writer) error {
 	ctx = yml.ContextWithConfig(ctx, a.core.Config)
 
-	if _, err := marshaller.SyncValue(ctx, a, &a.core, nil); err != nil {
+	if _, err := marshaller.SyncValue(ctx, a, &a.core, nil, false); err != nil {
 		return err
 	}
 

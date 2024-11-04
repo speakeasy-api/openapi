@@ -51,7 +51,7 @@ func (n Node[V]) GetValueType() reflect.Type {
 func (n *Node[V]) SyncValue(ctx context.Context, key string, value any) (*yaml.Node, *yaml.Node, error) {
 	n.Key = key
 	n.KeyNode = yml.CreateOrUpdateKeyNode(ctx, key, n.KeyNode)
-	valueNode, err := SyncValue(ctx, value, &n.Value, n.ValueNode)
+	valueNode, err := SyncValue(ctx, value, &n.Value, n.ValueNode, false)
 	if err != nil {
 		return nil, nil, err
 	}
