@@ -6,6 +6,7 @@ import (
 	"iter"
 	"reflect"
 	"slices"
+	"unsafe"
 
 	"github.com/speakeasy-api/openapi/errors"
 	"github.com/speakeasy-api/openapi/yml"
@@ -108,6 +109,15 @@ func syncExtensions(ctx context.Context, source any, target reflect.Value, mapNo
 			mapNode = yml.DeleteMapNodeElement(ctx, key, mapNode)
 			targetMap.Delete(key)
 		}
+	}
+
+	sUnderlying := getUnderlyingValue(reflect.ValueOf(source))
+
+	// Update the core of the source with the updated value
+	cf, ok := sUnderlying.Type().FieldByName("core")
+	if ok {
+		sf := sUnderlying.FieldByIndex(cf.Index)
+		reflect.NewAt(sf.Type(), unsafe.Pointer(sf.UnsafeAddr())).Elem().Set(target)
 	}
 
 	return mapNode, nil

@@ -62,6 +62,10 @@ func (e *Extensions) SetCore(core any) {
 	e.core = c
 }
 
+func (e *Extensions) GetCore() *sequencedmap.Map[string, marshaller.Node[*yaml.Node]] {
+	return e.core
+}
+
 // UnmarshalExtensionModel will unmarshal the extension into a model and its associated core model.
 func UnmarshalExtensionModel[H any, L any](ctx context.Context, e *Extensions, ext string, m *H) error {
 	if e == nil {

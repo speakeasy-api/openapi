@@ -1,4 +1,4 @@
-package marshaller
+package marshaller_test
 
 import (
 	"context"
@@ -6,7 +6,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/internal/testutils"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,7 +18,7 @@ import (
 
 func TestSyncValue_String(t *testing.T) {
 	target := ""
-	outNode, err := SyncValue(context.Background(), "some-value", &target, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), "some-value", &target, nil, false)
 	require.NoError(t, err)
 	assert.Equal(t, testutils.CreateStringYamlNode("some-value", 0, 0), outNode)
 	assert.Equal(t, "some-value", target)
@@ -23,7 +26,7 @@ func TestSyncValue_String(t *testing.T) {
 
 func TestSyncValue_StringPtrSet(t *testing.T) {
 	target := pointer.From("")
-	outNode, err := SyncValue(context.Background(), pointer.From("some-value"), &target, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), pointer.From("some-value"), &target, nil, false)
 	require.NoError(t, err)
 	assert.Equal(t, testutils.CreateStringYamlNode("some-value", 0, 0), outNode)
 	assert.Equal(t, "some-value", *target)
@@ -31,7 +34,7 @@ func TestSyncValue_StringPtrSet(t *testing.T) {
 
 func TestSyncValue_StringPtrNil(t *testing.T) {
 	var target *string
-	outNode, err := SyncValue(context.Background(), pointer.From("some-value"), &target, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), pointer.From("some-value"), &target, nil, false)
 	require.NoError(t, err)
 	assert.Equal(t, testutils.CreateStringYamlNode("some-value", 0, 0), outNode)
 	assert.Equal(t, "some-value", *target)
@@ -57,7 +60,7 @@ func (t *TestStructSyncerCore[T]) SyncChanges(ctx context.Context, model any, va
 	}
 
 	var err error
-	t.RootNode, err = SyncValue(ctx, mv.FieldByName("Val").Interface(), &t.Val, valueNode, false)
+	t.RootNode, err = marshaller.SyncValue(ctx, mv.FieldByName("Val").Interface(), &t.Val, valueNode, false)
 	return t.RootNode, err
 }
 
@@ -66,7 +69,7 @@ func TestSyncValue_StructPtr_CustomSyncer(t *testing.T) {
 
 	source := &TestStructSyncer[int]{Val: pointer.From(1)}
 
-	outNode, err := SyncValue(context.Background(), source, &target, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), source, &target, nil, false)
 	require.NoError(t, err)
 	node := testutils.CreateIntYamlNode(1, 0, 0)
 	assert.Equal(t, node, outNode)
@@ -79,7 +82,7 @@ func TestSyncValue_Struct_CustomSyncer(t *testing.T) {
 
 	source := TestStructSyncer[int]{Val: pointer.From(1)}
 
-	outNode, err := SyncValue(context.Background(), source, &target, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), source, &target, nil, false)
 	require.NoError(t, err)
 	node := testutils.CreateIntYamlNode(1, 0, 0)
 	assert.Equal(t, node, outNode)
@@ -96,10 +99,10 @@ type TestStruct struct {
 }
 
 type TestStructCore struct {
-	Int     Node[int]     `key:"int"`
-	Str     Node[string]  `key:"str"`
-	StrPtr  Node[*string] `key:"strPtr"`
-	BoolPtr Node[*bool]   `key:"boolPtr"`
+	Int     marshaller.Node[int]     `key:"int"`
+	Str     marshaller.Node[string]  `key:"str"`
+	StrPtr  marshaller.Node[*string] `key:"strPtr"`
+	BoolPtr marshaller.Node[*bool]   `key:"boolPtr"`
 
 	RootNode *yaml.Node
 }
@@ -112,7 +115,7 @@ func TestSyncChanges_Struct(t *testing.T) {
 		BoolPtr: pointer.From(true),
 	}
 
-	outNode, err := SyncValue(context.Background(), &source, &source.core, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), &source, &source.core, nil, false)
 	require.NoError(t, err)
 
 	node := testutils.CreateMapYamlNode([]*yaml.Node{
@@ -140,7 +143,7 @@ func TestSyncChanges_StructWithOptionalsUnset(t *testing.T) {
 		Str: "some-string",
 	}
 
-	outNode, err := SyncValue(context.Background(), &source, &source.core, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), &source, &source.core, nil, false)
 	require.NoError(t, err)
 
 	node := testutils.CreateMapYamlNode([]*yaml.Node{
@@ -166,7 +169,7 @@ func TestSyncChanges_StructPtr(t *testing.T) {
 		BoolPtr: pointer.From(true),
 	}
 
-	outNode, err := SyncValue(context.Background(), &source, &source.core, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), &source, &source.core, nil, false)
 	require.NoError(t, err)
 
 	node := testutils.CreateMapYamlNode([]*yaml.Node{
@@ -195,7 +198,7 @@ type TestStructNested struct {
 }
 
 type TestStructNestedCore struct {
-	TestStruct Node[TestStructCore] `key:"testStruct"`
+	TestStruct marshaller.Node[TestStructCore] `key:"testStruct"`
 
 	RootNode *yaml.Node
 }
@@ -210,7 +213,7 @@ func TestSyncChanges_NestedStruct(t *testing.T) {
 		},
 	}
 
-	outNode, err := SyncValue(context.Background(), &source, &source.core, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), &source, &source.core, nil, false)
 	require.NoError(t, err)
 
 	nestedNode := testutils.CreateMapYamlNode([]*yaml.Node{
@@ -242,8 +245,47 @@ type TestInt int
 
 func TestSyncValue_TypeDefinition(t *testing.T) {
 	var target TestInt
-	outNode, err := SyncValue(context.Background(), 1, &target, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), 1, &target, nil, false)
 	require.NoError(t, err)
 	assert.Equal(t, testutils.CreateIntYamlNode(1, 0, 0), outNode)
 	assert.Equal(t, TestInt(1), target)
+}
+
+type TestStructWithExtensions struct {
+	Extensions *extensions.Extensions
+
+	core TestStructWithExtensionsCore
+}
+
+type TestStructWithExtensionsCore struct {
+	Extensions core.Extensions `key:"extensions"`
+
+	RootNode *yaml.Node
+}
+
+func TestSyncValue_TypeWithExtensions(t *testing.T) {
+	var source TestStructWithExtensions
+
+	extensionNode := testutils.CreateMapYamlNode(
+		[]*yaml.Node{
+			testutils.CreateStringYamlNode("name", 0, 0),
+			testutils.CreateStringYamlNode("test", 0, 0),
+			testutils.CreateStringYamlNode("value", 0, 0),
+			testutils.CreateIntYamlNode(1, 0, 0),
+		}, 0, 0)
+
+	source.Extensions = extensions.New(extensions.NewElem("x-speakeasy-test", extensionNode))
+
+	outNode, err := marshaller.SyncValue(context.Background(), &source, &source.core, nil, false)
+	require.NoError(t, err)
+
+	node := testutils.CreateMapYamlNode(
+		[]*yaml.Node{
+			testutils.CreateStringYamlNode("x-speakeasy-test", 0, 0),
+			extensionNode,
+		}, 0, 0)
+
+	assert.Equal(t, node, outNode)
+	assert.Equal(t, node, source.core.RootNode)
+	assert.True(t, source.Extensions.GetCore().Has("x-speakeasy-test"))
 }
