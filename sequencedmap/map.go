@@ -338,7 +338,7 @@ type mapGetter interface {
 	AllUntyped() iter.Seq2[any, any]
 }
 
-func (m *Map[K, V]) SyncChangesWithSyncFunc(ctx context.Context, model any, valueNode *yaml.Node, syncFunc func(context.Context, any, any, *yaml.Node) (*yaml.Node, error)) (*yaml.Node, error) {
+func (m *Map[K, V]) SyncChangesWithSyncFunc(ctx context.Context, model any, valueNode *yaml.Node, syncFunc func(context.Context, any, any, *yaml.Node, bool) (*yaml.Node, error)) (*yaml.Node, error) {
 	m.Init()
 
 	mg, ok := (model).(mapGetter)
@@ -357,7 +357,7 @@ func (m *Map[K, V]) SyncChangesWithSyncFunc(ctx context.Context, model any, valu
 
 		kn, vn, _ := yml.GetMapElementNodes(ctx, valueNode, keyStr)
 
-		vn, err := syncFunc(ctx, v, &lv, vn)
+		vn, err := syncFunc(ctx, v, &lv, vn, false)
 		if err != nil {
 			return nil, err
 		}

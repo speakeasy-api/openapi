@@ -179,7 +179,7 @@ var testArazzoInstance = &arazzo.Arazzo{
 			Type:       arazzo.FailureActionTypeRetry,
 			RetryAfter: pointer.From(10.0),
 			RetryLimit: pointer.From(3),
-			Criteria: []criterion.Criterion{{Condition: "$statusCode == 500", Type: criterion.CriterionTypeUnion{
+			Criteria: []criterion.Criterion{{Context: pointer.From(expression.Expression("$statusCode")), Condition: "$statusCode == 500", Type: criterion.CriterionTypeUnion{
 				Type: pointer.From(criterion.CriterionTypeSimple),
 			}}},
 			Valid: true,
@@ -320,6 +320,9 @@ func TestArazzo_Mutate_Success(t *testing.T) {
 	err = arazzo.Marshal(ctx, a, outBuf)
 	require.NoError(t, err)
 
+	errs := a.Validate(ctx)
+	require.Empty(t, errs)
+
 	assert.Equal(t, `arazzo: 1.0.0
 info:
   title: My updated workflow title
@@ -383,7 +386,8 @@ components:
       retryAfter: 10
       retryLimit: 3
       criteria:
-        - condition: $statusCode == 500
+        - context: $statusCode
+          condition: $statusCode == 500
 x-test: some-value
 `, outBuf.String())
 }
@@ -391,8 +395,13 @@ x-test: some-value
 func TestArazzo_Create_Success(t *testing.T) {
 	outBuf := bytes.NewBuffer([]byte{})
 
-	err := arazzo.Marshal(context.Background(), testArazzoInstance, outBuf)
+	ctx := context.Background()
+
+	err := arazzo.Marshal(ctx, testArazzoInstance, outBuf)
 	require.NoError(t, err)
+
+	errs := testArazzoInstance.Validate(ctx)
+	require.Empty(t, errs)
 
 	data, err := os.ReadFile("testdata/test.arazzo.yaml")
 	require.NoError(t, err)
@@ -561,15 +570,66 @@ var stressTests = []struct {
 		wantTitle: "",
 	},
 	{
-		name: "DevAttila87 Example",
+		name: "Itarazzo Library Example",
 		args: args{
-			location: "https://raw.githubusercontent.com/devAttila87/arazzo/24dd4c896f98b942e61831f3529fe538089baedf/application-integration-test/src/test/resources/arazzo.yaml",
+			location: "https://raw.githubusercontent.com/leidenheit/itarazzo-library/3b335e1c4293444add52b5f2476420e2d871b1a5/src/test/resources/test.arazzo.yaml",
 			validationIgnores: []string{
-				"only one of operationId, operationPath or workflowId can be set", // legit issue
+				"expression is not valid, must begin with $: <root><id>4711</id><name>Chocolate</name></root>", // legit issue
 			},
 		},
 		wantTitle: "A cookie eating workflow",
 	},
+	{
+		name: "Itarazzo Client Pet Store Example",
+		args: args{
+			location: "https://raw.githubusercontent.com/leidenheit/itarazzo-client/b744ca1ca3a036964ae30be601f10a25b14dc52d/src/test/resources/pet-store.arazzo.yaml",
+			validationIgnores: []string{
+				"jsonpointer must start with /: $.status", // legit issues TODO: improve the error returned as it is wrong
+				"jsonpointer must start with /: $.id",     // legit issues TODO: improve the error returned as it is wrong
+			},
+		},
+		wantTitle: "PetStore - Example of Workflows",
+	},
+	{
+		name: "Ritza build-a-bot workflow",
+		args: args{
+			location:          "https://raw.githubusercontent.com/ritza-co/e2e-testing-arazzo/c0615c3708a1e4c0fcaeb79edae78ddc4eb5ba82/arazzo.yaml",
+			validationIgnores: []string{},
+		},
+		wantTitle: "Build-a-Bot Workflow",
+	},
+	{
+		name: " API-Flows adyen-giving workflow",
+		args: args{
+			location: "https://raw.githubusercontent.com/API-Flows/openapi-workflow-registry/3d85d79232fa8f42993b2f5bd47e273b9369dc2d/root/adyen/adyen-giving.yaml",
+			validationIgnores: []string{
+				"in must be one of [path, query, header, cookie] but was body",
+			},
+		},
+		wantTitle: "Adyen Giving",
+	},
+	{
+		name: "API-Flows simple workflow",
+		args: args{
+			location:          "https://raw.githubusercontent.com/API-Flows/openapi-workflow-parser/6b28ba4def262969c5a96bc54d08433e6c336643/src/test/resources/1.0.0/simple.workflow.yaml",
+			validationIgnores: []string{},
+		},
+		wantTitle: "simple",
+	},
+	// Disabled for now as it is currently failing round tripping due to missing conditions
+	// {
+	// 	name: "Kartikhub swap tokens workflow",
+	// 	args: args{
+	// 		location: "https://raw.githubusercontent.com/Kartikhub/web3-basics/d95bc51bb935ef07d627e52c6fdfe18aaea69e18/swap-react/docs/swap-transaction-arazzo.yaml",
+	// 		validationIgnores: []string{ // All valid issues
+	// 			"field condition is missing",
+	// 			"condition is required",
+	// 			"field value is missing",
+	// 			"expression is not valid, must begin with $",
+	// 		},
+	// 	},
+	// 	wantTitle: "Swap Tokens",
+	// },
 }
 
 func TestArazzo_StressTests_Validate(t *testing.T) {

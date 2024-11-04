@@ -76,13 +76,13 @@ workflows:
         operationId: createOrder
         parameters:
           - name: orderType
-            in: body
+            in: query
             value: $inputs.orderType
           - name: productCode
-            in: body
+            in: query
             value: $inputs.productCode
           - name: quantity
-            in: body
+            in: query
             value: $inputs.quantity
         outputs:
           orderNumber: $response.body#/orderNumber
@@ -176,9 +176,9 @@ components:
       value: $steps.authenticate.outputs.token
     username:
       name: username
-      in: body
+      in: query
       value: $inputs.username
     password:
       name: password
-      in: body
+      in: query
       value: $inputs.password

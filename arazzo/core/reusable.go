@@ -58,27 +58,14 @@ func (r *Reusable[T]) SyncChanges(ctx context.Context, model any, valueNode *yam
 
 	of := mv.FieldByName("Object")
 	if of.IsZero() {
-		type reusable[T any] struct {
-			Reference marshaller.Node[*Expression] `key:"reference"`
-			Value     marshaller.Node[Value]       `key:"value"`
-
-			RootNode *yaml.Node
-		}
-
-		rl := reusable[T]{
-			Reference: r.Reference,
-			Value:     r.Value,
-			RootNode:  r.RootNode,
-		}
-
 		var err error
-		valueNode, err = marshaller.SyncValue(ctx, model, &rl, valueNode)
+		valueNode, err = marshaller.SyncValue(ctx, model, r, valueNode, true)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		var err error
-		valueNode, err = marshaller.SyncValue(ctx, of.Interface(), &r.Object, valueNode)
+		valueNode, err = marshaller.SyncValue(ctx, of.Interface(), &r.Object, valueNode, false)
 		if err != nil {
 			return nil, err
 		}

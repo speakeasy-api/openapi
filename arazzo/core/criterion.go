@@ -64,12 +64,12 @@ func (c *CriterionTypeUnion) SyncChanges(ctx context.Context, model any, valueNo
 	tf := mv.FieldByName("Type")
 	ef := mv.FieldByName("ExpressionType")
 
-	tv, err := marshaller.SyncValue(ctx, tf.Interface(), &c.Type, valueNode)
+	tv, err := marshaller.SyncValue(ctx, tf.Interface(), &c.Type, valueNode, false)
 	if err != nil {
 		return nil, err
 	}
 
-	ev, err := marshaller.SyncValue(ctx, ef.Interface(), &c.ExpressionType, valueNode)
+	ev, err := marshaller.SyncValue(ctx, ef.Interface(), &c.ExpressionType, valueNode, false)
 	if err != nil {
 		return nil, err
 	}

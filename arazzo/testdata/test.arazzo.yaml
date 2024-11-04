@@ -68,5 +68,6 @@ components:
       retryAfter: 10
       retryLimit: 3
       criteria:
-        - condition: $statusCode == 500%s
+        - context: $statusCode
+          condition: $statusCode == 500%s
 x-test: some-value
