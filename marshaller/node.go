@@ -120,6 +120,6 @@ func (n Node[V]) GetMapValueNodeOrRoot(key string, rootNode *yaml.Node) *yaml.No
 	return n.ValueNode
 }
 
-func (n Node[V]) GetNavigableNode() any {
-	return n.Value
+func (n Node[V]) GetNavigableNode() (any, error) {
+	return n.Value, nil
 }

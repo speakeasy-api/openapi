@@ -72,11 +72,11 @@ func (v *EitherValue[L, R]) SyncChanges(ctx context.Context, model any, valueNod
 	}
 }
 
-func (v *EitherValue[L, R]) GetNavigableNode() any {
+func (v *EitherValue[L, R]) GetNavigableNode() (any, error) {
 	if v.Left != nil {
-		return v.Left
+		return v.Left, nil
 	}
-	return v.Right
+	return v.Right, nil
 }
 
 func unmarshalValue[T any](ctx context.Context, node *yaml.Node) (*T, []error) {

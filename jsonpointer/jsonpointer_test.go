@@ -2,6 +2,7 @@ package jsonpointer
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/sequencedmap"
@@ -382,7 +383,166 @@ func TestGetTarget_Error(t *testing.T) {
 				source:  TestStruct{},
 				pointer: JSONPointer("/1"),
 			},
-			wantErr: errors.New("invalid path -- expected key, got index at /1"),
+			wantErr: errors.New("not found -- expected IndexNavigable, got struct at /1"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target, err := GetTarget(tt.args.source, tt.args.pointer, tt.args.opts...)
+			assert.EqualError(t, err, tt.wantErr.Error())
+			assert.Nil(t, target)
+		})
+	}
+}
+
+type InterfaceTestStruct struct {
+	typ           string
+	valuesByKey   map[string]any
+	valuesByIndex []any
+	Field1        any
+	Field2        any
+}
+
+var (
+	_ KeyNavigable   = (*InterfaceTestStruct)(nil)
+	_ IndexNavigable = (*InterfaceTestStruct)(nil)
+)
+
+func (t InterfaceTestStruct) NavigateWithKey(key string) (any, error) {
+	switch t.typ {
+	case "map":
+		return t.valuesByKey[key], nil
+	case "struct":
+		return nil, ErrSkipInterface
+	case "slice":
+		return nil, ErrInvalidPath
+	default:
+		return nil, fmt.Errorf("unknown type %s", t.typ)
+	}
+}
+
+func (t InterfaceTestStruct) NavigateWithIndex(index int) (any, error) {
+	switch t.typ {
+	case "map":
+		return nil, ErrInvalidPath
+	case "struct":
+		return nil, ErrSkipInterface
+	case "slice":
+		return t.valuesByIndex[index], nil
+	default:
+		return nil, fmt.Errorf("unknown type %s", t.typ)
+	}
+}
+
+type NavigableNodeWrapper struct {
+	typ           string
+	NavigableNode InterfaceTestStruct
+	Field1        any
+	Field2        any
+}
+
+var _ NavigableNoder = (*NavigableNodeWrapper)(nil)
+
+func (n NavigableNodeWrapper) GetNavigableNode() (any, error) {
+	switch n.typ {
+	case "wrapper":
+		return n.NavigableNode, nil
+	case "struct":
+		return nil, ErrSkipInterface
+	case "other":
+		return nil, ErrInvalidPath
+	default:
+		return nil, fmt.Errorf("unknown type %s", n.typ)
+	}
+}
+
+func TestGetTarget_WithInterfaces_Success(t *testing.T) {
+	type args struct {
+		source  any
+		pointer JSONPointer
+		opts    []option
+	}
+	tests := []struct {
+		name string
+		args args
+		want any
+	}{
+		{
+			name: "KeyNavigable succeeds",
+			args: args{
+				source:  InterfaceTestStruct{typ: "map", valuesByKey: map[string]any{"key1": "value1"}},
+				pointer: JSONPointer("/key1"),
+			},
+			want: "value1",
+		},
+		{
+			name: "IndexNavigable succeeds",
+			args: args{
+				source:  InterfaceTestStruct{typ: "slice", valuesByIndex: []any{"value1", "value2"}},
+				pointer: JSONPointer("/1"),
+			},
+			want: "value2",
+		},
+		{
+			name: "Struct is navigable",
+			args: args{
+				source:  InterfaceTestStruct{typ: "struct", Field1: "value1"},
+				pointer: JSONPointer("/Field1"),
+			},
+			want: "value1",
+		},
+		{
+			name: "NavigableNoder succeeds",
+			args: args{
+				source:  NavigableNodeWrapper{typ: "wrapper", NavigableNode: InterfaceTestStruct{typ: "struct", Field1: "value1"}},
+				pointer: JSONPointer("/Field1"),
+			},
+			want: "value1",
+		},
+		{
+			name: "NavigableNoder struct is navigable",
+			args: args{
+				source:  NavigableNodeWrapper{typ: "struct", Field2: "value2"},
+				pointer: JSONPointer("/Field2"),
+			},
+			want: "value2",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target, err := GetTarget(tt.args.source, tt.args.pointer, tt.args.opts...)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, target)
+		})
+	}
+}
+
+func TestGetTarget_WithInterfaces_Error(t *testing.T) {
+	type args struct {
+		source  any
+		pointer JSONPointer
+		opts    []option
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr error
+	}{
+		{
+			name: "Error returned for invalid KeyNavigable type",
+			args: args{
+				source:  InterfaceTestStruct{typ: "slice", valuesByIndex: []any{"value1", "value2"}},
+				pointer: JSONPointer("/key2"),
+			},
+			wantErr: errors.New("not found -- invalid path"),
+		},
+		{
+			name: "Error returned for invalid IndexNavigable type",
+			args: args{
+				source:  InterfaceTestStruct{typ: "struct", Field1: "value1"},
+				pointer: JSONPointer("/1"),
+			},
+			wantErr: errors.New("can't navigate by index on jsonpointer.InterfaceTestStruct at /1"),
 		},
 	}
 	for _, tt := range tests {

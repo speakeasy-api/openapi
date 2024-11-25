@@ -10,9 +10,14 @@ import (
 )
 
 const (
-	ErrNotFound    = errors.Error("not found")
+	// ErrNotFound is returned when the target is not found.
+	ErrNotFound = errors.Error("not found")
+	// ErrInvalidPath is returned when the path is invalid.
 	ErrInvalidPath = errors.Error("invalid path")
-	ErrValidation  = errors.Error("validation error")
+	// ErrValidation is returned when the jsonpointer is invalid.
+	ErrValidation = errors.Error("validation error")
+	// ErrSkipInterface is returned when this implementation of the interface is not applicable to the current type.
+	ErrSkipInterface = errors.Error("skip interface")
 )
 
 const (
@@ -171,26 +176,41 @@ type IndexNavigable interface {
 
 // NavigableNoder is an interface that can be implemented by a struct to allow returning an alternative node to evaluate instead of the struct itself.
 type NavigableNoder interface {
-	GetNavigableNode() any
+	GetNavigableNode() (any, error)
 }
 
 func getStructTarget(sourceVal reflect.Value, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
-	sourceValElem := reflect.Indirect(sourceVal)
-
-	if currentPart.Type != partTypeKey {
-		return nil, nil, ErrInvalidPath.Wrap(fmt.Errorf("expected key, got %s at %s", currentPart.Type, currentPath))
-	}
-
-	if sourceVal.Type().Implements(reflect.TypeOf((*KeyNavigable)(nil)).Elem()) {
-		return getNavigableWithKeyTarget(sourceVal, currentPart, stack, currentPath, o)
-	}
-
-	if sourceVal.Type().Implements(reflect.TypeOf((*IndexNavigable)(nil)).Elem()) {
-		return getNavigableWithIndexTarget(sourceVal, currentPart, stack, currentPath, o)
-	}
-
 	if sourceVal.Type().Implements(reflect.TypeOf((*NavigableNoder)(nil)).Elem()) {
-		return getNavigableNoderTarget(sourceVal, currentPart, stack, currentPath, o)
+		val, stack, err := getNavigableNoderTarget(sourceVal, currentPart, stack, currentPath, o)
+		if err != nil {
+			if !errors.Is(err, ErrSkipInterface) {
+				return nil, nil, err
+			}
+		} else {
+			return val, stack, nil
+		}
+	}
+
+	switch currentPart.Type {
+	case partTypeKey:
+		return getKeyBasedStructTarget(sourceVal, currentPart, stack, currentPath, o)
+	case partTypeIndex:
+		return getIndexBasedStructTarget(sourceVal, currentPart, stack, currentPath, o)
+	default:
+		return nil, nil, ErrInvalidPath.Wrap(fmt.Errorf("expected key or index, got %s at %s", currentPart.Type, currentPath))
+	}
+}
+
+func getKeyBasedStructTarget(sourceVal reflect.Value, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
+	if sourceVal.Type().Implements(reflect.TypeOf((*KeyNavigable)(nil)).Elem()) {
+		val, stack, err := getNavigableWithKeyTarget(sourceVal, currentPart, stack, currentPath, o)
+		if err != nil {
+			if !errors.Is(err, ErrSkipInterface) {
+				return nil, nil, err
+			}
+		} else {
+			return val, stack, nil
+		}
 	}
 
 	if sourceVal.Kind() == reflect.Ptr && sourceVal.IsNil() {
@@ -198,6 +218,8 @@ func getStructTarget(sourceVal reflect.Value, currentPart navigationPart, stack 
 	}
 
 	key := currentPart.unescapeValue()
+
+	sourceValElem := reflect.Indirect(sourceVal)
 
 	for i := 0; i < sourceValElem.NumField(); i++ {
 		field := sourceValElem.Type().Field(i)
@@ -225,6 +247,22 @@ func getStructTarget(sourceVal reflect.Value, currentPart navigationPart, stack 
 	}
 
 	return nil, nil, ErrNotFound.Wrap(fmt.Errorf("key %s not found in %v at %s", key, sourceVal.Type(), currentPath))
+}
+
+func getIndexBasedStructTarget(sourceVal reflect.Value, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
+	if sourceVal.Type().Implements(reflect.TypeOf((*IndexNavigable)(nil)).Elem()) {
+		val, stack, err := getNavigableWithIndexTarget(sourceVal, currentPart, stack, currentPath, o)
+		if err != nil {
+			if errors.Is(err, ErrSkipInterface) {
+				return nil, nil, fmt.Errorf("can't navigate by index on %s at %s", sourceVal.Type(), currentPath)
+			}
+			return nil, nil, err
+		} else {
+			return val, stack, nil
+		}
+	} else {
+		return nil, nil, ErrNotFound.Wrap(fmt.Errorf("expected IndexNavigable, got %s at %s", sourceVal.Kind(), currentPath))
+	}
 }
 
 func getNavigableWithKeyTarget(sourceVal reflect.Value, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
@@ -277,7 +315,10 @@ func getNavigableNoderTarget(sourceVal reflect.Value, currentPart navigationPart
 		return nil, nil, ErrNotFound.Wrap(fmt.Errorf("expected navigableNoder, got %s at %s", sourceVal.Kind(), currentPath))
 	}
 
-	value := nn.GetNavigableNode()
+	value, err := nn.GetNavigableNode()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return getTarget(value, currentPart, stack, currentPath, o)
 }
