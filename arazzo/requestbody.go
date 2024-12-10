@@ -16,8 +16,8 @@ import (
 type RequestBody struct {
 	// ContentType is the content type of the request body
 	ContentType *string
-	// Payload is a static value or value containing expressions that will be used to populate the request body
-	Payload Value
+	// Payload is a static value, an expression or a value containing inline expressions that will be used to populate the request body
+	Payload ValueOrExpression
 	// Replacements is a list of expressions that will be used to populate the request body in addition to any in the Payload field
 	Replacements []*PayloadReplacement
 	// Extensions is a list of extensions to apply to the request body object
