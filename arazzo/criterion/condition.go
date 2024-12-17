@@ -44,7 +44,19 @@ func newCondition(rawCondition string) (*Condition, error) {
 		return nil, fmt.Errorf("condition must at least be in the format [expression] [operator] [value]")
 	}
 
-	if len(parts) > 3 || strings.ContainsAny(rawCondition, "&|") {
+	if strings.ContainsAny(rawCondition, "&|") {
+		// TODO this is a complex condition that we don't currently support
+		return nil, nil
+	}
+
+	// String literal value handling (single quotes) until parsing is tokenized.
+	// Reference: https://spec.openapis.org/arazzo/v1.0.0#literals
+	if len(parts) > 3 && strings.HasPrefix(parts[2], "'") && strings.HasSuffix(parts[len(parts)-1], "'") {
+		parts[2] = strings.Join(parts[2:], " ")
+		parts = parts[:3]
+	}
+
+	if len(parts) > 3 {
 		// TODO this is a complex condition that we don't currently support
 		return nil, nil
 	}
