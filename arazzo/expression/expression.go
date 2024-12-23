@@ -229,7 +229,7 @@ func getType(expression string) ([]string, ExpressionType) {
 	return expressionParts, typ
 }
 
-// TODO the spec is currently ambiguous on how to handle any additional dot seperated parts after the name so just treat as a name for now
+// TODO the spec is currently ambiguous on how to handle any additional dot separated parts after the name so just treat as a name for now
 // TODO there is probably something required to handle dots within a key name
 func validateName(expression, name, referenceType string) error {
 	parts := strings.Split(name, ".")
