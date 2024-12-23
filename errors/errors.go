@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// ErrSeperator is used to seperate the message from the cause in the error message
-const ErrSeperator = " -- "
+// ErrSeparator is used to separate the message from the cause in the error message
+const ErrSeparator = " -- "
 
 // Error provides a string based error type allowing the definition of const errors in packages
 type Error string
@@ -17,12 +17,12 @@ func (s Error) Error() string {
 	return string(s)
 }
 
-// Is checks if targer error is equivelant to Error
+// Is checks if target error is equivalent to Error
 func (s Error) Is(target error) bool {
-	return s.Error() == target.Error() || strings.HasPrefix(target.Error(), s.Error()+ErrSeperator)
+	return s.Error() == target.Error() || strings.HasPrefix(target.Error(), s.Error()+ErrSeparator)
 }
 
-// As will set target errors value to equal Error if they are equivelant
+// As will set target errors value to equal Error if they are equivalent
 func (s Error) As(target interface{}) bool {
 	v := reflect.ValueOf(target).Elem()
 	if v.Type().Name() == "Error" && v.CanSet() {
@@ -44,7 +44,7 @@ type wrappedError struct {
 
 func (w wrappedError) Error() string {
 	if w.cause != nil {
-		return fmt.Sprintf("%s%s%v", w.msg, ErrSeperator, w.cause)
+		return fmt.Sprintf("%s%s%v", w.msg, ErrSeparator, w.cause)
 	}
 	return w.msg
 }
@@ -63,12 +63,12 @@ func (w wrappedError) Unwrap() error {
 
 // The below are just wrappers as we are stealing the namespace of the errors package
 
-// Is checks if err is equivelant to target
+// Is checks if err is equivalent to target
 func Is(err error, target error) bool {
 	return errors.Is(err, target)
 }
 
-// As will set target errors value to equal Error if they are equivelant
+// As will set target errors value to equal Error if they are equivalent
 func As(err error, target any) bool {
 	return errors.As(err, target)
 }

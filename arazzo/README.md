@@ -1,4 +1,11 @@
-# github.com/speakeasy-api/openapi/arazzo
+[![https://www.speakeasy.com](../.github/assets/speakeasy.png?raw=true)](https://www.speakeasy.com)
+
+# [github.com/speakeasy-api/openapi/arazzo](https://github.com/speakeasy-api/openapi/arazzo)
+
+[![Reference](https://godoc.org/github.com/speakeasy-api/openapi/arazzo?status.svg)](http://godoc.org/github.com/speakeasy-api/openapi/arazzo)
+[![Test](https://github.com/speakeasy-api/openapi/actions/workflows/test.yaml/badge.svg)](https://github.com/speakeasy-api/openapi/actions/workflows/test.yaml)
+[![GoReportCard](https://goreportcard.com/badge/github.com/speakeasy-api/openapi)](https://goreportcard.com/report/github.com/speakeasy-api/openapi)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 The Arazzo package provides an API for working with Arazzo documents including reading, creating, mutating, walking and validating them.
 
@@ -199,3 +206,22 @@ func main() {
     }
 }
 ```
+
+## Contributing
+
+This repository is maintained by Speakeasy, but we welcome and encourage contributions from the community to help improve its capabilities and stability.
+
+### How to Contribute
+
+1. **Open Issues**: Found a bug or have a feature suggestion? Open an issue to describe what you'd like to see changed.
+
+2. **Pull Requests**: We welcome pull requests! If you'd like to contribute code:
+   - Fork the repository
+   - Create a new branch for your feature/fix
+   - Submit a PR with a clear description of the changes and any related issues
+
+3. **Feedback**: Share your experience using the packages or suggest improvements.
+
+All contributions, whether they're bug reports, feature requests, or code changes, help make this project better for everyone.
+
+Please ensure your contributions adhere to our coding standards and include appropriate tests where applicable.
