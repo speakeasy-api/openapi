@@ -1,17 +1,20 @@
-[![https://www.speakeasy.com](../.github/assets/speakeasy.png?raw=true)](https://www.speakeasy.com)
-
-# [github.com/speakeasy-api/openapi/arazzo](https://github.com/speakeasy-api/openapi/arazzo)
-
-[![Reference](https://godoc.org/github.com/speakeasy-api/openapi/arazzo?status.svg)](http://godoc.org/github.com/speakeasy-api/openapi/arazzo)
-[![Test](https://github.com/speakeasy-api/openapi/actions/workflows/test.yaml/badge.svg)](https://github.com/speakeasy-api/openapi/actions/workflows/test.yaml)
-[![GoReportCard](https://goreportcard.com/badge/github.com/speakeasy-api/openapi)](https://goreportcard.com/report/github.com/speakeasy-api/openapi)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-
-The Arazzo package provides an API for working with Arazzo documents including reading, creating, mutating, walking and validating them.
-
-For more details on the Arazzo specification see [Speakeasy's Arazzo Documentation](https://www.speakeasy.com/openapi/arazzo).
-
-For details on the API available via the `arazzo` package see [https://pkg.go.dev/github.com/speakeasy-api/openapi/arazzo](https://pkg.go.dev/github.com/speakeasy-api/openapi/arazzo).
+<p align="center">
+  <p align="center">
+    <img  width="200px" alt="Arazzo" src="https://github.com/user-attachments/assets/ded936d5-3fd9-439f-925a-a2959735b71a">
+  </p>
+  <h1 align="center"><b>Arazzo Parser</b></h1>
+  <p align="center">An API for working with <a href="https://www.speakeasy.com/openapi/arazzo">Arazzo documents</a> including: read, walk, create, mutate, and validate
+</p>
+  <p align="center">
+    <a href="https://speakeasy.com/"><img src="https://custom-icon-badges.demolab.com/badge/-Built%20By%20Speakeasy-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
+    <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/goadesign/goa.svg?style=for-the-badge"></a>
+    <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi/arazzo?tab=doc"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
+   <br />
+    <a href="https://github.com/speakeasy-api/openapi/actions/workflows/test.yaml"><img alt="GitHub Action: Test" src="https://img.shields.io/github/actions/workflow/status/speakeasy-api/openapi/test.yaml?style=for-the-badge"></a>
+    <a href="https://goreportcard.com/report/github.com/speakeasy-api/openapi"><img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/speakeasy-api/openapi?style=for-the-badge"></a>
+    <a href="/LICENSE"><img alt="Software License" src="https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge"></a>
+  </p>
+</p>
 
 ## Reading
 
