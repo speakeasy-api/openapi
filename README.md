@@ -3,7 +3,7 @@
 # [github.com/speakeasy-api/openapi](https://github.com/speakeasy-api/openapi)
 
 [![Reference](https://godoc.org/github.com/speakeasy-api/openapi?status.svg)](http://godoc.org/github.com/speakeasy-api/openapi)
-![Pipeline](https://github.com/speakeasy-api/openapi/workflows/test/badge.svg)
+[![Test](https://github.com/speakeasy-api/openapi/actions/workflows/test.yaml/badge.svg)](https://github.com/speakeasy-api/openapi/actions/workflows/test.yaml)
 [![GoReportCard](https://goreportcard.com/badge/github.com/speakeasy-api/openapi)](https://goreportcard.com/report/github.com/speakeasy-api/openapi)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
