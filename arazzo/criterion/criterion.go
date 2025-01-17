@@ -1,6 +1,7 @@
 package criterion
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -197,6 +198,14 @@ type Criterion struct {
 // Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
 func (c *Criterion) GetCore() *core.Criterion {
 	return &c.core
+}
+
+// Sync will sync any changes made to the Arazzo document models back to the core models.
+func (c *Criterion) Sync(ctx context.Context) error {
+	if _, err := marshaller.SyncValue(ctx, c, &c.core, nil, false); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetCondition will return the condition as a parsed condition object

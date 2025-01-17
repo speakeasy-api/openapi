@@ -194,6 +194,16 @@ func TestExpression_Validate_Success(t *testing.T) {
 				validateAsExpression: true,
 			},
 		},
+		{
+			name: "multiline empty json objects expression",
+			args: args{
+				e: Expression(`
+[
+  {}
+]`),
+				validateAsExpression: false,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
