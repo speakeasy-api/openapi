@@ -38,6 +38,11 @@ type Condition struct {
 
 // TODO this will need to evolve to have a more AST like structure (while remaining easy to work with)
 func newCondition(rawCondition string) (*Condition, error) {
+	// This is a raw value not a condition expressions
+	if !strings.HasPrefix(rawCondition, "$") {
+		return nil, nil
+	}
+
 	parts := strings.Split(rawCondition, " ")
 
 	if len(parts) < 3 {
