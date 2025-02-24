@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
@@ -18,7 +20,12 @@ import (
 )
 
 // Version is the version of the Arazzo Specification that this package conforms to.
-const Version = "1.0.0"
+const (
+	Version      = "1.0.1"
+	VersionMajor = 1
+	VersionMinor = 0
+	VersionPatch = 1
+)
 
 // Arazzo is the root object for an Arazzo document.
 type Arazzo struct {
@@ -148,9 +155,18 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 
 	errs := []error{}
 
-	if a.Arazzo != Version {
+	arazzoMajor, arazzoMinor, arazzoPatch, err := parseVersion(a.Arazzo)
+	if err != nil {
 		errs = append(errs, &validation.Error{
-			Message: "Arazzo version must be 1.0.0",
+			Message: fmt.Sprintf("invalid Arazzo version in document %s: %s", a.Arazzo, err.Error()),
+			Line:    a.core.Arazzo.GetValueNodeOrRoot(a.core.RootNode).Line,
+			Column:  a.core.Arazzo.GetValueNodeOrRoot(a.core.RootNode).Column,
+		})
+	}
+
+	if arazzoMajor != VersionMajor || arazzoMinor != VersionMinor || arazzoPatch > VersionPatch {
+		errs = append(errs, &validation.Error{
+			Message: fmt.Sprintf("Only Arazzo version %s and below is supported", Version),
 			Line:    a.core.Arazzo.GetValueNodeOrRoot(a.core.RootNode).Line,
 			Column:  a.core.Arazzo.GetValueNodeOrRoot(a.core.RootNode).Column,
 		})
@@ -199,4 +215,28 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 	}
 
 	return errs
+}
+
+func parseVersion(version string) (int, int, int, error) {
+	parts := strings.Split(version, ".")
+	if len(parts) != 3 {
+		return 0, 0, 0, fmt.Errorf("invalid version %s", version)
+	}
+
+	major, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid major version %s: %w", parts[0], err)
+	}
+
+	minor, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid minor version %s: %w", parts[1], err)
+	}
+
+	patch, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid patch version %s: %w", parts[2], err)
+	}
+
+	return major, minor, patch, nil
 }

@@ -139,6 +139,13 @@ func TestExpression_Validate_Success(t *testing.T) {
 			},
 		},
 		{
+			name: "outputs with json pointer",
+			args: args{
+				e:                    Expression("$outputs.someOutput#/some/path"),
+				validateAsExpression: true,
+			},
+		},
+		{
 			name: "steps",
 			args: args{
 				e:                    Expression("$steps.someStep"),
@@ -146,9 +153,23 @@ func TestExpression_Validate_Success(t *testing.T) {
 			},
 		},
 		{
+			name: "step outputs with json pointer",
+			args: args{
+				e:                    Expression("$steps.someStep.outputs.someOutput#/some/path"),
+				validateAsExpression: true,
+			},
+		},
+		{
 			name: "workflows",
 			args: args{
 				e:                    Expression("$workflows.someWorkflow"),
+				validateAsExpression: true,
+			},
+		},
+		{
+			name: "workflow outputs with json pointer",
+			args: args{
+				e:                    Expression("$workflows.someWorkflow.outputs.someOutput#/some/path"),
 				validateAsExpression: true,
 			},
 		},
@@ -335,11 +356,18 @@ func TestExpression_Validate_Failure(t *testing.T) {
 			wantErr: errors.New("expression is not valid, expected name after $inputs: $inputs"),
 		},
 		{
-			name: "invalid json pointer expression in context",
+			name: "invalid json pointer expression in inputs expression",
 			args: args{
-				e: Expression("$outputs.someOutput#/some/path"),
+				e: Expression("$inputs.someInput#/some/path"),
 			},
-			wantErr: errors.New("expression is not valid, json pointers are not allowed in current context: $outputs.someOutput#/some/path"),
+			wantErr: errors.New("expression is not valid, json pointers are not allowed in current context: $inputs.someInput#/some/path"),
+		},
+		{
+			name: "invalid json pointer expression in workflow inputs expression",
+			args: args{
+				e: Expression("$workflows.someWorkflow.inputs.someInput#/some/path"),
+			},
+			wantErr: errors.New("expression is not valid, json pointers are not allowed in current context: $workflows.someWorkflow.inputs.someInput#/some/path"),
 		},
 	}
 	for _, tt := range tests {

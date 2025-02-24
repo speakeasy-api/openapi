@@ -53,7 +53,7 @@ func Example_creating() {
 		Info: arazzo.Info{
 			Title:   "My Workflow",
 			Summary: pointer.From("A summary"),
-			Version: "1.0.0",
+			Version: "1.0.1",
 		},
 		// ...
 	}

@@ -237,7 +237,7 @@ func TestArazzo_RoundTrip_Success(t *testing.T) {
 }
 
 func TestArazzoUnmarshal_ValidationErrors(t *testing.T) {
-	data := []byte(`arazzo: 1.0.1
+	data := []byte(`arazzo: 1.0.2
 x-test: some-value
 info:
   title: My Workflow
@@ -254,14 +254,14 @@ sourceDescriptions:
 
 	assert.Equal(t, []error{
 		&validation.Error{Line: 1, Column: 1, Message: "field workflows is missing"},
-		&validation.Error{Line: 1, Column: 9, Message: "Arazzo version must be 1.0.0"},
+		&validation.Error{Line: 1, Column: 9, Message: "Only Arazzo version 1.0.1 and below is supported"},
 		&validation.Error{Line: 4, Column: 3, Message: "field version is missing"},
 		&validation.Error{Line: 6, Column: 5, Message: "field url is missing"},
 		&validation.Error{Line: 7, Column: 11, Message: "type must be one of [openapi, arazzo]"},
 	}, validationErrs)
 
 	expected := &arazzo.Arazzo{
-		Arazzo: "1.0.1",
+		Arazzo: "1.0.2",
 		Info: arazzo.Info{
 			Title:   "My Workflow",
 			Version: "",
@@ -307,6 +307,7 @@ func TestArazzo_Mutate_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
+	a.Arazzo = "1.0.0"
 	a.Info.Title = "My updated workflow title"
 	sd := a.SourceDescriptions[0]
 	sd.Extensions.Set("x-test", yml.CreateOrUpdateScalarNode(ctx, "some-value", nil))
@@ -478,53 +479,49 @@ var stressTests = []struct {
 	{
 		name: "Redocly Museum API",
 		args: args{
-			location: "https://raw.githubusercontent.com/Redocly/museum-openapi-example/091a853a0d2467bc4c65bb6f615a33d0a7201747/arazzo/museum-api.arazzo.yaml",
-			validationIgnores: []string{
-				"invalid jsonpath expression", // they have criterion marked as jsonpath but uses a simple condition instead
-			},
+			location: "https://raw.githubusercontent.com/Redocly/museum-openapi-example/2770b2b2e59832d245c7b0eb0badf6568d7efb53/arazzo/museum-api.arazzo.yaml",
 		},
 		wantTitle: "Redocly Museum API Test Workflow",
 	},
 	{
 		name: "Redocly Museum Tickets",
 		args: args{
-			location: "https://raw.githubusercontent.com/Redocly/museum-openapi-example/091a853a0d2467bc4c65bb6f615a33d0a7201747/arazzo/museum-tickets.arazzo.yaml",
+			location: "https://raw.githubusercontent.com/Redocly/museum-openapi-example/2770b2b2e59832d245c7b0eb0badf6568d7efb53/arazzo/museum-tickets.arazzo.yaml",
 		},
 		wantTitle: "Redocly Museum Tickets Workflow",
 	},
 	{
 		name: "Redocly Warp API",
 		args: args{
-			// TODO line 25 report inconsistency with spec and value
-			location: "https://raw.githubusercontent.com/Redocly/warp-single-sidebar/be5f885db3cdd9c595f9a7e724c04e9f6a0b70dd/apis/arazzo.yaml",
+			location: "https://raw.githubusercontent.com/Redocly/warp-single-sidebar/b78fc09da52d7755e92e1bc8f990edd37421cbde/apis/arazzo.yaml",
 		},
 		wantTitle: "Warp API",
 	},
 	{
 		name: "Arazzo Extended Parameters Example",
 		args: args{
-			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/977f586da14b65bd8e612b763267b8b728749e52/examples/1.0.0/ExtendedParametersExample.arazzo.yaml",
+			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/23852b8b0d13ab1e3288a57a990611ffed45ab5d/examples/1.0.0/ExtendedParametersExample.arazzo.yaml",
 		},
 		wantTitle: "Public Zoo API",
 	},
 	{
 		name: "Arazzo FAPI-PAR Example",
 		args: args{
-			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/977f586da14b65bd8e612b763267b8b728749e52/examples/1.0.0/FAPI-PAR.arazzo.yaml",
+			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/23852b8b0d13ab1e3288a57a990611ffed45ab5d/examples/1.0.0/FAPI-PAR.arazzo.yaml",
 		},
 		wantTitle: "PAR, Authorization and Token workflow",
 	},
 	{
 		name: "Arazzo Login and Retrieve Pets Example",
 		args: args{
-			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/977f586da14b65bd8e612b763267b8b728749e52/examples/1.0.0/LoginAndRetrievePets.arazzo.yaml",
+			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/23852b8b0d13ab1e3288a57a990611ffed45ab5d/examples/1.0.0/LoginAndRetrievePets.arazzo.yaml",
 		},
 		wantTitle: "A pet purchasing workflow",
 	},
 	{
 		name: "Arazzo BNPL Example",
 		args: args{
-			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/977f586da14b65bd8e612b763267b8b728749e52/examples/1.0.0/bnpl-arazzo.yaml",
+			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/23852b8b0d13ab1e3288a57a990611ffed45ab5d/examples/1.0.0/bnpl-arazzo.yaml",
 			validationIgnores: []string{
 				"$response.headers.Location", // doc should be referencing `$response.header.Location`
 			},
@@ -534,18 +531,14 @@ var stressTests = []struct {
 	{
 		name: "Arazzo OAuth Example",
 		args: args{
-			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/977f586da14b65bd8e612b763267b8b728749e52/examples/1.0.0/oauth.arazzo.yaml",
+			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/23852b8b0d13ab1e3288a57a990611ffed45ab5d/examples/1.0.0/oauth.arazzo.yaml",
 		},
 		wantTitle: "Example OAuth service",
 	},
 	{
 		name: "Arazzo Pet Coupons Example",
 		args: args{
-			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/977f586da14b65bd8e612b763267b8b728749e52/examples/1.0.0/pet-coupons.arazzo.yaml",
-			validationIgnores: []string{
-				"$outputs[0]",        // legit issue trying to reference outputs by index
-				"$workflow_order_id", // legit issue trying to reference workflow_order_id
-			},
+			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/23852b8b0d13ab1e3288a57a990611ffed45ab5d/examples/1.0.0/pet-coupons.arazzo.yaml",
 		},
 		wantTitle: "Petstore - Apply Coupons",
 	},
@@ -582,7 +575,7 @@ var stressTests = []struct {
 	{
 		name: "Itarazzo Client Pet Store Example",
 		args: args{
-			location: "https://raw.githubusercontent.com/leidenheit/itarazzo-client/b744ca1ca3a036964ae30be601f10a25b14dc52d/src/test/resources/pet-store.arazzo.yaml",
+			location: "https://raw.githubusercontent.com/leidenheit/itarazzo-client/b3c126d28bf80ae7d74861c08509be33b83c5ddf/src/test/resources/pet-store.arazzo.yaml",
 			validationIgnores: []string{
 				"jsonpointer must start with /: $.status", // legit issues TODO: improve the error returned as it is wrong
 				"jsonpointer must start with /: $.id",     // legit issues TODO: improve the error returned as it is wrong
@@ -593,15 +586,14 @@ var stressTests = []struct {
 	{
 		name: "Ritza build-a-bot workflow",
 		args: args{
-			location:          "https://raw.githubusercontent.com/ritza-co/e2e-testing-arazzo/c0615c3708a1e4c0fcaeb79edae78ddc4eb5ba82/arazzo.yaml",
-			validationIgnores: []string{},
+			location: "https://raw.githubusercontent.com/ritza-co/e2e-testing-arazzo/c0615c3708a1e4c0fcaeb79edae78ddc4eb5ba82/arazzo.yaml",
 		},
 		wantTitle: "Build-a-Bot Workflow",
 	},
 	{
 		name: " API-Flows adyen-giving workflow",
 		args: args{
-			location: "https://raw.githubusercontent.com/API-Flows/openapi-workflow-registry/3d85d79232fa8f42993b2f5bd47e273b9369dc2d/root/adyen/adyen-giving.yaml",
+			location: "https://raw.githubusercontent.com/API-Flows/openapi-workflow-registry/75c237ce1b155ba9f8dc7f065759df7ae1cbbbe5/root/adyen/adyen-giving.yaml",
 			validationIgnores: []string{
 				"in must be one of [path, query, header, cookie] but was body",
 			},
@@ -611,8 +603,7 @@ var stressTests = []struct {
 	{
 		name: "API-Flows simple workflow",
 		args: args{
-			location:          "https://raw.githubusercontent.com/API-Flows/openapi-workflow-parser/6b28ba4def262969c5a96bc54d08433e6c336643/src/test/resources/1.0.0/simple.workflow.yaml",
-			validationIgnores: []string{},
+			location: "https://raw.githubusercontent.com/API-Flows/openapi-workflow-parser/6b28ba4def262969c5a96bc54d08433e6c336643/src/test/resources/1.0.0/simple.workflow.yaml",
 		},
 		wantTitle: "simple",
 	},
@@ -620,7 +611,7 @@ var stressTests = []struct {
 	// {
 	// 	name: "Kartikhub swap tokens workflow",
 	// 	args: args{
-	// 		location: "https://raw.githubusercontent.com/Kartikhub/web3-basics/d95bc51bb935ef07d627e52c6fdfe18aaea69e18/swap-react/docs/swap-transaction-arazzo.yaml",
+	// 		location: "https://raw.githubusercontent.com/Kartikhub/web3-basics/be13fa7e6fdf386eef08bba2843d4a8b615561b9/swap-react/docs/swap-transaction-arazzo.yaml",
 	// 		validationIgnores: []string{ // All valid issues
 	// 			"field condition is missing",
 	// 			"condition is required",

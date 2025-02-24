@@ -3,6 +3,7 @@ package expression
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/jsonpointer"
@@ -150,7 +151,14 @@ func (e Expression) Validate(validateAsExpression bool) error {
 			return err
 		}
 
-		if typ == ExpressionTypeSourceDescriptions && strings.HasSuffix(name, "url") {
+		switch {
+		case typ == ExpressionTypeSourceDescriptions && strings.HasSuffix(name, "url"):
+			allowJsonPointers = true
+		case slices.Contains([]ExpressionType{ExpressionTypeSteps, ExpressionTypeWorkflows}, typ):
+			if len(expressionParts) > 0 && expressionParts[0] == "outputs" {
+				allowJsonPointers = true
+			}
+		case typ == ExpressionTypeOutputs:
 			allowJsonPointers = true
 		}
 	default:
