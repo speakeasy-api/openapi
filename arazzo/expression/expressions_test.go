@@ -35,7 +35,7 @@ func TestExtractExpressions(t *testing.T) {
 			},
 		},
 		{
-			name: "expression with json pointer",
+			name: "request body expression with json pointer",
 			args: args{
 				expression: "$request.body#/some/path",
 			},
