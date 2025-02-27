@@ -37,7 +37,7 @@ func WithStructTags(structTags ...string) option {
 	}
 }
 
-func getOptions(opts ...option) *options {
+func getOptions(opts []option) *options {
 	o := &options{
 		StructTags: []string{DefaultStructTag},
 	}
@@ -63,7 +63,7 @@ func (j JSONPointer) Validate() error {
 // WithStructTags can be used to set the type of struct tags to use when navigating structs.
 // If the struct implements any of the Navigable interfaces it will be used to navigate the source.
 func GetTarget(source any, pointer JSONPointer, opts ...option) (any, error) {
-	o := getOptions(opts...)
+	o := getOptions(opts)
 
 	stack, err := pointer.getNavigationStack()
 	if err != nil {
