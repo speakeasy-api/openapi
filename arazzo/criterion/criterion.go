@@ -3,15 +3,15 @@ package criterion
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
+	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
-	regexp "github.com/wasilibs/go-re2"
-	"k8s.io/client-go/util/jsonpath"
 )
 
 // CriterionType represents the type of criterion.
@@ -297,7 +297,7 @@ func (c *Criterion) validateCondition(opts ...validation.Option) []error {
 			})
 		}
 	case CriterionTypeJsonPath:
-		if err := jsonpath.NewParser("jsonpath").Parse(c.Condition); err != nil {
+		if _, err := jsonpath.NewPath(c.Condition); err != nil {
 			errs = append(errs, &validation.Error{
 				Message: fmt.Errorf("invalid jsonpath expression: %w", err).Error(),
 				Line:    conditionLine,
