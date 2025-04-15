@@ -480,6 +480,10 @@ var stressTests = []struct {
 		name: "Redocly Museum API",
 		args: args{
 			location: "https://raw.githubusercontent.com/Redocly/museum-openapi-example/2770b2b2e59832d245c7b0eb0badf6568d7efb53/arazzo/museum-api.arazzo.yaml",
+			validationIgnores: []string{
+				"[71:24] invalid jsonpath expression: Error at line 1, column 7: unexpected token when parsing segment",  // legit invalid RFC 9535 syntax
+				"[107:24] invalid jsonpath expression: Error at line 1, column 7: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
+			},
 		},
 		wantTitle: "Redocly Museum API Test Workflow",
 	},
@@ -494,6 +498,9 @@ var stressTests = []struct {
 		name: "Redocly Warp API",
 		args: args{
 			location: "https://raw.githubusercontent.com/Redocly/warp-single-sidebar/b78fc09da52d7755e92e1bc8f990edd37421cbde/apis/arazzo.yaml",
+			validationIgnores: []string{
+				"[63:24] invalid jsonpath expression: Error at line 1, column 12: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
+			},
 		},
 		wantTitle: "Warp API",
 	},
@@ -532,6 +539,12 @@ var stressTests = []struct {
 		name: "Arazzo OAuth Example",
 		args: args{
 			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/23852b8b0d13ab1e3288a57a990611ffed45ab5d/examples/1.0.0/oauth.arazzo.yaml",
+			validationIgnores: []string{
+				"[65:24] invalid jsonpath expression: Error at line 1, column 15: unexpected token when parsing segment",  // legit invalid RFC 9535 syntax
+				"[105:24] invalid jsonpath expression: Error at line 1, column 15: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
+				"[155:24] invalid jsonpath expression: Error at line 1, column 15: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
+				"[175:24] invalid jsonpath expression: Error at line 1, column 15: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
+			},
 		},
 		wantTitle: "Example OAuth service",
 	},
@@ -567,7 +580,9 @@ var stressTests = []struct {
 		args: args{
 			location: "https://raw.githubusercontent.com/leidenheit/itarazzo-library/3b335e1c4293444add52b5f2476420e2d871b1a5/src/test/resources/test.arazzo.yaml",
 			validationIgnores: []string{
-				"expression is not valid, must begin with $: <root><id>4711</id><name>Chocolate</name></root>", // legit issue
+				"expression is not valid, must begin with $: <root><id>4711</id><name>Chocolate</name></root>",          // legit issue
+				"[32:24] invalid jsonpath expression: Error at line 1, column 0: unexpected token",                      // unsupported version: draft-goessner-dispatch-jsonpath-00
+				"[36:24] invalid jsonpath expression: Error at line 1, column 5: unexpected token when parsing segment", // unsupported version: draft-goessner-dispatch-jsonpath-00
 			},
 		},
 		wantTitle: "A cookie eating workflow",
@@ -579,6 +594,9 @@ var stressTests = []struct {
 			validationIgnores: []string{
 				"jsonpointer must start with /: $.status", // legit issues TODO: improve the error returned as it is wrong
 				"jsonpointer must start with /: $.id",     // legit issues TODO: improve the error returned as it is wrong
+				"[81:24] invalid jsonpath expression: Error at line 1, column 7: unexpected token when parsing segment",  // unsupported version: draft-goessner-dispatch-jsonpath-00
+				"[110:24] invalid jsonpath expression: Error at line 1, column 5: unexpected token when parsing segment", // unsupported version: draft-goessner-dispatch-jsonpath-00
+				"[114:24] invalid jsonpath expression: Error at line 1, column 9: unexpected token when parsing segment", // unsupported version: draft-goessner-dispatch-jsonpath-00
 			},
 		},
 		wantTitle: "PetStore - Example of Workflows",
@@ -587,6 +605,9 @@ var stressTests = []struct {
 		name: "Ritza build-a-bot workflow",
 		args: args{
 			location: "https://raw.githubusercontent.com/ritza-co/e2e-testing-arazzo/c0615c3708a1e4c0fcaeb79edae78ddc4eb5ba82/arazzo.yaml",
+			validationIgnores: []string{
+				"[42:24] invalid jsonpath expression: Error at line 1, column 8: unexpected token", // legit invalid RFC 9535 syntax
+			},
 		},
 		wantTitle: "Build-a-Bot Workflow",
 	},
