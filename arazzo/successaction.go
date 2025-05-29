@@ -69,28 +69,16 @@ func (s *SuccessAction) Validate(ctx context.Context, opts ...validation.Option)
 	errs := []error{}
 
 	if s.core.Name.Present && s.Name == "" {
-		errs = append(errs, &validation.Error{
-			Message: "name is required",
-			Line:    s.core.Name.GetValueNodeOrRoot(s.core.RootNode).Line,
-			Column:  s.core.Name.GetValueNodeOrRoot(s.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError("name is required", s.core, s.core.Name))
 	}
 
 	switch s.Type {
 	case SuccessActionTypeEnd:
 		if s.WorkflowID != nil {
-			errs = append(errs, &validation.Error{
-				Message: "workflowId is not allowed when type: end is specified",
-				Line:    s.core.WorkflowID.GetKeyNodeOrRoot(s.core.RootNode).Line,
-				Column:  s.core.WorkflowID.GetKeyNodeOrRoot(s.core.RootNode).Column,
-			})
+			errs = append(errs, validation.NewValueError("workflowId is not allowed when type: end is specified", s.core, s.core.WorkflowID))
 		}
 		if s.StepID != nil {
-			errs = append(errs, &validation.Error{
-				Message: "stepId is not allowed when type: end is specified",
-				Line:    s.core.StepID.GetKeyNodeOrRoot(s.core.RootNode).Line,
-				Column:  s.core.StepID.GetKeyNodeOrRoot(s.core.RootNode).Column,
-			})
+			errs = append(errs, validation.NewValueError("stepId is not allowed when type: end is specified", s.core, s.core.StepID))
 		}
 	case SuccessActionTypeGoto:
 		errs = append(errs, validationActionWorkflowIDAndStepID(ctx, validationActionWorkflowStepIDParams{
@@ -106,11 +94,7 @@ func (s *SuccessAction) Validate(ctx context.Context, opts ...validation.Option)
 			required:         true,
 		}, opts...)...)
 	default:
-		errs = append(errs, &validation.Error{
-			Message: fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(SuccessActionTypeEnd), string(SuccessActionTypeGoto)}, ", ")),
-			Line:    s.core.Type.GetValueNodeOrRoot(s.core.RootNode).Line,
-			Column:  s.core.Type.GetValueNodeOrRoot(s.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(SuccessActionTypeEnd), string(SuccessActionTypeGoto)}, ", ")), s.core, s.core.Type))
 	}
 
 	for _, criterion := range s.Criteria {

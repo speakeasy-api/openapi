@@ -45,32 +45,20 @@ func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) [
 	if r.ContentType != nil {
 		_, _, err := mime.ParseMediaType(*r.ContentType)
 		if err != nil {
-			errs = append(errs, &validation.Error{
-				Message: fmt.Sprintf("contentType must be valid: %s", err),
-				Line:    r.core.ContentType.GetValueNodeOrRoot(r.core.RootNode).Line,
-				Column:  r.core.ContentType.GetValueNodeOrRoot(r.core.RootNode).Column,
-			})
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("contentType must be valid: %s", err), r.core, r.core.ContentType))
 		}
 	}
 
 	if r.Payload != nil {
 		payloadData, err := yaml.Marshal(r.Payload)
 		if err != nil {
-			errs = append(errs, &validation.Error{
-				Message: err.Error(),
-				Line:    r.core.Payload.GetValueNodeOrRoot(r.core.RootNode).Line,
-				Column:  r.core.Payload.GetValueNodeOrRoot(r.core.RootNode).Column,
-			})
+			errs = append(errs, validation.NewValueError(err.Error(), r.core, r.core.Payload))
 		}
 
 		expressions := expression.ExtractExpressions(string(payloadData))
 		for _, expression := range expressions {
 			if err := expression.Validate(true); err != nil {
-				errs = append(errs, &validation.Error{
-					Message: err.Error(),
-					Line:    r.core.Payload.GetValueNodeOrRoot(r.core.RootNode).Line,
-					Column:  r.core.Payload.GetValueNodeOrRoot(r.core.RootNode).Column,
-				})
+				errs = append(errs, validation.NewValueError(err.Error(), r.core, r.core.Payload))
 			}
 		}
 	}

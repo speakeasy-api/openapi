@@ -122,11 +122,7 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 	case "Parameter":
 	default:
 		if r.Value != nil {
-			errs = append(errs, &validation.Error{
-				Message: "value is not allowed when object is not a parameter",
-				Line:    r.core.Value.GetValueNodeOrRoot(r.core.RootNode).Line,
-				Column:  r.core.Value.GetValueNodeOrRoot(r.core.RootNode).Column,
-			})
+			errs = append(errs, validation.NewValueError("value is not allowed when object is not a parameter", r.core, r.core.Value))
 		}
 	}
 
@@ -146,11 +142,7 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, opts ...validation.Option) []error {
 	if err := r.Reference.Validate(true); err != nil {
 		return []error{
-			validation.Error{
-				Message: err.Error(),
-				Line:    r.core.Reference.GetValueNodeOrRoot(r.core.RootNode).Line,
-				Column:  r.core.Reference.GetValueNodeOrRoot(r.core.RootNode).Column,
-			},
+			validation.NewValueError(err.Error(), r.core, r.core.Reference),
 		}
 	}
 
@@ -158,21 +150,13 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 
 	if typ != expression.ExpressionTypeComponents {
 		return []error{
-			validation.Error{
-				Message: fmt.Sprintf("reference must be a components expression, got %s", r.Reference.GetType()),
-				Line:    r.core.Reference.GetValueNodeOrRoot(r.core.RootNode).Line,
-				Column:  r.core.Reference.GetValueNodeOrRoot(r.core.RootNode).Column,
-			},
+			validation.NewValueError(fmt.Sprintf("reference must be a components expression, got %s", r.Reference.GetType()), r.core, r.core.Reference),
 		}
 	}
 
 	if componentType == "" || len(references) != 1 {
 		return []error{
-			validation.Error{
-				Message: fmt.Sprintf("reference must be a components expression with 3 parts, got %s", *r.Reference),
-				Line:    r.core.Reference.GetValueNodeOrRoot(r.core.RootNode).Line,
-				Column:  r.core.Reference.GetValueNodeOrRoot(r.core.RootNode).Column,
-			},
+			validation.NewValueError(fmt.Sprintf("reference must be a components expression with 3 parts, got %s", *r.Reference), r.core, r.core.Reference),
 		}
 	}
 
@@ -180,11 +164,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 
 	if a.Components == nil {
 		return []error{
-			validation.Error{
-				Message: fmt.Sprintf("components not present, reference to missing component %s", *r.Reference),
-				Line:    r.core.Reference.GetValueNodeOrRoot(r.core.RootNode).Line,
-				Column:  r.core.Reference.GetValueNodeOrRoot(r.core.RootNode).Column,
-			},
+			validation.NewValueError(fmt.Sprintf("components not present, reference to missing component %s", *r.Reference), r.core, r.core.Reference),
 		}
 	}
 
@@ -220,11 +200,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 		}, opts...)
 	default:
 		return []error{
-			validation.Error{
-				Message: fmt.Sprintf("reference to %s is not valid, valid components are [parameters, successActions, failureActions]", componentType),
-				Line:    r.core.Reference.GetValueNodeOrRoot(r.core.RootNode).Line,
-				Column:  r.core.Reference.GetValueNodeOrRoot(r.core.RootNode).Column,
-			},
+			validation.NewValueError(fmt.Sprintf("reference to %s is not valid, valid components are [parameters, successActions, failureActions]", componentType), r.core, r.core.Reference),
 		}
 	}
 }
@@ -243,32 +219,20 @@ func validateComponentReference[T any, V interfaces.Validator[T]](ctx context.Co
 
 	if args.typ != typ {
 		return []error{
-			validation.Error{
-				Message: fmt.Sprintf("expected a %s reference got %s", typeToComponentType(args.typ), args.componentType),
-				Line:    args.referenceValueNode.Line,
-				Column:  args.referenceValueNode.Column,
-			},
+			validation.NewNodeError(fmt.Sprintf("expected a %s reference got %s", typeToComponentType(args.typ), args.componentType), args.referenceValueNode),
 		}
 	}
 
 	if args.components == nil {
 		return []error{
-			validation.Error{
-				Message: fmt.Sprintf("components.%s not present, reference to missing component %s", args.componentType, *args.reference),
-				Line:    args.referenceValueNode.Line,
-				Column:  args.referenceValueNode.Column,
-			},
+			validation.NewNodeError(fmt.Sprintf("components.%s not present, reference to missing component %s", args.componentType, *args.reference), args.referenceValueNode),
 		}
 	}
 
 	component, ok := args.components.Get(args.componentName)
 	if !ok {
 		return []error{
-			validation.Error{
-				Message: fmt.Sprintf("components.%s.%s not present, reference to missing component %s", args.componentType, args.componentName, *args.reference),
-				Line:    args.referenceValueNode.Line,
-				Column:  args.referenceValueNode.Column,
-			},
+			validation.NewNodeError(fmt.Sprintf("components.%s.%s not present, reference to missing component %s", args.componentType, args.componentName, *args.reference), args.referenceValueNode),
 		}
 	}
 

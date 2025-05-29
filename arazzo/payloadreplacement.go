@@ -38,43 +38,23 @@ func (p *PayloadReplacement) Validate(ctx context.Context, opts ...validation.Op
 	errs := []error{}
 
 	if p.core.Target.Present && p.Target == "" {
-		errs = append(errs, &validation.Error{
-			Message: "target is required",
-			Line:    p.core.Target.GetValueNodeOrRoot(p.core.RootNode).Line,
-			Column:  p.core.Target.GetValueNodeOrRoot(p.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError("target is required", p.core, p.core.Target))
 	}
 
 	if err := p.Target.Validate(); err != nil {
-		errs = append(errs, &validation.Error{
-			Message: err.Error(),
-			Line:    p.core.Target.GetValueNodeOrRoot(p.core.RootNode).Line,
-			Column:  p.core.Target.GetValueNodeOrRoot(p.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError(err.Error(), p.core, p.core.Target))
 	}
 
 	if p.core.Value.Present && p.Value == nil {
-		errs = append(errs, &validation.Error{
-			Message: "value is required",
-			Line:    p.core.Value.GetValueNodeOrRoot(p.core.RootNode).Line,
-			Column:  p.core.Value.GetValueNodeOrRoot(p.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError("value is required", p.core, p.core.Value))
 	} else if p.Value != nil {
 		_, expression, err := GetValueOrExpressionValue(p.Value)
 		if err != nil {
-			errs = append(errs, &validation.Error{
-				Message: err.Error(),
-				Line:    p.core.Value.GetValueNodeOrRoot(p.core.RootNode).Line,
-				Column:  p.core.Value.GetValueNodeOrRoot(p.core.RootNode).Column,
-			})
+			errs = append(errs, validation.NewValueError(err.Error(), p.core, p.core.Value))
 		}
 		if expression != nil {
 			if err := expression.Validate(true); err != nil {
-				errs = append(errs, &validation.Error{
-					Message: err.Error(),
-					Line:    p.core.Value.GetValueNodeOrRoot(p.core.RootNode).Line,
-					Column:  p.core.Value.GetValueNodeOrRoot(p.core.RootNode).Column,
-				})
+				errs = append(errs, validation.NewValueError(err.Error(), p.core, p.core.Value))
 			}
 		}
 	}
