@@ -65,26 +65,14 @@ func (s *SourceDescription) Validate(ctx context.Context, opts ...validation.Opt
 	errs := []error{}
 
 	if s.core.Name.Present && s.Name == "" {
-		errs = append(errs, &validation.Error{
-			Message: "name is required",
-			Line:    s.core.Name.GetValueNodeOrRoot(s.core.RootNode).Line,
-			Column:  s.core.Name.GetValueNodeOrRoot(s.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError("name is required", s.core, s.core.Name))
 	}
 
 	if s.core.URL.Present && s.URL == "" {
-		errs = append(errs, &validation.Error{
-			Message: "url is required",
-			Line:    s.core.URL.GetValueNodeOrRoot(s.core.RootNode).Line,
-			Column:  s.core.URL.GetValueNodeOrRoot(s.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError("url is required", s.core, s.core.URL))
 	} else if s.core.URL.Present {
 		if _, err := url.Parse(s.URL); err != nil {
-			errs = append(errs, &validation.Error{
-				Message: fmt.Sprintf("url is not a valid url/uri according to RFC 3986: %s", err),
-				Line:    s.core.URL.GetValueNodeOrRoot(s.core.RootNode).Line,
-				Column:  s.core.URL.GetValueNodeOrRoot(s.core.RootNode).Column,
-			})
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("url is not a valid url/uri according to RFC 3986: %s", err), s.core, s.core.URL))
 		}
 	}
 
@@ -92,11 +80,7 @@ func (s *SourceDescription) Validate(ctx context.Context, opts ...validation.Opt
 	case SourceDescriptionTypeOpenAPI:
 	case SourceDescriptionTypeArazzo:
 	default:
-		errs = append(errs, &validation.Error{
-			Message: fmt.Sprintf("type must be one of [%s]", strings.Join([]string{SourceDescriptionTypeOpenAPI, SourceDescriptionTypeArazzo}, ", ")),
-			Line:    s.core.Type.GetValueNodeOrRoot(s.core.RootNode).Line,
-			Column:  s.core.Type.GetValueNodeOrRoot(s.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{SourceDescriptionTypeOpenAPI, SourceDescriptionTypeArazzo}, ", ")), s.core, s.core.Type))
 	}
 
 	if len(errs) == 0 {

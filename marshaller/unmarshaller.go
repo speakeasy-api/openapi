@@ -147,11 +147,7 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 		}
 
 		if _, ok := foundFields.Get(key); !ok {
-			validation.AddValidationError(ctx, &validation.Error{
-				Message: fmt.Sprintf("field %s is missing", key),
-				Line:    node.Line,
-				Column:  node.Column,
-			})
+			validation.AddValidationError(ctx, validation.NewNodeError(fmt.Sprintf("field %s is missing", key), node))
 		}
 	}
 

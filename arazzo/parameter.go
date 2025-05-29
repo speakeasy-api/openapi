@@ -62,11 +62,7 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	s := validation.GetContextObject[Step](o)
 
 	if p.core.Name.Present && p.Name == "" {
-		errs = append(errs, &validation.Error{
-			Message: "name is required",
-			Line:    p.core.Name.GetValueNodeOrRoot(p.core.RootNode).Line,
-			Column:  p.core.Name.GetValueNodeOrRoot(p.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError("name is required", p.core, p.core.Name))
 	}
 
 	in := In("")
@@ -82,45 +78,25 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	default:
 		if p.In == nil || in == "" {
 			if w == nil && s != nil && s.WorkflowID == nil {
-				errs = append(errs, &validation.Error{
-					Message: "in is required within a step when workflowId is not set",
-					Line:    p.core.In.GetValueNodeOrRoot(p.core.RootNode).Line,
-					Column:  p.core.In.GetValueNodeOrRoot(p.core.RootNode).Column,
-				})
+				errs = append(errs, validation.NewValueError("in is required within a step when workflowId is not set", p.core, p.core.In))
 			}
 		}
 
 		if in != "" {
-			errs = append(errs, &validation.Error{
-				Message: fmt.Sprintf("in must be one of [%s] but was %s", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", "), in),
-				Line:    p.core.In.GetValueNodeOrRoot(p.core.RootNode).Line,
-				Column:  p.core.In.GetValueNodeOrRoot(p.core.RootNode).Column,
-			})
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("in must be one of [%s] but was %s", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", "), in), p.core, p.core.In))
 		}
 	}
 
 	if p.core.Value.Present && p.Value == nil {
-		errs = append(errs, &validation.Error{
-			Message: "value is required",
-			Line:    p.core.Value.GetValueNodeOrRoot(p.core.RootNode).Line,
-			Column:  p.core.Value.GetValueNodeOrRoot(p.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError("value is required", p.core, p.core.Value))
 	} else if p.Value != nil {
 		_, expression, err := GetValueOrExpressionValue(p.Value)
 		if err != nil {
-			errs = append(errs, &validation.Error{
-				Message: err.Error(),
-				Line:    p.core.Value.GetValueNodeOrRoot(p.core.RootNode).Line,
-				Column:  p.core.Value.GetValueNodeOrRoot(p.core.RootNode).Column,
-			})
+			errs = append(errs, validation.NewValueError(err.Error(), p.core, p.core.Value))
 		}
 		if expression != nil {
 			if err := expression.Validate(true); err != nil {
-				errs = append(errs, &validation.Error{
-					Message: err.Error(),
-					Line:    p.core.Value.GetValueNodeOrRoot(p.core.RootNode).Line,
-					Column:  p.core.Value.GetValueNodeOrRoot(p.core.RootNode).Column,
-				})
+				errs = append(errs, validation.NewValueError(err.Error(), p.core, p.core.Value))
 			}
 		}
 	}

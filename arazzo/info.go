@@ -41,19 +41,11 @@ func (i *Info) Validate(ctx context.Context, opts ...validation.Option) []error 
 	errs := []error{}
 
 	if i.core.Title.Present && i.Title == "" {
-		errs = append(errs, &validation.Error{
-			Message: "title is required",
-			Line:    i.core.Title.GetValueNodeOrRoot(i.core.RootNode).Line,
-			Column:  i.core.Title.GetValueNodeOrRoot(i.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError("title is required", i.core, i.core.Title))
 	}
 
 	if i.core.Version.Present && i.Version == "" {
-		errs = append(errs, &validation.Error{
-			Message: "version is required",
-			Line:    i.core.Version.GetValueNodeOrRoot(i.core.RootNode).Line,
-			Column:  i.core.Version.GetValueNodeOrRoot(i.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError("version is required", i.core, i.core.Version))
 	}
 
 	if len(errs) == 0 {

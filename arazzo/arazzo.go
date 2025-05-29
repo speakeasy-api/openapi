@@ -158,19 +158,11 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 
 	arazzoMajor, arazzoMinor, arazzoPatch, err := parseVersion(a.Arazzo)
 	if err != nil {
-		errs = append(errs, &validation.Error{
-			Message: fmt.Sprintf("invalid Arazzo version in document %s: %s", a.Arazzo, err.Error()),
-			Line:    a.core.Arazzo.GetValueNodeOrRoot(a.core.RootNode).Line,
-			Column:  a.core.Arazzo.GetValueNodeOrRoot(a.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError(fmt.Sprintf("invalid Arazzo version in document %s: %s", a.Arazzo, err.Error()), a.core, a.core.Arazzo))
 	}
 
 	if arazzoMajor != VersionMajor || arazzoMinor != VersionMinor || arazzoPatch > VersionPatch {
-		errs = append(errs, &validation.Error{
-			Message: fmt.Sprintf("Only Arazzo version %s and below is supported", Version),
-			Line:    a.core.Arazzo.GetValueNodeOrRoot(a.core.RootNode).Line,
-			Column:  a.core.Arazzo.GetValueNodeOrRoot(a.core.RootNode).Column,
-		})
+		errs = append(errs, validation.NewValueError(fmt.Sprintf("only Arazzo version %s and below is supported", Version), a.core, a.core.Arazzo))
 	}
 
 	errs = append(errs, a.Info.Validate(ctx, opts...)...)
@@ -181,11 +173,7 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, sourceDescription.Validate(ctx, opts...)...)
 
 		if _, ok := sourceDescriptionNames[sourceDescription.Name]; ok {
-			errs = append(errs, &validation.Error{
-				Message: fmt.Sprintf("sourceDescription name %s is not unique", sourceDescription.Name),
-				Line:    a.core.SourceDescriptions.GetSliceValueNodeOrRoot(i, a.core.RootNode).Line,
-				Column:  a.core.SourceDescriptions.GetSliceValueNodeOrRoot(i, a.core.RootNode).Column,
-			})
+			errs = append(errs, validation.NewSliceError(fmt.Sprintf("sourceDescription name %s is not unique", sourceDescription.Name), a.core, a.core.SourceDescriptions, i))
 		}
 
 		sourceDescriptionNames[sourceDescription.Name] = true
@@ -197,11 +185,7 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, workflow.Validate(ctx, opts...)...)
 
 		if _, ok := workflowIds[workflow.WorkflowID]; ok {
-			errs = append(errs, &validation.Error{
-				Message: fmt.Sprintf("workflowId %s is not unique", workflow.WorkflowID),
-				Line:    a.core.Workflows.GetSliceValueNodeOrRoot(i, a.core.RootNode).Line,
-				Column:  a.core.Workflows.GetSliceValueNodeOrRoot(i, a.core.RootNode).Column,
-			})
+			errs = append(errs, validation.NewSliceError(fmt.Sprintf("workflowId %s is not unique", workflow.WorkflowID), a.core, a.core.Workflows, i))
 		}
 
 		workflowIds[workflow.WorkflowID] = true
