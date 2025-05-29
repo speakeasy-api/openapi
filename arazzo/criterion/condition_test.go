@@ -54,6 +54,22 @@ func TestNewCondition(t *testing.T) {
 				Value:      `"string literal with spaces"`,
 			},
 		},
+		`$response.body#/test == "string with 'nested' quotes"`: {
+			raw: `$response.body#/test == "string with 'nested' quotes"`,
+			expected: &Condition{
+				Expression: expression.Expression("$response.body#/test"),
+				Operator:   OperatorEQ,
+				Value:      `"string with 'nested' quotes"`,
+			},
+		},
+		`$response.body#/test == 'string with "nested" quotes'`: {
+			raw: `$response.body#/test == 'string with "nested" quotes'`,
+			expected: &Condition{
+				Expression: expression.Expression("$response.body#/test"),
+				Operator:   OperatorEQ,
+				Value:      `'string with "nested" quotes'`,
+			},
+		},
 	}
 
 	for name, tt := range tests {

@@ -56,13 +56,8 @@ func newCondition(rawCondition string) (*Condition, error) {
 
 	// String literal value handling (single and double quotes) until parsing is tokenized.
 	// Reference: https://spec.openapis.org/arazzo/v1.0.0#literals
-	if len(parts) > 3 && strings.HasPrefix(parts[2], "'") && strings.HasSuffix(parts[len(parts)-1], "'") {
-		parts[2] = strings.Join(parts[2:], " ")
-		parts = parts[:3]
-	} else if len(parts) > 3 && strings.HasPrefix(parts[2], "\"") && strings.HasSuffix(parts[len(parts)-1], "\"") {
-		parts[2] = strings.Join(parts[2:], " ")
-		parts = parts[:3]
-	}
+	parts = handleQuotedString(parts, "'")
+	parts = handleQuotedString(parts, "\"")
 
 	if len(parts) > 3 {
 		// TODO this is a complex condition that we don't currently support
@@ -119,4 +114,14 @@ func (s *Condition) Validate(line, column int, opts ...validation.Option) []erro
 	}
 
 	return errs
+}
+
+// handleQuotedString processes parts that contain quoted strings (either single or double quotes)
+// and joins them into a single part if necessary.
+func handleQuotedString(parts []string, quoteChar string) []string {
+	if len(parts) > 3 && strings.HasPrefix(parts[2], quoteChar) && strings.HasSuffix(parts[len(parts)-1], quoteChar) {
+		parts[2] = strings.Join(parts[2:], " ")
+		return parts[:3]
+	}
+	return parts
 }
