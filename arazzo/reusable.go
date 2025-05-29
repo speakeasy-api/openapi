@@ -10,6 +10,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/arazzo/expression"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
 	"gopkg.in/yaml.v3"
@@ -24,7 +25,7 @@ type (
 	ReusableFailureAction = Reusable[FailureAction, *FailureAction, core.FailureAction]
 )
 
-type Reusable[T any, V validator[T], C any] struct {
+type Reusable[T any, V interfaces.Validator[T], C any] struct {
 	// Reference is the expression to the location of the reusable object.
 	Reference *expression.Expression
 	// Value is any value provided alongside a parameter reusable object.
@@ -237,7 +238,7 @@ type validateComponentReferenceArgs[T any] struct {
 	referenceValueNode *yaml.Node
 }
 
-func validateComponentReference[T any, V validator[T]](ctx context.Context, args validateComponentReferenceArgs[V], opts ...validation.Option) []error {
+func validateComponentReference[T any, V interfaces.Validator[T]](ctx context.Context, args validateComponentReferenceArgs[V], opts ...validation.Option) []error {
 	typ := reflect.TypeOf((*T)(nil)).Elem()
 
 	if args.typ != typ {

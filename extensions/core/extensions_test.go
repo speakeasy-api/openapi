@@ -21,9 +21,7 @@ type TestCoreModel struct {
 }
 
 func (t *TestCoreModel) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	t.RootNode = node
-
-	return marshaller.UnmarshalStruct(ctx, node, t)
+	return marshaller.UnmarshalModel(ctx, node, t)
 }
 
 func TestUnmarshalExtensionModel_Success(t *testing.T) {

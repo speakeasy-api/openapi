@@ -9,6 +9,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31"
 	"github.com/speakeasy-api/openapi/validation"
 )
@@ -57,7 +58,7 @@ type Workflow struct {
 	core core.Workflow
 }
 
-var _ model[core.Workflow] = (*Workflow)(nil)
+var _ interfaces.Model[core.Workflow] = (*Workflow)(nil)
 
 // GetCore will return the low level representation of the workflow object.
 // Useful for accessing line and column numbers for various nodes in the backing yaml/json document.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"gopkg.in/yaml.v3"
 )
@@ -16,6 +17,8 @@ type EitherValue[L any, R any] struct {
 
 	RootNode *yaml.Node
 }
+
+var _ interfaces.CoreModel = (*EitherValue[any, any])(nil)
 
 func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, node *yaml.Node) error {
 	errs := []error{}

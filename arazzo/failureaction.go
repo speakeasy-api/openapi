@@ -10,6 +10,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/criterion"
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -50,7 +51,7 @@ type FailureAction struct {
 	core core.FailureAction
 }
 
-var _ model[core.FailureAction] = (*FailureAction)(nil)
+var _ interfaces.Model[core.FailureAction] = (*FailureAction)(nil)
 
 // GetCore will return the low level representation of the failure action object.
 // Useful for accessing line and column numbers for various nodes in the backing yaml/json document.

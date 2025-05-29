@@ -7,6 +7,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -41,7 +42,7 @@ type Parameter struct {
 	core core.Parameter
 }
 
-var _ model[core.Parameter] = (*Parameter)(nil)
+var _ interfaces.Model[core.Parameter] = (*Parameter)(nil)
 
 // GetCore will return the low level representation of the parameter object.
 // Useful for accessing line and column numbers for various nodes in the backing yaml/json document.

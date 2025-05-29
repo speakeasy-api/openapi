@@ -43,9 +43,9 @@ func Unmarshal(ctx context.Context, node *yaml.Node, out any) error {
 	return unmarshal(ctx, node, v)
 }
 
-func UnmarshalStruct(ctx context.Context, node *yaml.Node, structPtr any) error {
+func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 	if node.Kind != yaml.MappingNode {
-		return fmt.Errorf("UnmarshalStruct expected a mapping node, got %v", node.Kind)
+		return fmt.Errorf("expected a mapping node, got %v", node.Kind)
 	}
 
 	out := reflect.ValueOf(structPtr)
@@ -54,7 +54,17 @@ func UnmarshalStruct(ctx context.Context, node *yaml.Node, structPtr any) error 
 		out = out.Elem()
 	}
 
-	// TODO we need to actually check its a struct and its not nil
+	if out.Kind() != reflect.Struct {
+		return fmt.Errorf("expected a struct, got %s", out.Kind())
+	}
+
+	// Find the RootNode field and populate it
+	rootNodeField := out.FieldByName("RootNode")
+	if rootNodeField.IsValid() {
+		rootNodeField.Set(reflect.ValueOf(node))
+	} else {
+		return fmt.Errorf("expected RootNode field to be present in model")
+	}
 
 	type Field struct {
 		Name     string
@@ -175,6 +185,16 @@ func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) error {
 		return unmarshallable.Unmarshal(ctx, node)
 	}
 
+	// Auto-detect core models by checking for RootNode field
+	if isCoreModel(out) && node.Kind == yaml.MappingNode {
+		outPtr := out
+		if out.Kind() != reflect.Ptr {
+			outPtr = out.Addr()
+		}
+
+		return UnmarshalModel(ctx, node, outPtr.Interface())
+	}
+
 	switch node.Kind {
 	case yaml.MappingNode:
 		return unmarshalMapping(ctx, node, out)
@@ -202,7 +222,7 @@ func unmarshalMapping(ctx context.Context, node *yaml.Node, out reflect.Value) e
 
 	switch {
 	case out.Kind() == reflect.Struct:
-		return UnmarshalStruct(ctx, node, out.Addr().Interface())
+		return UnmarshalModel(ctx, node, out.Addr().Interface())
 	case out.Kind() == reflect.Map:
 		return fmt.Errorf("currently unsupported out kind: %v", out.Kind())
 	default:
@@ -300,4 +320,25 @@ func isUnmarshallable(out reflect.Value) bool {
 	}
 
 	return out.Type().Implements(reflect.TypeOf((*Unmarshallable)(nil)).Elem())
+}
+
+// isCoreModel checks if a value is a struct with a RootNode field of type *yaml.Node
+func isCoreModel(out reflect.Value) bool {
+	if out.Kind() == reflect.Ptr {
+		if out.IsNil() {
+			return false
+		}
+		out = out.Elem()
+	}
+
+	if out.Kind() != reflect.Struct {
+		return false
+	}
+
+	rootNodeField := out.FieldByName("RootNode")
+	if !rootNodeField.IsValid() {
+		return false
+	}
+
+	return rootNodeField.Type() == reflect.TypeOf((*yaml.Node)(nil))
 }

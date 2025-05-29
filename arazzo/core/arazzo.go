@@ -25,8 +25,6 @@ type Arazzo struct {
 	Config   *yml.Config
 }
 
-var _ CoreModel = (*Arazzo)(nil)
-
 func Unmarshal(ctx context.Context, doc io.Reader) (*Arazzo, error) {
 	data, err := io.ReadAll(doc)
 	if err != nil {
@@ -50,12 +48,6 @@ func Unmarshal(ctx context.Context, doc io.Reader) (*Arazzo, error) {
 	arazzo.Config = yml.GetConfigFromDoc(data, &root)
 
 	return &arazzo, nil
-}
-
-func (a *Arazzo) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	a.RootNode = node
-
-	return marshaller.UnmarshalStruct(ctx, node, a)
 }
 
 func (a *Arazzo) Marshal(ctx context.Context, w io.Writer) error {

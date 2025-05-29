@@ -1,8 +1,6 @@
 package core
 
 import (
-	"context"
-
 	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
@@ -15,10 +13,4 @@ type Discriminator struct {
 	Extensions   core.Extensions                                    `key:"extensions"`
 
 	RootNode *yaml.Node
-}
-
-func (d *Discriminator) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	d.RootNode = node
-
-	return marshaller.UnmarshalStruct(ctx, node, d)
 }

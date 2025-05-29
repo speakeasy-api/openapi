@@ -7,6 +7,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
@@ -31,7 +32,7 @@ type Components struct {
 	core core.Components
 }
 
-var _ model[core.Components] = (*Components)(nil)
+var _ interfaces.Model[core.Components] = (*Components)(nil)
 
 // GetCore will return the low level representation of the components object.
 // Useful for accessing line and column numbers for various nodes in the backing yaml/json document.

@@ -11,7 +11,7 @@ import (
 func TestNewCondition(t *testing.T) {
 	t.Parallel()
 
-	testCases := map[string]struct {
+	tests := map[string]struct {
 		raw           string
 		expected      *Condition
 		expectedError error
@@ -46,19 +46,45 @@ func TestNewCondition(t *testing.T) {
 				Value:      "'string literal with spaces'",
 			},
 		},
+		`$response.body#/test == "string literal with spaces"`: {
+			raw: `$response.body#/test == "string literal with spaces"`,
+			expected: &Condition{
+				Expression: expression.Expression("$response.body#/test"),
+				Operator:   OperatorEQ,
+				Value:      `"string literal with spaces"`,
+			},
+		},
+		`$response.body#/test == "string with 'nested' quotes"`: {
+			raw: `$response.body#/test == "string with 'nested' quotes"`,
+			expected: &Condition{
+				Expression: expression.Expression("$response.body#/test"),
+				Operator:   OperatorEQ,
+				Value:      `"string with 'nested' quotes"`,
+			},
+		},
+		`$response.body#/test == 'string with "nested" quotes'`: {
+			raw: `$response.body#/test == 'string with "nested" quotes'`,
+			expected: &Condition{
+				Expression: expression.Expression("$response.body#/test"),
+				Operator:   OperatorEQ,
+				Value:      `'string with "nested" quotes'`,
+			},
+		},
 	}
 
-	for testName, testCase := range testCases {
-		t.Run(testName, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			actual, actualError := newCondition(testCase.raw)
+			actual, actualError := newCondition(tt.raw)
 
-			if testCase.expectedError != nil {
-				assert.EqualError(t, actualError, testCase.expectedError.Error())
+			if tt.expectedError != nil {
+				assert.EqualError(t, actualError, tt.expectedError.Error())
+			} else {
+				assert.NoError(t, actualError)
 			}
 
-			assert.EqualExportedValues(t, testCase.expected, actual)
+			assert.EqualExportedValues(t, tt.expected, actual)
 		})
 	}
 }

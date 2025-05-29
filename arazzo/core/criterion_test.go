@@ -151,6 +151,12 @@ type:
 								ValueNode: testutils.CreateStringYamlNode("draft-goessner-dispatch-jsonpath-00", 5, 12),
 								Present:   true,
 							},
+							RootNode: testutils.CreateMapYamlNode([]*yaml.Node{
+								testutils.CreateStringYamlNode("type", 4, 3),
+								testutils.CreateStringYamlNode("jsonpath", 4, 9),
+								testutils.CreateStringYamlNode("version", 5, 3),
+								testutils.CreateStringYamlNode("draft-goessner-dispatch-jsonpath-00", 5, 12),
+							}, 4, 3),
 						}, RootNode: testutils.CreateMapYamlNode([]*yaml.Node{
 							testutils.CreateStringYamlNode("type", 4, 3),
 							testutils.CreateStringYamlNode("jsonpath", 4, 9),
@@ -189,7 +195,8 @@ type:
 			require.NoError(t, err)
 
 			c := Criterion{}
-			err = c.Unmarshal(context.Background(), doc.Content[0])
+
+			err = marshaller.Unmarshal(context.Background(), doc.Content[0], &c)
 			require.NoError(t, err)
 
 			require.Equal(t, tt.want, c)

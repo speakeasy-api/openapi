@@ -1,8 +1,6 @@
 package core
 
 import (
-	"context"
-
 	coreExtensions "github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31/core"
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -23,12 +21,4 @@ type Workflow struct {
 	Extensions     coreExtensions.Extensions                   `key:"extensions"`
 
 	RootNode *yaml.Node
-}
-
-var _ CoreModel = (*Workflow)(nil)
-
-func (w *Workflow) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	w.RootNode = node
-
-	return marshaller.UnmarshalStruct(ctx, node, w)
 }

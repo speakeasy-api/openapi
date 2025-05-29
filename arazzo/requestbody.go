@@ -8,6 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/validation"
 	"gopkg.in/yaml.v3"
 )
@@ -29,7 +30,7 @@ type RequestBody struct {
 	core core.RequestBody
 }
 
-var _ model[core.RequestBody] = (*RequestBody)(nil)
+var _ interfaces.Model[core.RequestBody] = (*RequestBody)(nil)
 
 // GetCore will return the low level representation of the request body object.
 // Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
