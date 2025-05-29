@@ -5,6 +5,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/validation"
 )
@@ -24,7 +25,7 @@ type PayloadReplacement struct {
 	core core.PayloadReplacement
 }
 
-var _ model[core.PayloadReplacement] = (*PayloadReplacement)(nil)
+var _ interfaces.Model[core.PayloadReplacement] = (*PayloadReplacement)(nil)
 
 // GetCore will return the low level representation of the payload replacement object.
 // Useful for accessing line and column numbers for various nodes in the backing yaml/json document.

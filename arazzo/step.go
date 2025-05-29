@@ -10,6 +10,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/criterion"
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -59,7 +60,7 @@ type Step struct {
 	core core.Step
 }
 
-var _ model[core.Step] = (*Step)(nil)
+var _ interfaces.Model[core.Step] = (*Step)(nil)
 
 // GetCore will return the low level representation of the step object.
 // Useful for accessing line and column numbers for various nodes in the backing yaml/json document.

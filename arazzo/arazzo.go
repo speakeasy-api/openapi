@@ -14,6 +14,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
@@ -48,7 +49,7 @@ type Arazzo struct {
 	core core.Arazzo
 }
 
-var _ model[core.Arazzo] = (*Arazzo)(nil)
+var _ interfaces.Model[core.Arazzo] = (*Arazzo)(nil)
 
 type Option[T any] func(o *T)
 
@@ -56,7 +57,7 @@ type unmarshalOptions struct {
 	skipValidation bool
 }
 
-// WithSkipValidation will skip validation of the Arazzo document during unmarshalling.
+// WithSkipValidation will skip validation of the Arazzo document during unmarshaling.
 // Useful to quickly load a document that will be mutated and validated later.
 func WithSkipValidation() Option[unmarshalOptions] {
 	return func(o *unmarshalOptions) {

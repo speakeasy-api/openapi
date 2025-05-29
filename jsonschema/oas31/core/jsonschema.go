@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/speakeasy-api/openapi/extensions/core"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"gopkg.in/yaml.v3"
@@ -69,8 +70,9 @@ type Schema struct {
 	RootNode *yaml.Node
 }
 
-func (js *Schema) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	js.RootNode = node
+var _ interfaces.CoreModel = (*Schema)(nil)
 
-	return marshaller.UnmarshalStruct(ctx, node, js)
+// Schema needs to implement Unmarshallable to allow it to be used in the core.EitherValue correctly
+func (js *Schema) Unmarshal(ctx context.Context, node *yaml.Node) error {
+	return marshaller.UnmarshalModel(ctx, node, js)
 }

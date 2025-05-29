@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
@@ -18,11 +19,9 @@ type Reusable[T any] struct {
 	RootNode *yaml.Node
 }
 
-var _ CoreModel = (*Reusable[any])(nil)
+var _ interfaces.CoreModel = (*Reusable[any])(nil)
 
 func (r *Reusable[T]) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	r.RootNode = node
-
 	if node == nil {
 		return fmt.Errorf("node is nil")
 	}
@@ -32,7 +31,7 @@ func (r *Reusable[T]) Unmarshal(ctx context.Context, node *yaml.Node) error {
 	}
 
 	if _, _, ok := yml.GetMapElementNodes(ctx, node, "reference"); ok {
-		return marshaller.UnmarshalStruct(ctx, node, r)
+		return marshaller.UnmarshalModel(ctx, node, r)
 	}
 
 	var obj T

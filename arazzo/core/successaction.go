@@ -1,8 +1,6 @@
 package core
 
 import (
-	"context"
-
 	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"gopkg.in/yaml.v3"
@@ -17,12 +15,4 @@ type SuccessAction struct {
 	Extensions core.Extensions               `key:"extensions"`
 
 	RootNode *yaml.Node
-}
-
-var _ CoreModel = (*SuccessAction)(nil)
-
-func (s *SuccessAction) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	s.RootNode = node
-
-	return marshaller.UnmarshalStruct(ctx, node, s)
 }

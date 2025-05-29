@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/speakeasy-api/openapi/extensions/core"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"gopkg.in/yaml.v3"
 )
@@ -17,14 +18,6 @@ type CriterionExpressionType struct {
 	RootNode *yaml.Node
 }
 
-var _ CoreModel = (*CriterionExpressionType)(nil)
-
-func (c *CriterionExpressionType) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	c.RootNode = node
-
-	return marshaller.UnmarshalStruct(ctx, node, c)
-}
-
 type CriterionTypeUnion struct {
 	Type           *string
 	ExpressionType *CriterionExpressionType
@@ -32,7 +25,7 @@ type CriterionTypeUnion struct {
 	RootNode *yaml.Node
 }
 
-var _ CoreModel = (*CriterionTypeUnion)(nil)
+var _ interfaces.CoreModel = (*CriterionTypeUnion)(nil)
 
 func (c *CriterionTypeUnion) Unmarshal(ctx context.Context, node *yaml.Node) error {
 	c.RootNode = node
@@ -44,7 +37,7 @@ func (c *CriterionTypeUnion) Unmarshal(ctx context.Context, node *yaml.Node) err
 		if c.ExpressionType == nil {
 			c.ExpressionType = &CriterionExpressionType{}
 		}
-		return marshaller.UnmarshalStruct(ctx, node, c.ExpressionType)
+		return marshaller.UnmarshalModel(ctx, node, c.ExpressionType)
 	default:
 		return fmt.Errorf("expected scalar or mapping node, got %v", node.Kind)
 	}
@@ -90,12 +83,4 @@ type Criterion struct {
 	Extensions core.Extensions                     `key:"extensions"`
 
 	RootNode *yaml.Node
-}
-
-var _ CoreModel = (*Criterion)(nil)
-
-func (c *Criterion) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	c.RootNode = node
-
-	return marshaller.UnmarshalStruct(ctx, node, c)
 }

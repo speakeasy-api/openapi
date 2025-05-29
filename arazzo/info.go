@@ -5,6 +5,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -27,7 +28,7 @@ type Info struct {
 	core core.Info
 }
 
-var _ model[core.Info] = (*Info)(nil)
+var _ interfaces.Model[core.Info] = (*Info)(nil)
 
 // GetCore will return the low level representation of the info object.
 // Useful for accessing line and column numbers for various nodes in the backing yaml/json document.

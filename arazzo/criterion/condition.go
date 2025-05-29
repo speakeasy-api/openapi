@@ -54,9 +54,12 @@ func newCondition(rawCondition string) (*Condition, error) {
 		return nil, nil
 	}
 
-	// String literal value handling (single quotes) until parsing is tokenized.
+	// String literal value handling (single and double quotes) until parsing is tokenized.
 	// Reference: https://spec.openapis.org/arazzo/v1.0.0#literals
 	if len(parts) > 3 && strings.HasPrefix(parts[2], "'") && strings.HasSuffix(parts[len(parts)-1], "'") {
+		parts[2] = strings.Join(parts[2:], " ")
+		parts = parts[:3]
+	} else if len(parts) > 3 && strings.HasPrefix(parts[2], "\"") && strings.HasSuffix(parts[len(parts)-1], "\"") {
 		parts[2] = strings.Join(parts[2:], " ")
 		parts = parts[:3]
 	}

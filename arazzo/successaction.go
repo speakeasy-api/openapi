@@ -10,6 +10,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/criterion"
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -44,7 +45,7 @@ type SuccessAction struct {
 	core core.SuccessAction
 }
 
-var _ model[core.SuccessAction] = (*SuccessAction)(nil)
+var _ interfaces.Model[core.SuccessAction] = (*SuccessAction)(nil)
 
 // GetCore will return the low level representation of the success action object.
 // Useful for accessing line and column numbers for various nodes in the backing yaml/json document.

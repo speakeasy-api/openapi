@@ -21,6 +21,8 @@ type TestCoreModel struct {
 	SliceNestedModelField       Node[[]TestNestedModel]                          `key:"sliceNestedModelField"`
 	MapRequiredNestedModelField Node[*sequencedmap.Map[string, TestNestedModel]] `key:"mapRequiredNestedModelField" required:"true"`
 	Extensions                  Extensions                                       `key:"extensions"`
+
+	RootNode *yaml.Node
 }
 
 type TestNestedModel struct {
@@ -29,13 +31,15 @@ type TestNestedModel struct {
 	SliceRequiredPrimitiveField Node[[]string]                       `key:"sliceRequiredPrimitiveField" required:"true"`
 	MapPrimitiveField           Node[*sequencedmap.Map[string, int]] `key:"mapPrimitiveField"`
 	Extensions                  Extensions                           `key:"extensions"`
+
+	RootNode *yaml.Node
 }
 
 func (t *TestNestedModel) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	return UnmarshalStruct(ctx, node, t)
+	return UnmarshalModel(ctx, node, t)
 }
 
-func TestUnmarshal_Success(t *testing.T) {
+func TestUnmarshalStruct_Success(t *testing.T) {
 	testYaml := `primitiveField: "hello world"
 nestedModelField:
   primitiveOptionalField: "guess who"
@@ -116,6 +120,40 @@ x-test-2: some-value-2
 		Value:     xTestExtensionNode,
 		ValueNode: xTestExtensionNode,
 	})), out.Extensions)
+
+	assert.Equal(t, node.Content[0], out.RootNode)
+	assert.NotNil(t, out.NestedModelField.Value.RootNode)
+}
+
+func TestUnmarshalStruct_Error_NotAMappingNode(t *testing.T) {
+	testYaml := `"hello world"`
+	var node yaml.Node
+	err := yaml.Unmarshal([]byte(testYaml), &node)
+	require.NoError(t, err)
+
+	var out TestCoreModel
+
+	err = UnmarshalModel(context.Background(), node.Content[0], &out)
+	require.Error(t, err)
+	assert.Equal(t, "expected a mapping node, got 8", err.Error())
+}
+
+func TestUnmarshalStruct_Error_NotAStruct(t *testing.T) {
+	testYaml := `primitiveField: "hello world"`
+	var node yaml.Node
+	err := yaml.Unmarshal([]byte(testYaml), &node)
+	require.NoError(t, err)
+
+	var out map[string]string
+
+	err = UnmarshalModel(context.Background(), node.Content[0], &out)
+	require.Error(t, err)
+	assert.Equal(t, "expected a struct, got map", err.Error())
+
+	var outNil any = nil
+	err = UnmarshalModel(context.Background(), node.Content[0], &outNil)
+	require.Error(t, err)
+	assert.Equal(t, "expected a struct, got interface", err.Error())
 }
 
 func assertNodeField[T any](t *testing.T, expectedKey string, expectedKeyLine int, expectedValue any, expectedValueLine int, actual Node[T]) {
