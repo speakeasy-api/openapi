@@ -16,28 +16,61 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestSyncValue_String(t *testing.T) {
-	target := ""
-	outNode, err := marshaller.SyncValue(context.Background(), "some-value", &target, nil, false)
-	require.NoError(t, err)
-	assert.Equal(t, testutils.CreateStringYamlNode("some-value", 0, 0), outNode)
-	assert.Equal(t, "some-value", target)
-}
+func Test_SyncValue_String_Success(t *testing.T) {
+	tests := []struct {
+		name           string
+		source         any
+		targetFactory  func() any
+		expectedValue  string
+		validateTarget func(t *testing.T, target any, expected string)
+	}{
+		{
+			name:   "string to string",
+			source: "some-value",
+			targetFactory: func() any {
+				target := ""
+				return &target
+			},
+			expectedValue: "some-value",
+			validateTarget: func(t *testing.T, target any, expected string) {
+				assert.Equal(t, expected, *target.(*string))
+			},
+		},
+		{
+			name:   "string pointer set to string pointer",
+			source: pointer.From("some-value"),
+			targetFactory: func() any {
+				target := pointer.From("")
+				return &target
+			},
+			expectedValue: "some-value",
+			validateTarget: func(t *testing.T, target any, expected string) {
+				assert.Equal(t, expected, **target.(**string))
+			},
+		},
+		{
+			name:   "string pointer to nil string pointer",
+			source: pointer.From("some-value"),
+			targetFactory: func() any {
+				var target *string
+				return &target
+			},
+			expectedValue: "some-value",
+			validateTarget: func(t *testing.T, target any, expected string) {
+				assert.Equal(t, expected, **target.(**string))
+			},
+		},
+	}
 
-func TestSyncValue_StringPtrSet(t *testing.T) {
-	target := pointer.From("")
-	outNode, err := marshaller.SyncValue(context.Background(), pointer.From("some-value"), &target, nil, false)
-	require.NoError(t, err)
-	assert.Equal(t, testutils.CreateStringYamlNode("some-value", 0, 0), outNode)
-	assert.Equal(t, "some-value", *target)
-}
-
-func TestSyncValue_StringPtrNil(t *testing.T) {
-	var target *string
-	outNode, err := marshaller.SyncValue(context.Background(), pointer.From("some-value"), &target, nil, false)
-	require.NoError(t, err)
-	assert.Equal(t, testutils.CreateStringYamlNode("some-value", 0, 0), outNode)
-	assert.Equal(t, "some-value", *target)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := tt.targetFactory()
+			outNode, err := marshaller.SyncValue(context.Background(), tt.source, target, nil, false)
+			require.NoError(t, err)
+			assert.Equal(t, testutils.CreateStringYamlNode(tt.expectedValue, 0, 0), outNode)
+			tt.validateTarget(t, target, tt.expectedValue)
+		})
+	}
 }
 
 type TestStructSyncer[T any] struct {
@@ -64,7 +97,7 @@ func (t *TestStructSyncerCore[T]) SyncChanges(ctx context.Context, model any, va
 	return rootNode, err
 }
 
-func TestSyncValue_StructPtr_CustomSyncer(t *testing.T) {
+func Test_SyncValue_StructPtrCustomSyncer_Success(t *testing.T) {
 	var target *TestStructSyncerCore[int]
 
 	source := &TestStructSyncer[int]{Val: pointer.From(1)}
@@ -77,7 +110,7 @@ func TestSyncValue_StructPtr_CustomSyncer(t *testing.T) {
 	assert.Equal(t, 1, *target.Val)
 }
 
-func TestSyncValue_Struct_CustomSyncer(t *testing.T) {
+func Test_SyncValue_StructCustomSyncer_Success(t *testing.T) {
 	var target TestStructSyncerCore[int]
 
 	source := TestStructSyncer[int]{Val: pointer.From(1)}
@@ -105,7 +138,7 @@ type TestStructCore struct {
 	BoolPtr marshaller.Node[*bool]   `key:"boolPtr"`
 }
 
-func TestSyncChanges_Struct(t *testing.T) {
+func Test_SyncChanges_Struct_Success(t *testing.T) {
 	source := TestStruct{
 		Int:     1,
 		Str:     "some-string",
@@ -135,7 +168,7 @@ func TestSyncChanges_Struct(t *testing.T) {
 	assert.Equal(t, true, *source.GetCore().BoolPtr.Value)
 }
 
-func TestSyncChanges_StructWithOptionalsUnset(t *testing.T) {
+func Test_SyncChanges_StructWithOptionalsUnset_Success(t *testing.T) {
 	source := TestStruct{
 		Int: 1,
 		Str: "some-string",
@@ -159,7 +192,7 @@ func TestSyncChanges_StructWithOptionalsUnset(t *testing.T) {
 	assert.Nil(t, source.GetCore().BoolPtr.Value)
 }
 
-func TestSyncChanges_StructPtr(t *testing.T) {
+func Test_SyncChanges_StructPtr_Success(t *testing.T) {
 	source := &TestStruct{
 		Int:     1,
 		Str:     "some-string",
@@ -199,7 +232,7 @@ type TestStructNestedCore struct {
 	TestStruct marshaller.Node[TestStructCore] `key:"testStruct"`
 }
 
-func TestSyncChanges_NestedStruct(t *testing.T) {
+func Test_SyncChanges_NestedStruct_Success(t *testing.T) {
 	source := TestStructNested{
 		TestStruct: TestStruct{
 			Int:     1,
@@ -239,7 +272,7 @@ func TestSyncChanges_NestedStruct(t *testing.T) {
 
 type TestInt int
 
-func TestSyncValue_TypeDefinition(t *testing.T) {
+func Test_SyncValue_TypeDefinition_Success(t *testing.T) {
 	var target TestInt
 	outNode, err := marshaller.SyncValue(context.Background(), 1, &target, nil, false)
 	require.NoError(t, err)
@@ -257,7 +290,7 @@ type TestStructWithExtensionsCore struct {
 	Extensions core.Extensions `key:"extensions"`
 }
 
-func TestSyncValue_TypeWithExtensions(t *testing.T) {
+func Test_SyncValue_TypeWithExtensions_Success(t *testing.T) {
 	var source TestStructWithExtensions
 
 	extensionNode := testutils.CreateMapYamlNode(
@@ -302,7 +335,7 @@ func (t *TestValidityStruct) GetCore() *TestValidityCoreModel {
 	return &t.core
 }
 
-func TestSyncChangesValidityWithRequiredFields(t *testing.T) {
+func Test_SyncChanges_ValidityWithRequiredFields_Success(t *testing.T) {
 	ctx := context.Background()
 
 	// Test case 1: All required fields present - should be valid
@@ -385,7 +418,7 @@ func TestSyncChangesValidityWithRequiredFields(t *testing.T) {
 	})
 }
 
-func TestSyncChangesValidityWithInferredRequiredFields(t *testing.T) {
+func Test_SyncChanges_ValidityWithInferredRequiredFields_Success(t *testing.T) {
 	ctx := context.Background()
 
 	// Test struct with inferred required field (non-pointer string)
