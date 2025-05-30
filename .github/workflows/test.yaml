@@ -41,12 +41,69 @@ jobs:
           echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
           echo "Coverage: $COVERAGE"
 
+      - name: Get main branch coverage
+        if: github.event_name == 'pull_request'
+        id: main-coverage
+        run: |
+          # Fetch main branch
+          git fetch origin main:main
+          
+          # Checkout main branch in a temporary directory
+          git worktree add ../main-branch main
+          
+          # Run tests on main branch to get coverage
+          cd ../main-branch
+          go test -coverprofile=main-coverage.out -covermode=atomic ./... > /dev/null 2>&1 || echo "Main branch tests failed"
+          
+          if [ -f main-coverage.out ]; then
+            MAIN_COVERAGE=$(go tool cover -func=main-coverage.out | grep total | awk '{print $3}' || echo "0.0%")
+            echo "main-coverage=$MAIN_COVERAGE" >> $GITHUB_OUTPUT
+            echo "Main branch coverage: $MAIN_COVERAGE"
+            
+            # Copy main coverage file back to workspace
+            cp main-coverage.out ../workspace/main-coverage.out
+          else
+            echo "main-coverage=0.0%" >> $GITHUB_OUTPUT
+            echo "Could not get main branch coverage"
+          fi
+          
+          # Return to original directory
+          cd ../workspace
+
       - name: Generate coverage summary
         id: coverage-summary
         run: |
           echo "## 📊 Test Coverage Report" > coverage-summary.md
           echo "" >> coverage-summary.md
-          echo "**Overall Coverage:** \`${{ steps.coverage.outputs.coverage }}\`" >> coverage-summary.md
+          
+          # Current coverage
+          CURRENT_COV="${{ steps.coverage.outputs.coverage }}"
+          echo "**Current Coverage:** \`$CURRENT_COV\`" >> coverage-summary.md
+          
+          # Compare with main if this is a PR
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ steps.main-coverage.outputs.main-coverage }}" != "" ]; then
+            MAIN_COV="${{ steps.main-coverage.outputs.main-coverage }}"
+            echo "**Main Branch Coverage:** \`$MAIN_COV\`" >> coverage-summary.md
+            echo "" >> coverage-summary.md
+            
+            # Calculate difference
+            CURRENT_NUM=$(echo $CURRENT_COV | sed 's/%//')
+            MAIN_NUM=$(echo $MAIN_COV | sed 's/%//')
+            
+            if [ "$CURRENT_NUM" != "" ] && [ "$MAIN_NUM" != "" ]; then
+              DIFF=$(echo "$CURRENT_NUM - $MAIN_NUM" | bc -l 2>/dev/null || echo "0")
+              
+              if [ "$(echo "$DIFF > 0" | bc -l 2>/dev/null)" = "1" ]; then
+                echo "**Coverage Change:** 📈 +${DIFF}% (improved)" >> coverage-summary.md
+              elif [ "$(echo "$DIFF < 0" | bc -l 2>/dev/null)" = "1" ]; then
+                DIFF_ABS=$(echo "$DIFF * -1" | bc -l 2>/dev/null || echo "${DIFF#-}")
+                echo "**Coverage Change:** 📉 -${DIFF_ABS}% (decreased)" >> coverage-summary.md
+              else
+                echo "**Coverage Change:** ✅ No change" >> coverage-summary.md
+              fi
+            fi
+          fi
+          
           echo "" >> coverage-summary.md
           echo "### Coverage by Package" >> coverage-summary.md
           echo "\`\`\`" >> coverage-summary.md
