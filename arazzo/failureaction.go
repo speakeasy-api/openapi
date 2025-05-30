@@ -66,8 +66,8 @@ func (f *FailureAction) Validate(ctx context.Context, opts ...validation.Option)
 		}
 	}
 
-	errs := []error{}
 	core := f.GetCore()
+	errs := core.GetValidationErrors()
 
 	if core.Name.Present && f.Name == "" {
 		errs = append(errs, validation.NewValueError("name is required", core, core.Name))

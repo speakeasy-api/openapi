@@ -54,8 +54,8 @@ var _ interfaces.Model[core.SourceDescription] = (*SourceDescription)(nil)
 
 // Validate will validate the source description object against the Arazzo specification.
 func (s *SourceDescription) Validate(ctx context.Context, opts ...validation.Option) []error {
-	errs := []error{}
 	core := s.GetCore()
+	errs := core.GetValidationErrors()
 
 	if core.Name.Present && s.Name == "" {
 		errs = append(errs, validation.NewValueError("name is required", core, core.Name))

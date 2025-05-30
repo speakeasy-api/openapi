@@ -40,8 +40,8 @@ type componentKey struct {
 
 // Validate validates the Components object.
 func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []error {
-	errs := []error{}
 	core := c.GetCore()
+	errs := core.GetValidationErrors()
 
 	for key, input := range c.Inputs.All() {
 		if !componentNameRegex.MatchString(key) {

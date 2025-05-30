@@ -7,11 +7,15 @@ type CoreModeler interface {
 	SetRootNode(rootNode *yaml.Node)
 	GetValid() bool
 	SetValid(valid bool)
+	AddValidationError(err error)
+	GetValidationErrors() []error
 }
 
 type CoreModel struct {
 	RootNode *yaml.Node
 	Valid    bool
+
+	validationErrors []error
 }
 
 var _ CoreModeler = (*CoreModel)(nil)
@@ -30,4 +34,16 @@ func (c CoreModel) GetValid() bool {
 
 func (c *CoreModel) SetValid(valid bool) {
 	c.Valid = valid
+
+	if c.Valid {
+		c.validationErrors = []error{}
+	}
+}
+
+func (c *CoreModel) AddValidationError(err error) {
+	c.validationErrors = append(c.validationErrors, err)
+}
+
+func (c *CoreModel) GetValidationErrors() []error {
+	return c.validationErrors
 }

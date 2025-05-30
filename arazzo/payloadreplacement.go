@@ -27,8 +27,8 @@ var _ interfaces.Model[core.PayloadReplacement] = (*PayloadReplacement)(nil)
 
 // Validate will validate the payload replacement object against the Arazzo specification.
 func (p *PayloadReplacement) Validate(ctx context.Context, opts ...validation.Option) []error {
-	errs := []error{}
 	core := p.GetCore()
+	errs := core.GetValidationErrors()
 
 	if core.Target.Present && p.Target == "" {
 		errs = append(errs, validation.NewValueError("target is required", core, core.Target))

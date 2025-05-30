@@ -51,8 +51,8 @@ type CriterionExpressionType struct {
 
 // Validate will validate the criterion expression type object against the Arazzo specification.
 func (c *CriterionExpressionType) Validate(opts ...validation.Option) []error {
-	errs := []error{}
 	core := c.GetCore()
+	errs := core.GetValidationErrors()
 
 	switch c.Type {
 	case CriterionTypeJsonPath:
@@ -186,8 +186,8 @@ func (c *Criterion) GetCondition() (*Condition, error) {
 
 // Validate will validate the criterion object against the Arazzo specification.
 func (c *Criterion) Validate(opts ...validation.Option) []error {
-	errs := []error{}
 	core := c.GetCore()
+	errs := core.GetValidationErrors()
 
 	if c.Condition == "" {
 		errs = append(errs, validation.NewValueError("condition is required", core, core.Condition))
