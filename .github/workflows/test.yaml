@@ -45,14 +45,17 @@ jobs:
         if: github.event_name == 'pull_request'
         id: main-coverage
         run: |
+          # Store current working directory
+          CURRENT_DIR=$(pwd)
+          
           # Fetch main branch
           git fetch origin main:main
           
           # Checkout main branch in a temporary directory
-          git worktree add ../main-branch main
+          git worktree add /tmp/main-branch main
           
           # Run tests on main branch to get coverage
-          cd ../main-branch
+          cd /tmp/main-branch
           go test -coverprofile=main-coverage.out -covermode=atomic ./... > /dev/null 2>&1 || echo "Main branch tests failed"
           
           if [ -f main-coverage.out ]; then
@@ -60,15 +63,18 @@ jobs:
             echo "main-coverage=$MAIN_COVERAGE" >> $GITHUB_OUTPUT
             echo "Main branch coverage: $MAIN_COVERAGE"
             
-            # Copy main coverage file back to workspace
-            cp main-coverage.out ../workspace/main-coverage.out
+            # Copy main coverage file back to current directory
+            cp main-coverage.out "$CURRENT_DIR/main-coverage.out"
           else
             echo "main-coverage=0.0%" >> $GITHUB_OUTPUT
             echo "Could not get main branch coverage"
           fi
           
           # Return to original directory
-          cd ../workspace
+          cd "$CURRENT_DIR"
+          
+          # Clean up worktree
+          git worktree remove /tmp/main-branch
 
       - name: Generate coverage summary
         id: coverage-summary
