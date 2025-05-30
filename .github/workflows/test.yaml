@@ -73,8 +73,8 @@ jobs:
           # Return to original directory
           cd "$CURRENT_DIR"
           
-          # Clean up worktree
-          git worktree remove /tmp/main-branch
+          # Clean up worktree (force removal to handle modified files)
+          git worktree remove --force /tmp/main-branch || rm -rf /tmp/main-branch
 
       - name: Generate coverage summary
         id: coverage-summary
@@ -129,12 +129,35 @@ jobs:
             const fs = require('fs');
             const coverageSummary = fs.readFileSync('coverage-summary.md', 'utf8');
             
-            github.rest.issues.createComment({
+            // Look for existing coverage comment
+            const comments = await github.rest.issues.listComments({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: coverageSummary
             });
+            
+            const botComment = comments.data.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('📊 Test Coverage Report')
+            );
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                comment_id: botComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: coverageSummary
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: coverageSummary
+              });
+            }
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
