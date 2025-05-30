@@ -41,10 +41,11 @@ type componentKey struct {
 // Validate validates the Components object.
 func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []error {
 	errs := []error{}
+	core := c.GetCore()
 
 	for key, input := range c.Inputs.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("input key must be a valid key [%s]: %s", componentNameRegex.String(), key), c.GetCore(), c.GetCore().Inputs, key))
+			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("input key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Inputs, key))
 		}
 
 		if input.IsLeft() {
@@ -56,7 +57,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	for key, parameter := range c.Parameters.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("parameter key must be a valid key [%s]: %s", componentNameRegex.String(), key), c.GetCore(), c.GetCore().Parameters, key))
+			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("parameter key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Parameters, key))
 		}
 
 		paramOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
@@ -66,7 +67,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	for key, successAction := range c.SuccessActions.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("successAction key must be a valid key [%s]: %s", componentNameRegex.String(), key), c.GetCore(), c.GetCore().SuccessActions, key))
+			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("successAction key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.SuccessActions, key))
 		}
 
 		successActionOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
@@ -76,7 +77,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	for key, failureAction := range c.FailureActions.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("failureAction key must be a valid key [%s]: %s", componentNameRegex.String(), key), c.GetCore(), c.GetCore().FailureActions, key))
+			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("failureAction key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.FailureActions, key))
 		}
 
 		failureActionOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
@@ -84,7 +85,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 		errs = append(errs, failureAction.Validate(ctx, failureActionOps...)...)
 	}
 
-	c.Valid = len(errs) == 0 && c.GetCore().GetValid()
+	c.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
 }

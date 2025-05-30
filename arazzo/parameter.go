@@ -52,9 +52,10 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 
 	w := validation.GetContextObject[Workflow](o)
 	s := validation.GetContextObject[Step](o)
+	core := p.GetCore()
 
-	if p.GetCore().Name.Present && p.Name == "" {
-		errs = append(errs, validation.NewValueError("name is required", p.GetCore(), p.GetCore().Name))
+	if core.Name.Present && p.Name == "" {
+		errs = append(errs, validation.NewValueError("name is required", core, core.Name))
 	}
 
 	in := In("")
@@ -70,30 +71,30 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	default:
 		if p.In == nil || in == "" {
 			if w == nil && s != nil && s.WorkflowID == nil {
-				errs = append(errs, validation.NewValueError("in is required within a step when workflowId is not set", p.GetCore(), p.GetCore().In))
+				errs = append(errs, validation.NewValueError("in is required within a step when workflowId is not set", core, core.In))
 			}
 		}
 
 		if in != "" {
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("in must be one of [%s] but was %s", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", "), in), p.GetCore(), p.GetCore().In))
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("in must be one of [%s] but was %s", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", "), in), core, core.In))
 		}
 	}
 
-	if p.GetCore().Value.Present && p.Value == nil {
-		errs = append(errs, validation.NewValueError("value is required", p.GetCore(), p.GetCore().Value))
+	if core.Value.Present && p.Value == nil {
+		errs = append(errs, validation.NewValueError("value is required", core, core.Value))
 	} else if p.Value != nil {
 		_, expression, err := GetValueOrExpressionValue(p.Value)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(err.Error(), p.GetCore(), p.GetCore().Value))
+			errs = append(errs, validation.NewValueError(err.Error(), core, core.Value))
 		}
 		if expression != nil {
 			if err := expression.Validate(true); err != nil {
-				errs = append(errs, validation.NewValueError(err.Error(), p.GetCore(), p.GetCore().Value))
+				errs = append(errs, validation.NewValueError(err.Error(), core, core.Value))
 			}
 		}
 	}
 
-	p.Valid = len(errs) == 0 && p.GetCore().GetValid()
+	p.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
 }

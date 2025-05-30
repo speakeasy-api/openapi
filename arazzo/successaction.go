@@ -59,41 +59,42 @@ func (s *SuccessAction) Validate(ctx context.Context, opts ...validation.Option)
 	}
 
 	errs := []error{}
+	core := s.GetCore()
 
-	if s.GetCore().Name.Present && s.Name == "" {
-		errs = append(errs, validation.NewValueError("name is required", s.GetCore(), s.GetCore().Name))
+	if core.Name.Present && s.Name == "" {
+		errs = append(errs, validation.NewValueError("name is required", core, core.Name))
 	}
 
 	switch s.Type {
 	case SuccessActionTypeEnd:
 		if s.WorkflowID != nil {
-			errs = append(errs, validation.NewValueError("workflowId is not allowed when type: end is specified", s.GetCore(), s.GetCore().WorkflowID))
+			errs = append(errs, validation.NewValueError("workflowId is not allowed when type: end is specified", core, core.WorkflowID))
 		}
 		if s.StepID != nil {
-			errs = append(errs, validation.NewValueError("stepId is not allowed when type: end is specified", s.GetCore(), s.GetCore().StepID))
+			errs = append(errs, validation.NewValueError("stepId is not allowed when type: end is specified", core, core.StepID))
 		}
 	case SuccessActionTypeGoto:
 		errs = append(errs, validationActionWorkflowIDAndStepID(ctx, validationActionWorkflowStepIDParams{
 			parentType:       "successAction",
 			workflowID:       s.WorkflowID,
-			workflowIDLine:   s.GetCore().WorkflowID.GetKeyNodeOrRoot(s.GetCore().RootNode).Line,
-			workflowIDColumn: s.GetCore().WorkflowID.GetKeyNodeOrRoot(s.GetCore().RootNode).Column,
+			workflowIDLine:   core.WorkflowID.GetKeyNodeOrRoot(core.RootNode).Line,
+			workflowIDColumn: core.WorkflowID.GetKeyNodeOrRoot(core.RootNode).Column,
 			stepID:           s.StepID,
-			stepIDLine:       s.GetCore().StepID.GetKeyNodeOrRoot(s.GetCore().RootNode).Line,
-			stepIDColumn:     s.GetCore().StepID.GetKeyNodeOrRoot(s.GetCore().RootNode).Column,
+			stepIDLine:       core.StepID.GetKeyNodeOrRoot(core.RootNode).Line,
+			stepIDColumn:     core.StepID.GetKeyNodeOrRoot(core.RootNode).Column,
 			arazzo:           a,
 			workflow:         validation.GetContextObject[Workflow](o),
 			required:         true,
 		}, opts...)...)
 	default:
-		errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(SuccessActionTypeEnd), string(SuccessActionTypeGoto)}, ", ")), s.GetCore(), s.GetCore().Type))
+		errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(SuccessActionTypeEnd), string(SuccessActionTypeGoto)}, ", ")), core, core.Type))
 	}
 
 	for _, criterion := range s.Criteria {
 		errs = append(errs, criterion.Validate(opts...)...)
 	}
 
-	s.Valid = len(errs) == 0 && s.GetCore().GetValid()
+	s.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
 }

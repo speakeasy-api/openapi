@@ -33,24 +33,25 @@ var _ interfaces.Model[core.RequestBody] = (*RequestBody)(nil)
 // Validate will validate the request body object against the Arazzo specification.
 func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) []error {
 	errs := []error{}
+	core := r.GetCore()
 
 	if r.ContentType != nil {
 		_, _, err := mime.ParseMediaType(*r.ContentType)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("contentType must be valid: %s", err), r.GetCore(), r.GetCore().ContentType))
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("contentType must be valid: %s", err), core, core.ContentType))
 		}
 	}
 
 	if r.Payload != nil {
 		payloadData, err := yaml.Marshal(r.Payload)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(err.Error(), r.GetCore(), r.GetCore().Payload))
+			errs = append(errs, validation.NewValueError(err.Error(), core, core.Payload))
 		}
 
 		expressions := expression.ExtractExpressions(string(payloadData))
 		for _, expression := range expressions {
 			if err := expression.Validate(true); err != nil {
-				errs = append(errs, validation.NewValueError(err.Error(), r.GetCore(), r.GetCore().Payload))
+				errs = append(errs, validation.NewValueError(err.Error(), core, core.Payload))
 			}
 		}
 	}
@@ -59,7 +60,7 @@ func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) [
 		errs = append(errs, replacement.Validate(ctx, opts...)...)
 	}
 
-	r.Valid = len(errs) == 0 && r.GetCore().GetValid()
+	r.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
 }

@@ -109,12 +109,13 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 	}
 
 	errs := []error{}
+	core := r.GetCore()
 
 	switch reflect.TypeOf((*T)(nil)).Elem().Name() {
 	case "Parameter":
 	default:
 		if r.Value != nil {
-			errs = append(errs, validation.NewValueError("value is not allowed when object is not a parameter", r.GetCore(), r.GetCore().Value))
+			errs = append(errs, validation.NewValueError("value is not allowed when object is not a parameter", core, core.Value))
 		}
 	}
 
@@ -124,15 +125,16 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 		errs = append(errs, r.Object.Validate(ctx, opts...)...)
 	}
 
-	r.Valid = len(errs) == 0 && r.GetCore().GetValid()
+	r.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
 }
 
 func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, opts ...validation.Option) []error {
+	core := r.GetCore()
 	if err := r.Reference.Validate(true); err != nil {
 		return []error{
-			validation.NewValueError(err.Error(), r.GetCore(), r.GetCore().Reference),
+			validation.NewValueError(err.Error(), core, core.Reference),
 		}
 	}
 
@@ -140,13 +142,13 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 
 	if typ != expression.ExpressionTypeComponents {
 		return []error{
-			validation.NewValueError(fmt.Sprintf("reference must be a components expression, got %s", r.Reference.GetType()), r.GetCore(), r.GetCore().Reference),
+			validation.NewValueError(fmt.Sprintf("reference must be a components expression, got %s", r.Reference.GetType()), core, core.Reference),
 		}
 	}
 
 	if componentType == "" || len(references) != 1 {
 		return []error{
-			validation.NewValueError(fmt.Sprintf("reference must be a components expression with 3 parts, got %s", *r.Reference), r.GetCore(), r.GetCore().Reference),
+			validation.NewValueError(fmt.Sprintf("reference must be a components expression with 3 parts, got %s", *r.Reference), core, core.Reference),
 		}
 	}
 
@@ -154,7 +156,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 
 	if a.Components == nil {
 		return []error{
-			validation.NewValueError(fmt.Sprintf("components not present, reference to missing component %s", *r.Reference), r.GetCore(), r.GetCore().Reference),
+			validation.NewValueError(fmt.Sprintf("components not present, reference to missing component %s", *r.Reference), core, core.Reference),
 		}
 	}
 
@@ -168,7 +170,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 			typ:                objType,
 			components:         a.Components.Parameters,
 			reference:          r.Reference,
-			referenceValueNode: r.GetCore().Reference.GetValueNodeOrRoot(r.GetCore().RootNode),
+			referenceValueNode: core.Reference.GetValueNodeOrRoot(core.RootNode),
 		}, opts...)
 	case "successActions":
 		return validateComponentReference(ctx, validateComponentReferenceArgs[*SuccessAction]{
@@ -177,7 +179,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 			typ:                objType,
 			components:         a.Components.SuccessActions,
 			reference:          r.Reference,
-			referenceValueNode: r.GetCore().Reference.GetValueNodeOrRoot(r.GetCore().RootNode),
+			referenceValueNode: core.Reference.GetValueNodeOrRoot(core.RootNode),
 		}, opts...)
 	case "failureActions":
 		return validateComponentReference(ctx, validateComponentReferenceArgs[*FailureAction]{
@@ -186,11 +188,11 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 			typ:                objType,
 			components:         a.Components.FailureActions,
 			reference:          r.Reference,
-			referenceValueNode: r.GetCore().Reference.GetValueNodeOrRoot(r.GetCore().RootNode),
+			referenceValueNode: core.Reference.GetValueNodeOrRoot(core.RootNode),
 		}, opts...)
 	default:
 		return []error{
-			validation.NewValueError(fmt.Sprintf("reference to %s is not valid, valid components are [parameters, successActions, failureActions]", componentType), r.GetCore(), r.GetCore().Reference),
+			validation.NewValueError(fmt.Sprintf("reference to %s is not valid, valid components are [parameters, successActions, failureActions]", componentType), core, core.Reference),
 		}
 	}
 }

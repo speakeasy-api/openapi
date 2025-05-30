@@ -15,13 +15,6 @@ import (
 func Test_SyncValue_ErrorPaths_Coverage(t *testing.T) {
 	ctx := context.Background()
 
-	// Test with interface{} to hit the panic path
-	defer func() {
-		if r := recover(); r != nil {
-			// This is expected for the interface{} case
-		}
-	}()
-
 	// Test sync with invalid target
 	_, err := marshaller.SyncValue(ctx, "test", nil, nil, false)
 	require.Error(t, err)
@@ -30,9 +23,9 @@ func Test_SyncValue_ErrorPaths_Coverage(t *testing.T) {
 // Test Node.SyncValue error path
 func Test_Node_SyncValue_Error_Coverage(t *testing.T) {
 	ctx := context.Background()
-	
+
 	node := &marshaller.Node[string]{}
-	
+
 	// Test with an error-causing scenario
 	_, _, err := node.SyncValue(ctx, "key", make(chan int))
 	require.Error(t, err)
@@ -55,27 +48,27 @@ func Test_UnmarshalNode_VariousTypes_Coverage(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name string
-		yaml string
-		target any
+		name        string
+		yaml        string
+		target      any
 		expectError bool
 	}{
 		{
-			name: "alias node",
-			yaml: `&anchor "value"`,
-			target: new(string),
+			name:        "alias node",
+			yaml:        `&anchor "value"`,
+			target:      new(string),
 			expectError: false,
 		},
 		{
-			name: "null node",
-			yaml: `null`,
-			target: new(*string),
+			name:        "null node",
+			yaml:        `null`,
+			target:      new(*string),
 			expectError: false,
 		},
 		{
-			name: "document node",
-			yaml: `"value"`,
-			target: new(string),
+			name:        "document node",
+			yaml:        `"value"`,
+			target:      new(string),
 			expectError: false,
 		},
 	}
@@ -220,7 +213,7 @@ func Test_UnmarshallerSpecificErrors_Coverage(t *testing.T) {
 	require.Error(t, err)
 }
 
-// Test simple additional scenarios 
+// Test simple additional scenarios
 func Test_SimpleAdditionalScenarios_Coverage(t *testing.T) {
 	ctx := context.Background()
 

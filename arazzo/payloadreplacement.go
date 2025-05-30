@@ -28,30 +28,31 @@ var _ interfaces.Model[core.PayloadReplacement] = (*PayloadReplacement)(nil)
 // Validate will validate the payload replacement object against the Arazzo specification.
 func (p *PayloadReplacement) Validate(ctx context.Context, opts ...validation.Option) []error {
 	errs := []error{}
+	core := p.GetCore()
 
-	if p.GetCore().Target.Present && p.Target == "" {
-		errs = append(errs, validation.NewValueError("target is required", p.GetCore(), p.GetCore().Target))
+	if core.Target.Present && p.Target == "" {
+		errs = append(errs, validation.NewValueError("target is required", core, core.Target))
 	}
 
 	if err := p.Target.Validate(); err != nil {
-		errs = append(errs, validation.NewValueError(err.Error(), p.GetCore(), p.GetCore().Target))
+		errs = append(errs, validation.NewValueError(err.Error(), core, core.Target))
 	}
 
-	if p.GetCore().Value.Present && p.Value == nil {
-		errs = append(errs, validation.NewValueError("value is required", p.GetCore(), p.GetCore().Value))
+	if core.Value.Present && p.Value == nil {
+		errs = append(errs, validation.NewValueError("value is required", core, core.Value))
 	} else if p.Value != nil {
 		_, expression, err := GetValueOrExpressionValue(p.Value)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(err.Error(), p.GetCore(), p.GetCore().Value))
+			errs = append(errs, validation.NewValueError(err.Error(), core, core.Value))
 		}
 		if expression != nil {
 			if err := expression.Validate(true); err != nil {
-				errs = append(errs, validation.NewValueError(err.Error(), p.GetCore(), p.GetCore().Value))
+				errs = append(errs, validation.NewValueError(err.Error(), core, core.Value))
 			}
 		}
 	}
 
-	p.Valid = len(errs) == 0 && p.GetCore().GetValid()
+	p.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
 }

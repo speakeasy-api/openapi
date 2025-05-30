@@ -60,9 +60,9 @@ func Test_PopulateModel_SequencedMap_Success(t *testing.T) {
 	// Create source SequencedMap
 	source := &MockSequencedMap{}
 	source.Init()
-	source.SetUntyped("key1", "value1")
-	source.SetUntyped("key2", "value2")
-	source.SetUntyped("key3", "value3")
+	require.NoError(t, source.SetUntyped("key1", "value1"))
+	require.NoError(t, source.SetUntyped("key2", "value2"))
+	require.NoError(t, source.SetUntyped("key3", "value3"))
 
 	// Create target SequencedMap
 	target := &MockSequencedMap{}
@@ -108,7 +108,7 @@ func Test_PopulateModel_SequencedMap_InvalidSource_Error(t *testing.T) {
 	type NotSequencedMapSource struct {
 		Field string
 	}
-	
+
 	source := &NotSequencedMapSource{Field: "not-a-sequenced-map"}
 
 	// Create target SequencedMap
@@ -144,14 +144,14 @@ func Test_PopulateModel_SequencedMap_InvalidTarget_Error(t *testing.T) {
 	// Create source SequencedMap
 	source := &MockSequencedMap{}
 	source.Init()
-	source.SetUntyped("key", "value")
+	require.NoError(t, source.SetUntyped("key", "value"))
 
 	// Create a mock target that looks like it implements SequencedMap but doesn't cast correctly
 	// This creates a scenario where the type checking would pass but interface assertion fails
 	type FakeSequencedMap struct {
-		field string
+		field string // nolint:unused
 	}
-	
+
 	// Don't implement the interface - this will cause the populateSequencedMap to fail
 	// when it tries to cast target.Interface().(SequencedMap)
 	target := &FakeSequencedMap{}
@@ -176,7 +176,7 @@ func Test_PopulateModel_SequencedMap_SetError(t *testing.T) {
 	// Create source SequencedMap
 	source := &MockSequencedMap{}
 	source.Init()
-	source.SetUntyped("key", "value")
+	require.NoError(t, source.SetUntyped("key", "value"))
 
 	// Create target SequencedMap that errors on Set
 	target := &ErrorSequencedMap{}
@@ -241,8 +241,8 @@ func Test_PopulateModel_SequencedMap_ComplexValues_Success(t *testing.T) {
 	// Create source SequencedMap with complex values
 	source := &ComplexSequencedMap{}
 	source.Init()
-	source.SetUntyped("item1", ComplexValue{Field: "value1"})
-	source.SetUntyped("item2", ComplexValue{Field: "value2"})
+	require.NoError(t, source.SetUntyped("item1", ComplexValue{Field: "value1"}))
+	require.NoError(t, source.SetUntyped("item2", ComplexValue{Field: "value2"}))
 
 	// Create target SequencedMap
 	target := &ComplexSequencedMap{}
@@ -253,7 +253,7 @@ func Test_PopulateModel_SequencedMap_ComplexValues_Success(t *testing.T) {
 
 	// Verify complex values were copied correctly
 	assert.NotNil(t, target.data)
-	
+
 	item1, ok := target.data["item1"].(ComplexValue)
 	require.True(t, ok)
 	assert.Equal(t, "value1", item1.Field)

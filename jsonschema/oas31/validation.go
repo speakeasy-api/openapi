@@ -27,17 +27,18 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 	// TODO we maybe need to unset any $schema node as it will potentially change how the schema is validated
 
 	buf := bytes.NewBuffer([]byte{})
+	core := js.GetCore()
 
-	if err := json.YAMLToJSON(js.GetCore().RootNode, 0, buf); err != nil {
+	if err := json.YAMLToJSON(core.RootNode, 0, buf); err != nil {
 		return []error{
-			validation.NewNodeError(err.Error(), js.GetCore().RootNode),
+			validation.NewNodeError(err.Error(), core.RootNode),
 		}
 	}
 
 	jsAny, err := jsValidator.UnmarshalJSON(buf)
 	if err != nil {
 		return []error{
-			validation.NewNodeError(err.Error(), js.GetCore().RootNode),
+			validation.NewNodeError(err.Error(), core.RootNode),
 		}
 	}
 
@@ -46,15 +47,15 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 	if err != nil {
 		var validationErr *jsValidator.ValidationError
 		if errors.As(err, &validationErr) {
-			errs = getRootCauses(validationErr, *js.GetCore())
+			errs = getRootCauses(validationErr, *core)
 		} else {
 			errs = []error{
-				validation.NewNodeError(err.Error(), js.GetCore().RootNode),
+				validation.NewNodeError(err.Error(), core.RootNode),
 			}
 		}
 	}
 
-	js.Valid = len(errs) == 0 && js.GetCore().GetValid()
+	js.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
 }
