@@ -16,32 +16,30 @@ import (
 )
 
 type ModelWithExtensions struct {
-	Test string
+	marshaller.Model[CoreModelWithExtensions]
 
+	Test       string
 	Extensions *extensions.Extensions
-
-	core CoreModelWithExtensions //nolint:unused
 }
 
 type CoreModelWithExtensions struct {
+	marshaller.CoreModel
 	Test       marshaller.Node[string]   `key:"test"`
 	Extensions coreExtensions.Extensions `key:"extensions"`
-
-	RootNode *yaml.Node
 }
 
 type TestModel struct {
+	marshaller.Model[TestCoreModel]
+
 	Name  string
 	Value yaml.Node
-
-	core TestCoreModel //nolint:unused
 }
 
 type TestCoreModel struct {
+	marshaller.CoreModel
+
 	Name  marshaller.Node[string]     `key:"name"`
 	Value marshaller.Node[*yaml.Node] `key:"value" required:"true"`
-
-	RootNode *yaml.Node
 }
 
 func TestUnmarshalExtensionModel_Success(t *testing.T) {

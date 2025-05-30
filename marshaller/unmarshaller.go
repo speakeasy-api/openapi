@@ -58,13 +58,20 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 		return fmt.Errorf("expected a struct, got %s", out.Kind())
 	}
 
-	// Find the RootNode field and populate it
-	rootNodeField := out.FieldByName("RootNode")
-	if rootNodeField.IsValid() {
-		rootNodeField.Set(reflect.ValueOf(node))
+	var unmarshallable CoreModeler
+
+	// Check if struct implements UnmarshallableCoreModel
+	if out.Addr().Type().Implements(reflect.TypeOf((*CoreModeler)(nil)).Elem()) {
+		var ok bool
+		unmarshallable, ok = out.Addr().Interface().(CoreModeler)
+		if !ok {
+			return fmt.Errorf("expected UnmarshallableCoreModel, got %s", out.Type())
+		}
 	} else {
-		return fmt.Errorf("expected RootNode field to be present in model")
+		return fmt.Errorf("expected struct to implement UnmarshallableCoreModel, got %s", out.Type())
 	}
+
+	unmarshallable.SetRootNode(node)
 
 	type Field struct {
 		Name     string
@@ -141,6 +148,8 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 		}
 	}
 
+	valid := true
+
 	for key, field := range fields.All() {
 		if !field.Required {
 			continue
@@ -148,8 +157,11 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 
 		if _, ok := foundFields.Get(key); !ok {
 			validation.AddValidationError(ctx, validation.NewNodeError(fmt.Sprintf("field %s is missing", key), node))
+			valid = false
 		}
 	}
+
+	unmarshallable.SetValid(valid)
 
 	return nil
 }

@@ -2,7 +2,6 @@ package validation
 
 import (
 	"fmt"
-	"reflect"
 
 	"gopkg.in/yaml.v3"
 )
@@ -43,20 +42,20 @@ func NewNodeError(msg string, node *yaml.Node) error {
 	}
 }
 
-func NewValueError(msg string, core any, node valueNodeGetter) error {
-	// Use reflection to get the RootNode field from the core model
-	v := reflect.ValueOf(core)
-	rootNodeField := v.FieldByName("RootNode")
+type CoreModeler interface {
+	GetRootNode() *yaml.Node
+}
 
-	if !rootNodeField.IsValid() || rootNodeField.IsNil() {
+func NewValueError(msg string, core CoreModeler, node valueNodeGetter) error {
+	rootNode := core.GetRootNode()
+
+	if rootNode == nil {
 		// Fallback if RootNode is not available
 		return &Error{
 			Message: msg,
 			// Default to line 0, column 0 if we can't get location info
 		}
 	}
-
-	rootNode := rootNodeField.Interface().(*yaml.Node)
 	valueNode := node.GetValueNodeOrRoot(rootNode)
 
 	return &Error{
@@ -66,20 +65,16 @@ func NewValueError(msg string, core any, node valueNodeGetter) error {
 	}
 }
 
-func NewSliceError(msg string, core any, node sliceNodeGetter, index int) error {
-	// Use reflection to get the RootNode field from the core model
-	v := reflect.ValueOf(core)
-	rootNodeField := v.FieldByName("RootNode")
+func NewSliceError(msg string, core CoreModeler, node sliceNodeGetter, index int) error {
+	rootNode := core.GetRootNode()
 
-	if !rootNodeField.IsValid() || rootNodeField.IsNil() {
+	if rootNode == nil {
 		// Fallback if RootNode is not available
 		return &Error{
 			Message: msg,
 			// Default to line 0, column 0 if we can't get location info
 		}
 	}
-
-	rootNode := rootNodeField.Interface().(*yaml.Node)
 	valueNode := node.GetSliceValueNodeOrRoot(index, rootNode)
 
 	return &Error{
@@ -89,20 +84,16 @@ func NewSliceError(msg string, core any, node sliceNodeGetter, index int) error 
 	}
 }
 
-func NewMapKeyError(msg string, core any, node mapKeyNodeGetter, key string) error {
-	// Use reflection to get the RootNode field from the core model
-	v := reflect.ValueOf(core)
-	rootNodeField := v.FieldByName("RootNode")
+func NewMapKeyError(msg string, core CoreModeler, node mapKeyNodeGetter, key string) error {
+	rootNode := core.GetRootNode()
 
-	if !rootNodeField.IsValid() || rootNodeField.IsNil() {
+	if rootNode == nil {
 		// Fallback if RootNode is not available
 		return &Error{
 			Message: msg,
 			// Default to line 0, column 0 if we can't get location info
 		}
 	}
-
-	rootNode := rootNodeField.Interface().(*yaml.Node)
 	valueNode := node.GetMapKeyNodeOrRoot(key, rootNode)
 
 	return &Error{
@@ -112,20 +103,16 @@ func NewMapKeyError(msg string, core any, node mapKeyNodeGetter, key string) err
 	}
 }
 
-func NewMapValueError(msg string, core any, node mapValueNodeGetter, key string) error {
-	// Use reflection to get the RootNode field from the core model
-	v := reflect.ValueOf(core)
-	rootNodeField := v.FieldByName("RootNode")
+func NewMapValueError(msg string, core CoreModeler, node mapValueNodeGetter, key string) error {
+	rootNode := core.GetRootNode()
 
-	if !rootNodeField.IsValid() || rootNodeField.IsNil() {
+	if rootNode == nil {
 		// Fallback if RootNode is not available
 		return &Error{
 			Message: msg,
 			// Default to line 0, column 0 if we can't get location info
 		}
 	}
-
-	rootNode := rootNodeField.Interface().(*yaml.Node)
 	valueNode := node.GetMapValueNodeOrRoot(key, rootNode)
 
 	return &Error{

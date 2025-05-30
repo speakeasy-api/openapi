@@ -13,11 +13,14 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/arazzo"
+	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/arazzo/criterion"
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31"
+	jsonschema_core "github.com/speakeasy-api/openapi/jsonschema/oas31/core"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
@@ -41,7 +44,9 @@ var testArazzoInstance = &arazzo.Arazzo{
 			Line:   6,
 			Column: 11,
 		})),
-		Valid: true,
+		Model: marshaller.Model[core.Info]{
+			Valid: true,
+		},
 	},
 	SourceDescriptions: []*arazzo.SourceDescription{
 		{
@@ -55,7 +60,9 @@ var testArazzoInstance = &arazzo.Arazzo{
 				Line:   11,
 				Column: 13,
 			})),
-			Valid: true,
+			Model: marshaller.Model[core.SourceDescription]{
+				Valid: true,
+			},
 		},
 	},
 	Workflows: []*arazzo.Workflow{
@@ -69,19 +76,27 @@ var testArazzoInstance = &arazzo.Arazzo{
 						Name:  "parameter1",
 						In:    pointer.From(arazzo.InQuery),
 						Value: &yaml.Node{Value: "123", Kind: yaml.ScalarNode, Tag: "!!str", Line: 19, Column: 16, Style: yaml.DoubleQuotedStyle},
+						Model: marshaller.Model[core.Parameter]{
+							Valid: true,
+						},
+					},
+					Model: marshaller.Model[core.Reusable[*core.Parameter]]{
 						Valid: true,
 					},
-					Valid: true,
 				},
 			},
 			Inputs: oas31.NewJSONSchemaFromSchema(&oas31.Schema{
 				Type: oas31.NewTypeFromString("object"),
 				Properties: sequencedmap.New(sequencedmap.NewElem("input1", oas31.NewJSONSchemaFromSchema(&oas31.Schema{
-					Type:  oas31.NewTypeFromString("string"),
-					Valid: true,
+					Type: oas31.NewTypeFromString("string"),
+					Model: marshaller.Model[jsonschema_core.Schema]{
+						Valid: true,
+					},
 				}))),
 				Required: []string{"input1"},
-				Valid:    true,
+				Model: marshaller.Model[jsonschema_core.Schema]{
+					Valid: true,
+				},
 			}),
 			Steps: []*arazzo.Step{
 				{
@@ -92,7 +107,9 @@ var testArazzoInstance = &arazzo.Arazzo{
 						{
 							Reference: pointer.From[expression.Expression]("$components.parameters.userId"),
 							Value:     &yaml.Node{Value: "456", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle, Line: 33, Column: 20},
-							Valid:     true,
+							Model: marshaller.Model[core.Reusable[*core.Parameter]]{
+								Valid: true,
+							},
 						},
 					},
 					RequestBody: &arazzo.RequestBody{
@@ -133,30 +150,42 @@ var testArazzoInstance = &arazzo.Arazzo{
 							{
 								Target: jsonpointer.JSONPointer("/b"),
 								Value:  &yaml.Node{Value: "3", Kind: yaml.ScalarNode, Tag: "!!int", Line: 39, Column: 22},
-								Valid:  true,
+								Model: marshaller.Model[core.PayloadReplacement]{
+									Valid: true,
+								},
 							},
 						},
-						Valid: true,
+						Model: marshaller.Model[core.RequestBody]{
+							Valid: true,
+						},
 					},
-					SuccessCriteria: []*criterion.Criterion{{Condition: "$statusCode == 200", Type: criterion.CriterionTypeUnion{}, Valid: true}},
+					SuccessCriteria: []*criterion.Criterion{{Condition: "$statusCode == 200", Type: criterion.CriterionTypeUnion{}, Model: marshaller.Model[core.Criterion]{Valid: true}}},
 					OnSuccess: []*arazzo.ReusableSuccessAction{
 						{
 							Reference: pointer.From[expression.Expression]("$components.successActions.success"),
-							Valid:     true,
+							Model: marshaller.Model[core.Reusable[*core.SuccessAction]]{
+								Valid: true,
+							},
 						},
 					},
 					OnFailure: []*arazzo.ReusableFailureAction{
 						{
 							Reference: pointer.From[expression.Expression]("$components.failureActions.failure"),
-							Valid:     true,
+							Model: marshaller.Model[core.Reusable[*core.FailureAction]]{
+								Valid: true,
+							},
 						},
 					},
 					Outputs: sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("name", "$response.body#/name")),
-					Valid:   true,
+					Model: marshaller.Model[core.Step]{
+						Valid: true,
+					},
 				},
 			},
 			Outputs: sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("name", "$steps.step1.outputs.name")),
-			Valid:   true,
+			Model: marshaller.Model[core.Workflow]{
+				Valid: true,
+			},
 		},
 	},
 	Components: &arazzo.Components{
@@ -164,7 +193,9 @@ var testArazzoInstance = &arazzo.Arazzo{
 			Name:  "userId",
 			In:    pointer.From(arazzo.InQuery),
 			Value: &yaml.Node{Value: "123", Kind: yaml.ScalarNode, Tag: "!!str"},
-			Valid: true,
+			Model: marshaller.Model[core.Parameter]{
+				Valid: true,
+			},
 		})),
 		SuccessActions: sequencedmap.New(sequencedmap.NewElem("success", &arazzo.SuccessAction{
 			Name: "success",
@@ -172,7 +203,9 @@ var testArazzoInstance = &arazzo.Arazzo{
 			Criteria: []criterion.Criterion{{Context: pointer.From(expression.Expression("$statusCode")), Condition: "$statusCode == 200", Type: criterion.CriterionTypeUnion{
 				Type: pointer.From(criterion.CriterionTypeSimple),
 			}}},
-			Valid: true,
+			Model: marshaller.Model[core.SuccessAction]{
+				Valid: true,
+			},
 		})),
 		FailureActions: sequencedmap.New(sequencedmap.NewElem("failure", &arazzo.FailureAction{
 			Name:       "failure",
@@ -182,9 +215,13 @@ var testArazzoInstance = &arazzo.Arazzo{
 			Criteria: []criterion.Criterion{{Context: pointer.From(expression.Expression("$statusCode")), Condition: "$statusCode == 500", Type: criterion.CriterionTypeUnion{
 				Type: pointer.From(criterion.CriterionTypeSimple),
 			}}},
-			Valid: true,
+			Model: marshaller.Model[core.FailureAction]{
+				Valid: true,
+			},
 		})),
-		Valid: true,
+		Model: marshaller.Model[core.Components]{
+			Valid: true,
+		},
 	},
 	Extensions: extensions.New(extensions.NewElem("x-test", &yaml.Node{
 		Value:  "some-value",
@@ -193,7 +230,9 @@ var testArazzoInstance = &arazzo.Arazzo{
 		Line:   72,
 		Column: 9,
 	})),
-	Valid: true,
+	Model: marshaller.Model[core.Arazzo]{
+		Valid: true,
+	},
 }
 
 func TestArazzo_Unmarshal_Success(t *testing.T) {
@@ -265,7 +304,9 @@ sourceDescriptions:
 		Info: arazzo.Info{
 			Title:   "My Workflow",
 			Version: "",
-			Valid:   true,
+			Model: marshaller.Model[core.Info]{
+				Valid: false,
+			},
 		},
 		SourceDescriptions: []*arazzo.SourceDescription{
 			{

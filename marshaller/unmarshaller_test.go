@@ -15,31 +15,31 @@ import (
 type Extensions = *sequencedmap.Map[string, Node[Extension]]
 
 type TestCoreModel struct {
+	CoreModel
+
 	PrimitiveField              Node[string]                                     `key:"primitiveField"`
 	NestedModelField            Node[TestNestedModel]                            `key:"nestedModelField"`
 	NestedModelOptionalField    Node[*TestNestedModel]                           `key:"nestedModelOptionalField"`
 	SliceNestedModelField       Node[[]TestNestedModel]                          `key:"sliceNestedModelField"`
 	MapRequiredNestedModelField Node[*sequencedmap.Map[string, TestNestedModel]] `key:"mapRequiredNestedModelField" required:"true"`
 	Extensions                  Extensions                                       `key:"extensions"`
-
-	RootNode *yaml.Node
 }
 
 type TestNestedModel struct {
+	CoreModel
+
 	PrimitiveOptionalField      Node[*string]                        `key:"primitiveOptionalField"`
 	SlicePrimitiveField         Node[[]string]                       `key:"slicePrimitiveField"`
 	SliceRequiredPrimitiveField Node[[]string]                       `key:"sliceRequiredPrimitiveField" required:"true"`
 	MapPrimitiveField           Node[*sequencedmap.Map[string, int]] `key:"mapPrimitiveField"`
 	Extensions                  Extensions                           `key:"extensions"`
-
-	RootNode *yaml.Node
 }
 
 func (t *TestNestedModel) Unmarshal(ctx context.Context, node *yaml.Node) error {
 	return UnmarshalModel(ctx, node, t)
 }
 
-func TestUnmarshalStruct_Success(t *testing.T) {
+func Test_UnmarshalModel_Success(t *testing.T) {
 	testYaml := `primitiveField: "hello world"
 nestedModelField:
   primitiveOptionalField: "guess who"
@@ -125,7 +125,7 @@ x-test-2: some-value-2
 	assert.NotNil(t, out.NestedModelField.Value.RootNode)
 }
 
-func TestUnmarshalStruct_Error_NotAMappingNode(t *testing.T) {
+func Test_UnmarshalModel_NotAMappingNode_Error(t *testing.T) {
 	testYaml := `"hello world"`
 	var node yaml.Node
 	err := yaml.Unmarshal([]byte(testYaml), &node)
@@ -138,7 +138,7 @@ func TestUnmarshalStruct_Error_NotAMappingNode(t *testing.T) {
 	assert.Equal(t, "expected a mapping node, got 8", err.Error())
 }
 
-func TestUnmarshalStruct_Error_NotAStruct(t *testing.T) {
+func Test_UnmarshalModel_NotAStruct_Error(t *testing.T) {
 	testYaml := `primitiveField: "hello world"`
 	var node yaml.Node
 	err := yaml.Unmarshal([]byte(testYaml), &node)

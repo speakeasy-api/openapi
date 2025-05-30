@@ -11,6 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -29,6 +30,8 @@ func (w Workflows) Find(id string) *Workflow {
 
 // Workflow represents a set of steps that orchestrates the execution of API calls.
 type Workflow struct {
+	marshaller.Model[core.Workflow]
+
 	// WorkflowID is a unique identifier for the workflow.
 	WorkflowID string
 	// Summary is a short description of the purpose of the workflow.
@@ -51,20 +54,9 @@ type Workflow struct {
 	Outputs Outputs
 	// Extensions provides a list of extensions to the Workflow object.
 	Extensions *extensions.Extensions
-
-	// Valid indicates whether this model passed validation.
-	Valid bool
-
-	core core.Workflow
 }
 
 var _ interfaces.Model[core.Workflow] = (*Workflow)(nil)
-
-// GetCore will return the low level representation of the workflow object.
-// Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
-func (w *Workflow) GetCore() *core.Workflow {
-	return &w.core
-}
 
 var outputNameRegex = regexp.MustCompile(`^[a-zA-Z0-9\.\-_]+$`)
 
@@ -84,34 +76,35 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 	opts = append(opts, validation.WithContextObject(w))
 
 	errs := []error{}
+	core := w.GetCore()
 
-	if w.core.WorkflowID.Present && w.WorkflowID == "" {
-		errs = append(errs, validation.NewValueError("workflowId is required", w.core, w.core.WorkflowID))
+	if core.WorkflowID.Present && w.WorkflowID == "" {
+		errs = append(errs, validation.NewValueError("workflowId is required", core, core.WorkflowID))
 	}
 
 	if w.Inputs != nil {
-		inputsValNode := w.core.Inputs.GetValueNodeOrRoot(w.core.RootNode)
+		inputsValNode := core.Inputs.GetValueNodeOrRoot(core.RootNode)
 		errs = append(errs, validateJSONSchema(ctx, w.Inputs, inputsValNode.Line, inputsValNode.Column, opts...)...)
 	}
 
 	for i, dependsOn := range w.DependsOn {
 		if err := dependsOn.Validate(false); err != nil {
-			errs = append(errs, validation.NewSliceError(err.Error(), w.core, w.core.DependsOn, i))
+			errs = append(errs, validation.NewSliceError(err.Error(), core, core.DependsOn, i))
 		}
 
 		if dependsOn.IsExpression() {
 			typ, sourceDescriptionName, _, _ := dependsOn.GetParts()
 
 			if typ != expression.ExpressionTypeSourceDescriptions {
-				errs = append(errs, validation.NewSliceError(fmt.Sprintf("dependsOn must be a sourceDescriptions expression if not a workflowId, got %s", typ), w.core, w.core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(fmt.Sprintf("dependsOn must be a sourceDescriptions expression if not a workflowId, got %s", typ), core, core.DependsOn, i))
 			}
 
 			if a.SourceDescriptions.Find(sourceDescriptionName) == nil {
-				errs = append(errs, validation.NewSliceError(fmt.Sprintf("dependsOn sourceDescription %s not found", sourceDescriptionName), w.core, w.core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(fmt.Sprintf("dependsOn sourceDescription %s not found", sourceDescriptionName), core, core.DependsOn, i))
 			}
 		} else {
 			if a.Workflows.Find(string(dependsOn)) == nil {
-				errs = append(errs, validation.NewSliceError(fmt.Sprintf("dependsOn workflowId %s not found", dependsOn), w.core, w.core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(fmt.Sprintf("dependsOn workflowId %s not found", dependsOn), core, core.DependsOn, i))
 			}
 		}
 	}
@@ -130,11 +123,11 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	for name, output := range w.Outputs.All() {
 		if !outputNameRegex.MatchString(name) {
-			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("output name must be a valid name [%s]: %s", outputNameRegex.String(), name), w.core, w.core.Outputs, name))
+			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("output name must be a valid name [%s]: %s", outputNameRegex.String(), name), core, core.Outputs, name))
 		}
 
 		if err := output.Validate(true); err != nil {
-			errs = append(errs, validation.NewMapValueError(err.Error(), w.core, w.core.Outputs, name))
+			errs = append(errs, validation.NewMapValueError(err.Error(), core, core.Outputs, name))
 		}
 	}
 
@@ -142,9 +135,7 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 		errs = append(errs, parameter.Validate(ctx, opts...)...)
 	}
 
-	if len(errs) == 0 {
-		w.Valid = true
-	}
+	w.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
 }

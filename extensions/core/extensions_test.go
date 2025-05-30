@@ -14,10 +14,9 @@ import (
 )
 
 type TestCoreModel struct {
+	marshaller.CoreModel
 	Name  marshaller.Node[string]     `key:"name"`
 	Value marshaller.Node[*yaml.Node] `key:"value" required:"true"`
-
-	RootNode *yaml.Node
 }
 
 func (t *TestCoreModel) Unmarshal(ctx context.Context, node *yaml.Node) error {

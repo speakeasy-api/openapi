@@ -13,6 +13,7 @@ import (
 type JSONSchema = *EitherValue[Schema, bool]
 
 type Schema struct {
+	marshaller.CoreModel
 	Ref                   marshaller.Node[*string]                               `key:"$ref"`
 	ExclusiveMaximum      marshaller.Node[*EitherValue[bool, float64]]           `key:"exclusiveMaximum"`
 	ExclusiveMinimum      marshaller.Node[*EitherValue[bool, float64]]           `key:"exclusiveMinimum"`
@@ -66,8 +67,6 @@ type Schema struct {
 	Schema                marshaller.Node[*string]                               `key:"$schema"`
 
 	Extensions core.Extensions `key:"extensions"`
-
-	RootNode *yaml.Node
 }
 
 var _ interfaces.CoreModel = (*Schema)(nil)

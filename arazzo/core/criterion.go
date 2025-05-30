@@ -12,23 +12,22 @@ import (
 )
 
 type CriterionExpressionType struct {
+	marshaller.CoreModel
 	Type    marshaller.Node[string] `key:"type"`
 	Version marshaller.Node[string] `key:"version"`
-
-	RootNode *yaml.Node
 }
 
 type CriterionTypeUnion struct {
+	marshaller.CoreModel
 	Type           *string
 	ExpressionType *CriterionExpressionType
-
-	RootNode *yaml.Node
 }
 
 var _ interfaces.CoreModel = (*CriterionTypeUnion)(nil)
 
 func (c *CriterionTypeUnion) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	c.RootNode = node
+	c.SetRootNode(node)
+	c.SetValid(true)
 
 	switch node.Kind {
 	case yaml.ScalarNode:
@@ -68,19 +67,18 @@ func (c *CriterionTypeUnion) SyncChanges(ctx context.Context, model any, valueNo
 	}
 
 	if tv != nil {
-		c.RootNode = tv
+		c.SetRootNode(tv)
 		return tv, nil
 	} else {
-		c.RootNode = ev
+		c.SetRootNode(ev)
 		return ev, nil
 	}
 }
 
 type Criterion struct {
+	marshaller.CoreModel
 	Context    marshaller.Node[*Expression]        `key:"context"`
 	Condition  marshaller.Node[string]             `key:"condition"`
 	Type       marshaller.Node[CriterionTypeUnion] `key:"type" required:"false"`
 	Extensions core.Extensions                     `key:"extensions"`
-
-	RootNode *yaml.Node
 }

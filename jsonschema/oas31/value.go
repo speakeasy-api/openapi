@@ -2,6 +2,7 @@ package oas31
 
 import (
 	"github.com/speakeasy-api/openapi/jsonschema/oas31/core"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
 	"gopkg.in/yaml.v3"
 )
@@ -64,14 +65,10 @@ func NewJSONSchemaOrBoolFromBool(value bool) JSONSchema {
 }
 
 type EitherValue[L any, LCore any, R any, RCore any] struct {
+	marshaller.Model[core.EitherValue[LCore, RCore]]
+
 	Left  *L
 	Right *R
-
-	core core.EitherValue[LCore, RCore]
-}
-
-func (e *EitherValue[L, LCore, R, RCore]) GetCore() *core.EitherValue[LCore, RCore] {
-	return &e.core
 }
 
 func (e *EitherValue[L, LCore, R, RCore]) IsLeft() bool {

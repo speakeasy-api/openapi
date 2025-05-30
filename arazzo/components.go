@@ -9,12 +9,15 @@ import (
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
 // Components holds reusable components that can be referenced in an Arazzo document.
 type Components struct {
+	marshaller.Model[core.Components]
+
 	// Inputs provides a list of reusable JSON Schemas that can be referenced from inputs and other JSON Schemas.
 	Inputs *sequencedmap.Map[string, oas31.JSONSchema]
 	// Parameters provides a list of reusable parameters that can be referenced from workflows and steps.
@@ -25,20 +28,9 @@ type Components struct {
 	FailureActions *sequencedmap.Map[string, *FailureAction]
 	// Extensions provides a list of extensions to the Components object.
 	Extensions *extensions.Extensions
-
-	// Valid indicates whether this model passed validation.
-	Valid bool
-
-	core core.Components
 }
 
 var _ interfaces.Model[core.Components] = (*Components)(nil)
-
-// GetCore will return the low level representation of the components object.
-// Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
-func (c *Components) GetCore() *core.Components {
-	return &c.core
-}
 
 var componentNameRegex = regexp.MustCompile(`^[a-zA-Z0-9\.\-_]+$`)
 
@@ -49,10 +41,11 @@ type componentKey struct {
 // Validate validates the Components object.
 func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []error {
 	errs := []error{}
+	core := c.GetCore()
 
 	for key, input := range c.Inputs.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("input key must be a valid key [%s]: %s", componentNameRegex.String(), key), c.core, c.core.Inputs, key))
+			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("input key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Inputs, key))
 		}
 
 		if input.IsLeft() {
@@ -64,7 +57,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	for key, parameter := range c.Parameters.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("parameter key must be a valid key [%s]: %s", componentNameRegex.String(), key), c.core, c.core.Parameters, key))
+			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("parameter key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Parameters, key))
 		}
 
 		paramOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
@@ -74,7 +67,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	for key, successAction := range c.SuccessActions.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("successAction key must be a valid key [%s]: %s", componentNameRegex.String(), key), c.core, c.core.SuccessActions, key))
+			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("successAction key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.SuccessActions, key))
 		}
 
 		successActionOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
@@ -84,7 +77,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	for key, failureAction := range c.FailureActions.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("failureAction key must be a valid key [%s]: %s", componentNameRegex.String(), key), c.core, c.core.FailureActions, key))
+			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("failureAction key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.FailureActions, key))
 		}
 
 		failureActionOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
@@ -92,9 +85,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 		errs = append(errs, failureAction.Validate(ctx, failureActionOps...)...)
 	}
 
-	if len(errs) == 0 {
-		c.Valid = true
-	}
+	c.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
 }

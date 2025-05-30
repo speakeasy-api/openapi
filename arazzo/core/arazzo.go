@@ -14,6 +14,8 @@ import (
 )
 
 type Arazzo struct {
+	marshaller.CoreModel
+
 	Arazzo             marshaller.Node[string]               `key:"arazzo"`
 	Info               marshaller.Node[Info]                 `key:"info"`
 	SourceDescriptions marshaller.Node[[]*SourceDescription] `key:"sourceDescriptions" required:"true"`
@@ -21,8 +23,7 @@ type Arazzo struct {
 	Components         marshaller.Node[*Components]          `key:"components"`
 	Extensions         core.Extensions                       `key:"extensions"`
 
-	RootNode *yaml.Node
-	Config   *yml.Config
+	Config *yml.Config
 }
 
 func Unmarshal(ctx context.Context, doc io.Reader) (*Arazzo, error) {

@@ -41,33 +41,25 @@ const (
 
 // CriterionExpressionType represents the type of expression used to evaluate the criterion.
 type CriterionExpressionType struct {
+	marshaller.Model[core.CriterionExpressionType]
+
 	// Type is the type of criterion.
 	Type CriterionType
 	// Version is the version of the criterion type.
 	Version CriterionTypeVersion
-
-	// Valid indicates whether this model passed validation.
-	Valid bool
-
-	core core.CriterionExpressionType
-}
-
-// GetCore will return the low level representation of the criterion expression type object.
-// Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
-func (c *CriterionExpressionType) GetCore() *core.CriterionExpressionType {
-	return &c.core
 }
 
 // Validate will validate the criterion expression type object against the Arazzo specification.
 func (c *CriterionExpressionType) Validate(opts ...validation.Option) []error {
 	errs := []error{}
+	core := c.GetCore()
 
 	switch c.Type {
 	case CriterionTypeJsonPath:
 		switch c.Version {
 		case CriterionTypeVersionDraftGoesnerDispatchJsonPath00:
 		default:
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionDraftGoesnerDispatchJsonPath00)}, ", ")), c.core, c.core.Type))
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionDraftGoesnerDispatchJsonPath00)}, ", ")), core, core.Version))
 		}
 	case CriterionTypeXPath:
 		switch c.Version {
@@ -75,10 +67,10 @@ func (c *CriterionExpressionType) Validate(opts ...validation.Option) []error {
 		case CriterionTypeVersionXPath20:
 		case CriterionTypeVersionXPath10:
 		default:
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionXPath30), string(CriterionTypeVersionXPath20), string(CriterionTypeVersionXPath10)}, ", ")), c.core, c.core.Type))
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionXPath30), string(CriterionTypeVersionXPath20), string(CriterionTypeVersionXPath10)}, ", ")), core, core.Version))
 		}
 	default:
-		errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), c.core, c.core.Type))
+		errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
 	}
 
 	if len(errs) == 0 {
@@ -167,6 +159,8 @@ func (c *CriterionTypeUnion) FromCore(cr any) error {
 
 // Criterion represents a criterion that will be evaluated for a given step.
 type Criterion struct {
+	marshaller.Model[core.Criterion]
+
 	// Context is the expression to the value to be evaluated.
 	Context *expression.Expression
 	// Condition is the condition to be evaluated.
@@ -175,22 +169,11 @@ type Criterion struct {
 	Type CriterionTypeUnion
 	// Extensions provides a list of extensions to the Criterion object.
 	Extensions *extensions.Extensions
-
-	// Valid indicates whether this model passed validation.
-	Valid bool
-
-	core core.Criterion
-}
-
-// GetCore will return the low level representation of the criterion object.
-// Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
-func (c *Criterion) GetCore() *core.Criterion {
-	return &c.core
 }
 
 // Sync will sync any changes made to the Arazzo document models back to the core models.
 func (c *Criterion) Sync(ctx context.Context) error {
-	if _, err := marshaller.SyncValue(ctx, c, &c.core, nil, false); err != nil {
+	if _, err := marshaller.SyncValue(ctx, c, c.GetCore(), nil, false); err != nil {
 		return err
 	}
 	return nil
@@ -204,9 +187,10 @@ func (c *Criterion) GetCondition() (*Condition, error) {
 // Validate will validate the criterion object against the Arazzo specification.
 func (c *Criterion) Validate(opts ...validation.Option) []error {
 	errs := []error{}
+	core := c.GetCore()
 
 	if c.Condition == "" {
-		errs = append(errs, validation.NewValueError("condition is required", c.core, c.core.Condition))
+		errs = append(errs, validation.NewValueError("condition is required", core, core.Condition))
 	}
 
 	if c.Type.Type != nil {
@@ -216,19 +200,19 @@ func (c *Criterion) Validate(opts ...validation.Option) []error {
 		case CriterionTypeJsonPath:
 		case CriterionTypeXPath:
 		default:
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(CriterionTypeSimple), string(CriterionTypeRegex), string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), c.core, c.core.Type))
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(CriterionTypeSimple), string(CriterionTypeRegex), string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
 		}
 	} else if c.Type.ExpressionType != nil {
 		errs = append(errs, c.Type.ExpressionType.Validate(opts...)...)
 	}
 
 	if c.Type.IsTypeProvided() && c.Context == nil {
-		errs = append(errs, validation.NewValueError("context is required, if type is set", c.core, c.core.Context))
+		errs = append(errs, validation.NewValueError("context is required, if type is set", core, core.Context))
 	}
 
 	if c.Context != nil {
 		if err := c.Context.Validate(true); err != nil {
-			errs = append(errs, validation.NewValueError(err.Error(), c.core, c.core.Context))
+			errs = append(errs, validation.NewValueError(err.Error(), core, core.Context))
 		}
 	}
 
@@ -243,26 +227,27 @@ func (c *Criterion) Validate(opts ...validation.Option) []error {
 
 func (c *Criterion) validateCondition(opts ...validation.Option) []error {
 	errs := []error{}
+	core := c.GetCore()
 
-	conditionLine := c.GetCore().Condition.GetValueNodeOrRoot(c.GetCore().RootNode).Line
-	conditionColumn := c.GetCore().Condition.GetValueNodeOrRoot(c.GetCore().RootNode).Column
+	conditionLine := core.Condition.GetValueNodeOrRoot(core.RootNode).Line
+	conditionColumn := core.Condition.GetValueNodeOrRoot(core.RootNode).Column
 
 	switch c.Type.GetType() {
 	case CriterionTypeSimple:
 		cond, err := newCondition(c.Condition)
 		if err != nil && c.Context == nil {
-			errs = append(errs, validation.NewValueError(err.Error(), c.core, c.core.Condition))
+			errs = append(errs, validation.NewValueError(err.Error(), core, core.Condition))
 		} else if cond != nil {
 			errs = append(errs, cond.Validate(conditionLine, conditionColumn, opts...)...)
 		}
 	case CriterionTypeRegex:
 		_, err := regexp.Compile(c.Condition)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(fmt.Errorf("invalid regex expression: %w", err).Error(), c.core, c.core.Condition))
+			errs = append(errs, validation.NewValueError(fmt.Errorf("invalid regex expression: %w", err).Error(), core, core.Condition))
 		}
 	case CriterionTypeJsonPath:
 		if _, err := jsonpath.NewPath(c.Condition); err != nil {
-			errs = append(errs, validation.NewValueError(fmt.Errorf("invalid jsonpath expression: %w", err).Error(), c.core, c.core.Condition))
+			errs = append(errs, validation.NewValueError(fmt.Errorf("invalid jsonpath expression: %w", err).Error(), core, core.Condition))
 		}
 	case CriterionTypeXPath:
 		// TODO validate xpath

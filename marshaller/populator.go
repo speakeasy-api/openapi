@@ -3,7 +3,6 @@ package marshaller
 import (
 	"fmt"
 	"reflect"
-	"unsafe"
 )
 
 type ModelFromCore interface {
@@ -134,22 +133,14 @@ func populateValue(source any, target reflect.Value) error {
 		return target.Interface().(ModelFromCore).FromCore(value.Interface())
 	}
 
-	// TODO we are trusting core is a core model we may want to add some sort of marker interface to ensure this is the case
-	if target.Elem().Kind() == reflect.Struct {
-		cf, ok := target.Elem().Type().FieldByName("core")
-		if ok {
-			if cf.Type != value.Type() {
-				return fmt.Errorf("populateValue expected core field to be of type %s, got %s", cf.Type, value.Type())
-			}
-
-			if err := populateModel(value.Interface(), target.Interface()); err != nil {
-				return err
-			}
-
-			tf := target.Elem().FieldByIndex(cf.Index)
-			reflect.NewAt(tf.Type(), unsafe.Pointer(tf.UnsafeAddr())).Elem().Set(value)
-			return nil
+	// Check if target implements CoreSetter interface
+	if coreSetter, ok := target.Interface().(CoreSetter); ok {
+		if err := populateModel(value.Interface(), target.Interface()); err != nil {
+			return err
 		}
+
+		coreSetter.SetCoreValue(value.Interface())
+		return nil
 	}
 
 	if target.Type().Implements(reflect.TypeOf((*SequencedMap)(nil)).Elem()) {
