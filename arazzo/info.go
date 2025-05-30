@@ -6,13 +6,13 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/models"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
 // Info represents metadata about the Arazzo document
 type Info struct {
-	models.Model[core.Info]
+	marshaller.Model[core.Info]
 
 	// Title is the name of the Arazzo document
 	Title string
@@ -27,7 +27,6 @@ type Info struct {
 }
 
 var _ interfaces.Model[core.Info] = (*Info)(nil)
-
 
 // Validate will validate the Info object against the Arazzo Specification.
 func (i *Info) Validate(ctx context.Context, opts ...validation.Option) []error {

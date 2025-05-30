@@ -11,7 +11,6 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
@@ -35,9 +34,8 @@ type Reusable[T any, V interfaces.Validator[T], C marshaller.CoreModeler] struct
 	// If this reusable object is not a reference, this will be the inline object for this node.
 	Object V
 
-	models.Model[core.Reusable[C]]
+	marshaller.Model[core.Reusable[C]]
 }
-
 
 // Get will return either the inline object or the object referenced by the reference.
 func (r *Reusable[T, V, C]) Get(components *Components) *T {

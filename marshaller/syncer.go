@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"unsafe"
 
 	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
@@ -213,18 +212,15 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 	}
 
 	// Populate the RootNode of the target with the result
-	rn, ok := t.Type().FieldByName("RootNode")
-	if !ok {
-		return nil, fmt.Errorf("SyncChanges expected a RootNode field on the target %s", t.Type())
+	if coreModel, ok := t.Addr().Interface().(CoreModeler); ok {
+		coreModel.SetRootNode(valueNode)
+	} else {
+		return nil, fmt.Errorf("SyncChanges expected target to implement CoreModeler, got %s", t.Type())
 	}
 
-	t.FieldByIndex(rn.Index).Set(reflect.ValueOf(valueNode))
-
 	// Update the core of the source with the updated value
-	cf, ok := sUnderlying.Type().FieldByName("core")
-	if ok {
-		sf := sUnderlying.FieldByIndex(cf.Index)
-		reflect.NewAt(sf.Type(), unsafe.Pointer(sf.UnsafeAddr())).Elem().Set(t)
+	if coreSetter, ok := s.Interface().(CoreSetter); ok {
+		coreSetter.SetCoreValue(t.Interface())
 	}
 
 	// Set validity on the core model

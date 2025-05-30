@@ -45,9 +45,8 @@ type TestStructSyncer[T any] struct {
 }
 
 type TestStructSyncerCore[T any] struct {
+	marshaller.CoreModel
 	Val *T
-
-	RootNode *yaml.Node
 }
 
 func (t *TestStructSyncerCore[T]) SyncChanges(ctx context.Context, model any, valueNode *yaml.Node) (*yaml.Node, error) {
@@ -60,8 +59,9 @@ func (t *TestStructSyncerCore[T]) SyncChanges(ctx context.Context, model any, va
 	}
 
 	var err error
-	t.RootNode, err = marshaller.SyncValue(ctx, mv.FieldByName("Val").Interface(), &t.Val, valueNode, false)
-	return t.RootNode, err
+	rootNode, err := marshaller.SyncValue(ctx, mv.FieldByName("Val").Interface(), &t.Val, valueNode, false)
+	t.SetRootNode(rootNode)
+	return rootNode, err
 }
 
 func TestSyncValue_StructPtr_CustomSyncer(t *testing.T) {
@@ -73,7 +73,7 @@ func TestSyncValue_StructPtr_CustomSyncer(t *testing.T) {
 	require.NoError(t, err)
 	node := testutils.CreateIntYamlNode(1, 0, 0)
 	assert.Equal(t, node, outNode)
-	assert.Equal(t, node, target.RootNode)
+	assert.Equal(t, node, target.GetRootNode())
 	assert.Equal(t, 1, *target.Val)
 }
 
@@ -86,25 +86,23 @@ func TestSyncValue_Struct_CustomSyncer(t *testing.T) {
 	require.NoError(t, err)
 	node := testutils.CreateIntYamlNode(1, 0, 0)
 	assert.Equal(t, node, outNode)
-	assert.Equal(t, node, target.RootNode)
+	assert.Equal(t, node, target.GetRootNode())
 }
 
 type TestStruct struct {
+	marshaller.Model[TestStructCore]
 	Int     int
 	Str     string
 	StrPtr  *string
 	BoolPtr *bool
-
-	core TestStructCore
 }
 
 type TestStructCore struct {
+	marshaller.CoreModel
 	Int     marshaller.Node[int]     `key:"int"`
 	Str     marshaller.Node[string]  `key:"str"`
 	StrPtr  marshaller.Node[*string] `key:"strPtr"`
 	BoolPtr marshaller.Node[*bool]   `key:"boolPtr"`
-
-	RootNode *yaml.Node
 }
 
 func TestSyncChanges_Struct(t *testing.T) {
@@ -115,7 +113,7 @@ func TestSyncChanges_Struct(t *testing.T) {
 		BoolPtr: pointer.From(true),
 	}
 
-	outNode, err := marshaller.SyncValue(context.Background(), &source, &source.core, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), &source, source.GetCore(), nil, false)
 	require.NoError(t, err)
 
 	node := testutils.CreateMapYamlNode([]*yaml.Node{
@@ -130,11 +128,11 @@ func TestSyncChanges_Struct(t *testing.T) {
 	}, 0, 0)
 
 	assert.Equal(t, node, outNode)
-	assert.Equal(t, node, source.core.RootNode)
-	assert.Equal(t, 1, source.core.Int.Value)
-	assert.Equal(t, "some-string", source.core.Str.Value)
-	assert.Equal(t, "some-string-ptr", *source.core.StrPtr.Value)
-	assert.Equal(t, true, *source.core.BoolPtr.Value)
+	assert.Equal(t, node, source.GetCore().GetRootNode())
+	assert.Equal(t, 1, source.GetCore().Int.Value)
+	assert.Equal(t, "some-string", source.GetCore().Str.Value)
+	assert.Equal(t, "some-string-ptr", *source.GetCore().StrPtr.Value)
+	assert.Equal(t, true, *source.GetCore().BoolPtr.Value)
 }
 
 func TestSyncChanges_StructWithOptionalsUnset(t *testing.T) {
@@ -143,7 +141,7 @@ func TestSyncChanges_StructWithOptionalsUnset(t *testing.T) {
 		Str: "some-string",
 	}
 
-	outNode, err := marshaller.SyncValue(context.Background(), &source, &source.core, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), &source, source.GetCore(), nil, false)
 	require.NoError(t, err)
 
 	node := testutils.CreateMapYamlNode([]*yaml.Node{
@@ -154,11 +152,11 @@ func TestSyncChanges_StructWithOptionalsUnset(t *testing.T) {
 	}, 0, 0)
 
 	assert.Equal(t, node, outNode)
-	assert.Equal(t, node, source.core.RootNode)
-	assert.Equal(t, 1, source.core.Int.Value)
-	assert.Equal(t, "some-string", source.core.Str.Value)
-	assert.Nil(t, source.core.StrPtr.Value)
-	assert.Nil(t, source.core.BoolPtr.Value)
+	assert.Equal(t, node, source.GetCore().GetRootNode())
+	assert.Equal(t, 1, source.GetCore().Int.Value)
+	assert.Equal(t, "some-string", source.GetCore().Str.Value)
+	assert.Nil(t, source.GetCore().StrPtr.Value)
+	assert.Nil(t, source.GetCore().BoolPtr.Value)
 }
 
 func TestSyncChanges_StructPtr(t *testing.T) {
@@ -169,7 +167,7 @@ func TestSyncChanges_StructPtr(t *testing.T) {
 		BoolPtr: pointer.From(true),
 	}
 
-	outNode, err := marshaller.SyncValue(context.Background(), &source, &source.core, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), &source, source.GetCore(), nil, false)
 	require.NoError(t, err)
 
 	node := testutils.CreateMapYamlNode([]*yaml.Node{
@@ -184,23 +182,21 @@ func TestSyncChanges_StructPtr(t *testing.T) {
 	}, 0, 0)
 
 	assert.Equal(t, node, outNode)
-	assert.Equal(t, node, source.core.RootNode)
-	assert.Equal(t, 1, source.core.Int.Value)
-	assert.Equal(t, "some-string", source.core.Str.Value)
-	assert.Equal(t, "some-string-ptr", *source.core.StrPtr.Value)
-	assert.Equal(t, true, *source.core.BoolPtr.Value)
+	assert.Equal(t, node, source.GetCore().GetRootNode())
+	assert.Equal(t, 1, source.GetCore().Int.Value)
+	assert.Equal(t, "some-string", source.GetCore().Str.Value)
+	assert.Equal(t, "some-string-ptr", *source.GetCore().StrPtr.Value)
+	assert.Equal(t, true, *source.GetCore().BoolPtr.Value)
 }
 
 type TestStructNested struct {
+	marshaller.Model[TestStructNestedCore]
 	TestStruct TestStruct
-
-	core TestStructNestedCore
 }
 
 type TestStructNestedCore struct {
+	marshaller.CoreModel
 	TestStruct marshaller.Node[TestStructCore] `key:"testStruct"`
-
-	RootNode *yaml.Node
 }
 
 func TestSyncChanges_NestedStruct(t *testing.T) {
@@ -213,7 +209,7 @@ func TestSyncChanges_NestedStruct(t *testing.T) {
 		},
 	}
 
-	outNode, err := marshaller.SyncValue(context.Background(), &source, &source.core, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), &source, source.GetCore(), nil, false)
 	require.NoError(t, err)
 
 	nestedNode := testutils.CreateMapYamlNode([]*yaml.Node{
@@ -233,12 +229,12 @@ func TestSyncChanges_NestedStruct(t *testing.T) {
 	}, 0, 0)
 
 	assert.Equal(t, node, outNode)
-	assert.Equal(t, node, source.core.RootNode)
-	assert.Equal(t, nestedNode, source.TestStruct.core.RootNode)
-	assert.Equal(t, 1, source.core.TestStruct.Value.Int.Value)
-	assert.Equal(t, "some-string", source.core.TestStruct.Value.Str.Value)
-	assert.Equal(t, "some-string-ptr", *source.core.TestStruct.Value.StrPtr.Value)
-	assert.Equal(t, true, *source.core.TestStruct.Value.BoolPtr.Value)
+	assert.Equal(t, node, source.GetCore().GetRootNode())
+	assert.Equal(t, nestedNode, source.TestStruct.GetCore().GetRootNode())
+	assert.Equal(t, 1, source.GetCore().TestStruct.Value.Int.Value)
+	assert.Equal(t, "some-string", source.GetCore().TestStruct.Value.Str.Value)
+	assert.Equal(t, "some-string-ptr", *source.GetCore().TestStruct.Value.StrPtr.Value)
+	assert.Equal(t, true, *source.GetCore().TestStruct.Value.BoolPtr.Value)
 }
 
 type TestInt int
@@ -252,15 +248,13 @@ func TestSyncValue_TypeDefinition(t *testing.T) {
 }
 
 type TestStructWithExtensions struct {
+	marshaller.Model[TestStructWithExtensionsCore]
 	Extensions *extensions.Extensions
-
-	core TestStructWithExtensionsCore
 }
 
 type TestStructWithExtensionsCore struct {
+	marshaller.CoreModel
 	Extensions core.Extensions `key:"extensions"`
-
-	RootNode *yaml.Node
 }
 
 func TestSyncValue_TypeWithExtensions(t *testing.T) {
@@ -276,7 +270,7 @@ func TestSyncValue_TypeWithExtensions(t *testing.T) {
 
 	source.Extensions = extensions.New(extensions.NewElem("x-speakeasy-test", extensionNode))
 
-	outNode, err := marshaller.SyncValue(context.Background(), &source, &source.core, nil, false)
+	outNode, err := marshaller.SyncValue(context.Background(), &source, source.GetCore(), nil, false)
 	require.NoError(t, err)
 
 	node := testutils.CreateMapYamlNode(
@@ -286,7 +280,7 @@ func TestSyncValue_TypeWithExtensions(t *testing.T) {
 		}, 0, 0)
 
 	assert.Equal(t, node, outNode)
-	assert.Equal(t, node, source.core.RootNode)
+	assert.Equal(t, node, source.GetCore().GetRootNode())
 	assert.True(t, source.Extensions.GetCore().Has("x-speakeasy-test"))
 }
 
@@ -333,7 +327,7 @@ func TestSyncChangesValidityWithRequiredFields(t *testing.T) {
 	// Test case 2: Required field missing - should be invalid
 	t.Run("invalid when required field missing", func(t *testing.T) {
 		mainModel := &TestValidityStruct{
-			RequiredField: nil,  // nil value should result in no sync
+			RequiredField: nil, // nil value should result in no sync
 			OptionalField: nil,
 		}
 
@@ -405,7 +399,6 @@ func TestSyncChangesValidityWithInferredRequiredFields(t *testing.T) {
 		InferredRequired string
 		InferredOptional *string
 		Valid            bool
-		core             TestInferredValidityCoreModel
 	}
 
 	t.Run("inferred required field validation", func(t *testing.T) {

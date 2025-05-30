@@ -15,7 +15,6 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
@@ -31,7 +30,7 @@ const (
 
 // Arazzo is the root object for an Arazzo document.
 type Arazzo struct {
-	models.Model[core.Arazzo]
+	marshaller.Model[core.Arazzo]
 
 	// Arazzo is the version of the Arazzo Specification that this document conforms to.
 	Arazzo string

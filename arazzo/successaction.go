@@ -11,7 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/models"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -40,11 +40,10 @@ type SuccessAction struct {
 	// Extensions provides a list of extensions to the SuccessAction object.
 	Extensions *extensions.Extensions
 
-	models.Model[core.SuccessAction]
+	marshaller.Model[core.SuccessAction]
 }
 
 var _ interfaces.Model[core.SuccessAction] = (*SuccessAction)(nil)
-
 
 // Validate will validate the success action object against the Arazzo specification.
 // Requires an Arazzo object to be passed via validation options with validation.WithContextObject().

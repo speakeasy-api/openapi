@@ -11,7 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/models"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -55,11 +55,10 @@ type Step struct {
 	// Extensions provides a list of extensions to the Step object.
 	Extensions *extensions.Extensions
 
-	models.Model[core.Step]
+	marshaller.Model[core.Step]
 }
 
 var _ interfaces.Model[core.Step] = (*Step)(nil)
-
 
 var stepIDRegex = regexp.MustCompile(`^[A-Za-z0-9_\-]+$`)
 

@@ -11,7 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/models"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -29,7 +29,7 @@ const (
 
 // FailureAction represents an action to take on failure of a workflow/step.
 type FailureAction struct {
-	models.Model[core.FailureAction]
+	marshaller.Model[core.FailureAction]
 
 	// Name is the case sensitive name of the failure action.
 	Name string
@@ -50,7 +50,6 @@ type FailureAction struct {
 }
 
 var _ interfaces.Model[core.FailureAction] = (*FailureAction)(nil)
-
 
 // Validate will validate the failure action object.
 // Requires an Arazzo object to be passed via validation options with validation.WithContextObject().

@@ -10,8 +10,8 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -30,7 +30,7 @@ func (w Workflows) Find(id string) *Workflow {
 
 // Workflow represents a set of steps that orchestrates the execution of API calls.
 type Workflow struct {
-	models.Model[core.Workflow]
+	marshaller.Model[core.Workflow]
 
 	// WorkflowID is a unique identifier for the workflow.
 	WorkflowID string
@@ -57,7 +57,6 @@ type Workflow struct {
 }
 
 var _ interfaces.Model[core.Workflow] = (*Workflow)(nil)
-
 
 var outputNameRegex = regexp.MustCompile(`^[a-zA-Z0-9\.\-_]+$`)
 

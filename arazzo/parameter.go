@@ -8,7 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/models"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -28,7 +28,7 @@ const (
 
 // Parameter represents parameters that will be passed to a workflow or operation referenced by a step.
 type Parameter struct {
-	models.Model[core.Parameter]
+	marshaller.Model[core.Parameter]
 
 	// Name is the case sensitive name of the parameter.
 	Name string
@@ -41,7 +41,6 @@ type Parameter struct {
 }
 
 var _ interfaces.Model[core.Parameter] = (*Parameter)(nil)
-
 
 // Validate will validate the parameter object against the Arazzo specification.
 // If an Workflow or Step object is provided via validation options with validation.WithContextObject() then

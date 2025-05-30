@@ -9,7 +9,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/models"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -38,7 +38,7 @@ const (
 
 // SourceDescription represents an Arazzo or OpenAPI document that is referenced by this Arazzo document.
 type SourceDescription struct {
-	models.Model[core.SourceDescription]
+	marshaller.Model[core.SourceDescription]
 
 	// Name is the case-sensitive name of the SourceDescription object used to reference it.
 	Name string
@@ -51,7 +51,6 @@ type SourceDescription struct {
 }
 
 var _ interfaces.Model[core.SourceDescription] = (*SourceDescription)(nil)
-
 
 // Validate will validate the source description object against the Arazzo specification.
 func (s *SourceDescription) Validate(ctx context.Context, opts ...validation.Option) []error {

@@ -9,14 +9,14 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/models"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 	"gopkg.in/yaml.v3"
 )
 
 // RequestBody represents the request body to pass to an operation represented by a step
 type RequestBody struct {
-	models.Model[core.RequestBody]
+	marshaller.Model[core.RequestBody]
 
 	// ContentType is the content type of the request body
 	ContentType *string
@@ -29,7 +29,6 @@ type RequestBody struct {
 }
 
 var _ interfaces.Model[core.RequestBody] = (*RequestBody)(nil)
-
 
 // Validate will validate the request body object against the Arazzo specification.
 func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) []error {

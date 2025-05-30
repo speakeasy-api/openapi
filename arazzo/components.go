@@ -8,15 +8,15 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
 // Components holds reusable components that can be referenced in an Arazzo document.
 type Components struct {
-	models.Model[core.Components]
+	marshaller.Model[core.Components]
 
 	// Inputs provides a list of reusable JSON Schemas that can be referenced from inputs and other JSON Schemas.
 	Inputs *sequencedmap.Map[string, oas31.JSONSchema]
@@ -31,7 +31,6 @@ type Components struct {
 }
 
 var _ interfaces.Model[core.Components] = (*Components)(nil)
-
 
 var componentNameRegex = regexp.MustCompile(`^[a-zA-Z0-9\.\-_]+$`)
 

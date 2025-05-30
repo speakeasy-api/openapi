@@ -10,7 +10,6 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
-	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 )
@@ -41,15 +40,14 @@ const (
 )
 
 // CriterionExpressionType represents the type of expression used to evaluate the criterion.
-type CriterionExpressionType struct {	
-	models.Model[core.CriterionExpressionType]
-	
+type CriterionExpressionType struct {
+	marshaller.Model[core.CriterionExpressionType]
+
 	// Type is the type of criterion.
 	Type CriterionType
 	// Version is the version of the criterion type.
 	Version CriterionTypeVersion
 }
-
 
 // Validate will validate the criterion expression type object against the Arazzo specification.
 func (c *CriterionExpressionType) Validate(opts ...validation.Option) []error {
@@ -159,9 +157,9 @@ func (c *CriterionTypeUnion) FromCore(cr any) error {
 }
 
 // Criterion represents a criterion that will be evaluated for a given step.
-type Criterion struct {	
-	models.Model[core.Criterion]
-	
+type Criterion struct {
+	marshaller.Model[core.Criterion]
+
 	// Context is the expression to the value to be evaluated.
 	Context *expression.Expression
 	// Condition is the condition to be evaluated.
@@ -171,7 +169,6 @@ type Criterion struct {
 	// Extensions provides a list of extensions to the Criterion object.
 	Extensions *extensions.Extensions
 }
-
 
 // Sync will sync any changes made to the Arazzo document models back to the core models.
 func (c *Criterion) Sync(ctx context.Context) error {

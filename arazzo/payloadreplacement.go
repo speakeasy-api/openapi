@@ -6,14 +6,14 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/jsonpointer"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
 // PayloadReplacement represents a replacement of a value within a payload such as a request body.
 type PayloadReplacement struct {
-	models.Model[core.PayloadReplacement]
+	marshaller.Model[core.PayloadReplacement]
 
 	// Target is a JSON pointer of XPath expression to the value to be replaced.
 	Target jsonpointer.JSONPointer // TODO also support XPath
@@ -24,7 +24,6 @@ type PayloadReplacement struct {
 }
 
 var _ interfaces.Model[core.PayloadReplacement] = (*PayloadReplacement)(nil)
-
 
 // Validate will validate the payload replacement object against the Arazzo specification.
 func (p *PayloadReplacement) Validate(ctx context.Context, opts ...validation.Option) []error {

@@ -5,8 +5,8 @@ import (
 	_ "embed"
 
 	"github.com/speakeasy-api/openapi/extensions"
-	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31/core"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 )
@@ -28,7 +28,7 @@ func NewJSONSchemaFromBool(value bool) JSONSchema {
 }
 
 type Schema struct {
-	models.Model[core.Schema]
+	marshaller.Model[core.Schema]
 
 	Ref                   *string
 	ExclusiveMaximum      ExclusiveMaximum
@@ -83,4 +83,3 @@ type Schema struct {
 	Schema                *string
 	Extensions            *extensions.Extensions
 }
-
