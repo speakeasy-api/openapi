@@ -46,13 +46,13 @@ var _ interfaces.Model[core.Parameter] = (*Parameter)(nil)
 // If an Workflow or Step object is provided via validation options with validation.WithContextObject() then
 // it will be validated in the context of that object.
 func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []error {
-	errs := []error{}
+	core := p.GetCore()
+	errs := core.GetValidationErrors()
 
 	o := validation.NewOptions(opts...)
 
 	w := validation.GetContextObject[Workflow](o)
 	s := validation.GetContextObject[Step](o)
-	core := p.GetCore()
 
 	if core.Name.Present && p.Name == "" {
 		errs = append(errs, validation.NewValueError("name is required", core, core.Name))

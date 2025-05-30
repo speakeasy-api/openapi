@@ -85,8 +85,8 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 
 	opts = append(opts, validation.WithContextObject(s))
 
-	errs := []error{}
 	core := s.GetCore()
+	errs := core.GetValidationErrors()
 
 	if core.StepID.Present && s.StepID == "" {
 		errs = append(errs, validation.NewValueError("stepId is required", core, core.StepID))

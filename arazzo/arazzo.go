@@ -9,12 +9,11 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strconv"
-	"strings"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
@@ -70,8 +69,6 @@ func Unmarshal(ctx context.Context, doc io.Reader, opts ...Option[unmarshalOptio
 		opt(&o)
 	}
 
-	ctx = validation.ContextWithValidationContext(ctx)
-
 	c, err := core.Unmarshal(ctx, doc)
 	if err != nil {
 		return nil, nil, err
@@ -84,7 +81,6 @@ func Unmarshal(ctx context.Context, doc io.Reader, opts ...Option[unmarshalOptio
 
 	var validationErrs []error
 	if !o.skipValidation {
-		validationErrs = validation.GetValidationErrors(ctx)
 		validationErrs = append(validationErrs, arazzo.Validate(ctx)...)
 		slices.SortFunc(validationErrs, func(a, b error) int {
 			var aValidationErr *validation.Error
@@ -145,15 +141,16 @@ func (a *Arazzo) Marshal(ctx context.Context, w io.Writer) error {
 func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []error {
 	opts = append(opts, validation.WithContextObject(a))
 
-	errs := []error{}
+	core := a.GetCore()
+	errs := core.GetValidationErrors()
 
-	arazzoMajor, arazzoMinor, arazzoPatch, err := parseVersion(a.Arazzo)
+	arazzoMajor, arazzoMinor, arazzoPatch, err := utils.ParseVersion(a.Arazzo)
 	if err != nil {
-		errs = append(errs, validation.NewValueError(fmt.Sprintf("invalid Arazzo version in document %s: %s", a.Arazzo, err.Error()), a.GetCore(), a.GetCore().Arazzo))
+		errs = append(errs, validation.NewValueError(fmt.Sprintf("invalid Arazzo version in document %s: %s", a.Arazzo, err.Error()), core, core.Arazzo))
 	}
 
 	if arazzoMajor != VersionMajor || arazzoMinor != VersionMinor || arazzoPatch > VersionPatch {
-		errs = append(errs, validation.NewValueError(fmt.Sprintf("only Arazzo version %s and below is supported", Version), a.GetCore(), a.GetCore().Arazzo))
+		errs = append(errs, validation.NewValueError(fmt.Sprintf("only Arazzo version %s and below is supported", Version), core, core.Arazzo))
 	}
 
 	errs = append(errs, a.Info.Validate(ctx, opts...)...)
@@ -164,7 +161,7 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, sourceDescription.Validate(ctx, opts...)...)
 
 		if _, ok := sourceDescriptionNames[sourceDescription.Name]; ok {
-			errs = append(errs, validation.NewSliceError(fmt.Sprintf("sourceDescription name %s is not unique", sourceDescription.Name), a.GetCore(), a.GetCore().SourceDescriptions, i))
+			errs = append(errs, validation.NewSliceError(fmt.Sprintf("sourceDescription name %s is not unique", sourceDescription.Name), core, core.SourceDescriptions, i))
 		}
 
 		sourceDescriptionNames[sourceDescription.Name] = true
@@ -176,7 +173,7 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, workflow.Validate(ctx, opts...)...)
 
 		if _, ok := workflowIds[workflow.WorkflowID]; ok {
-			errs = append(errs, validation.NewSliceError(fmt.Sprintf("workflowId %s is not unique", workflow.WorkflowID), a.GetCore(), a.GetCore().Workflows, i))
+			errs = append(errs, validation.NewSliceError(fmt.Sprintf("workflowId %s is not unique", workflow.WorkflowID), core, core.Workflows, i))
 		}
 
 		workflowIds[workflow.WorkflowID] = true
@@ -186,31 +183,7 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, a.Components.Validate(ctx, opts...)...)
 	}
 
-	a.Valid = len(errs) == 0 && a.GetCore().GetValid()
+	a.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
-}
-
-func parseVersion(version string) (int, int, int, error) {
-	parts := strings.Split(version, ".")
-	if len(parts) != 3 {
-		return 0, 0, 0, fmt.Errorf("invalid version %s", version)
-	}
-
-	major, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid major version %s: %w", parts[0], err)
-	}
-
-	minor, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid minor version %s: %w", parts[1], err)
-	}
-
-	patch, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("invalid patch version %s: %w", parts[2], err)
-	}
-
-	return major, minor, patch, nil
 }

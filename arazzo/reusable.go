@@ -108,8 +108,8 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 		}
 	}
 
-	errs := []error{}
 	core := r.GetCore()
+	errs := core.GetValidationErrors()
 
 	switch reflect.TypeOf((*T)(nil)).Elem().Name() {
 	case "Parameter":

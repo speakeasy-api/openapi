@@ -32,8 +32,8 @@ var _ interfaces.Model[core.RequestBody] = (*RequestBody)(nil)
 
 // Validate will validate the request body object against the Arazzo specification.
 func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) []error {
-	errs := []error{}
 	core := r.GetCore()
+	errs := core.GetValidationErrors()
 
 	if r.ContentType != nil {
 		_, _, err := mime.ParseMediaType(*r.ContentType)

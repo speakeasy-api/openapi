@@ -75,8 +75,8 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	opts = append(opts, validation.WithContextObject(w))
 
-	errs := []error{}
 	core := w.GetCore()
+	errs := core.GetValidationErrors()
 
 	if core.WorkflowID.Present && w.WorkflowID == "" {
 		errs = append(errs, validation.NewValueError("workflowId is required", core, core.WorkflowID))
