@@ -12,10 +12,9 @@ import (
 )
 
 type EitherValue[L any, R any] struct {
+	marshaller.CoreModel
 	Left  *L `populatorValue:"true"`
 	Right *R `populatorValue:"true"`
-
-	RootNode *yaml.Node
 }
 
 var _ interfaces.CoreModel = (*EitherValue[any, any])(nil)
@@ -26,7 +25,7 @@ func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, node *yaml.Node) erro
 	l, lErrs := unmarshalValue[L](ctx, node)
 	if l != nil && len(lErrs) == 0 {
 		v.Left = l
-		v.RootNode = node
+		v.SetRootNode(node)
 		return nil
 	}
 	errs = append(errs, lErrs...)
@@ -34,7 +33,7 @@ func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, node *yaml.Node) erro
 	r, rErrs := unmarshalValue[R](ctx, node)
 	if r != nil && len(rErrs) == 0 {
 		v.Right = r
-		v.RootNode = node
+		v.SetRootNode(node)
 		return nil
 	}
 	errs = append(errs, rErrs...)
@@ -67,10 +66,10 @@ func (v *EitherValue[L, R]) SyncChanges(ctx context.Context, model any, valueNod
 	}
 
 	if lv != nil {
-		v.RootNode = lv
+		v.SetRootNode(lv)
 		return lv, nil
 	} else {
-		v.RootNode = rv
+		v.SetRootNode(rv)
 		return rv, nil
 	}
 }

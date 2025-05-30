@@ -11,15 +11,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type Reusable[T any] struct {
+type Reusable[T marshaller.CoreModeler] struct {
+	marshaller.CoreModel
 	Reference marshaller.Node[*Expression] `key:"reference"`
 	Value     marshaller.Node[Value]       `key:"value"`
-	Object    *T                           `populatorValue:"true"`
-
-	RootNode *yaml.Node
+	Object    T                            `populatorValue:"true"`
 }
 
-var _ interfaces.CoreModel = (*Reusable[any])(nil)
+var _ interfaces.CoreModel = (*Reusable[*Parameter])(nil)
 
 func (r *Reusable[T]) Unmarshal(ctx context.Context, node *yaml.Node) error {
 	if node == nil {
@@ -39,7 +38,8 @@ func (r *Reusable[T]) Unmarshal(ctx context.Context, node *yaml.Node) error {
 		return err
 	}
 
-	r.Object = &obj
+	r.Object = obj
+	r.SetValid(true)
 
 	return nil
 }
@@ -62,14 +62,18 @@ func (r *Reusable[T]) SyncChanges(ctx context.Context, model any, valueNode *yam
 		if err != nil {
 			return nil, err
 		}
+		r.SetValid(true)
 	} else {
 		var err error
 		valueNode, err = marshaller.SyncValue(ctx, of.Interface(), &r.Object, valueNode, false)
 		if err != nil {
 			return nil, err
 		}
+
+		// We are valid if the object is valid
+		r.SetValid(r.Object.GetValid())
 	}
 
-	r.RootNode = valueNode
+	r.SetRootNode(valueNode)
 	return valueNode, nil
 }

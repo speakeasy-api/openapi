@@ -11,6 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -28,6 +29,8 @@ const (
 
 // FailureAction represents an action to take on failure of a workflow/step.
 type FailureAction struct {
+	models.Model[core.FailureAction]
+
 	// Name is the case sensitive name of the failure action.
 	Name string
 	// Type is the type of action to take on failure.
@@ -44,20 +47,10 @@ type FailureAction struct {
 	Criteria []criterion.Criterion
 	// Extensions provides a list of extensions to the FailureAction object.
 	Extensions *extensions.Extensions
-
-	// Valid indicates whether this model passed validation.
-	Valid bool
-
-	core core.FailureAction
 }
 
 var _ interfaces.Model[core.FailureAction] = (*FailureAction)(nil)
 
-// GetCore will return the low level representation of the failure action object.
-// Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
-func (f *FailureAction) GetCore() *core.FailureAction {
-	return &f.core
-}
 
 // Validate will validate the failure action object.
 // Requires an Arazzo object to be passed via validation options with validation.WithContextObject().
@@ -76,77 +69,75 @@ func (f *FailureAction) Validate(ctx context.Context, opts ...validation.Option)
 
 	errs := []error{}
 
-	if f.core.Name.Present && f.Name == "" {
-		errs = append(errs, validation.NewValueError("name is required", f.core, f.core.Name))
+	if f.GetCore().Name.Present && f.Name == "" {
+		errs = append(errs, validation.NewValueError("name is required", f.GetCore(), f.GetCore().Name))
 	}
 
 	switch f.Type {
 	case FailureActionTypeEnd:
 		if f.WorkflowID != nil {
-			errs = append(errs, validation.NewValueError("workflowId is not allowed when type: end is specified", f.core, f.core.WorkflowID))
+			errs = append(errs, validation.NewValueError("workflowId is not allowed when type: end is specified", f.GetCore(), f.GetCore().WorkflowID))
 		}
 		if f.StepID != nil {
-			errs = append(errs, validation.NewValueError("stepId is not allowed when type: end is specified", f.core, f.core.StepID))
+			errs = append(errs, validation.NewValueError("stepId is not allowed when type: end is specified", f.GetCore(), f.GetCore().StepID))
 		}
 		if f.RetryAfter != nil {
-			errs = append(errs, validation.NewValueError("retryAfter is not allowed when type: end is specified", f.core, f.core.RetryAfter))
+			errs = append(errs, validation.NewValueError("retryAfter is not allowed when type: end is specified", f.GetCore(), f.GetCore().RetryAfter))
 		}
 		if f.RetryLimit != nil {
-			errs = append(errs, validation.NewValueError("retryLimit is not allowed when type: end is specified", f.core, f.core.RetryLimit))
+			errs = append(errs, validation.NewValueError("retryLimit is not allowed when type: end is specified", f.GetCore(), f.GetCore().RetryLimit))
 		}
 	case FailureActionTypeGoto:
 		errs = append(errs, validationActionWorkflowIDAndStepID(ctx, validationActionWorkflowStepIDParams{
 			parentType:       "failureAction",
 			workflowID:       f.WorkflowID,
-			workflowIDLine:   f.core.WorkflowID.GetKeyNodeOrRoot(f.core.RootNode).Line,
-			workflowIDColumn: f.core.WorkflowID.GetKeyNodeOrRoot(f.core.RootNode).Column,
+			workflowIDLine:   f.GetCore().WorkflowID.GetKeyNodeOrRoot(f.GetCore().RootNode).Line,
+			workflowIDColumn: f.GetCore().WorkflowID.GetKeyNodeOrRoot(f.GetCore().RootNode).Column,
 			stepID:           f.StepID,
-			stepIDLine:       f.core.StepID.GetKeyNodeOrRoot(f.core.RootNode).Line,
-			stepIDColumn:     f.core.StepID.GetKeyNodeOrRoot(f.core.RootNode).Column,
+			stepIDLine:       f.GetCore().StepID.GetKeyNodeOrRoot(f.GetCore().RootNode).Line,
+			stepIDColumn:     f.GetCore().StepID.GetKeyNodeOrRoot(f.GetCore().RootNode).Column,
 			arazzo:           a,
 			workflow:         validation.GetContextObject[Workflow](o),
 			required:         true,
 		}, opts...)...)
 		if f.RetryAfter != nil {
-			errs = append(errs, validation.NewValueError("retryAfter is not allowed when type: goto is specified", f.core, f.core.RetryAfter))
+			errs = append(errs, validation.NewValueError("retryAfter is not allowed when type: goto is specified", f.GetCore(), f.GetCore().RetryAfter))
 		}
 		if f.RetryLimit != nil {
-			errs = append(errs, validation.NewValueError("retryLimit is not allowed when type: goto is specified", f.core, f.core.RetryLimit))
+			errs = append(errs, validation.NewValueError("retryLimit is not allowed when type: goto is specified", f.GetCore(), f.GetCore().RetryLimit))
 		}
 	case FailureActionTypeRetry:
 		errs = append(errs, validationActionWorkflowIDAndStepID(ctx, validationActionWorkflowStepIDParams{
 			parentType:       "failureAction",
 			workflowID:       f.WorkflowID,
-			workflowIDLine:   f.core.WorkflowID.GetKeyNodeOrRoot(f.core.RootNode).Line,
-			workflowIDColumn: f.core.WorkflowID.GetKeyNodeOrRoot(f.core.RootNode).Column,
+			workflowIDLine:   f.GetCore().WorkflowID.GetKeyNodeOrRoot(f.GetCore().RootNode).Line,
+			workflowIDColumn: f.GetCore().WorkflowID.GetKeyNodeOrRoot(f.GetCore().RootNode).Column,
 			stepID:           f.StepID,
-			stepIDLine:       f.core.StepID.GetKeyNodeOrRoot(f.core.RootNode).Line,
-			stepIDColumn:     f.core.StepID.GetKeyNodeOrRoot(f.core.RootNode).Column,
+			stepIDLine:       f.GetCore().StepID.GetKeyNodeOrRoot(f.GetCore().RootNode).Line,
+			stepIDColumn:     f.GetCore().StepID.GetKeyNodeOrRoot(f.GetCore().RootNode).Column,
 			arazzo:           a,
 			workflow:         validation.GetContextObject[Workflow](o),
 			required:         false,
 		}, opts...)...)
 		if f.RetryAfter != nil {
 			if *f.RetryAfter < 0 {
-				errs = append(errs, validation.NewValueError("retryAfter must be greater than or equal to 0", f.core, f.core.RetryAfter))
+				errs = append(errs, validation.NewValueError("retryAfter must be greater than or equal to 0", f.GetCore(), f.GetCore().RetryAfter))
 			}
 		}
 		if f.RetryLimit != nil {
 			if *f.RetryLimit < 0 {
-				errs = append(errs, validation.NewValueError("retryLimit must be greater than or equal to 0", f.core, f.core.RetryLimit))
+				errs = append(errs, validation.NewValueError("retryLimit must be greater than or equal to 0", f.GetCore(), f.GetCore().RetryLimit))
 			}
 		}
 	default:
-		errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(FailureActionTypeEnd), string(FailureActionTypeGoto), string(FailureActionTypeRetry)}, ", ")), f.core, f.core.Type))
+		errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(FailureActionTypeEnd), string(FailureActionTypeGoto), string(FailureActionTypeRetry)}, ", ")), f.GetCore(), f.GetCore().Type))
 	}
 
 	for _, criterion := range f.Criteria {
 		errs = append(errs, criterion.Validate(opts...)...)
 	}
 
-	if len(errs) == 0 {
-		f.Valid = true
-	}
+	f.Valid = len(errs) == 0 && f.GetCore().GetValid()
 
 	return errs
 }

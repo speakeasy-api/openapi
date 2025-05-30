@@ -28,34 +28,35 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	buf := bytes.NewBuffer([]byte{})
 
-	if err := json.YAMLToJSON(js.core.RootNode, 0, buf); err != nil {
+	if err := json.YAMLToJSON(js.GetCore().RootNode, 0, buf); err != nil {
 		return []error{
-			validation.NewNodeError(err.Error(), js.core.RootNode),
+			validation.NewNodeError(err.Error(), js.GetCore().RootNode),
 		}
 	}
 
 	jsAny, err := jsValidator.UnmarshalJSON(buf)
 	if err != nil {
 		return []error{
-			validation.NewNodeError(err.Error(), js.core.RootNode),
+			validation.NewNodeError(err.Error(), js.GetCore().RootNode),
 		}
 	}
 
+	var errs []error
 	err = oasSchemaValidator.Validate(jsAny)
 	if err != nil {
 		var validationErr *jsValidator.ValidationError
 		if errors.As(err, &validationErr) {
-			return getRootCauses(validationErr, js.core)
+			errs = getRootCauses(validationErr, *js.GetCore())
 		} else {
-			return []error{
-				validation.NewNodeError(err.Error(), js.core.RootNode),
+			errs = []error{
+				validation.NewNodeError(err.Error(), js.GetCore().RootNode),
 			}
 		}
 	}
 
-	js.Valid = true
+	js.Valid = len(errs) == 0 && js.GetCore().GetValid()
 
-	return nil
+	return errs
 }
 
 type marshallerNode interface {

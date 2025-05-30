@@ -15,6 +15,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
@@ -30,6 +31,8 @@ const (
 
 // Arazzo is the root object for an Arazzo document.
 type Arazzo struct {
+	models.Model[core.Arazzo]
+
 	// Arazzo is the version of the Arazzo Specification that this document conforms to.
 	Arazzo string
 	// Info provides metadata about the Arazzo document.
@@ -42,11 +45,6 @@ type Arazzo struct {
 	Components *Components
 	// Extensions provides a list of extensions to the Arazzo document.
 	Extensions *extensions.Extensions
-
-	// Valid indicates whether this model passed validation.
-	Valid bool
-
-	core core.Arazzo
 }
 
 var _ interfaces.Model[core.Arazzo] = (*Arazzo)(nil)
@@ -125,15 +123,9 @@ func Marshal(ctx context.Context, arazzo *Arazzo, w io.Writer) error {
 	return nil
 }
 
-// GetCore will return the low level representation of the Arazzo document.
-// Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
-func (a *Arazzo) GetCore() *core.Arazzo {
-	return &a.core
-}
-
 // Sync will sync any changes made to the Arazzo document models back to the core models.
 func (a *Arazzo) Sync(ctx context.Context) error {
-	if _, err := marshaller.SyncValue(ctx, a, &a.core, nil, false); err != nil {
+	if _, err := marshaller.SyncValue(ctx, a, a.GetCore(), nil, false); err != nil {
 		return err
 	}
 	return nil
@@ -141,13 +133,13 @@ func (a *Arazzo) Sync(ctx context.Context) error {
 
 // Marshal will marshal the Arazzo document to the provided io.Writer.
 func (a *Arazzo) Marshal(ctx context.Context, w io.Writer) error {
-	ctx = yml.ContextWithConfig(ctx, a.core.Config)
+	ctx = yml.ContextWithConfig(ctx, a.GetCore().Config)
 
-	if _, err := marshaller.SyncValue(ctx, a, &a.core, nil, false); err != nil {
+	if _, err := marshaller.SyncValue(ctx, a, a.GetCore(), nil, false); err != nil {
 		return err
 	}
 
-	return a.core.Marshal(ctx, w)
+	return a.GetCore().Marshal(ctx, w)
 }
 
 // Validate will validate the Arazzo document against the Arazzo Specification.
@@ -158,11 +150,11 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 
 	arazzoMajor, arazzoMinor, arazzoPatch, err := parseVersion(a.Arazzo)
 	if err != nil {
-		errs = append(errs, validation.NewValueError(fmt.Sprintf("invalid Arazzo version in document %s: %s", a.Arazzo, err.Error()), a.core, a.core.Arazzo))
+		errs = append(errs, validation.NewValueError(fmt.Sprintf("invalid Arazzo version in document %s: %s", a.Arazzo, err.Error()), a.GetCore(), a.GetCore().Arazzo))
 	}
 
 	if arazzoMajor != VersionMajor || arazzoMinor != VersionMinor || arazzoPatch > VersionPatch {
-		errs = append(errs, validation.NewValueError(fmt.Sprintf("only Arazzo version %s and below is supported", Version), a.core, a.core.Arazzo))
+		errs = append(errs, validation.NewValueError(fmt.Sprintf("only Arazzo version %s and below is supported", Version), a.GetCore(), a.GetCore().Arazzo))
 	}
 
 	errs = append(errs, a.Info.Validate(ctx, opts...)...)
@@ -173,7 +165,7 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, sourceDescription.Validate(ctx, opts...)...)
 
 		if _, ok := sourceDescriptionNames[sourceDescription.Name]; ok {
-			errs = append(errs, validation.NewSliceError(fmt.Sprintf("sourceDescription name %s is not unique", sourceDescription.Name), a.core, a.core.SourceDescriptions, i))
+			errs = append(errs, validation.NewSliceError(fmt.Sprintf("sourceDescription name %s is not unique", sourceDescription.Name), a.GetCore(), a.GetCore().SourceDescriptions, i))
 		}
 
 		sourceDescriptionNames[sourceDescription.Name] = true
@@ -185,7 +177,7 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, workflow.Validate(ctx, opts...)...)
 
 		if _, ok := workflowIds[workflow.WorkflowID]; ok {
-			errs = append(errs, validation.NewSliceError(fmt.Sprintf("workflowId %s is not unique", workflow.WorkflowID), a.core, a.core.Workflows, i))
+			errs = append(errs, validation.NewSliceError(fmt.Sprintf("workflowId %s is not unique", workflow.WorkflowID), a.GetCore(), a.GetCore().Workflows, i))
 		}
 
 		workflowIds[workflow.WorkflowID] = true
@@ -195,9 +187,7 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, a.Components.Validate(ctx, opts...)...)
 	}
 
-	if len(errs) == 0 {
-		a.Valid = true
-	}
+	a.Valid = len(errs) == 0 && a.GetCore().GetValid()
 
 	return errs
 }

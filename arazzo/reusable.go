@@ -11,6 +11,8 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/internal/models"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
 	"gopkg.in/yaml.v3"
@@ -18,14 +20,14 @@ import (
 
 type (
 	// ReusableParameter represents a parameter that can either be referenced from components or declared inline in a workflow or step.
-	ReusableParameter = Reusable[Parameter, *Parameter, core.Parameter]
+	ReusableParameter = Reusable[Parameter, *Parameter, *core.Parameter]
 	// ReusableSuccessAction represents a success action that can either be referenced from components or declared inline in a workflow or step.
-	ReusableSuccessAction = Reusable[SuccessAction, *SuccessAction, core.SuccessAction]
+	ReusableSuccessAction = Reusable[SuccessAction, *SuccessAction, *core.SuccessAction]
 	// ReusableFailureAction represents a failure action that can either be referenced from components or declared inline in a workflow or step.
-	ReusableFailureAction = Reusable[FailureAction, *FailureAction, core.FailureAction]
+	ReusableFailureAction = Reusable[FailureAction, *FailureAction, *core.FailureAction]
 )
 
-type Reusable[T any, V interfaces.Validator[T], C any] struct {
+type Reusable[T any, V interfaces.Validator[T], C marshaller.CoreModeler] struct {
 	// Reference is the expression to the location of the reusable object.
 	Reference *expression.Expression
 	// Value is any value provided alongside a parameter reusable object.
@@ -33,17 +35,9 @@ type Reusable[T any, V interfaces.Validator[T], C any] struct {
 	// If this reusable object is not a reference, this will be the inline object for this node.
 	Object V
 
-	// Valid indicates whether this reusable model passed validation.
-	Valid bool
-
-	core core.Reusable[C]
+	models.Model[core.Reusable[C]]
 }
 
-// GetCore will return the low level representation of the reusable object.
-// Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
-func (r *Reusable[T, V, C]) GetCore() *core.Reusable[C] {
-	return &r.core
-}
 
 // Get will return either the inline object or the object referenced by the reference.
 func (r *Reusable[T, V, C]) Get(components *Components) *T {
@@ -122,7 +116,7 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 	case "Parameter":
 	default:
 		if r.Value != nil {
-			errs = append(errs, validation.NewValueError("value is not allowed when object is not a parameter", r.core, r.core.Value))
+			errs = append(errs, validation.NewValueError("value is not allowed when object is not a parameter", r.GetCore(), r.GetCore().Value))
 		}
 	}
 
@@ -132,9 +126,7 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 		errs = append(errs, r.Object.Validate(ctx, opts...)...)
 	}
 
-	if len(errs) == 0 {
-		r.Valid = true
-	}
+	r.Valid = len(errs) == 0 && r.GetCore().GetValid()
 
 	return errs
 }
@@ -142,7 +134,7 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, opts ...validation.Option) []error {
 	if err := r.Reference.Validate(true); err != nil {
 		return []error{
-			validation.NewValueError(err.Error(), r.core, r.core.Reference),
+			validation.NewValueError(err.Error(), r.GetCore(), r.GetCore().Reference),
 		}
 	}
 
@@ -150,13 +142,13 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 
 	if typ != expression.ExpressionTypeComponents {
 		return []error{
-			validation.NewValueError(fmt.Sprintf("reference must be a components expression, got %s", r.Reference.GetType()), r.core, r.core.Reference),
+			validation.NewValueError(fmt.Sprintf("reference must be a components expression, got %s", r.Reference.GetType()), r.GetCore(), r.GetCore().Reference),
 		}
 	}
 
 	if componentType == "" || len(references) != 1 {
 		return []error{
-			validation.NewValueError(fmt.Sprintf("reference must be a components expression with 3 parts, got %s", *r.Reference), r.core, r.core.Reference),
+			validation.NewValueError(fmt.Sprintf("reference must be a components expression with 3 parts, got %s", *r.Reference), r.GetCore(), r.GetCore().Reference),
 		}
 	}
 
@@ -164,7 +156,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 
 	if a.Components == nil {
 		return []error{
-			validation.NewValueError(fmt.Sprintf("components not present, reference to missing component %s", *r.Reference), r.core, r.core.Reference),
+			validation.NewValueError(fmt.Sprintf("components not present, reference to missing component %s", *r.Reference), r.GetCore(), r.GetCore().Reference),
 		}
 	}
 
@@ -178,7 +170,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 			typ:                objType,
 			components:         a.Components.Parameters,
 			reference:          r.Reference,
-			referenceValueNode: r.core.Reference.GetValueNodeOrRoot(r.core.RootNode),
+			referenceValueNode: r.GetCore().Reference.GetValueNodeOrRoot(r.GetCore().RootNode),
 		}, opts...)
 	case "successActions":
 		return validateComponentReference(ctx, validateComponentReferenceArgs[*SuccessAction]{
@@ -187,7 +179,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 			typ:                objType,
 			components:         a.Components.SuccessActions,
 			reference:          r.Reference,
-			referenceValueNode: r.core.Reference.GetValueNodeOrRoot(r.core.RootNode),
+			referenceValueNode: r.GetCore().Reference.GetValueNodeOrRoot(r.GetCore().RootNode),
 		}, opts...)
 	case "failureActions":
 		return validateComponentReference(ctx, validateComponentReferenceArgs[*FailureAction]{
@@ -196,11 +188,11 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 			typ:                objType,
 			components:         a.Components.FailureActions,
 			reference:          r.Reference,
-			referenceValueNode: r.core.Reference.GetValueNodeOrRoot(r.core.RootNode),
+			referenceValueNode: r.GetCore().Reference.GetValueNodeOrRoot(r.GetCore().RootNode),
 		}, opts...)
 	default:
 		return []error{
-			validation.NewValueError(fmt.Sprintf("reference to %s is not valid, valid components are [parameters, successActions, failureActions]", componentType), r.core, r.core.Reference),
+			validation.NewValueError(fmt.Sprintf("reference to %s is not valid, valid components are [parameters, successActions, failureActions]", componentType), r.GetCore(), r.GetCore().Reference),
 		}
 	}
 }

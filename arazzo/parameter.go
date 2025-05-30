@@ -8,6 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -27,6 +28,8 @@ const (
 
 // Parameter represents parameters that will be passed to a workflow or operation referenced by a step.
 type Parameter struct {
+	models.Model[core.Parameter]
+
 	// Name is the case sensitive name of the parameter.
 	Name string
 	// In is the location of the parameter within an operation.
@@ -35,20 +38,10 @@ type Parameter struct {
 	Value ValueOrExpression
 	// Extensions provides a list of extensions to the Parameter object.
 	Extensions *extensions.Extensions
-
-	// Valid indicates whether this model passed validation.
-	Valid bool
-
-	core core.Parameter
 }
 
 var _ interfaces.Model[core.Parameter] = (*Parameter)(nil)
 
-// GetCore will return the low level representation of the parameter object.
-// Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
-func (p *Parameter) GetCore() *core.Parameter {
-	return &p.core
-}
 
 // Validate will validate the parameter object against the Arazzo specification.
 // If an Workflow or Step object is provided via validation options with validation.WithContextObject() then
@@ -61,8 +54,8 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	w := validation.GetContextObject[Workflow](o)
 	s := validation.GetContextObject[Step](o)
 
-	if p.core.Name.Present && p.Name == "" {
-		errs = append(errs, validation.NewValueError("name is required", p.core, p.core.Name))
+	if p.GetCore().Name.Present && p.Name == "" {
+		errs = append(errs, validation.NewValueError("name is required", p.GetCore(), p.GetCore().Name))
 	}
 
 	in := In("")
@@ -78,32 +71,30 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	default:
 		if p.In == nil || in == "" {
 			if w == nil && s != nil && s.WorkflowID == nil {
-				errs = append(errs, validation.NewValueError("in is required within a step when workflowId is not set", p.core, p.core.In))
+				errs = append(errs, validation.NewValueError("in is required within a step when workflowId is not set", p.GetCore(), p.GetCore().In))
 			}
 		}
 
 		if in != "" {
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("in must be one of [%s] but was %s", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", "), in), p.core, p.core.In))
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("in must be one of [%s] but was %s", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", "), in), p.GetCore(), p.GetCore().In))
 		}
 	}
 
-	if p.core.Value.Present && p.Value == nil {
-		errs = append(errs, validation.NewValueError("value is required", p.core, p.core.Value))
+	if p.GetCore().Value.Present && p.Value == nil {
+		errs = append(errs, validation.NewValueError("value is required", p.GetCore(), p.GetCore().Value))
 	} else if p.Value != nil {
 		_, expression, err := GetValueOrExpressionValue(p.Value)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(err.Error(), p.core, p.core.Value))
+			errs = append(errs, validation.NewValueError(err.Error(), p.GetCore(), p.GetCore().Value))
 		}
 		if expression != nil {
 			if err := expression.Validate(true); err != nil {
-				errs = append(errs, validation.NewValueError(err.Error(), p.core, p.core.Value))
+				errs = append(errs, validation.NewValueError(err.Error(), p.GetCore(), p.GetCore().Value))
 			}
 		}
 	}
 
-	if len(errs) == 0 {
-		p.Valid = true
-	}
+	p.Valid = len(errs) == 0 && p.GetCore().GetValid()
 
 	return errs
 }

@@ -15,24 +15,24 @@ import (
 type Extensions = *sequencedmap.Map[string, Node[Extension]]
 
 type TestCoreModel struct {
+	CoreModel
+
 	PrimitiveField              Node[string]                                     `key:"primitiveField"`
 	NestedModelField            Node[TestNestedModel]                            `key:"nestedModelField"`
 	NestedModelOptionalField    Node[*TestNestedModel]                           `key:"nestedModelOptionalField"`
 	SliceNestedModelField       Node[[]TestNestedModel]                          `key:"sliceNestedModelField"`
 	MapRequiredNestedModelField Node[*sequencedmap.Map[string, TestNestedModel]] `key:"mapRequiredNestedModelField" required:"true"`
 	Extensions                  Extensions                                       `key:"extensions"`
-
-	RootNode *yaml.Node
 }
 
 type TestNestedModel struct {
+	CoreModel
+
 	PrimitiveOptionalField      Node[*string]                        `key:"primitiveOptionalField"`
 	SlicePrimitiveField         Node[[]string]                       `key:"slicePrimitiveField"`
 	SliceRequiredPrimitiveField Node[[]string]                       `key:"sliceRequiredPrimitiveField" required:"true"`
 	MapPrimitiveField           Node[*sequencedmap.Map[string, int]] `key:"mapPrimitiveField"`
 	Extensions                  Extensions                           `key:"extensions"`
-
-	RootNode *yaml.Node
 }
 
 func (t *TestNestedModel) Unmarshal(ctx context.Context, node *yaml.Node) error {

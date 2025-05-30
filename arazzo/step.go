@@ -11,6 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -54,19 +55,11 @@ type Step struct {
 	// Extensions provides a list of extensions to the Step object.
 	Extensions *extensions.Extensions
 
-	// Valid indicates whether this model passed validation.
-	Valid bool
-
-	core core.Step
+	models.Model[core.Step]
 }
 
 var _ interfaces.Model[core.Step] = (*Step)(nil)
 
-// GetCore will return the low level representation of the step object.
-// Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
-func (s *Step) GetCore() *core.Step {
-	return &s.core
-}
 
 var stepIDRegex = regexp.MustCompile(`^[A-Za-z0-9_\-]+$`)
 
@@ -95,11 +88,11 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 
 	errs := []error{}
 
-	if s.core.StepID.Present && s.StepID == "" {
-		errs = append(errs, validation.NewValueError("stepId is required", s.core, s.core.StepID))
+	if s.GetCore().StepID.Present && s.StepID == "" {
+		errs = append(errs, validation.NewValueError("stepId is required", s.GetCore(), s.GetCore().StepID))
 	} else if s.StepID != "" {
 		if !stepIDRegex.MatchString(s.StepID) {
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("stepId must be a valid name [%s]: %s", stepIDRegex.String(), s.StepID), s.core, s.core.StepID))
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("stepId must be a valid name [%s]: %s", stepIDRegex.String(), s.StepID), s.GetCore(), s.GetCore().StepID))
 		}
 
 		numStepsWithID := 0
@@ -109,7 +102,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 			}
 		}
 		if numStepsWithID > 1 {
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("stepId must be unique within the workflow, found %d steps with the same stepId", numStepsWithID), s.core, s.core.StepID))
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("stepId must be unique within the workflow, found %d steps with the same stepId", numStepsWithID), s.GetCore(), s.GetCore().StepID))
 		}
 	}
 
@@ -127,10 +120,10 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 	}
 	switch numSet {
 	case 0:
-		errs = append(errs, validation.NewNodeError("at least one of operationId, operationPath or workflowId must be set", s.core.RootNode))
+		errs = append(errs, validation.NewNodeError("at least one of operationId, operationPath or workflowId must be set", s.GetCore().RootNode))
 	case 1:
 	default:
-		errs = append(errs, validation.NewNodeError("only one of operationId, operationPath or workflowId can be set", s.core.RootNode))
+		errs = append(errs, validation.NewNodeError("only one of operationId, operationPath or workflowId can be set", s.GetCore().RootNode))
 	}
 
 	if s.OperationID != nil {
@@ -141,66 +134,66 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 			}
 		}
 		if numOpenAPISourceDescriptions > 1 && !s.OperationID.IsExpression() {
-			errs = append(errs, validation.NewValueError("operationId must be a valid expression if there are multiple OpenAPI source descriptions", s.core, s.core.OperationID))
+			errs = append(errs, validation.NewValueError("operationId must be a valid expression if there are multiple OpenAPI source descriptions", s.GetCore(), s.GetCore().OperationID))
 		}
 		if s.OperationID.IsExpression() {
 			if err := s.OperationID.Validate(false); err != nil {
-				errs = append(errs, validation.NewValueError(err.Error(), s.core, s.core.OperationID))
+				errs = append(errs, validation.NewValueError(err.Error(), s.GetCore(), s.GetCore().OperationID))
 			}
 
 			typ, sourceDescriptionName, _, _ := s.OperationID.GetParts()
 
 			if typ != expression.ExpressionTypeSourceDescriptions {
-				errs = append(errs, validation.NewValueError(fmt.Sprintf("operationId must be a sourceDescriptions expression, got %s", typ), s.core, s.core.OperationID))
+				errs = append(errs, validation.NewValueError(fmt.Sprintf("operationId must be a sourceDescriptions expression, got %s", typ), s.GetCore(), s.GetCore().OperationID))
 			}
 
 			if a.SourceDescriptions.Find(string(sourceDescriptionName)) == nil {
-				errs = append(errs, validation.NewValueError(fmt.Sprintf("sourceDescription %s not found", sourceDescriptionName), s.core, s.core.OperationID))
+				errs = append(errs, validation.NewValueError(fmt.Sprintf("sourceDescription %s not found", sourceDescriptionName), s.GetCore(), s.GetCore().OperationID))
 			}
 		}
 	}
 
 	if s.OperationPath != nil {
 		if err := s.OperationPath.Validate(true); err != nil {
-			errs = append(errs, validation.NewValueError(err.Error(), s.core, s.core.OperationPath))
+			errs = append(errs, validation.NewValueError(err.Error(), s.GetCore(), s.GetCore().OperationPath))
 		}
 
 		typ, sourceDescriptionName, expressionParts, jp := s.OperationPath.GetParts()
 
 		if typ != expression.ExpressionTypeSourceDescriptions {
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("operationPath must be a sourceDescriptions expression, got %s", typ), s.core, s.core.OperationPath))
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("operationPath must be a sourceDescriptions expression, got %s", typ), s.GetCore(), s.GetCore().OperationPath))
 		}
 
 		if a.SourceDescriptions.Find(string(sourceDescriptionName)) == nil {
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("sourceDescription %s not found", sourceDescriptionName), s.core, s.core.OperationPath))
+			errs = append(errs, validation.NewValueError(fmt.Sprintf("sourceDescription %s not found", sourceDescriptionName), s.GetCore(), s.GetCore().OperationPath))
 		}
 
 		if len(expressionParts) != 1 || expressionParts[0] != "url" {
-			errs = append(errs, validation.NewValueError("operationPath must reference the url of a sourceDescription", s.core, s.core.OperationPath))
+			errs = append(errs, validation.NewValueError("operationPath must reference the url of a sourceDescription", s.GetCore(), s.GetCore().OperationPath))
 		}
 		if jp == "" {
-			errs = append(errs, validation.NewValueError("operationPath must contain a json pointer to the operation path within the sourceDescription", s.core, s.core.OperationPath))
+			errs = append(errs, validation.NewValueError("operationPath must contain a json pointer to the operation path within the sourceDescription", s.GetCore(), s.GetCore().OperationPath))
 		}
 	}
 
 	if s.WorkflowID != nil {
 		if s.WorkflowID.IsExpression() {
 			if err := s.WorkflowID.Validate(false); err != nil {
-				errs = append(errs, validation.NewValueError(err.Error(), s.core, s.core.WorkflowID))
+				errs = append(errs, validation.NewValueError(err.Error(), s.GetCore(), s.GetCore().WorkflowID))
 			}
 
 			typ, sourceDescriptionName, _, _ := s.WorkflowID.GetParts()
 
 			if typ != expression.ExpressionTypeSourceDescriptions {
-				errs = append(errs, validation.NewValueError(fmt.Sprintf("workflowId must be a sourceDescriptions expression, got %s", typ), s.core, s.core.WorkflowID))
+				errs = append(errs, validation.NewValueError(fmt.Sprintf("workflowId must be a sourceDescriptions expression, got %s", typ), s.GetCore(), s.GetCore().WorkflowID))
 			}
 
 			if a.SourceDescriptions.Find(string(sourceDescriptionName)) == nil {
-				errs = append(errs, validation.NewValueError(fmt.Sprintf("sourceDescription %s not found", sourceDescriptionName), s.core, s.core.WorkflowID))
+				errs = append(errs, validation.NewValueError(fmt.Sprintf("sourceDescription %s not found", sourceDescriptionName), s.GetCore(), s.GetCore().WorkflowID))
 			}
 		} else {
 			if a.Workflows.Find(string(*s.WorkflowID)) == nil {
-				errs = append(errs, validation.NewValueError(fmt.Sprintf("workflow %s not found", *s.WorkflowID), s.core, s.core.WorkflowID))
+				errs = append(errs, validation.NewValueError(fmt.Sprintf("workflow %s not found", *s.WorkflowID), s.GetCore(), s.GetCore().WorkflowID))
 			}
 		}
 	}
@@ -214,14 +207,14 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 		if parameter.Reference != nil {
 			_, ok := parameterRefs[string(*parameter.Reference)]
 			if ok {
-				errs = append(errs, validation.NewSliceError(fmt.Sprintf("duplicate parameter found with reference %s", *parameter.Reference), s.core, s.core.Parameters, i))
+				errs = append(errs, validation.NewSliceError(fmt.Sprintf("duplicate parameter found with reference %s", *parameter.Reference), s.GetCore(), s.GetCore().Parameters, i))
 			}
 			parameterRefs[string(*parameter.Reference)] = true
 		} else if parameter.Object != nil {
 			id := fmt.Sprintf("%s.%v", parameter.Object.Name, parameter.Object.In)
 			_, ok := parameters[id]
 			if ok {
-				errs = append(errs, validation.NewSliceError(fmt.Sprintf("duplicate parameter found with name %s and in %v", parameter.Object.Name, parameter.Object.In), s.core, s.core.Parameters, i))
+				errs = append(errs, validation.NewSliceError(fmt.Sprintf("duplicate parameter found with name %s and in %v", parameter.Object.Name, parameter.Object.In), s.GetCore(), s.GetCore().Parameters, i))
 			}
 			parameters[id] = true
 		}
@@ -229,7 +222,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 
 	if s.RequestBody != nil {
 		if s.WorkflowID != nil {
-			errs = append(errs, validation.NewValueError("requestBody should not be set when workflowId is set", s.core, s.core.RequestBody))
+			errs = append(errs, validation.NewValueError("requestBody should not be set when workflowId is set", s.GetCore(), s.GetCore().RequestBody))
 		}
 
 		errs = append(errs, s.RequestBody.Validate(ctx, opts...)...)
@@ -248,14 +241,14 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 		if onSuccess.Reference != nil {
 			_, ok := successActionRefs[string(*onSuccess.Reference)]
 			if ok {
-				errs = append(errs, validation.NewSliceError(fmt.Sprintf("duplicate successAction found with reference %s", *onSuccess.Reference), s.core, s.core.OnSuccess, i))
+				errs = append(errs, validation.NewSliceError(fmt.Sprintf("duplicate successAction found with reference %s", *onSuccess.Reference), s.GetCore(), s.GetCore().OnSuccess, i))
 			}
 			successActionRefs[string(*onSuccess.Reference)] = true
 		} else if onSuccess.Object != nil {
 			id := fmt.Sprintf("%s.%v", onSuccess.Object.Name, onSuccess.Object.Type)
 			_, ok := successActions[id]
 			if ok {
-				errs = append(errs, validation.NewSliceError(fmt.Sprintf("duplicate successAction found with name %s and type %v", onSuccess.Object.Name, onSuccess.Object.Type), s.core, s.core.OnSuccess, i))
+				errs = append(errs, validation.NewSliceError(fmt.Sprintf("duplicate successAction found with name %s and type %v", onSuccess.Object.Name, onSuccess.Object.Type), s.GetCore(), s.GetCore().OnSuccess, i))
 			}
 			successActions[id] = true
 		}
@@ -270,14 +263,14 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 		if onFailure.Reference != nil {
 			_, ok := failureActionRefs[string(*onFailure.Reference)]
 			if ok {
-				errs = append(errs, validation.NewSliceError(fmt.Sprintf("duplicate failureAction found with reference %s", *onFailure.Reference), s.core, s.core.OnFailure, i))
+				errs = append(errs, validation.NewSliceError(fmt.Sprintf("duplicate failureAction found with reference %s", *onFailure.Reference), s.GetCore(), s.GetCore().OnFailure, i))
 			}
 			failureActionRefs[string(*onFailure.Reference)] = true
 		} else if onFailure.Object != nil {
 			id := fmt.Sprintf("%s.%v", onFailure.Object.Name, onFailure.Object.Type)
 			_, ok := failureActions[id]
 			if ok {
-				errs = append(errs, validation.NewSliceError(fmt.Sprintf("duplicate failureAction found with name %s and type %v", onFailure.Object.Name, onFailure.Object.Type), s.core, s.core.OnFailure, i))
+				errs = append(errs, validation.NewSliceError(fmt.Sprintf("duplicate failureAction found with name %s and type %v", onFailure.Object.Name, onFailure.Object.Type), s.GetCore(), s.GetCore().OnFailure, i))
 			}
 			failureActions[id] = true
 		}
@@ -285,17 +278,15 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 
 	for name, output := range s.Outputs.All() {
 		if !outputNameRegex.MatchString(name) {
-			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("output name must be a valid name [%s]: %s", outputNameRegex.String(), name), s.core, s.core.Outputs, name))
+			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("output name must be a valid name [%s]: %s", outputNameRegex.String(), name), s.GetCore(), s.GetCore().Outputs, name))
 		}
 
 		if err := output.Validate(true); err != nil {
-			errs = append(errs, validation.NewMapValueError(err.Error(), s.core, s.core.Outputs, name))
+			errs = append(errs, validation.NewMapValueError(err.Error(), s.GetCore(), s.GetCore().Outputs, name))
 		}
 	}
 
-	if len(errs) == 0 {
-		s.Valid = true
-	}
+	s.Valid = len(errs) == 0 && s.GetCore().GetValid()
 
 	return errs
 }

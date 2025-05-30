@@ -289,3 +289,141 @@ func TestSyncValue_TypeWithExtensions(t *testing.T) {
 	assert.Equal(t, node, source.core.RootNode)
 	assert.True(t, source.Extensions.GetCore().Has("x-speakeasy-test"))
 }
+
+// Test struct with required and optional fields for validity testing
+type TestValidityStruct struct {
+	RequiredField *string
+	OptionalField *string
+	Valid         bool
+	core          TestValidityCoreModel
+}
+
+type TestValidityCoreModel struct {
+	marshaller.CoreModel
+	RequiredField marshaller.Node[*string] `key:"required" required:"true"`
+	OptionalField marshaller.Node[*string] `key:"optional"`
+}
+
+func (t *TestValidityStruct) GetCore() *TestValidityCoreModel {
+	return &t.core
+}
+
+func TestSyncChangesValidityWithRequiredFields(t *testing.T) {
+	ctx := context.Background()
+
+	// Test case 1: All required fields present - should be valid
+	t.Run("valid when required fields present", func(t *testing.T) {
+		mainModel := &TestValidityStruct{
+			RequiredField: pointer.From("test value"),
+			OptionalField: nil,
+		}
+
+		coreModel := &TestValidityCoreModel{}
+		coreModel.RequiredField.Present = true
+		coreModel.RequiredField.Value = pointer.From("test value")
+
+		valueNode := &yaml.Node{Kind: yaml.MappingNode}
+
+		_, err := marshaller.SyncValue(ctx, mainModel, coreModel, valueNode, false)
+		require.NoError(t, err)
+
+		assert.True(t, coreModel.GetValid(), "Expected core model to be valid when required field is present")
+	})
+
+	// Test case 2: Required field missing - should be invalid
+	t.Run("invalid when required field missing", func(t *testing.T) {
+		mainModel := &TestValidityStruct{
+			RequiredField: nil,  // nil value should result in no sync
+			OptionalField: nil,
+		}
+
+		coreModel := &TestValidityCoreModel{}
+		// RequiredField.Present is false by default
+		coreModel.RequiredField.Value = pointer.From("test value")
+
+		valueNode := &yaml.Node{Kind: yaml.MappingNode}
+
+		_, err := marshaller.SyncValue(ctx, mainModel, coreModel, valueNode, false)
+		require.NoError(t, err)
+
+		assert.False(t, coreModel.GetValid(), "Expected core model to be invalid when required field is not present")
+	})
+
+	// Test case 3: Optional field missing - should still be valid
+	t.Run("valid when optional field missing", func(t *testing.T) {
+		mainModel := &TestValidityStruct{
+			RequiredField: pointer.From("test value"),
+			OptionalField: nil,
+		}
+
+		coreModel := &TestValidityCoreModel{}
+		coreModel.RequiredField.Present = true
+		coreModel.RequiredField.Value = pointer.From("test value")
+		// OptionalField.Present is false by default
+
+		valueNode := &yaml.Node{Kind: yaml.MappingNode}
+
+		_, err := marshaller.SyncValue(ctx, mainModel, coreModel, valueNode, false)
+		require.NoError(t, err)
+
+		assert.True(t, coreModel.GetValid(), "Expected core model to be valid when only optional field is missing")
+	})
+
+	// Test case 4: Initially invalid becomes valid after sync
+	t.Run("invalid becomes valid after required field added", func(t *testing.T) {
+		mainModel := &TestValidityStruct{
+			RequiredField: pointer.From("new value"),
+			OptionalField: nil,
+		}
+
+		coreModel := &TestValidityCoreModel{}
+		coreModel.SetValid(false) // Start as invalid
+		// Initially no fields are present
+
+		valueNode := &yaml.Node{Kind: yaml.MappingNode}
+
+		_, err := marshaller.SyncValue(ctx, mainModel, coreModel, valueNode, false)
+		require.NoError(t, err)
+
+		// After sync, the required field should be present and model should be valid
+		assert.True(t, coreModel.GetValid(), "Expected core model to become valid after syncing required field")
+		assert.True(t, coreModel.RequiredField.Present, "Expected required field to be marked as present after sync")
+	})
+}
+
+func TestSyncChangesValidityWithInferredRequiredFields(t *testing.T) {
+	ctx := context.Background()
+
+	// Test struct with inferred required field (non-pointer string)
+	type TestInferredValidityCoreModel struct {
+		marshaller.CoreModel
+		InferredRequired marshaller.Node[string]  `key:"inferred"`    // Should be required (non-pointer)
+		InferredOptional marshaller.Node[*string] `key:"inferredOpt"` // Should be optional (pointer)
+	}
+
+	type TestInferredValidityStruct struct {
+		InferredRequired string
+		InferredOptional *string
+		Valid            bool
+		core             TestInferredValidityCoreModel
+	}
+
+	t.Run("inferred required field validation", func(t *testing.T) {
+		mainModel := &TestInferredValidityStruct{
+			InferredRequired: "test",
+			InferredOptional: nil,
+		}
+
+		coreModel := &TestInferredValidityCoreModel{}
+		// Initially no fields are present
+
+		valueNode := &yaml.Node{Kind: yaml.MappingNode}
+
+		_, err := marshaller.SyncValue(ctx, mainModel, coreModel, valueNode, false)
+		require.NoError(t, err)
+
+		// Non-pointer string field should be inferred as required and should be present after sync
+		assert.True(t, coreModel.GetValid(), "Expected core model to be valid after syncing non-pointer required field")
+		assert.True(t, coreModel.InferredRequired.Present, "Expected non-pointer required field to be present after sync")
+	})
+}

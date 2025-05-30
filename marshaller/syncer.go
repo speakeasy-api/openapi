@@ -111,6 +111,8 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 		return nil, fmt.Errorf("syncChanges expected struct, got %s", s.Type())
 	}
 
+	valid := true
+
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Type().Field(i)
 		if !field.IsExported() {
@@ -125,7 +127,11 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 
 		target := t.Field(i)
 		if target.Kind() != reflect.Ptr {
-			target = target.Addr()
+			if target.CanAddr() {
+				target = target.Addr()
+			} else {
+				continue
+			}
 		}
 
 		// If both are nil, we don't need to sync
@@ -147,7 +153,15 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 		}
 
 		targetInt := target.Interface()
-		sourceInt := sourceVal.Addr().Interface()
+		var sourceInt any
+		if !sourceVal.IsValid() {
+			continue
+		}
+		if sourceVal.CanAddr() {
+			sourceInt = sourceVal.Addr().Interface()
+		} else {
+			sourceInt = sourceVal.Interface()
+		}
 
 		nodeMutator, ok := targetInt.(NodeMutator)
 		if !ok {
@@ -161,8 +175,40 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 
 		if valNode != nil {
 			valueNode = yml.CreateOrUpdateMapNodeElement(ctx, key, keyNode, valNode, valueNode)
+			nodeMutator.SetPresent(true)
 		} else {
 			valueNode = yml.DeleteMapNodeElement(ctx, key, valueNode)
+			nodeMutator.SetPresent(false)
+		}
+
+		// Check if this field is required for validity
+		if valid {
+			requiredTag := field.Tag.Get("required")
+			required := requiredTag == "true"
+
+			if requiredTag == "" {
+				fieldValue := t.Field(i)
+				if nodeAccessor, ok := fieldValue.Interface().(NodeAccessor); ok {
+					fieldType := nodeAccessor.GetValueType()
+
+					if fieldType.Kind() != reflect.Ptr {
+						required = fieldType.Kind() != reflect.Map && fieldType.Kind() != reflect.Slice && fieldType.Kind() != reflect.Array
+					}
+				}
+			}
+
+			if required {
+				fieldValue := t.Field(i)
+				// Check if the field has a Present boolean field (for Node[T] types)
+				if presentField := fieldValue.FieldByName("Present"); presentField.IsValid() && presentField.Kind() == reflect.Bool {
+					if !presentField.Bool() {
+						valid = false
+					}
+				} else if fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
+					// Fallback for non-Node fields
+					valid = false
+				}
+			}
 		}
 	}
 
@@ -179,6 +225,11 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 	if ok {
 		sf := sUnderlying.FieldByIndex(cf.Index)
 		reflect.NewAt(sf.Type(), unsafe.Pointer(sf.UnsafeAddr())).Elem().Set(t)
+	}
+
+	// Set validity on the core model
+	if coreModel, ok := t.Addr().Interface().(CoreModeler); ok {
+		coreModel.SetValid(valid)
 	}
 
 	return valueNode, nil

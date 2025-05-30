@@ -24,10 +24,9 @@ type ModelWithExtensions struct {
 }
 
 type CoreModelWithExtensions struct {
+	marshaller.CoreModel
 	Test       marshaller.Node[string]   `key:"test"`
 	Extensions coreExtensions.Extensions `key:"extensions"`
-
-	RootNode *yaml.Node
 }
 
 type TestModel struct {
@@ -38,10 +37,9 @@ type TestModel struct {
 }
 
 type TestCoreModel struct {
+	marshaller.CoreModel
 	Name  marshaller.Node[string]     `key:"name"`
 	Value marshaller.Node[*yaml.Node] `key:"value" required:"true"`
-
-	RootNode *yaml.Node
 }
 
 func TestUnmarshalExtensionModel_Success(t *testing.T) {

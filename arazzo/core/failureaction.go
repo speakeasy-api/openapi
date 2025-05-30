@@ -3,10 +3,10 @@ package core
 import (
 	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
-	"gopkg.in/yaml.v3"
 )
 
 type FailureAction struct {
+	marshaller.CoreModel
 	Name       marshaller.Node[string]       `key:"name"`
 	Type       marshaller.Node[string]       `key:"type"`
 	WorkflowID marshaller.Node[*Expression]  `key:"workflowId"`
@@ -15,6 +15,4 @@ type FailureAction struct {
 	RetryLimit marshaller.Node[*int]         `key:"retryLimit"`
 	Criteria   marshaller.Node[[]*Criterion] `key:"criteria"`
 	Extensions core.Extensions               `key:"extensions"`
-
-	RootNode *yaml.Node
 }

@@ -5,6 +5,7 @@ import (
 	_ "embed"
 
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31/core"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/sequencedmap"
@@ -27,6 +28,8 @@ func NewJSONSchemaFromBool(value bool) JSONSchema {
 }
 
 type Schema struct {
+	models.Model[core.Schema]
+
 	Ref                   *string
 	ExclusiveMaximum      ExclusiveMaximum
 	ExclusiveMinimum      ExclusiveMinimum
@@ -79,12 +82,5 @@ type Schema struct {
 	Deprecated            *bool
 	Schema                *string
 	Extensions            *extensions.Extensions
-
-	Valid bool
-
-	core core.Schema
 }
 
-func (js *Schema) GetCore() *core.Schema {
-	return &js.core
-}

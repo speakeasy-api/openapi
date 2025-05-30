@@ -11,6 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/internal/models"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -39,19 +40,11 @@ type SuccessAction struct {
 	// Extensions provides a list of extensions to the SuccessAction object.
 	Extensions *extensions.Extensions
 
-	// Valid indicates whether this model passed validation.
-	Valid bool
-
-	core core.SuccessAction
+	models.Model[core.SuccessAction]
 }
 
 var _ interfaces.Model[core.SuccessAction] = (*SuccessAction)(nil)
 
-// GetCore will return the low level representation of the success action object.
-// Useful for accessing line and column numbers for various nodes in the backing yaml/json document.
-func (s *SuccessAction) GetCore() *core.SuccessAction {
-	return &s.core
-}
 
 // Validate will validate the success action object against the Arazzo specification.
 // Requires an Arazzo object to be passed via validation options with validation.WithContextObject().
@@ -68,42 +61,40 @@ func (s *SuccessAction) Validate(ctx context.Context, opts ...validation.Option)
 
 	errs := []error{}
 
-	if s.core.Name.Present && s.Name == "" {
-		errs = append(errs, validation.NewValueError("name is required", s.core, s.core.Name))
+	if s.GetCore().Name.Present && s.Name == "" {
+		errs = append(errs, validation.NewValueError("name is required", s.GetCore(), s.GetCore().Name))
 	}
 
 	switch s.Type {
 	case SuccessActionTypeEnd:
 		if s.WorkflowID != nil {
-			errs = append(errs, validation.NewValueError("workflowId is not allowed when type: end is specified", s.core, s.core.WorkflowID))
+			errs = append(errs, validation.NewValueError("workflowId is not allowed when type: end is specified", s.GetCore(), s.GetCore().WorkflowID))
 		}
 		if s.StepID != nil {
-			errs = append(errs, validation.NewValueError("stepId is not allowed when type: end is specified", s.core, s.core.StepID))
+			errs = append(errs, validation.NewValueError("stepId is not allowed when type: end is specified", s.GetCore(), s.GetCore().StepID))
 		}
 	case SuccessActionTypeGoto:
 		errs = append(errs, validationActionWorkflowIDAndStepID(ctx, validationActionWorkflowStepIDParams{
 			parentType:       "successAction",
 			workflowID:       s.WorkflowID,
-			workflowIDLine:   s.core.WorkflowID.GetKeyNodeOrRoot(s.core.RootNode).Line,
-			workflowIDColumn: s.core.WorkflowID.GetKeyNodeOrRoot(s.core.RootNode).Column,
+			workflowIDLine:   s.GetCore().WorkflowID.GetKeyNodeOrRoot(s.GetCore().RootNode).Line,
+			workflowIDColumn: s.GetCore().WorkflowID.GetKeyNodeOrRoot(s.GetCore().RootNode).Column,
 			stepID:           s.StepID,
-			stepIDLine:       s.core.StepID.GetKeyNodeOrRoot(s.core.RootNode).Line,
-			stepIDColumn:     s.core.StepID.GetKeyNodeOrRoot(s.core.RootNode).Column,
+			stepIDLine:       s.GetCore().StepID.GetKeyNodeOrRoot(s.GetCore().RootNode).Line,
+			stepIDColumn:     s.GetCore().StepID.GetKeyNodeOrRoot(s.GetCore().RootNode).Column,
 			arazzo:           a,
 			workflow:         validation.GetContextObject[Workflow](o),
 			required:         true,
 		}, opts...)...)
 	default:
-		errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(SuccessActionTypeEnd), string(SuccessActionTypeGoto)}, ", ")), s.core, s.core.Type))
+		errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(SuccessActionTypeEnd), string(SuccessActionTypeGoto)}, ", ")), s.GetCore(), s.GetCore().Type))
 	}
 
 	for _, criterion := range s.Criteria {
 		errs = append(errs, criterion.Validate(opts...)...)
 	}
 
-	if len(errs) == 0 {
-		s.Valid = true
-	}
+	s.Valid = len(errs) == 0 && s.GetCore().GetValid()
 
 	return errs
 }
