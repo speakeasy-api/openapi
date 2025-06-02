@@ -73,8 +73,8 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 
 	// get fields by tag first
 	fields := map[string]Field{}
-	fieldsByTag := []string{}
 	var extensionsField *reflect.Value
+	requiredFields := map[string]Field{} // Track required fields separately
 
 	for i := 0; i < out.NumField(); i++ {
 		field := out.Type().Field(i)
@@ -106,15 +106,23 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 			}
 		}
 
-		fields[tag] = Field{
+		fieldInfo := Field{
 			Name:     field.Name,
 			Field:    out.Field(i),
 			Required: required,
 		}
-		fieldsByTag = append(fieldsByTag, tag)
+
+		fields[tag] = fieldInfo
+
+		// Track required fields for validation
+		if required {
+			requiredFields[tag] = fieldInfo
+		}
 	}
 
-	foundFields := map[string]bool{}
+	// Process YAML nodes and validate required fields in one pass
+	valid := true
+	foundRequiredFields := map[string]bool{}
 
 	for i := 0; i < len(node.Content); i += 2 {
 		keyNode := node.Content[i]
@@ -138,23 +146,16 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 				return err
 			}
 
-			foundFields[key] = true
+			// Mark required field as found
+			if field.Required {
+				foundRequiredFields[key] = true
+			}
 		}
 	}
 
-	valid := true
-
-	for _, tag := range fieldsByTag {
-		field, ok := fields[tag]
-		if !ok {
-			continue
-		}
-
-		if !field.Required {
-			continue
-		}
-
-		if _, ok := foundFields[tag]; !ok {
+	// Check for missing required fields
+	for tag := range requiredFields {
+		if !foundRequiredFields[tag] {
 			unmarshallable.AddValidationError(validation.NewNodeError(fmt.Sprintf("field %s is missing", tag), node))
 			valid = false
 		}
