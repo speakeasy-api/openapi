@@ -12,11 +12,11 @@ type NestedSourceStruct struct {
 	Value string
 }
 
-type ModelFromCoreTarget struct {
+type PopulatorTarget struct {
 	Value string
 }
 
-func (m *ModelFromCoreTarget) FromCore(c any) error {
+func (m *PopulatorTarget) Populate(c any) error {
 	if core, ok := c.(NestedSourceStruct); ok {
 		m.Value = core.Value
 	}
@@ -24,11 +24,11 @@ func (m *ModelFromCoreTarget) FromCore(c any) error {
 }
 
 func Test_PopulateModel_Success(t *testing.T) {
-	// Test ModelFromCore interface
+	// Test Populator interface
 	source := NestedSourceStruct{Value: "from-core"}
-	target := &ModelFromCoreTarget{}
-	
-	err := marshaller.PopulateModel(source, target)
+	target := &PopulatorTarget{}
+
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 	assert.Equal(t, "from-core", target.Value)
 }
@@ -37,8 +37,8 @@ func Test_PopulateModel_SimpleStruct_Success(t *testing.T) {
 	// Test basic struct population
 	source := NestedSourceStruct{Value: "test"}
 	target := &NestedSourceStruct{}
-	
-	err := marshaller.PopulateModel(source, target)
+
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 	assert.Equal(t, "test", target.Value)
 }

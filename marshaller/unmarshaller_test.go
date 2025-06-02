@@ -1,10 +1,11 @@
-package marshaller
+package marshaller_test
 
 import (
 	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/internal/testutils"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/stretchr/testify/assert"
@@ -12,31 +13,31 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type Extensions = *sequencedmap.Map[string, Node[Extension]]
+type Extensions = *sequencedmap.Map[string, marshaller.Node[marshaller.Extension]]
 
 type TestCoreModel struct {
-	CoreModel
+	marshaller.CoreModel
 
-	PrimitiveField              Node[string]                                     `key:"primitiveField"`
-	NestedModelField            Node[TestNestedModel]                            `key:"nestedModelField"`
-	NestedModelOptionalField    Node[*TestNestedModel]                           `key:"nestedModelOptionalField"`
-	SliceNestedModelField       Node[[]TestNestedModel]                          `key:"sliceNestedModelField"`
-	MapRequiredNestedModelField Node[*sequencedmap.Map[string, TestNestedModel]] `key:"mapRequiredNestedModelField" required:"true"`
-	Extensions                  Extensions                                       `key:"extensions"`
+	PrimitiveField              marshaller.Node[string]                                     `key:"primitiveField"`
+	NestedModelField            marshaller.Node[TestNestedModel]                            `key:"nestedModelField"`
+	NestedModelOptionalField    marshaller.Node[*TestNestedModel]                           `key:"nestedModelOptionalField"`
+	SliceNestedModelField       marshaller.Node[[]TestNestedModel]                          `key:"sliceNestedModelField"`
+	MapRequiredNestedModelField marshaller.Node[*sequencedmap.Map[string, TestNestedModel]] `key:"mapRequiredNestedModelField" required:"true"`
+	Extensions                  Extensions                                                  `key:"extensions"`
 }
 
 type TestNestedModel struct {
-	CoreModel
+	marshaller.CoreModel
 
-	PrimitiveOptionalField      Node[*string]                        `key:"primitiveOptionalField"`
-	SlicePrimitiveField         Node[[]string]                       `key:"slicePrimitiveField"`
-	SliceRequiredPrimitiveField Node[[]string]                       `key:"sliceRequiredPrimitiveField" required:"true"`
-	MapPrimitiveField           Node[*sequencedmap.Map[string, int]] `key:"mapPrimitiveField"`
-	Extensions                  Extensions                           `key:"extensions"`
+	PrimitiveOptionalField      marshaller.Node[*string]                        `key:"primitiveOptionalField"`
+	SlicePrimitiveField         marshaller.Node[[]string]                       `key:"slicePrimitiveField"`
+	SliceRequiredPrimitiveField marshaller.Node[[]string]                       `key:"sliceRequiredPrimitiveField" required:"true"`
+	MapPrimitiveField           marshaller.Node[*sequencedmap.Map[string, int]] `key:"mapPrimitiveField"`
+	Extensions                  Extensions                                      `key:"extensions"`
 }
 
 func (t *TestNestedModel) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	return UnmarshalModel(ctx, node, t)
+	return marshaller.UnmarshalModel(ctx, node, t)
 }
 
 func Test_UnmarshalModel_Success(t *testing.T) {
@@ -72,7 +73,7 @@ x-test-2: some-value-2
 	require.NoError(t, err)
 
 	var out TestCoreModel
-	err = Unmarshal(context.Background(), &node, &out)
+	err = marshaller.Unmarshal(context.Background(), &node, &out)
 	require.NoError(t, err)
 
 	assertNodeField(t, "primitiveField", 1, "hello world", 1, out.PrimitiveField)
@@ -83,7 +84,7 @@ x-test-2: some-value-2
 	assertNodeField(t, "sliceRequiredPrimitiveField", 5, []string{"I", "am", "here"}, 5, out.NestedModelField.Value.SliceRequiredPrimitiveField)
 	assertNodeField(t, "mapPrimitiveField", 6, sequencedmap.New(sequencedmap.NewElem("a", 1), sequencedmap.NewElem("b", 2)), 7, out.NestedModelField.Value.MapPrimitiveField)
 	xTestExtensionNodeNestedModelField := testutils.CreateStringYamlNode("some-value", 9, 11)
-	assert.Equal(t, sequencedmap.New(sequencedmap.NewElem("x-test", Node[Extension]{
+	assert.Equal(t, sequencedmap.New(sequencedmap.NewElem("x-test", marshaller.Node[marshaller.Extension]{
 		Key:       "x-test",
 		KeyNode:   testutils.CreateStringYamlNode("x-test", 9, 3),
 		Value:     xTestExtensionNodeNestedModelField,
@@ -104,7 +105,7 @@ x-test-2: some-value-2
 	assertNodeField(t, "slicePrimitiveField", 20, []string{"p", "q", "r"}, 20, out.MapRequiredNestedModelField.Value.GetOrZero("z").SlicePrimitiveField)
 	assertNodeField(t, "sliceRequiredPrimitiveField", 21, []string{"s", "t", "u"}, 21, out.MapRequiredNestedModelField.Value.GetOrZero("z").SliceRequiredPrimitiveField)
 	xTestExtensionNodeMapRequiredNestedModelField := testutils.CreateStringYamlNode("some-value", 22, 13)
-	assert.Equal(t, sequencedmap.New(sequencedmap.NewElem("x-test", Node[Extension]{
+	assert.Equal(t, sequencedmap.New(sequencedmap.NewElem("x-test", marshaller.Node[marshaller.Extension]{
 		Key:       "x-test",
 		KeyNode:   testutils.CreateStringYamlNode("x-test", 22, 5),
 		Value:     xTestExtensionNodeMapRequiredNestedModelField,
@@ -114,7 +115,7 @@ x-test-2: some-value-2
 	assertNodeField(t, "sliceRequiredPrimitiveField", 25, []string{"1", "2", "3"}, 25, out.MapRequiredNestedModelField.Value.GetOrZero("x").SliceRequiredPrimitiveField)
 
 	xTestExtensionNode := testutils.CreateStringYamlNode("some-value-2", 26, 11)
-	assert.Equal(t, sequencedmap.New(sequencedmap.NewElem("x-test-2", Node[Extension]{
+	assert.Equal(t, sequencedmap.New(sequencedmap.NewElem("x-test-2", marshaller.Node[marshaller.Extension]{
 		Key:       "x-test-2",
 		KeyNode:   testutils.CreateStringYamlNode("x-test-2", 26, 1),
 		Value:     xTestExtensionNode,
@@ -133,7 +134,7 @@ func Test_UnmarshalModel_NotAMappingNode_Error(t *testing.T) {
 
 	var out TestCoreModel
 
-	err = UnmarshalModel(context.Background(), node.Content[0], &out)
+	err = marshaller.UnmarshalModel(context.Background(), node.Content[0], &out)
 	require.Error(t, err)
 	assert.Equal(t, "expected a mapping node, got 8", err.Error())
 }
@@ -146,24 +147,24 @@ func Test_UnmarshalModel_NotAStruct_Error(t *testing.T) {
 
 	var out map[string]string
 
-	err = UnmarshalModel(context.Background(), node.Content[0], &out)
+	err = marshaller.UnmarshalModel(context.Background(), node.Content[0], &out)
 	require.Error(t, err)
 	assert.Equal(t, "expected a struct, got map", err.Error())
 
 	var outNil any = nil
-	err = UnmarshalModel(context.Background(), node.Content[0], &outNil)
+	err = marshaller.UnmarshalModel(context.Background(), node.Content[0], &outNil)
 	require.Error(t, err)
 	assert.Equal(t, "expected a struct, got interface", err.Error())
 }
 
-func assertNodeField[T any](t *testing.T, expectedKey string, expectedKeyLine int, expectedValue any, expectedValueLine int, actual Node[T]) {
+func assertNodeField[T any](t *testing.T, expectedKey string, expectedKeyLine int, expectedValue any, expectedValueLine int, actual marshaller.Node[T]) {
 	assert.Equal(t, expectedKey, actual.Key)
 	assert.Equal(t, expectedKeyLine, actual.KeyNode.Line)
 	assert.Equal(t, expectedValue, actual.Value)
 	assert.Equal(t, expectedValueLine, actual.ValueNode.Line)
 }
 
-func assertModelNodeField[T any](t *testing.T, expectedKey string, expectedKeyLine int, expectedValueLine int, actual Node[T]) {
+func assertModelNodeField[T any](t *testing.T, expectedKey string, expectedKeyLine int, expectedValueLine int, actual marshaller.Node[T]) {
 	assert.Equal(t, expectedKey, actual.Key)
 	assert.Equal(t, expectedKeyLine, actual.KeyNode.Line)
 	assert.Equal(t, expectedValueLine, actual.ValueNode.Line)

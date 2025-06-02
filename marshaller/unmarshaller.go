@@ -3,12 +3,10 @@ package marshaller
 import (
 	"context"
 	"fmt"
-	"iter"
 	"reflect"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/errors"
-	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
 	"gopkg.in/yaml.v3"
 )
@@ -16,15 +14,6 @@ import (
 type Unmarshallable interface {
 	Unmarshal(ctx context.Context, value *yaml.Node) error
 }
-
-type SequencedMap interface {
-	Init()
-	SetUntyped(key, value any) error
-	AllUntyped() iter.Seq2[any, any]
-	GetValueType() reflect.Type
-}
-
-var _ SequencedMap = (*sequencedmap.Map[any, any])(nil)
 
 func Unmarshal(ctx context.Context, node *yaml.Node, out any) error {
 	if node.Kind == yaml.DocumentNode {
@@ -37,6 +26,9 @@ func Unmarshal(ctx context.Context, node *yaml.Node, out any) error {
 
 	v := reflect.ValueOf(out)
 	if v.Kind() == reflect.Ptr && !v.IsNil() {
+		v = v.Elem()
+	}
+	for v.Kind() == reflect.Interface && !v.IsNil() {
 		v = v.Elem()
 	}
 
@@ -60,15 +52,15 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 
 	var unmarshallable CoreModeler
 
-	// Check if struct implements UnmarshallableCoreModel
-	if out.Addr().Type().Implements(reflect.TypeOf((*CoreModeler)(nil)).Elem()) {
+	// Check if struct implements CoreModeler
+	if isCoreModel(out) {
 		var ok bool
 		unmarshallable, ok = out.Addr().Interface().(CoreModeler)
 		if !ok {
-			return fmt.Errorf("expected UnmarshallableCoreModel, got %s", out.Type())
+			return fmt.Errorf("expected CoreModeler, got %s", out.Type())
 		}
 	} else {
-		return fmt.Errorf("expected struct to implement UnmarshallableCoreModel, got %s", out.Type())
+		return fmt.Errorf("expected struct to implement CoreModeler, got %s", out.Type())
 	}
 
 	unmarshallable.SetRootNode(node)
@@ -80,8 +72,9 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 	}
 
 	// get fields by tag first
-	fields := sequencedmap.New[string, Field]()
+	fields := map[string]Field{}
 	var extensionsField *reflect.Value
+	requiredFields := map[string]Field{} // Track required fields separately
 
 	for i := 0; i < out.NumField(); i++ {
 		field := out.Type().Field(i)
@@ -113,14 +106,23 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 			}
 		}
 
-		fields.Set(tag, Field{
+		fieldInfo := Field{
 			Name:     field.Name,
 			Field:    out.Field(i),
 			Required: required,
-		})
+		}
+
+		fields[tag] = fieldInfo
+
+		// Track required fields for validation
+		if required {
+			requiredFields[tag] = fieldInfo
+		}
 	}
 
-	foundFields := sequencedmap.New[string, bool]()
+	// Process YAML nodes and validate required fields in one pass
+	valid := true
+	foundRequiredFields := map[string]bool{}
 
 	for i := 0; i < len(node.Content); i += 2 {
 		keyNode := node.Content[i]
@@ -128,7 +130,7 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 
 		key := keyNode.Value
 
-		field, ok := fields.Get(key)
+		field, ok := fields[key]
 		if !ok {
 			if !strings.HasPrefix(key, "x-") {
 				continue
@@ -144,19 +146,17 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 				return err
 			}
 
-			foundFields.Set(key, true)
+			// Mark required field as found
+			if field.Required {
+				foundRequiredFields[key] = true
+			}
 		}
 	}
 
-	valid := true
-
-	for key, field := range fields.All() {
-		if !field.Required {
-			continue
-		}
-
-		if _, ok := foundFields.Get(key); !ok {
-			unmarshallable.AddValidationError(validation.NewNodeError(fmt.Sprintf("field %s is missing", key), node))
+	// Check for missing required fields
+	for tag := range requiredFields {
+		if !foundRequiredFields[tag] {
+			unmarshallable.AddValidationError(validation.NewNodeError(fmt.Sprintf("field %s is missing", tag), node))
 			valid = false
 		}
 	}
@@ -193,16 +193,6 @@ func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) error {
 		return unmarshallable.Unmarshal(ctx, node)
 	}
 
-	// Auto-detect core models by checking for RootNode field
-	if isCoreModel(out) && node.Kind == yaml.MappingNode {
-		outPtr := out
-		if out.Kind() != reflect.Ptr {
-			outPtr = out.Addr()
-		}
-
-		return UnmarshalModel(ctx, node, outPtr.Interface())
-	}
-
 	switch node.Kind {
 	case yaml.MappingNode:
 		return unmarshalMapping(ctx, node, out)
@@ -218,11 +208,6 @@ func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) error {
 }
 
 func unmarshalMapping(ctx context.Context, node *yaml.Node, out reflect.Value) error {
-	_, ok := out.Interface().(SequencedMap)
-	if ok {
-		return unmarshalSequencedMap(ctx, node, out)
-	}
-
 	if out.Kind() == reflect.Ptr {
 		out.Set(reflect.New(out.Type().Elem()))
 		out = out.Elem()
@@ -230,12 +215,21 @@ func unmarshalMapping(ctx context.Context, node *yaml.Node, out reflect.Value) e
 
 	switch {
 	case out.Kind() == reflect.Struct:
-		return UnmarshalModel(ctx, node, out.Addr().Interface())
+		if isCoreModel(out) {
+			return UnmarshalModel(ctx, node, out.Addr().Interface())
+		} else {
+			return unmarshalStruct(ctx, node, out.Addr().Interface())
+		}
 	case out.Kind() == reflect.Map:
 		return fmt.Errorf("currently unsupported out kind: %v", out.Kind())
 	default:
 		return fmt.Errorf("expected struct or map, got %s", out.Kind())
 	}
+}
+
+func unmarshalStruct(_ context.Context, node *yaml.Node, structPtr any) error {
+	// TODO do we need a custom implementation for this? This implementation will treat any child of a normal struct as also a normal struct unless it implements a custom unmarshaller
+	return node.Decode(structPtr)
 }
 
 func unmarshalSequence(ctx context.Context, node *yaml.Node, out reflect.Value) error {
@@ -290,63 +284,39 @@ func unmarshalNode(ctx context.Context, keyNode, valueNode *yaml.Node, fieldName
 	return nil
 }
 
-func unmarshalSequencedMap(ctx context.Context, node *yaml.Node, out reflect.Value) error {
-	if out.Kind() == reflect.Ptr && out.IsNil() {
-		out.Set(reflect.New(out.Type().Elem()))
-	}
-
-	sm, ok := out.Interface().(SequencedMap)
-	if !ok {
-		return fmt.Errorf("expected SequencedMap, got %s", out.Type())
-	}
-
-	sm.Init()
-
-	for i := 0; i < len(node.Content); i += 2 {
-		keyNode := node.Content[i]
-		valueNode := node.Content[i+1]
-
-		key := keyNode.Value
-
-		valueOut := reflect.New(sm.GetValueType()).Elem()
-
-		if err := unmarshal(ctx, valueNode, valueOut); err != nil {
-			return err
-		}
-
-		if err := sm.SetUntyped(key, valueOut.Interface()); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func isUnmarshallable(out reflect.Value) bool {
+	// Store original value to check directly
+	original := out
+
+	// Unwrap interface if needed
+	for out.Kind() == reflect.Interface && !out.IsNil() {
+		out = out.Elem()
+	}
+
+	// Get addressable value if needed
 	if out.Kind() != reflect.Ptr {
+		if !out.CanAddr() {
+			// Try checking the original value directly
+			return original.Type().Implements(reflect.TypeOf((*Unmarshallable)(nil)).Elem())
+		}
 		out = out.Addr()
 	}
 
 	return out.Type().Implements(reflect.TypeOf((*Unmarshallable)(nil)).Elem())
 }
 
-// isCoreModel checks if a value is a struct with a RootNode field of type *yaml.Node
+// isCoreModel checks if a value implements the CoreModeler interface
 func isCoreModel(out reflect.Value) bool {
 	if out.Kind() == reflect.Ptr {
 		if out.IsNil() {
 			return false
 		}
-		out = out.Elem()
-	}
-
-	if out.Kind() != reflect.Struct {
+	} else if out.CanAddr() {
+		out = out.Addr()
+	} else {
 		return false
 	}
 
-	rootNodeField := out.FieldByName("RootNode")
-	if !rootNodeField.IsValid() {
-		return false
-	}
-
-	return rootNodeField.Type() == reflect.TypeOf((*yaml.Node)(nil))
+	coreModelerType := reflect.TypeOf((*CoreModeler)(nil)).Elem()
+	return out.Type().Implements(coreModelerType)
 }

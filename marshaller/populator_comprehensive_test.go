@@ -27,7 +27,7 @@ func Test_PopulateModel_SimpleStructToStruct(t *testing.T) {
 
 	target := &Target{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 	assert.Equal(t, "test", target.StringField)
 	assert.Equal(t, 42, target.IntField)
@@ -49,7 +49,7 @@ func Test_PopulateModel_WithSlices(t *testing.T) {
 
 	target := &Target{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"a", "b", "c"}, target.SliceField)
 }
@@ -70,7 +70,7 @@ func Test_PopulateModel_WithNilSlice(t *testing.T) {
 
 	target := &Target{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 	assert.Nil(t, target.SliceField)
 }
@@ -91,7 +91,7 @@ func Test_PopulateModel_TypeConversion(t *testing.T) {
 
 	target := &Target{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	// This might fail due to type incompatibility - that's expected
 	if err != nil {
 		assert.Contains(t, err.Error(), "cannot convert")
@@ -117,7 +117,7 @@ func Test_PopulateModel_WithPointers(t *testing.T) {
 
 	target := &Target{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 	require.NotNil(t, target.PtrField)
 	assert.Equal(t, "test-value", *target.PtrField)
@@ -139,7 +139,7 @@ func Test_PopulateModel_WithNilPointer(t *testing.T) {
 
 	target := &Target{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 	assert.Nil(t, target.PtrField)
 }
@@ -153,7 +153,7 @@ func Test_PopulateModel_NonStructSource_Error(t *testing.T) {
 	source := "not-a-struct"
 	target := &Target{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot convert")
 }
@@ -174,7 +174,7 @@ func Test_PopulateModel_IncompatibleTypes_Error(t *testing.T) {
 
 	target := &Target{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot convert")
 }
@@ -202,7 +202,7 @@ func Test_PopulateModel_NestedSlices(t *testing.T) {
 
 	target := &Target{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 	require.Len(t, target.NestedSlice, 2)
 	assert.Equal(t, "first", target.NestedSlice[0].Value)

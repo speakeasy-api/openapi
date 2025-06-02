@@ -8,17 +8,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test to trigger the slice/array path in populateValue by using ModelFromCore interface
-type SliceModelFromCore struct {
+// Test to trigger the slice/array path in populateValue by using Populator interface
+type SlicePopulator struct {
 	SliceData []string
 	ArrayData [3]int
 	processed bool
 }
 
-func (s *SliceModelFromCore) FromCore(c any) error {
+func (s *SlicePopulator) Populate(c any) error {
 	// This will trigger populateValue with the slice/array types directly
 	s.processed = true
-	
+
 	// Cast the core data and populate manually to trigger slice path
 	if data, ok := c.(map[string]any); ok {
 		if sliceData, exists := data["slice"]; exists {
@@ -32,24 +32,24 @@ func (s *SliceModelFromCore) FromCore(c any) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
 func Test_PopulateValue_SliceViaModelFromCore_Success(t *testing.T) {
-	// Create source data that will be passed to FromCore
+	// Create source data that will be passed to Populate
 	source := map[string]any{
 		"slice": []string{"item1", "item2", "item3"},
 		"array": [3]int{10, 20, 30},
 	}
 
-	// Target implements ModelFromCore
-	target := &SliceModelFromCore{}
+	// Target implements Populator
+	target := &SlicePopulator{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
-	// Verify that FromCore was called
+	// Verify that Populate was called
 	assert.True(t, target.processed)
 	assert.Equal(t, []string{"item1", "item2", "item3"}, target.SliceData)
 	assert.Equal(t, [3]int{10, 20, 30}, target.ArrayData)
@@ -70,10 +70,10 @@ func Test_PopulateValue_SimpleSliceStruct_Success(t *testing.T) {
 		Items: []string{"simple1", "simple2"},
 		Nums:  []int{100, 200},
 	}
-	
+
 	target := &SimpleSliceStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"simple1", "simple2"}, target.Items)
@@ -86,10 +86,10 @@ func Test_PopulateValue_SimpleSliceStruct_NilSlice_Success(t *testing.T) {
 		Items: nil,
 		Nums:  nil,
 	}
-	
+
 	target := &SimpleSliceStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Nil(t, target.Items)
@@ -107,10 +107,10 @@ func Test_PopulateValue_SimpleArrayStruct_Success(t *testing.T) {
 		Items: [3]string{"array1", "array2", "array3"},
 		Nums:  [2]int{300, 400},
 	}
-	
+
 	target := &SimpleArrayStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Equal(t, [3]string{"array1", "array2", "array3"}, target.Items)

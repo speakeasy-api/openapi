@@ -5,11 +5,11 @@ import (
 	"reflect"
 )
 
-type ModelFromCore interface {
-	FromCore(c any) error
+type Populator interface {
+	Populate(source any) error
 }
 
-func PopulateModel(source any, target any) error {
+func Populate(source any, target any) error {
 	t := reflect.ValueOf(target)
 
 	if t.Kind() == reflect.Ptr && t.IsNil() {
@@ -125,12 +125,8 @@ func populateValue(source any, target reflect.Value) error {
 		target = target.Addr()
 	}
 
-	if value.Kind() == reflect.Ptr {
-		value = value.Elem()
-	}
-
-	if target.Type().Implements(reflect.TypeOf((*ModelFromCore)(nil)).Elem()) {
-		return target.Interface().(ModelFromCore).FromCore(value.Interface())
+	if target.Type().Implements(reflect.TypeOf((*Populator)(nil)).Elem()) {
+		return target.Interface().(Populator).Populate(value.Interface())
 	}
 
 	// Check if target implements CoreSetter interface
@@ -143,58 +139,33 @@ func populateValue(source any, target reflect.Value) error {
 		return nil
 	}
 
-	if target.Type().Implements(reflect.TypeOf((*SequencedMap)(nil)).Elem()) {
-		return populateSequencedMap(value, target)
-	}
-
 	target = target.Elem()
 
-	switch value.Kind() {
+	valueDerefed := value
+	if value.Kind() == reflect.Ptr {
+		valueDerefed = value.Elem()
+	}
+
+	switch valueDerefed.Kind() {
 	case reflect.Slice, reflect.Array:
-		if value.IsNil() {
+		if valueDerefed.IsNil() {
 			return nil
 		}
 
-		target.Set(reflect.MakeSlice(target.Type(), value.Len(), value.Len()))
+		target.Set(reflect.MakeSlice(target.Type(), valueDerefed.Len(), valueDerefed.Len()))
 
-		for i := 0; i < value.Len(); i++ {
-			if err := populateValue(value.Index(i).Interface(), target.Index(i)); err != nil {
+		for i := 0; i < valueDerefed.Len(); i++ {
+			if err := populateValue(valueDerefed.Index(i).Interface(), target.Index(i)); err != nil {
 				return err
 			}
 		}
 	default:
-		if value.Type().AssignableTo(target.Type()) {
-			target.Set(value)
-		} else if value.CanConvert(target.Type()) {
-			target.Set(value.Convert(target.Type()))
+		if valueDerefed.Type().AssignableTo(target.Type()) {
+			target.Set(valueDerefed)
+		} else if valueDerefed.CanConvert(target.Type()) {
+			target.Set(valueDerefed.Convert(target.Type()))
 		} else {
-			return fmt.Errorf("cannot convert %v to %v", value.Type(), target.Type())
-		}
-	}
-
-	return nil
-}
-
-func populateSequencedMap(source reflect.Value, target reflect.Value) error {
-	sm, ok := source.Addr().Interface().(SequencedMap)
-	if !ok {
-		return fmt.Errorf("expected source to be SequencedMap, got %s", source.Type())
-	}
-
-	tm, ok := target.Interface().(SequencedMap)
-	if !ok {
-		return fmt.Errorf("expected target to be SequencedMap, got %s", target.Type())
-	}
-
-	tm.Init()
-
-	for key, value := range sm.AllUntyped() {
-		targetValue := reflect.New(tm.GetValueType()).Elem()
-		if err := populateValue(value, targetValue); err != nil {
-			return err
-		}
-		if err := tm.SetUntyped(key, targetValue.Interface()); err != nil {
-			return err
+			return fmt.Errorf("cannot convert %v to %v", valueDerefed.Type(), target.Type())
 		}
 	}
 

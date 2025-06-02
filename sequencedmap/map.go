@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"slices"
 
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
@@ -299,6 +300,33 @@ func (m *Map[K, V]) NavigateWithKey(key string) (any, error) {
 	return v, nil
 }
 
+func (m *Map[K, V]) Unmarshal(ctx context.Context, node *yaml.Node) error {
+	m.Init()
+
+	for i := 0; i < len(node.Content); i += 2 {
+		keyNode := node.Content[i]
+		valueNode := node.Content[i+1]
+
+		key := keyNode.Value
+
+		// Create a concrete value of the value type
+		valueType := m.GetValueType()
+		concreteValue := reflect.New(valueType).Interface()
+
+		// Unmarshal into the concrete value
+		if err := marshaller.Unmarshal(ctx, valueNode, concreteValue); err != nil {
+			return err
+		}
+
+		// Extract the value from the pointer and set it in the map
+		if err := m.SetUntyped(key, reflect.ValueOf(concreteValue).Elem().Interface()); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // MarshalJSON returns the JSON representation of the map.
 func (m *Map[K, V]) MarshalJSON() ([]byte, error) {
 	if m == nil {
@@ -332,6 +360,54 @@ func (m *Map[K, V]) MarshalJSON() ([]byte, error) {
 	buf.WriteString("}")
 
 	return buf.Bytes(), nil
+}
+
+func (m *Map[K, V]) Populate(source any) error {
+	if source == nil {
+		return nil
+	}
+
+	type SequencedMap interface {
+		Init()
+		SetUntyped(key, value any) error
+		AllUntyped() iter.Seq2[any, any]
+		GetValueType() reflect.Type
+	}
+
+	sourceValue := reflect.ValueOf(source)
+
+	var sm SequencedMap
+	var ok bool
+
+	// Handle both pointer and non-pointer cases
+	if sourceValue.Kind() == reflect.Ptr {
+		// Source is already a pointer
+		sm, ok = source.(SequencedMap)
+	} else if sourceValue.CanAddr() {
+		// Source is addressable, get a pointer to it
+		sm, ok = sourceValue.Addr().Interface().(SequencedMap)
+	} else {
+		// Source is neither a pointer nor addressable
+		return fmt.Errorf("expected source to be addressable or a pointer to SequencedMap, got %s", sourceValue.Type())
+	}
+
+	if !ok {
+		return fmt.Errorf("expected source to be SequencedMap, got %s", sourceValue.Type())
+	}
+
+	m.Init()
+
+	for key, value := range sm.AllUntyped() {
+		targetValue := reflect.New(m.GetValueType()).Interface()
+		if err := marshaller.Populate(value, targetValue); err != nil {
+			return err
+		}
+		if err := m.SetUntyped(key, reflect.ValueOf(targetValue).Elem().Interface()); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type mapGetter interface {

@@ -14,13 +14,13 @@ import (
 func Test_PopulateValue_SliceAsSource_Success(t *testing.T) {
 	// Use a slice as the source directly
 	source := []string{"source1", "source2", "source3"}
-	
+
 	// Target must be a pointer to a slice
 	var target []string
-	
-	err := marshaller.PopulateModel(source, &target)
+
+	err := marshaller.Populate(source, &target)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, []string{"source1", "source2", "source3"}, target)
 }
 
@@ -37,26 +37,26 @@ func Test_PopulateValue_SliceAsSource_Success(t *testing.T) {
 func Test_PopulateValue_NilSliceAsSource_Success(t *testing.T) {
 	// Use a nil slice as the source
 	var source []string = nil
-	
+
 	// Target must be a pointer to a slice
 	var target []string
-	
-	err := marshaller.PopulateModel(source, &target)
+
+	err := marshaller.Populate(source, &target)
 	require.NoError(t, err)
-	
+
 	assert.Nil(t, target)
 }
 
 func Test_PopulateValue_EmptySliceAsSource_Success(t *testing.T) {
 	// Use an empty slice as the source
 	source := []string{}
-	
+
 	// Target must be a pointer to a slice
 	var target []string
-	
-	err := marshaller.PopulateModel(source, &target)
+
+	err := marshaller.Populate(source, &target)
 	require.NoError(t, err)
-	
+
 	assert.NotNil(t, target)
 	assert.Len(t, target, 0)
 }
@@ -64,10 +64,10 @@ func Test_PopulateValue_EmptySliceAsSource_Success(t *testing.T) {
 func Test_PopulateValue_SliceOfIntsAsSource_Success(t *testing.T) {
 	source := []int{1, 2, 3, 4, 5}
 	var target []int
-	
-	err := marshaller.PopulateModel(source, &target)
+
+	err := marshaller.Populate(source, &target)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, []int{1, 2, 3, 4, 5}, target)
 }
 
@@ -78,10 +78,10 @@ func Test_PopulateValue_NestedSliceAsSource_Success(t *testing.T) {
 		{"nested3", "nested4"},
 	}
 	var target [][]string
-	
-	err := marshaller.PopulateModel(source, &target)
+
+	err := marshaller.Populate(source, &target)
 	require.NoError(t, err)
-	
+
 	require.Len(t, target, 2)
 	assert.Equal(t, []string{"nested1", "nested2"}, target[0])
 	assert.Equal(t, []string{"nested3", "nested4"}, target[1])

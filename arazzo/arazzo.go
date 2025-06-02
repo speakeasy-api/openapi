@@ -75,7 +75,7 @@ func Unmarshal(ctx context.Context, doc io.Reader, opts ...Option[unmarshalOptio
 	}
 
 	arazzo := &Arazzo{}
-	if err := marshaller.PopulateModel(*c, arazzo); err != nil {
+	if err := marshaller.Populate(*c, arazzo); err != nil {
 		return nil, nil, err
 	}
 

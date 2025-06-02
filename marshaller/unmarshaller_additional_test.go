@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -44,9 +45,219 @@ func Test_UnmarshalMapping_Error(t *testing.T) {
 	}
 }
 
+// Simple model for testing
+type SimpleModel struct {
+	Name  string `yaml:"name"`
+	Value int    `yaml:"value"`
+}
+
+// CoreModeler-based model for testing
+type CoreModel struct {
+	marshaller.CoreModel
+	Name  marshaller.Node[string] `key:"name"`
+	Value marshaller.Node[int]    `key:"value"`
+}
+
 func Test_UnmarshalMapping_SequencedMap_Success(t *testing.T) {
-	// Skip this test for now as it requires specific unmarshalling setup
-	t.Skip("Skipping sequenced map test - requires specific interface implementation")
+	tests := []struct {
+		name     string
+		yaml     string
+		target   any
+		validate func(t *testing.T, target any)
+	}{
+		{
+			name: "simple string values",
+			yaml: `key1: value1
+key2: value2
+key3: value3`,
+			target: sequencedmap.New[string, string](),
+			validate: func(t *testing.T, target any) {
+				sm := target.(*sequencedmap.Map[string, string])
+
+				assert.Equal(t, 3, sm.Len())
+
+				// Check values
+				val1, ok := sm.Get("key1")
+				require.True(t, ok)
+				assert.Equal(t, "value1", val1)
+
+				val2, ok := sm.Get("key2")
+				require.True(t, ok)
+				assert.Equal(t, "value2", val2)
+
+				val3, ok := sm.Get("key3")
+				require.True(t, ok)
+				assert.Equal(t, "value3", val3)
+
+				// Verify order is maintained
+				keys := make([]string, 0)
+				for key := range sm.Keys() {
+					keys = append(keys, key)
+				}
+				assert.Equal(t, []string{"key1", "key2", "key3"}, keys)
+			},
+		},
+		{
+			name: "integer values",
+			yaml: `item1: 42
+item2: 84
+item3: 126`,
+			target: sequencedmap.New[string, int](),
+			validate: func(t *testing.T, target any) {
+				sm := target.(*sequencedmap.Map[string, int])
+
+				assert.Equal(t, 3, sm.Len())
+
+				// Check values
+				val1, ok := sm.Get("item1")
+				require.True(t, ok)
+				assert.Equal(t, 42, val1)
+
+				val2, ok := sm.Get("item2")
+				require.True(t, ok)
+				assert.Equal(t, 84, val2)
+
+				val3, ok := sm.Get("item3")
+				require.True(t, ok)
+				assert.Equal(t, 126, val3)
+
+				// Verify order is maintained
+				keys := make([]string, 0)
+				for key := range sm.Keys() {
+					keys = append(keys, key)
+				}
+				assert.Equal(t, []string{"item1", "item2", "item3"}, keys)
+			},
+		},
+		{
+			name:   "empty map",
+			yaml:   `{}`,
+			target: sequencedmap.New[string, string](),
+			validate: func(t *testing.T, target any) {
+				sm := target.(*sequencedmap.Map[string, string])
+				assert.Equal(t, 0, sm.Len())
+			},
+		},
+		{
+			name:   "single key-value pair",
+			yaml:   `single: value`,
+			target: sequencedmap.New[string, string](),
+			validate: func(t *testing.T, target any) {
+				sm := target.(*sequencedmap.Map[string, string])
+				assert.Equal(t, 1, sm.Len())
+
+				val, ok := sm.Get("single")
+				require.True(t, ok)
+				assert.Equal(t, "value", val)
+			},
+		},
+		{
+			name: "plain struct values",
+			yaml: `model1:
+  name: "test1"
+  value: 42
+model2:
+  name: "test2"
+  value: 84`,
+			target: sequencedmap.New[string, SimpleModel](),
+			validate: func(t *testing.T, target any) {
+				sm := target.(*sequencedmap.Map[string, SimpleModel])
+				assert.Equal(t, 2, sm.Len())
+
+				// Check first model
+				model1, ok := sm.Get("model1")
+				require.True(t, ok)
+				assert.Equal(t, "test1", model1.Name)
+				assert.Equal(t, 42, model1.Value)
+
+				// Check second model
+				model2, ok := sm.Get("model2")
+				require.True(t, ok)
+				assert.Equal(t, "test2", model2.Name)
+				assert.Equal(t, 84, model2.Value)
+
+				// Verify order is maintained
+				keys := make([]string, 0)
+				for key := range sm.Keys() {
+					keys = append(keys, key)
+				}
+				assert.Equal(t, []string{"model1", "model2"}, keys)
+			},
+		},
+		{
+			name: "CoreModeler struct values",
+			yaml: `core1:
+  name: "core1"
+  value: 123
+core2:
+  name: "core2"
+  value: 456`,
+			target: sequencedmap.New[string, CoreModel](),
+			validate: func(t *testing.T, target any) {
+				sm := target.(*sequencedmap.Map[string, CoreModel])
+				assert.Equal(t, 2, sm.Len())
+
+				// Check first core model
+				core1, ok := sm.Get("core1")
+				require.True(t, ok)
+				assert.Equal(t, "core1", core1.Name.GetValue())
+				assert.Equal(t, 123, core1.Value.GetValue())
+				assert.True(t, core1.GetValid())
+
+				// Check second core model
+				core2, ok := sm.Get("core2")
+				require.True(t, ok)
+				assert.Equal(t, "core2", core2.Name.GetValue())
+				assert.Equal(t, 456, core2.Value.GetValue())
+				assert.True(t, core2.GetValid())
+
+				// Verify order is maintained
+				keys := make([]string, 0)
+				for key := range sm.Keys() {
+					keys = append(keys, key)
+				}
+				assert.Equal(t, []string{"core1", "core2"}, keys)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var node yaml.Node
+			err := yaml.Unmarshal([]byte(tt.yaml), &node)
+			require.NoError(t, err)
+
+			// Use a pointer to the target to avoid the interface detection issue
+			err = marshaller.Unmarshal(context.Background(), node.Content[0], &tt.target)
+			require.NoError(t, err)
+
+			tt.validate(t, tt.target)
+		})
+	}
+}
+
+func Test_UnmarshalMapping_SequencedMap_PlainStruct_Success(t *testing.T) {
+	yamlData := `model1:
+  name: "test1"
+  value: 42`
+
+	var node yaml.Node
+	err := yaml.Unmarshal([]byte(yamlData), &node)
+	require.NoError(t, err)
+
+	target := sequencedmap.New[string, SimpleModel]()
+	err = marshaller.Unmarshal(context.Background(), node.Content[0], &target)
+
+	// Should now work for plain structs
+	require.NoError(t, err)
+
+	// Verify the data was unmarshaled correctly
+	assert.Equal(t, 1, target.Len())
+
+	model, ok := target.Get("model1")
+	require.True(t, ok)
+	assert.Equal(t, "test1", model.Name)
+	assert.Equal(t, 42, model.Value)
 }
 
 func Test_UnmarshalSequence_Error(t *testing.T) {
@@ -94,11 +305,6 @@ type TestCoreModelStruct struct {
 type TestCoreModelStructCore struct {
 	marshaller.CoreModel
 	Value marshaller.Node[string] `key:"value"`
-}
-
-func Test_UnmarshalNode_CoreModel_Success(t *testing.T) {
-	// Skip this test for now as it requires specific core model implementation
-	t.Skip("Skipping core model test - requires specific interface implementation")
 }
 
 func Test_UnmarshalNode_ScalarTypes_Success(t *testing.T) {

@@ -8,13 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test slice handling in populateValue by creating a scenario where 
+// Test slice handling in populateValue by creating a scenario where
 // the target doesn't implement special interfaces but the source has slice fields
 func Test_PopulateValue_Slice_DirectPopulation_Success(t *testing.T) {
 	// Create a scenario where populateValue handles slices directly
 	// This happens when the target is a simple type (not implementing special interfaces)
 	// and the source contains slices
-	
+
 	type SimpleTarget struct {
 		StringSlice []string
 		IntSlice    []int
@@ -29,7 +29,7 @@ func Test_PopulateValue_Slice_DirectPopulation_Success(t *testing.T) {
 	// Target that will be populated
 	target := &SimpleTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify slice population
@@ -53,7 +53,7 @@ func Test_PopulateValue_Array_DirectPopulation_Success(t *testing.T) {
 	// Target that will be populated
 	target := &ArrayTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify array population
@@ -77,7 +77,7 @@ func Test_PopulateValue_NilSlice_DirectPopulation_Success(t *testing.T) {
 	// Target that will be populated
 	target := &NilSliceTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify nil slices remain nil
@@ -101,7 +101,7 @@ func Test_PopulateValue_EmptySlice_DirectPopulation_Success(t *testing.T) {
 	// Target that will be populated
 	target := &EmptySliceTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify empty slices are created
@@ -134,7 +134,7 @@ func Test_PopulateValue_NestedSlice_DirectPopulation_Success(t *testing.T) {
 	// Target that will be populated
 	target := &NestedSliceTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify nested slice population
@@ -166,7 +166,7 @@ func Test_PopulateValue_SliceRecursion_Error(t *testing.T) {
 	// Target that will cause conversion error
 	target := &IncompatibleTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot convert")
 }
@@ -189,7 +189,7 @@ func Test_PopulateValue_SliceOfPointers_DirectPopulation_Success(t *testing.T) {
 	// Target that will be populated
 	target := &PointerSliceTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify pointer slice population
@@ -217,7 +217,7 @@ func Test_PopulateValue_MultiDimensionalSlice_DirectPopulation_Success(t *testin
 	// Target that will be populated
 	target := &MultiDimTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify 2D slice population
@@ -245,7 +245,7 @@ func Test_PopulateValue_LargeSlice_DirectPopulation_Success(t *testing.T) {
 	// Target that will be populated
 	target := &LargeSliceTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify large slice population

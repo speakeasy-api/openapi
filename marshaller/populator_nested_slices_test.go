@@ -30,7 +30,7 @@ func Test_PopulateValue_SliceOfSlices_Success(t *testing.T) {
 
 	target := &SliceOfSlicesStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify nested slices
@@ -67,14 +67,14 @@ func Test_PopulateValue_SliceOfSlicesOfSlices_Success(t *testing.T) {
 
 	target := &TripleNestedStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify 3D slice structure
 	require.Len(t, target.ThreeDSlice, 2)
 	require.Len(t, target.ThreeDSlice[0], 2)
 	require.Len(t, target.ThreeDSlice[1], 2)
-	
+
 	assert.Equal(t, []string{"1a", "1b"}, target.ThreeDSlice[0][0])
 	assert.Equal(t, []string{"1c", "1d"}, target.ThreeDSlice[0][1])
 	assert.Equal(t, []string{"2a", "2b"}, target.ThreeDSlice[1][0])
@@ -97,7 +97,7 @@ func Test_PopulateValue_SliceOfSlices_WithNilInner_Success(t *testing.T) {
 
 	target := &SliceWithNilsStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify mixed slices with nil
@@ -107,7 +107,7 @@ func Test_PopulateValue_SliceOfSlices_WithNilInner_Success(t *testing.T) {
 	assert.Equal(t, []string{"c", "d"}, target.MixedSlices[2])
 }
 
-// Test array of slices 
+// Test array of slices
 func Test_PopulateValue_ArrayOfSlices_Success(t *testing.T) {
 	type ArrayOfSlicesStruct struct {
 		ArrayOfSlices [3][]string
@@ -123,7 +123,7 @@ func Test_PopulateValue_ArrayOfSlices_Success(t *testing.T) {
 
 	target := &ArrayOfSlicesStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify array of slices
@@ -148,7 +148,7 @@ func Test_PopulateValue_SliceOfArrays_Success(t *testing.T) {
 
 	target := &SliceOfArraysStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify slice of arrays
@@ -184,7 +184,7 @@ func Test_PopulateValue_ComplexNestedSlices_Success(t *testing.T) {
 
 	target := &ComplexNestedStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify complex nested structure
@@ -221,7 +221,7 @@ func Test_PopulateValue_EmptyOuterSlice_Success(t *testing.T) {
 
 	target := &EmptyOuterStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify empty outer slice
@@ -241,7 +241,7 @@ func Test_PopulateValue_NilOuterSlice_Success(t *testing.T) {
 
 	target := &NilOuterStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify nil outer slice
