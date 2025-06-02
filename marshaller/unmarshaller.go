@@ -224,12 +224,21 @@ func unmarshalMapping(ctx context.Context, node *yaml.Node, out reflect.Value) e
 
 	switch {
 	case out.Kind() == reflect.Struct:
-		return UnmarshalModel(ctx, node, out.Addr().Interface())
+		if isCoreModel(out) {
+			return UnmarshalModel(ctx, node, out.Addr().Interface())
+		} else {
+			return unmarshalStruct(ctx, node, out.Addr().Interface())
+		}
 	case out.Kind() == reflect.Map:
 		return fmt.Errorf("currently unsupported out kind: %v", out.Kind())
 	default:
 		return fmt.Errorf("expected struct or map, got %s", out.Kind())
 	}
+}
+
+func unmarshalStruct(_ context.Context, node *yaml.Node, structPtr any) error {
+	// TODO do we need a custom implementation for this? This implementation will treat any child of a normal struct as also a normal struct unless it implements a custom unmarshaller
+	return node.Decode(structPtr)
 }
 
 func unmarshalSequence(ctx context.Context, node *yaml.Node, out reflect.Value) error {

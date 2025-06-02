@@ -51,6 +51,13 @@ type SimpleModel struct {
 	Value int    `yaml:"value"`
 }
 
+// CoreModeler-based model for testing
+type CoreModel struct {
+	marshaller.CoreModel
+	Name  marshaller.Node[string] `key:"name"`
+	Value marshaller.Node[int]    `key:"value"`
+}
+
 func Test_UnmarshalMapping_SequencedMap_Success(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -144,6 +151,74 @@ item3: 126`,
 				assert.Equal(t, "value", val)
 			},
 		},
+		{
+			name: "plain struct values",
+			yaml: `model1:
+  name: "test1"
+  value: 42
+model2:
+  name: "test2"
+  value: 84`,
+			target: sequencedmap.New[string, SimpleModel](),
+			validate: func(t *testing.T, target any) {
+				sm := target.(*sequencedmap.Map[string, SimpleModel])
+				assert.Equal(t, 2, sm.Len())
+
+				// Check first model
+				model1, ok := sm.Get("model1")
+				require.True(t, ok)
+				assert.Equal(t, "test1", model1.Name)
+				assert.Equal(t, 42, model1.Value)
+
+				// Check second model
+				model2, ok := sm.Get("model2")
+				require.True(t, ok)
+				assert.Equal(t, "test2", model2.Name)
+				assert.Equal(t, 84, model2.Value)
+
+				// Verify order is maintained
+				keys := make([]string, 0)
+				for key := range sm.Keys() {
+					keys = append(keys, key)
+				}
+				assert.Equal(t, []string{"model1", "model2"}, keys)
+			},
+		},
+		{
+			name: "CoreModeler struct values",
+			yaml: `core1:
+  name: "core1"
+  value: 123
+core2:
+  name: "core2"
+  value: 456`,
+			target: sequencedmap.New[string, CoreModel](),
+			validate: func(t *testing.T, target any) {
+				sm := target.(*sequencedmap.Map[string, CoreModel])
+				assert.Equal(t, 2, sm.Len())
+
+				// Check first core model
+				core1, ok := sm.Get("core1")
+				require.True(t, ok)
+				assert.Equal(t, "core1", core1.Name.GetValue())
+				assert.Equal(t, 123, core1.Value.GetValue())
+				assert.True(t, core1.GetValid())
+
+				// Check second core model
+				core2, ok := sm.Get("core2")
+				require.True(t, ok)
+				assert.Equal(t, "core2", core2.Name.GetValue())
+				assert.Equal(t, 456, core2.Value.GetValue())
+				assert.True(t, core2.GetValid())
+
+				// Verify order is maintained
+				keys := make([]string, 0)
+				for key := range sm.Keys() {
+					keys = append(keys, key)
+				}
+				assert.Equal(t, []string{"core1", "core2"}, keys)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -162,8 +237,6 @@ item3: 126`,
 }
 
 func Test_UnmarshalMapping_SequencedMap_PlainStruct_Success(t *testing.T) {
-	t.Skip("Skipping until we can figure out how to handle plain structs")
-
 	yamlData := `model1:
   name: "test1"
   value: 42`
