@@ -3,7 +3,6 @@ package marshaller
 import (
 	"context"
 	"fmt"
-	"iter"
 	"reflect"
 	"strings"
 
@@ -14,13 +13,6 @@ import (
 
 type Unmarshallable interface {
 	Unmarshal(ctx context.Context, value *yaml.Node) error
-}
-
-type SequencedMap interface {
-	Init()
-	SetUntyped(key, value any) error
-	AllUntyped() iter.Seq2[any, any]
-	GetValueType() reflect.Type
 }
 
 func Unmarshal(ctx context.Context, node *yaml.Node, out any) error {
@@ -34,6 +26,9 @@ func Unmarshal(ctx context.Context, node *yaml.Node, out any) error {
 
 	v := reflect.ValueOf(out)
 	if v.Kind() == reflect.Ptr && !v.IsNil() {
+		v = v.Elem()
+	}
+	for v.Kind() == reflect.Interface && !v.IsNil() {
 		v = v.Elem()
 	}
 
@@ -58,7 +53,7 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 	var unmarshallable CoreModeler
 
 	// Check if struct implements CoreModeler
-	if out.Addr().Type().Implements(reflect.TypeOf((*CoreModeler)(nil)).Elem()) {
+	if isCoreModel(out) {
 		var ok bool
 		unmarshallable, ok = out.Addr().Interface().(CoreModeler)
 		if !ok {
@@ -212,11 +207,6 @@ func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) error {
 }
 
 func unmarshalMapping(ctx context.Context, node *yaml.Node, out reflect.Value) error {
-	_, ok := out.Interface().(SequencedMap)
-	if ok {
-		return unmarshalSequencedMap(ctx, node, out)
-	}
-
 	if out.Kind() == reflect.Ptr {
 		out.Set(reflect.New(out.Type().Elem()))
 		out = out.Elem()
@@ -293,40 +283,21 @@ func unmarshalNode(ctx context.Context, keyNode, valueNode *yaml.Node, fieldName
 	return nil
 }
 
-func unmarshalSequencedMap(ctx context.Context, node *yaml.Node, out reflect.Value) error {
-	if out.Kind() == reflect.Ptr && out.IsNil() {
-		out.Set(reflect.New(out.Type().Elem()))
-	}
-
-	sm, ok := out.Interface().(SequencedMap)
-	if !ok {
-		return fmt.Errorf("expected SequencedMap, got %s", out.Type())
-	}
-
-	sm.Init()
-
-	for i := 0; i < len(node.Content); i += 2 {
-		keyNode := node.Content[i]
-		valueNode := node.Content[i+1]
-
-		key := keyNode.Value
-
-		valueOut := reflect.New(sm.GetValueType()).Elem()
-
-		if err := unmarshal(ctx, valueNode, valueOut); err != nil {
-			return err
-		}
-
-		if err := sm.SetUntyped(key, valueOut.Interface()); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func isUnmarshallable(out reflect.Value) bool {
+	// Store original value to check directly
+	original := out
+
+	// Unwrap interface if needed
+	for out.Kind() == reflect.Interface && !out.IsNil() {
+		out = out.Elem()
+	}
+
+	// Get addressable value if needed
 	if out.Kind() != reflect.Ptr {
+		if !out.CanAddr() {
+			// Try checking the original value directly
+			return original.Type().Implements(reflect.TypeOf((*Unmarshallable)(nil)).Elem())
+		}
 		out = out.Addr()
 	}
 
