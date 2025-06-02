@@ -8,13 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test ModelFromCore interface path in populateValue
-type MockModelFromCore struct {
-	Value  string
+// Test Populator interface path in populateValue
+type MockPopulator struct {
+	Value          string
 	FromCoreCalled bool
 }
 
-func (m *MockModelFromCore) FromCore(c any) error {
+func (m *MockPopulator) Populate(c any) error {
 	m.FromCoreCalled = true
 	if str, ok := c.(string); ok {
 		m.Value = str
@@ -24,27 +24,27 @@ func (m *MockModelFromCore) FromCore(c any) error {
 
 func Test_PopulateValue_ModelFromCore_Success(t *testing.T) {
 	source := "test-value"
-	target := &MockModelFromCore{}
+	target := &MockPopulator{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.True(t, target.FromCoreCalled)
 	assert.Equal(t, "test-value", target.Value)
 }
 
-// Test ModelFromCore error path
-type ErrorModelFromCore struct{}
+// Test Populator error path
+type ErrorPopulator struct{}
 
-func (e *ErrorModelFromCore) FromCore(c any) error {
+func (e *ErrorPopulator) Populate(c any) error {
 	return assert.AnError
 }
 
 func Test_PopulateValue_ModelFromCore_Error(t *testing.T) {
 	source := "test-value"
-	target := &ErrorModelFromCore{}
+	target := &ErrorPopulator{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.Error(t, err)
 	assert.Equal(t, assert.AnError, err)
 }
@@ -61,7 +61,7 @@ func Test_PopulateValue_Slice_Success(t *testing.T) {
 
 	target := &SimpleStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"item1", "item2", "item3"}, target.SliceField)
@@ -79,7 +79,7 @@ func Test_PopulateValue_Array_Success(t *testing.T) {
 
 	target := &ArrayStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Equal(t, [3]string{"item1", "item2", "item3"}, target.ArrayField)
@@ -97,7 +97,7 @@ func Test_PopulateValue_NilSlice_Success(t *testing.T) {
 
 	target := &SliceStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Nil(t, target.SliceField)
@@ -124,7 +124,7 @@ func Test_PopulateValue_Slice_Recursive_Error(t *testing.T) {
 
 	target := &TargetStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot convert")
 }
@@ -141,7 +141,7 @@ func Test_PopulateValue_NilPointer_BothPointers(t *testing.T) {
 
 	target := &PointerStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Nil(t, target.PtrField)
@@ -156,7 +156,7 @@ func Test_PopulateValue_AssignableType_Success(t *testing.T) {
 	}
 
 	type TargetStruct struct {
-		StringField string  // Same type, directly assignable
+		StringField string // Same type, directly assignable
 	}
 
 	source := SourceStruct{
@@ -165,7 +165,7 @@ func Test_PopulateValue_AssignableType_Success(t *testing.T) {
 
 	target := &TargetStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Equal(t, "test-value", target.StringField)
@@ -174,7 +174,7 @@ func Test_PopulateValue_AssignableType_Success(t *testing.T) {
 // Test conversion error path (line 171)
 func Test_PopulateValue_ConversionError(t *testing.T) {
 	type SourceStruct struct {
-		ChanField chan int  // Cannot be converted to string
+		ChanField chan int // Cannot be converted to string
 	}
 
 	type TargetStruct struct {
@@ -187,7 +187,7 @@ func Test_PopulateValue_ConversionError(t *testing.T) {
 
 	target := &TargetStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot convert")
 }
@@ -212,7 +212,7 @@ func Test_PopulateValue_NestedSliceComplex_Success(t *testing.T) {
 
 	target := &ContainerStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	require.Len(t, target.Items, 2)

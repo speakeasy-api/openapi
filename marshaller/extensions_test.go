@@ -42,7 +42,7 @@ primitiveField: hello
 type TestExtensionModel struct {
 	marshaller.CoreModel
 	PrimitiveField marshaller.Node[string] `key:"primitiveField"`
-	Extensions     marshaller.Extensions   `key:"extensions"`
+	Extensions     Extensions              `key:"extensions"`
 }
 
 func Test_Extensions_SyncExtensions_Success(t *testing.T) {
@@ -74,7 +74,7 @@ func Test_Extensions_SyncExtensions_Success(t *testing.T) {
 
 type TestExtensionUnmarshalError struct {
 	marshaller.CoreModel
-	Extensions marshaller.Extensions `key:"extensions"`
+	Extensions Extensions `key:"extensions"`
 }
 
 func Test_Extensions_UnmarshalError_Coverage(t *testing.T) {

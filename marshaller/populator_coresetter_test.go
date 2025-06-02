@@ -49,12 +49,12 @@ func Test_PopulateModel_CoreSetter_With_NodeAccessor(t *testing.T) {
 
 	target := &SimpleCoreSetterTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify the field was populated via populateModel using NodeAccessor.GetValue()
 	assert.Equal(t, "test-value", target.Value)
-	
+
 	// Verify SetCoreValue was called (proves CoreSetter path was taken)
 	assert.NotNil(t, target.core)
 }
@@ -148,24 +148,24 @@ func Test_PopulateModel_Extensions_Handling_NodeAccessor(t *testing.T) {
 	extensionNode := marshaller.Node[*yaml.Node]{
 		Value: &yaml.Node{Kind: yaml.ScalarNode, Value: "extension-value"},
 	}
-	
+
 	extensionMap := &MockExtensionCoreMap{}
 	extensionMap.Init()
 	extensionMap.Set("x-test", extensionNode)
-	
+
 	source := SourceWithExtensionsNodeAccessor{
-		Value: TestNodeAccessor{value: "test-value"},
+		Value:      TestNodeAccessor{value: "test-value"},
 		Extensions: extensionMap,
 	}
 
 	target := &TargetWithExtensions{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify basic field
 	assert.Equal(t, "test-value", target.Value)
-	
+
 	// Verify Extensions field was handled specially
 	assert.NotNil(t, target.Extensions)
 	assert.NotNil(t, target.Extensions.data)
@@ -173,10 +173,10 @@ func Test_PopulateModel_Extensions_Handling_NodeAccessor(t *testing.T) {
 	extensionValue := target.Extensions.data["x-test"]
 	assert.NotNil(t, extensionValue)
 	assert.Equal(t, "extension-value", extensionValue.Value)
-	
+
 	// Verify Extensions.SetCore was called
 	assert.NotNil(t, target.Extensions.core)
-	
+
 	// Verify target SetCoreValue was called
 	assert.NotNil(t, target.core)
 }
@@ -205,15 +205,15 @@ func Test_PopulateModel_PopulatorValue_Tag_NodeAccessor(t *testing.T) {
 
 	target := &TargetWithTag{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify tagged field used direct value (not NodeAccessor.GetValue)
 	assert.Equal(t, "tagged-value", target.TaggedField)
-	
+
 	// Verify untagged field used NodeAccessor.GetValue
 	assert.Equal(t, "untagged-value", target.UntaggedField)
-	
+
 	// Verify SetCoreValue was called
 	assert.NotNil(t, target.core)
 }
@@ -222,7 +222,7 @@ func Test_PopulateModel_PopulatorValue_Tag_NodeAccessor(t *testing.T) {
 func Test_PopulateModel_NonStruct_Error_CoreSetter(t *testing.T) {
 	target := &SimpleCoreSetterTarget{}
 
-	err := marshaller.PopulateModel("not-a-struct", target)
+	err := marshaller.Populate("not-a-struct", target)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "expected struct, got string")
 }
@@ -251,7 +251,7 @@ func Test_PopulateModel_MissingTargetField_NodeAccessor(t *testing.T) {
 
 	target := &TargetMissingField{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Should succeed and ignore missing field
@@ -283,14 +283,14 @@ func Test_PopulateModel_PointerHandling_NodeAccessor(t *testing.T) {
 
 	target := &TargetWithPointer{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify fields were populated
 	require.NotNil(t, target.PtrField)
 	assert.Equal(t, "ptr-value", *target.PtrField)
 	assert.Equal(t, "can-addr-value", target.CanAddr)
-	
+
 	// Verify SetCoreValue was called
 	assert.NotNil(t, target.core)
 }
@@ -316,7 +316,7 @@ func Test_PopulateModel_Invalid_NodeAccessor_Error(t *testing.T) {
 
 	target := &TargetInvalidAccessor{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "expected NodeAccessor")
 }

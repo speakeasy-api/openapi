@@ -27,33 +27,33 @@ func Test_PopulateValue_RecursiveSliceCall_Success(t *testing.T) {
 	// recursive populateValue calls with slice values and pointer targets
 	source := RecursiveSliceStruct{
 		SliceOfAny: []interface{}{
-			[]string{"sub1", "sub2"}, // This slice should trigger the slice case in populateValue
-			[]int{10, 20, 30},       // This slice should also trigger it
+			[]string{"sub1", "sub2"},  // This slice should trigger the slice case in populateValue
+			[]int{10, 20, 30},         // This slice should also trigger it
 			[2]string{"arr1", "arr2"}, // This array should trigger the array case
 		},
 	}
 
 	target := &RecursiveSliceStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	require.Len(t, target.SliceOfAny, 3)
-	
+
 	// Check first slice
 	if firstSlice, ok := target.SliceOfAny[0].([]string); ok {
 		assert.Equal(t, []string{"sub1", "sub2"}, firstSlice)
 	} else {
 		t.Errorf("Expected []string, got %T", target.SliceOfAny[0])
 	}
-	
-	// Check second slice  
+
+	// Check second slice
 	if secondSlice, ok := target.SliceOfAny[1].([]int); ok {
 		assert.Equal(t, []int{10, 20, 30}, secondSlice)
 	} else {
 		t.Errorf("Expected []int, got %T", target.SliceOfAny[1])
 	}
-	
+
 	// Check array
 	if thirdArray, ok := target.SliceOfAny[2].([2]string); ok {
 		assert.Equal(t, [2]string{"arr1", "arr2"}, thirdArray)
@@ -88,7 +88,7 @@ func Test_PopulateValue_DeeplyNestedSlices_Success(t *testing.T) {
 
 	target := &DeeplyNestedWithSlices{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	require.NotNil(t, target.Level1)
@@ -114,7 +114,7 @@ func Test_PopulateValue_MixedNesting_SliceInInterface_Success(t *testing.T) {
 
 	target := &MixedNestingStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	if dataMap, ok := target.Data.(map[string]interface{}); ok {
@@ -125,7 +125,7 @@ func Test_PopulateValue_MixedNesting_SliceInInterface_Success(t *testing.T) {
 				t.Errorf("Expected []string for nested_slice, got %T", nestedSlice)
 			}
 		}
-		
+
 		if nestedArray, exists := dataMap["nested_array"]; exists {
 			if array, ok := nestedArray.([3]int); ok {
 				assert.Equal(t, [3]int{1, 2, 3}, array)
@@ -159,13 +159,13 @@ func Test_PopulateValue_SliceValueInMap_Success(t *testing.T) {
 
 	target := &SliceValueMapStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	require.Len(t, target.SliceMap, 2)
 	assert.Equal(t, []string{"map1", "map2"}, target.SliceMap["key1"])
 	assert.Equal(t, []string{"map3", "map4"}, target.SliceMap["key2"])
-	
+
 	require.Len(t, target.ArrayMap, 2)
 	assert.Equal(t, [2]int{10, 20}, target.ArrayMap["arr1"])
 	assert.Equal(t, [2]int{30, 40}, target.ArrayMap["arr2"])

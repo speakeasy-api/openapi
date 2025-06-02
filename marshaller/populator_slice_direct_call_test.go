@@ -18,7 +18,7 @@ type DirectSlicePopulator struct {
 }
 
 // This is a custom implementation that will trigger the slice path
-func (d *DirectSlicePopulator) FromCore(c any) error {
+func (d *DirectSlicePopulator) Populate(c any) error {
 	// We'll use reflection to directly call populateValue with slices
 	if data, ok := c.(map[string]any); ok {
 		// Get the slice data
@@ -26,7 +26,7 @@ func (d *DirectSlicePopulator) FromCore(c any) error {
 			// Create reflect values for direct populateValue call
 			sourceValue := reflect.ValueOf(sliceData)
 			targetValue := reflect.ValueOf(&d.SliceField)
-			
+
 			// This should trigger the slice case in populateValue
 			// because sourceValue is a slice and targetValue is a pointer to slice
 			if sourceValue.Kind() == reflect.Slice && targetValue.Kind() == reflect.Ptr {
@@ -42,11 +42,11 @@ func (d *DirectSlicePopulator) FromCore(c any) error {
 				}
 			}
 		}
-		
+
 		if arrayData, exists := data["array_field"]; exists {
 			sourceValue := reflect.ValueOf(arrayData)
 			targetValue := reflect.ValueOf(&d.ArrayField)
-			
+
 			if sourceValue.Kind() == reflect.Array && targetValue.Kind() == reflect.Ptr {
 				targetArray := targetValue.Elem()
 				for i := 0; i < sourceValue.Len(); i++ {
@@ -66,7 +66,7 @@ func Test_PopulateValue_DirectSliceCall_Success(t *testing.T) {
 
 	target := &DirectSlicePopulator{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"direct1", "direct2", "direct3"}, target.SliceField)
@@ -93,7 +93,7 @@ func Test_PopulateValue_NestedSliceContainer_Success(t *testing.T) {
 
 	target := &NestedSliceContainer{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	require.NotNil(t, target.Inner)
@@ -115,7 +115,7 @@ func Test_PopulateValue_InterfaceSliceHolder_Success(t *testing.T) {
 
 	target := &InterfaceSliceHolder{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	if slice, ok := target.Data.([]string); ok {
@@ -136,7 +136,7 @@ func Test_PopulateValue_InterfaceNestedSlices_Success(t *testing.T) {
 
 	target := &InterfaceSliceHolder{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	if nestedSlice, ok := target.Data.([][]string); ok {

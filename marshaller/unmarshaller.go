@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/speakeasy-api/openapi/errors"
-	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
 	"gopkg.in/yaml.v3"
 )
@@ -23,8 +22,6 @@ type SequencedMap interface {
 	AllUntyped() iter.Seq2[any, any]
 	GetValueType() reflect.Type
 }
-
-var _ SequencedMap = (*sequencedmap.Map[any, any])(nil)
 
 func Unmarshal(ctx context.Context, node *yaml.Node, out any) error {
 	if node.Kind == yaml.DocumentNode {
@@ -60,15 +57,15 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 
 	var unmarshallable CoreModeler
 
-	// Check if struct implements UnmarshallableCoreModel
+	// Check if struct implements CoreModeler
 	if out.Addr().Type().Implements(reflect.TypeOf((*CoreModeler)(nil)).Elem()) {
 		var ok bool
 		unmarshallable, ok = out.Addr().Interface().(CoreModeler)
 		if !ok {
-			return fmt.Errorf("expected UnmarshallableCoreModel, got %s", out.Type())
+			return fmt.Errorf("expected CoreModeler, got %s", out.Type())
 		}
 	} else {
-		return fmt.Errorf("expected struct to implement UnmarshallableCoreModel, got %s", out.Type())
+		return fmt.Errorf("expected struct to implement CoreModeler, got %s", out.Type())
 	}
 
 	unmarshallable.SetRootNode(node)
@@ -80,7 +77,8 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 	}
 
 	// get fields by tag first
-	fields := sequencedmap.New[string, Field]()
+	fields := map[string]Field{}
+	fieldsByTag := []string{}
 	var extensionsField *reflect.Value
 
 	for i := 0; i < out.NumField(); i++ {
@@ -113,14 +111,15 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 			}
 		}
 
-		fields.Set(tag, Field{
+		fields[tag] = Field{
 			Name:     field.Name,
 			Field:    out.Field(i),
 			Required: required,
-		})
+		}
+		fieldsByTag = append(fieldsByTag, tag)
 	}
 
-	foundFields := sequencedmap.New[string, bool]()
+	foundFields := map[string]bool{}
 
 	for i := 0; i < len(node.Content); i += 2 {
 		keyNode := node.Content[i]
@@ -128,7 +127,7 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 
 		key := keyNode.Value
 
-		field, ok := fields.Get(key)
+		field, ok := fields[key]
 		if !ok {
 			if !strings.HasPrefix(key, "x-") {
 				continue
@@ -144,19 +143,24 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 				return err
 			}
 
-			foundFields.Set(key, true)
+			foundFields[key] = true
 		}
 	}
 
 	valid := true
 
-	for key, field := range fields.All() {
+	for _, tag := range fieldsByTag {
+		field, ok := fields[tag]
+		if !ok {
+			continue
+		}
+
 		if !field.Required {
 			continue
 		}
 
-		if _, ok := foundFields.Get(key); !ok {
-			unmarshallable.AddValidationError(validation.NewNodeError(fmt.Sprintf("field %s is missing", key), node))
+		if _, ok := foundFields[tag]; !ok {
+			unmarshallable.AddValidationError(validation.NewNodeError(fmt.Sprintf("field %s is missing", tag), node))
 			valid = false
 		}
 	}
@@ -191,16 +195,6 @@ func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) error {
 		}
 
 		return unmarshallable.Unmarshal(ctx, node)
-	}
-
-	// Auto-detect core models by checking for RootNode field
-	if isCoreModel(out) && node.Kind == yaml.MappingNode {
-		outPtr := out
-		if out.Kind() != reflect.Ptr {
-			outPtr = out.Addr()
-		}
-
-		return UnmarshalModel(ctx, node, outPtr.Interface())
 	}
 
 	switch node.Kind {
@@ -330,23 +324,18 @@ func isUnmarshallable(out reflect.Value) bool {
 	return out.Type().Implements(reflect.TypeOf((*Unmarshallable)(nil)).Elem())
 }
 
-// isCoreModel checks if a value is a struct with a RootNode field of type *yaml.Node
+// isCoreModel checks if a value implements the CoreModeler interface
 func isCoreModel(out reflect.Value) bool {
 	if out.Kind() == reflect.Ptr {
 		if out.IsNil() {
 			return false
 		}
-		out = out.Elem()
-	}
-
-	if out.Kind() != reflect.Struct {
+	} else if out.CanAddr() {
+		out = out.Addr()
+	} else {
 		return false
 	}
 
-	rootNodeField := out.FieldByName("RootNode")
-	if !rootNodeField.IsValid() {
-		return false
-	}
-
-	return rootNodeField.Type() == reflect.TypeOf((*yaml.Node)(nil))
+	coreModelerType := reflect.TypeOf((*CoreModeler)(nil)).Elem()
+	return out.Type().Implements(coreModelerType)
 }

@@ -9,7 +9,7 @@ import (
 )
 
 // To trigger the slice/array case in populateValue, we need:
-// 1. A target that does NOT implement ModelFromCore, CoreSetter, or SequencedMap
+// 1. A target that does NOT implement Populator, CoreSetter, or SequencedMap
 // 2. A source that is a slice or array
 // 3. The target to be a pointer that after target.Elem() can accept the slice/array
 
@@ -28,7 +28,7 @@ func Test_PopulateValue_BareSliceTarget_Success(t *testing.T) {
 
 	target := &BareSliceTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"bare1", "bare2", "bare3"}, target.SimpleSlice)
@@ -36,7 +36,7 @@ func Test_PopulateValue_BareSliceTarget_Success(t *testing.T) {
 }
 
 // Try with an even simpler case: directly pass slice values
-// This creates a scenario where populateValue would be called recursively 
+// This creates a scenario where populateValue would be called recursively
 // with slice source and pointer target
 
 type ContainerWithSliceField struct {
@@ -51,7 +51,7 @@ func Test_PopulateValue_ContainerWithSlice_Success(t *testing.T) {
 
 	target := &ContainerWithSliceField{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"container1", "container2"}, target.SliceField)
@@ -66,7 +66,7 @@ type PointerSliceTarget struct {
 func Test_PopulateValue_PointerSliceTarget_Success(t *testing.T) {
 	sourceSlice := []string{"ptr1", "ptr2"}
 	sourceArray := [2]int{100, 200}
-	
+
 	source := PointerSliceTarget{
 		SlicePtr: &sourceSlice,
 		ArrayPtr: &sourceArray,
@@ -74,7 +74,7 @@ func Test_PopulateValue_PointerSliceTarget_Success(t *testing.T) {
 
 	target := &PointerSliceTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	require.NotNil(t, target.SlicePtr)
@@ -101,7 +101,7 @@ func Test_PopulateValue_EmbeddedSliceStruct_Success(t *testing.T) {
 
 	target := &EmbeddedSliceStruct{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"embedded1", "embedded2"}, target.Inner.Data)
@@ -119,7 +119,7 @@ func Test_PopulateValue_JustSlice_Success(t *testing.T) {
 
 	target := &JustSlice{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"just1", "just2"}, target.Data)

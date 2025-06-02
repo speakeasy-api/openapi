@@ -136,8 +136,8 @@ func (c CriterionTypeUnion) GetVersion() CriterionTypeVersion {
 	return c.ExpressionType.Version
 }
 
-func (c *CriterionTypeUnion) FromCore(cr any) error {
-	coreCriterionTypeUnion, ok := cr.(core.CriterionTypeUnion)
+func (c *CriterionTypeUnion) Populate(source any) error {
+	coreCriterionTypeUnion, ok := source.(core.CriterionTypeUnion)
 	if !ok {
 		return fmt.Errorf("expected core.CriterionTypeUnion, got %T", c)
 	}
@@ -147,7 +147,7 @@ func (c *CriterionTypeUnion) FromCore(cr any) error {
 		c.Type = &typ
 	} else if coreCriterionTypeUnion.ExpressionType != nil {
 		c.ExpressionType = &CriterionExpressionType{}
-		if err := marshaller.PopulateModel(*coreCriterionTypeUnion.ExpressionType, c.ExpressionType); err != nil {
+		if err := marshaller.Populate(*coreCriterionTypeUnion.ExpressionType, c.ExpressionType); err != nil {
 			return err
 		}
 	}

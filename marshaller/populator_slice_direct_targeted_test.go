@@ -8,17 +8,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Create a scenario where ModelFromCore.FromCore calls something that triggers slice path
-type SliceFromCoreProcessor struct {
+// Create a scenario where Populator.Populate calls something that triggers slice path
+type SliceProcessorPopulator struct {
 	ProcessedSlices [][]string
 	ProcessedArrays [][3]int
 }
 
-func (s *SliceFromCoreProcessor) FromCore(c any) error {
-	// This implements ModelFromCore interface
+func (s *SliceProcessorPopulator) Populate(c any) error {
+	// This implements Populator interface
 	// Inside here, we could theoretically call populateValue with slices directly
 	// But since we don't have access to populateValue directly, we'll simulate the scenario
-	
+
 	if data, ok := c.(map[string]any); ok {
 		if sliceData, exists := data["slices"]; exists {
 			if slices, ok := sliceData.([][]string); ok {
@@ -40,15 +40,15 @@ func Test_PopulateValue_SliceFromCoreProcessor_Success(t *testing.T) {
 		"arrays": [][3]int{{1, 2, 3}, {4, 5, 6}},
 	}
 
-	target := &SliceFromCoreProcessor{}
+	target := &SliceProcessorPopulator{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Len(t, target.ProcessedSlices, 2)
 	assert.Equal(t, []string{"a", "b"}, target.ProcessedSlices[0])
 	assert.Equal(t, []string{"c", "d"}, target.ProcessedSlices[1])
-	
+
 	assert.Len(t, target.ProcessedArrays, 2)
 	assert.Equal(t, [3]int{1, 2, 3}, target.ProcessedArrays[0])
 	assert.Equal(t, [3]int{4, 5, 6}, target.ProcessedArrays[1])
@@ -71,7 +71,7 @@ func Test_PopulateValue_UnusualSliceScenario_Success(t *testing.T) {
 
 	target := &UnusualSliceTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"unusual1", "unusual2", "unusual3"}, target.Data)
@@ -90,7 +90,7 @@ func Test_PopulateValue_ReflectiveSlice_Success(t *testing.T) {
 
 	target := &ReflectiveSliceTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify the slice was copied
@@ -113,7 +113,7 @@ func Test_PopulateValue_InterfaceSlice_Success(t *testing.T) {
 
 	target := &InterfaceSliceTarget{}
 
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	require.Len(t, target.Items, 3)

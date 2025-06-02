@@ -5,11 +5,11 @@ import (
 	"reflect"
 )
 
-type ModelFromCore interface {
-	FromCore(c any) error
+type Populator interface {
+	Populate(source any) error
 }
 
-func PopulateModel(source any, target any) error {
+func Populate(source any, target any) error {
 	t := reflect.ValueOf(target)
 
 	if t.Kind() == reflect.Ptr && t.IsNil() {
@@ -129,8 +129,8 @@ func populateValue(source any, target reflect.Value) error {
 		value = value.Elem()
 	}
 
-	if target.Type().Implements(reflect.TypeOf((*ModelFromCore)(nil)).Elem()) {
-		return target.Interface().(ModelFromCore).FromCore(value.Interface())
+	if target.Type().Implements(reflect.TypeOf((*Populator)(nil)).Elem()) {
+		return target.Interface().(Populator).Populate(value.Interface())
 	}
 
 	// Check if target implements CoreSetter interface

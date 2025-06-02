@@ -68,7 +68,7 @@ func Test_PopulateModel_SequencedMap_Success(t *testing.T) {
 	target := &MockSequencedMap{}
 
 	// Test populateSequencedMap by calling PopulateModel
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify the data was copied
@@ -94,7 +94,7 @@ func Test_PopulateModel_SequencedMap_NilSource_Success(t *testing.T) {
 	target := &MockSequencedMap{}
 
 	// Test populateSequencedMap by calling PopulateModel
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify target was initialized but has no data
@@ -115,7 +115,7 @@ func Test_PopulateModel_SequencedMap_InvalidSource_Error(t *testing.T) {
 	target := &MockSequencedMap{}
 
 	// Test should fail with type error when it tries to cast source to SequencedMap
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "expected source to be SequencedMap")
 }
@@ -157,7 +157,7 @@ func Test_PopulateModel_SequencedMap_InvalidTarget_Error(t *testing.T) {
 	target := &FakeSequencedMap{}
 
 	// This should fail because target doesn't actually implement SequencedMap interface
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot convert")
 }
@@ -182,7 +182,7 @@ func Test_PopulateModel_SequencedMap_SetError(t *testing.T) {
 	target := &ErrorSequencedMap{}
 
 	// Test should fail with the set error
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.Error(t, err)
 	assert.Equal(t, assert.AnError, err)
 }
@@ -248,7 +248,7 @@ func Test_PopulateModel_SequencedMap_ComplexValues_Success(t *testing.T) {
 	target := &ComplexSequencedMap{}
 
 	// Test populateSequencedMap
-	err := marshaller.PopulateModel(source, target)
+	err := marshaller.Populate(source, target)
 	require.NoError(t, err)
 
 	// Verify complex values were copied correctly
