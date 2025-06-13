@@ -2,6 +2,8 @@ package extensions
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 
 	"github.com/speakeasy-api/openapi/errors"
 	"github.com/speakeasy-api/openapi/extensions/core"
@@ -64,6 +66,23 @@ func (e *Extensions) SetCore(core any) {
 
 func (e *Extensions) GetCore() *sequencedmap.Map[string, marshaller.Node[*yaml.Node]] {
 	return e.core
+}
+
+func (e *Extensions) Populate(source any) error {
+	e.Init()
+
+	se, ok := source.(*sequencedmap.Map[string, marshaller.Node[Extension]])
+	if !ok {
+		return fmt.Errorf("expected source to be *sequencedmap.Map[string, marshaller.Node[Extension]], got %s", reflect.TypeOf(source))
+	}
+
+	for key, value := range se.All() {
+		e.Set(key, value.Value)
+	}
+
+	e.SetCore(se)
+
+	return nil
 }
 
 // UnmarshalExtensionModel will unmarshal the extension into a model and its associated core model.

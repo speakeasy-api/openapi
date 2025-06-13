@@ -309,17 +309,15 @@ func (m *Map[K, V]) Unmarshal(ctx context.Context, node *yaml.Node) error {
 
 		key := keyNode.Value
 
-		// Create a concrete value of the value type
-		valueType := m.GetValueType()
-		concreteValue := reflect.New(valueType).Interface()
+		var concreteValue V
 
 		// Unmarshal into the concrete value
-		if err := marshaller.Unmarshal(ctx, valueNode, concreteValue); err != nil {
+		if err := marshaller.UnmarshalKeyValuePair(ctx, keyNode, valueNode, &concreteValue); err != nil {
 			return err
 		}
 
 		// Extract the value from the pointer and set it in the map
-		if err := m.SetUntyped(key, reflect.ValueOf(concreteValue).Elem().Interface()); err != nil {
+		if err := m.SetUntyped(key, concreteValue); err != nil {
 			return err
 		}
 	}
@@ -398,11 +396,12 @@ func (m *Map[K, V]) Populate(source any) error {
 	m.Init()
 
 	for key, value := range sm.AllUntyped() {
-		targetValue := reflect.New(m.GetValueType()).Interface()
-		if err := marshaller.Populate(value, targetValue); err != nil {
+		var targetValue V
+
+		if err := marshaller.Populate(value, &targetValue); err != nil {
 			return err
 		}
-		if err := m.SetUntyped(key, reflect.ValueOf(targetValue).Elem().Interface()); err != nil {
+		if err := m.SetUntyped(key, targetValue); err != nil {
 			return err
 		}
 	}

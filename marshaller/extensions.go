@@ -33,7 +33,7 @@ type ExtensionSourceIterator interface {
 	All() iter.Seq2[string, Extension]
 }
 
-func unmarshalExtension(keyNode *yaml.Node, valueNode *yaml.Node, extensionsField reflect.Value) error {
+func UnmarshalExtension(keyNode *yaml.Node, valueNode *yaml.Node, extensionsField reflect.Value) error {
 	if !extensionsField.CanSet() {
 		return errors.New("Extensions field is not settable")
 	}
@@ -60,6 +60,17 @@ func unmarshalExtension(keyNode *yaml.Node, valueNode *yaml.Node, extensionsFiel
 }
 
 func syncExtensions(ctx context.Context, source any, target reflect.Value, mapNode *yaml.Node) (*yaml.Node, error) {
+	// Handle nil source (when Extensions field is nil)
+	if source == nil {
+		return mapNode, nil
+	}
+
+	// Handle case where source is a pointer to nil
+	sourceVal := reflect.ValueOf(source)
+	if sourceVal.Kind() == reflect.Ptr && sourceVal.IsNil() {
+		return mapNode, nil
+	}
+
 	iterator, ok := source.(ExtensionSourceIterator)
 	if !ok {
 		return nil, fmt.Errorf("expected ExtensionSourceIterator, got %v", reflect.TypeOf(source))

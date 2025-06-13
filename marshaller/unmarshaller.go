@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/speakeasy-api/openapi/errors"
 	"github.com/speakeasy-api/openapi/validation"
 	"gopkg.in/yaml.v3"
 )
@@ -53,7 +52,7 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 	var unmarshallable CoreModeler
 
 	// Check if struct implements CoreModeler
-	if isCoreModel(out) {
+	if implementsInterface[CoreModeler](out) {
 		var ok bool
 		unmarshallable, ok = out.Addr().Interface().(CoreModeler)
 		if !ok {
@@ -137,11 +136,11 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 			}
 
 			if extensionsField != nil {
-				if err := unmarshalExtension(keyNode, valueNode, *extensionsField); err != nil {
+				if err := UnmarshalExtension(keyNode, valueNode, *extensionsField); err != nil {
 					return err
 				}
 			}
-		} else {
+		} else if implementsInterface[NodeMutator](field.Field) {
 			if err := unmarshalNode(ctx, keyNode, valueNode, field.Name, field.Field); err != nil {
 				return err
 			}
@@ -150,6 +149,8 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 			if field.Required {
 				foundRequiredFields[key] = true
 			}
+		} else {
+			return fmt.Errorf("expected field to be marshaller.Node, got %s", field.Field.Type())
 		}
 	}
 
@@ -166,6 +167,16 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 	return nil
 }
 
+func UnmarshalKeyValuePair(ctx context.Context, keyNode, valueNode *yaml.Node, outValue any) error {
+	out := reflect.ValueOf(outValue)
+
+	if implementsInterface[NodeMutator](out) {
+		return unmarshalNode(ctx, keyNode, valueNode, "value", out)
+	} else {
+		return Unmarshal(ctx, valueNode, outValue)
+	}
+}
+
 func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) error {
 	switch {
 	case out.Type() == reflect.TypeOf((*yaml.Node)(nil)):
@@ -176,7 +187,7 @@ func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) error {
 		return nil
 	}
 
-	if isUnmarshallable(out) {
+	if implementsInterface[Unmarshallable](out) {
 		if out.Kind() != reflect.Ptr {
 			out = out.Addr()
 		}
@@ -215,7 +226,7 @@ func unmarshalMapping(ctx context.Context, node *yaml.Node, out reflect.Value) e
 
 	switch {
 	case out.Kind() == reflect.Struct:
-		if isCoreModel(out) {
+		if implementsInterface[CoreModeler](out) {
 			return UnmarshalModel(ctx, node, out.Addr().Interface())
 		} else {
 			return unmarshalStruct(ctx, node, out.Addr().Interface())
@@ -251,40 +262,52 @@ func unmarshalSequence(ctx context.Context, node *yaml.Node, out reflect.Value) 
 }
 
 func unmarshalNode(ctx context.Context, keyNode, valueNode *yaml.Node, fieldName string, out reflect.Value) error {
-	if !out.CanSet() {
-		return fmt.Errorf("field %s is not settable", fieldName)
-	}
-
 	ref := out
 
 	if out.Kind() != reflect.Ptr {
-		ref = out.Addr()
+		if out.CanSet() {
+			ref = out.Addr()
+		} else {
+			// For non-settable values (like local variables), we need to work with what we have
+			// This typically happens when out is already a pointer to the value we want to modify
+			ref = out
+		}
 	} else if out.IsNil() {
-		out.Set(reflect.New(out.Type().Elem()))
-		ref = out.Elem().Addr()
+		if out.CanSet() {
+			out.Set(reflect.New(out.Type().Elem()))
+			ref = out.Elem().Addr()
+		} else {
+			return fmt.Errorf("field %s is a nil pointer and cannot be set", fieldName)
+		}
 	}
 
 	unmarshallable, ok := ref.Interface().(NodeMutator)
 	if !ok {
-		return errors.New("expected NodeMutator")
+		return fmt.Errorf("expected field to be marshaller.Node, got %s", ref.Type())
 	}
 
 	if err := unmarshallable.Unmarshal(ctx, keyNode, valueNode); err != nil {
 		return err
 	}
 
-	unmarshallable.SetPresent(true)
-
-	if out.Kind() == reflect.Ptr {
-		out.Set(reflect.ValueOf(unmarshallable))
-	} else {
-		out.Set(reflect.ValueOf(unmarshallable).Elem())
+	// Fix: Only set the value if the original field can be set
+	if out.CanSet() {
+		if out.Kind() == reflect.Ptr {
+			out.Set(reflect.ValueOf(unmarshallable))
+		} else {
+			// Get the value from the unmarshallable and set it directly
+			unmarshallableValue := reflect.ValueOf(unmarshallable)
+			if unmarshallableValue.Kind() == reflect.Ptr {
+				unmarshallableValue = unmarshallableValue.Elem()
+			}
+			out.Set(unmarshallableValue)
+		}
 	}
 
 	return nil
 }
 
-func isUnmarshallable(out reflect.Value) bool {
+func implementsInterface[T any](out reflect.Value) bool {
 	// Store original value to check directly
 	original := out
 
@@ -297,26 +320,10 @@ func isUnmarshallable(out reflect.Value) bool {
 	if out.Kind() != reflect.Ptr {
 		if !out.CanAddr() {
 			// Try checking the original value directly
-			return original.Type().Implements(reflect.TypeOf((*Unmarshallable)(nil)).Elem())
+			return original.Type().Implements(reflect.TypeOf((*T)(nil)).Elem())
 		}
 		out = out.Addr()
 	}
 
-	return out.Type().Implements(reflect.TypeOf((*Unmarshallable)(nil)).Elem())
-}
-
-// isCoreModel checks if a value implements the CoreModeler interface
-func isCoreModel(out reflect.Value) bool {
-	if out.Kind() == reflect.Ptr {
-		if out.IsNil() {
-			return false
-		}
-	} else if out.CanAddr() {
-		out = out.Addr()
-	} else {
-		return false
-	}
-
-	coreModelerType := reflect.TypeOf((*CoreModeler)(nil)).Elem()
-	return out.Type().Implements(coreModelerType)
+	return out.Type().Implements(reflect.TypeOf((*T)(nil)).Elem())
 }

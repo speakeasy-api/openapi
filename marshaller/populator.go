@@ -19,6 +19,11 @@ func Populate(source any, target any) error {
 		t = t.Elem()
 	}
 
+	s := reflect.ValueOf(source)
+	if s.Type().Implements(reflect.TypeOf((*NodeAccessor)(nil)).Elem()) {
+		source = source.(NodeAccessor).GetValue()
+	}
+
 	return populateValue(source, t)
 }
 
