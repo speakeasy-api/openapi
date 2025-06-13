@@ -37,7 +37,10 @@ func (n *Node[V]) Unmarshal(ctx context.Context, keyNode, valueNode *yaml.Node) 
 	n.KeyNode = keyNode
 	n.ValueNode = valueNode
 
-	return Unmarshal(ctx, valueNode, &n.Value)
+	err := Unmarshal(ctx, valueNode, &n.Value)
+	n.SetPresent(err == nil)
+
+	return err
 }
 
 func (n Node[V]) GetValue() any {

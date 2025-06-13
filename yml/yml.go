@@ -57,13 +57,17 @@ func CreateOrUpdateMapNodeElement(ctx context.Context, key string, keyNode, valu
 		return mapNode
 	}
 
+	return CreateMapNode(ctx, []*yaml.Node{
+		CreateOrUpdateKeyNode(ctx, key, keyNode),
+		valueNode,
+	})
+}
+
+func CreateMapNode(ctx context.Context, content []*yaml.Node) *yaml.Node {
 	return &yaml.Node{
-		Content: []*yaml.Node{
-			CreateOrUpdateKeyNode(ctx, key, keyNode),
-			valueNode,
-		},
-		Kind: yaml.MappingNode,
-		Tag:  "!!map",
+		Content: content,
+		Kind:    yaml.MappingNode,
+		Tag:     "!!map",
 	}
 }
 

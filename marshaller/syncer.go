@@ -282,16 +282,14 @@ func syncArraySlice(ctx context.Context, source any, target any, valueNode *yaml
 		targetVal.Set(tempVal)
 	}
 
+	// When arrays are reordered at the high level (e.g., moving workflows around),
+	// we need to match source elements with their corresponding target core models
+	// by identity (RootNode) rather than by array position to preserve elements.
+	reorderedTargets, reorderedNodes := reorderArrayElements(sourceVal, targetVal, valueNode)
+
 	elements := make([]*yaml.Node, sourceVal.Len())
 
 	for i := 0; i < sourceVal.Len(); i++ {
-		var currentElementNode *yaml.Node
-		if valueNode != nil && i < len(valueNode.Content) {
-			currentElementNode = valueNode.Content[i]
-		}
-
-		var err error
-
 		var sourceValAtIdx any
 		if sourceVal.Index(i).CanAddr() {
 			sourceValAtIdx = sourceVal.Index(i).Addr().Interface()
@@ -299,7 +297,13 @@ func syncArraySlice(ctx context.Context, source any, target any, valueNode *yaml
 			sourceValAtIdx = sourceVal.Index(i).Interface()
 		}
 
-		currentElementNode, err = SyncValue(ctx, sourceValAtIdx, targetVal.Index(i).Addr().Interface(), currentElementNode, false)
+		var currentElementNode *yaml.Node
+		if i < len(reorderedNodes) {
+			currentElementNode = reorderedNodes[i]
+		}
+
+		var err error
+		currentElementNode, err = SyncValue(ctx, sourceValAtIdx, reorderedTargets[i], currentElementNode, false)
 		if err != nil {
 			return nil, err
 		}
@@ -312,6 +316,104 @@ func syncArraySlice(ctx context.Context, source any, target any, valueNode *yaml
 	}
 
 	return yml.CreateOrUpdateSliceNode(ctx, elements, valueNode), nil
+}
+
+// reorderArrayElements reorders target array elements and YAML nodes to match source order
+// by matching high-level models with their corresponding core models via RootNode identity.
+//
+// This function solves the problem where array reordering at the high level (e.g., moving
+// workflows around) would cause field ordering issues because the sync process was matching
+// elements by array position rather than by identity.
+//
+// The function handles three scenarios:
+// 1. Reordering: Source elements are matched with target elements by RootNode identity
+// 2. Additions: New source elements (no matching target) get new target slots
+// 3. Deletions: Handled automatically as the result arrays are sized to match source length
+//
+// Returns reordered target elements and YAML nodes that correspond to the source order.
+func reorderArrayElements(sourceVal, targetVal reflect.Value, valueNode *yaml.Node) ([]any, []*yaml.Node) {
+	sourceLen := sourceVal.Len()
+	reorderedTargets := make([]any, sourceLen)
+	reorderedNodes := make([]*yaml.Node, sourceLen)
+
+	// Extract original YAML nodes for potential reuse
+	var originalNodes []*yaml.Node
+	if valueNode != nil && valueNode.Content != nil {
+		originalNodes = valueNode.Content
+	}
+
+	for i := 0; i < sourceLen; i++ {
+		sourceElement := sourceVal.Index(i)
+
+		// Try to get the unique identity (RootNode) of this source element
+		var sourceRootNode *yaml.Node
+		if sourceElement.CanInterface() {
+			if rootNodeAccessor, ok := sourceElement.Interface().(RootNodeAccessor); ok {
+				sourceRootNode = rootNodeAccessor.GetRootNode()
+			}
+		}
+
+		if sourceRootNode == nil {
+			// No identity available - this could be a new element or one without RootNode support.
+			// Fall back to index-based matching for backward compatibility.
+			if i < targetVal.Len() {
+				reorderedTargets[i] = targetVal.Index(i).Addr().Interface()
+			} else {
+				// This is a new element beyond the target array length - create a new target slot
+				reorderedTargets[i] = reflect.New(targetVal.Type().Elem()).Interface()
+			}
+			if i < len(originalNodes) {
+				reorderedNodes[i] = originalNodes[i]
+			}
+			// Note: reorderedNodes[i] will be nil for new elements, which is correct
+			continue
+		}
+
+		// Search for a target element with matching RootNode identity
+		found := false
+		for j := 0; j < targetVal.Len(); j++ {
+			targetElement := targetVal.Index(j)
+
+			// Skip nil elements in the target array
+			if targetElement.Kind() == reflect.Ptr && targetElement.IsNil() {
+				continue
+			}
+
+			// Get the RootNode from the target element for comparison
+			var targetRootNode *yaml.Node
+			if targetElement.CanInterface() {
+				if rootNodeAccessor, ok := targetElement.Interface().(RootNodeAccessor); ok {
+					// Safely call GetRootNode() - it may return nil for uninitialized cores
+					targetRootNode = rootNodeAccessor.GetRootNode()
+				} else if targetElement.CanAddr() {
+					if rootNodeAccessor, ok := targetElement.Addr().Interface().(RootNodeAccessor); ok {
+						// Safely call GetRootNode() - it may return nil for uninitialized cores
+						targetRootNode = rootNodeAccessor.GetRootNode()
+					}
+				}
+			}
+
+			// Only match if both RootNodes are non-nil and equal
+			if targetRootNode != nil && sourceRootNode != nil && targetRootNode == sourceRootNode {
+				// Found the matching target element - reuse it to preserve its core state
+				reorderedTargets[i] = targetElement.Addr().Interface()
+				if j < len(originalNodes) {
+					reorderedNodes[i] = originalNodes[j]
+				}
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			// No matching target found - this is a new element that was added to the source array.
+			// Create a new target element to sync with.
+			reorderedTargets[i] = reflect.New(targetVal.Type().Elem()).Interface()
+			// reorderedNodes[i] remains nil for new elements, which will trigger creation of new YAML nodes
+		}
+	}
+
+	return reorderedTargets, reorderedNodes
 }
 
 // will dereference the last ptr in the type while initializing any higher level pointers

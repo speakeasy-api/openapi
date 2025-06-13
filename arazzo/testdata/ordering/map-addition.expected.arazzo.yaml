@@ -1,0 +1,112 @@
+arazzo: 1.0.1
+info:
+  title: Order Test Workflow
+  summary: Test document for field ordering
+  version: 1.0.0
+sourceDescriptions:
+  - name: test-api
+    url: https://api.example.com
+    type: openapi
+workflows:
+  - workflowId: workflow-a
+    summary: First workflow
+    description: A test workflow for ordering
+    steps:
+      - stepId: step1
+        description: First step
+        operationId: operation-a
+        parameters:
+          - name: param1
+            in: query
+            value: "value1"
+        requestBody:
+          contentType: application/json
+          payload:
+            action: create
+            data: test
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.header.Content-Type == application/json
+  - workflowId: workflow-b
+    summary: Second workflow
+    description: Another test workflow
+    steps:
+      - stepId: step1
+        description: Second step
+        operationId: operation-b
+        parameters:
+          - name: param2
+            in: path
+            value: "value2"
+        successCriteria:
+          - condition: $statusCode == 201
+  - workflowId: workflow-c
+    summary: Third workflow
+    description: Final test workflow
+    steps:
+      - stepId: step1
+        description: Third step
+        operationId: operation-c
+        requestBody:
+          contentType: application/json
+          payload:
+            action: update
+            id: 123
+        successCriteria:
+          - condition: $statusCode == 200
+          - condition: $response.header.Content-Type == application/json
+components:
+  parameters:
+    param-a:
+      name: param-a
+      in: query
+      value: "test-value-a"
+    param-b:
+      name: param-b
+      in: header
+      value: "test-value-b"
+    param-c:
+      name: param-c
+      in: path
+      value: "test-value-c"
+    param-new:
+      name: param-new
+      in: header
+      value: new-value
+  successActions:
+    success-a:
+      name: success-a
+      type: end
+      criteria:
+        - condition: $statusCode == 200
+    success-b:
+      name: success-b
+      type: goto
+      stepId: step2
+      criteria:
+        - condition: $statusCode == 201
+    success-c:
+      name: success-c
+      type: retry
+      retryAfter: 5
+      criteria:
+        - condition: $statusCode == 500
+  failureActions:
+    failure-a:
+      name: failure-a
+      type: end
+      criteria:
+        - condition: $statusCode == 400
+    failure-b:
+      name: failure-b
+      type: retry
+      retryAfter: 10
+      retryLimit: 3
+      criteria:
+        - condition: $statusCode == 503
+    failure-c:
+      name: failure-c
+      type: goto
+      stepId: error-step
+      criteria:
+        - condition: $statusCode == 404

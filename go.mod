@@ -5,7 +5,7 @@ go 1.23
 require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 	github.com/speakeasy-api/jsonpath v0.6.1
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
