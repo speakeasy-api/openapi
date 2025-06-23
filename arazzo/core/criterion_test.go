@@ -13,19 +13,19 @@ import (
 
 func createCriterionWithRootNode(c Criterion, rootNode *yaml.Node) Criterion {
 	c.SetRootNode(rootNode)
-	c.SetValid(true)
+	c.SetValid(true, true)
 	return c
 }
 
 func createCriterionTypeUnionWithRootNode(ctu CriterionTypeUnion, rootNode *yaml.Node) CriterionTypeUnion {
 	ctu.SetRootNode(rootNode)
-	ctu.SetValid(true)
+	ctu.SetValid(true, true)
 	return ctu
 }
 
 func createCriterionExpressionTypeWithRootNode(cet CriterionExpressionType, rootNode *yaml.Node) CriterionExpressionType {
 	cet.SetRootNode(rootNode)
-	cet.SetValid(true)
+	cet.SetValid(true, true)
 	return cet
 }
 
@@ -100,10 +100,10 @@ type: jsonpath`,
 					ValueNode: testutils.CreateStringYamlNode("$[?count(@.pets) > 0]", 2, 12),
 					Present:   true,
 				},
-				Context: marshaller.Node[*Expression]{
+				Context: marshaller.Node[*string]{
 					Key:       "context",
 					KeyNode:   testutils.CreateStringYamlNode("context", 1, 1),
-					Value:     pointer.From[Expression]("$response.body"),
+					Value:     pointer.From[string]("$response.body"),
 					ValueNode: testutils.CreateStringYamlNode("$response.body", 1, 10),
 					Present:   true,
 				},
@@ -140,10 +140,10 @@ type:
 					ValueNode: testutils.CreateStringYamlNode("$[?count(@.pets) > 0]", 2, 12),
 					Present:   true,
 				},
-				Context: marshaller.Node[*Expression]{
+				Context: marshaller.Node[*string]{
 					Key:       "context",
 					KeyNode:   testutils.CreateStringYamlNode("context", 1, 1),
-					Value:     pointer.From[Expression]("$response.body"),
+					Value:     pointer.From[string]("$response.body"),
 					ValueNode: testutils.CreateStringYamlNode("$response.body", 1, 10),
 					Present:   true,
 				},
@@ -212,8 +212,9 @@ type:
 
 			c := Criterion{}
 
-			err = marshaller.Unmarshal(context.Background(), doc.Content[0], &c)
+			validationErrs, err := marshaller.UnmarshalCore(context.Background(), doc.Content[0], &c)
 			require.NoError(t, err)
+			require.Empty(t, validationErrs, "Expected no validation errors")
 
 			require.Equal(t, tt.want, c)
 		})

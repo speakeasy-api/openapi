@@ -5,7 +5,7 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 )
 
-type ExternalDoc struct {
+type ExternalDocumentation struct {
 	marshaller.CoreModel
 	Description marshaller.Node[*string] `key:"description"`
 	URL         marshaller.Node[string]  `key:"url"`

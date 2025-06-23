@@ -3,17 +3,17 @@ package arazzo
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
-	"github.com/speakeasy-api/openapi/arazzo/expression"
+	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
+	"github.com/speakeasy-api/openapi/values"
 	"gopkg.in/yaml.v3"
 )
 
@@ -27,14 +27,14 @@ type (
 )
 
 type Reusable[T any, V interfaces.Validator[T], C marshaller.CoreModeler] struct {
+	marshaller.Model[core.Reusable[C]]
+
 	// Reference is the expression to the location of the reusable object.
 	Reference *expression.Expression
 	// Value is any value provided alongside a parameter reusable object.
-	Value Value
+	Value values.Value
 	// If this reusable object is not a reference, this will be the inline object for this node.
 	Object V
-
-	marshaller.Model[core.Reusable[C]]
 }
 
 // Get will return either the inline object or the object referenced by the reference.
@@ -109,13 +109,13 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 	}
 
 	core := r.GetCore()
-	errs := core.GetValidationErrors()
+	errs := []error{}
 
 	switch reflect.TypeOf((*T)(nil)).Elem().Name() {
 	case "Parameter":
 	default:
 		if r.Value != nil {
-			errs = append(errs, validation.NewValueError("value is not allowed when object is not a parameter", core, core.Value))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("value is not allowed when object is not a parameter"), core, core.Value))
 		}
 	}
 
@@ -134,7 +134,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 	core := r.GetCore()
 	if err := r.Reference.Validate(true); err != nil {
 		return []error{
-			validation.NewValueError(err.Error(), core, core.Reference),
+			validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Reference),
 		}
 	}
 
@@ -142,13 +142,13 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 
 	if typ != expression.ExpressionTypeComponents {
 		return []error{
-			validation.NewValueError(fmt.Sprintf("reference must be a components expression, got %s", r.Reference.GetType()), core, core.Reference),
+			validation.NewValueError(validation.NewValueValidationError("reference must be a components expression, got %s", r.Reference.GetType()), core, core.Reference),
 		}
 	}
 
 	if componentType == "" || len(references) != 1 {
 		return []error{
-			validation.NewValueError(fmt.Sprintf("reference must be a components expression with 3 parts, got %s", *r.Reference), core, core.Reference),
+			validation.NewValueError(validation.NewValueValidationError("reference must be a components expression with 3 parts, got %s", *r.Reference), core, core.Reference),
 		}
 	}
 
@@ -156,7 +156,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 
 	if a.Components == nil {
 		return []error{
-			validation.NewValueError(fmt.Sprintf("components not present, reference to missing component %s", *r.Reference), core, core.Reference),
+			validation.NewValueError(validation.NewValueValidationError("components not present, reference to missing component %s", *r.Reference), core, core.Reference),
 		}
 	}
 
@@ -192,7 +192,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 		}, opts...)
 	default:
 		return []error{
-			validation.NewValueError(fmt.Sprintf("reference to %s is not valid, valid components are [parameters, successActions, failureActions]", componentType), core, core.Reference),
+			validation.NewValueError(validation.NewValueValidationError("reference to %s is not valid, valid components are [parameters, successActions, failureActions]", componentType), core, core.Reference),
 		}
 	}
 }
@@ -211,20 +211,20 @@ func validateComponentReference[T any, V interfaces.Validator[T]](ctx context.Co
 
 	if args.typ != typ {
 		return []error{
-			validation.NewNodeError(fmt.Sprintf("expected a %s reference got %s", typeToComponentType(args.typ), args.componentType), args.referenceValueNode),
+			validation.NewNodeError(validation.NewValueValidationError("expected a %s reference got %s", typeToComponentType(args.typ), args.componentType), args.referenceValueNode),
 		}
 	}
 
 	if args.components == nil {
 		return []error{
-			validation.NewNodeError(fmt.Sprintf("components.%s not present, reference to missing component %s", args.componentType, *args.reference), args.referenceValueNode),
+			validation.NewNodeError(validation.NewValueValidationError("components.%s not present, reference to missing component %s", args.componentType, *args.reference), args.referenceValueNode),
 		}
 	}
 
 	component, ok := args.components.Get(args.componentName)
 	if !ok {
 		return []error{
-			validation.NewNodeError(fmt.Sprintf("components.%s.%s not present, reference to missing component %s", args.componentType, args.componentName, *args.reference), args.referenceValueNode),
+			validation.NewNodeError(validation.NewValueValidationError("components.%s.%s not present, reference to missing component %s", args.componentType, args.componentName, *args.reference), args.referenceValueNode),
 		}
 	}
 

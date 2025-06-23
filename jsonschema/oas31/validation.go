@@ -11,6 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/json"
 	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31/core"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 	"gopkg.in/yaml.v3"
 )
@@ -23,6 +24,18 @@ var schemaBaseJSON string
 
 var oasSchemaValidator *jsValidator.Schema
 
+func Validate(ctx context.Context, schema JSONSchema, opts ...validation.Option) []error {
+	if schema == nil {
+		return nil
+	}
+
+	if schema.IsLeft() {
+		return schema.Left.Validate(ctx, opts...)
+	}
+
+	return nil
+}
+
 func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []error {
 	// TODO we maybe need to unset any $schema node as it will potentially change how the schema is validated
 
@@ -31,14 +44,14 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	if err := json.YAMLToJSON(core.RootNode, 0, buf); err != nil {
 		return []error{
-			validation.NewNodeError(err.Error(), core.RootNode),
+			validation.NewNodeError(validation.NewValueValidationError(err.Error()), core.RootNode),
 		}
 	}
 
 	jsAny, err := jsValidator.UnmarshalJSON(buf)
 	if err != nil {
 		return []error{
-			validation.NewNodeError(err.Error(), core.RootNode),
+			validation.NewNodeError(validation.NewValueValidationError(err.Error()), core.RootNode),
 		}
 	}
 
@@ -50,7 +63,7 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 			errs = getRootCauses(validationErr, *core)
 		} else {
 			errs = []error{
-				validation.NewNodeError(err.Error(), core.RootNode),
+				validation.NewNodeError(validation.NewValueValidationError(err.Error()), core.RootNode),
 			}
 		}
 	}
@@ -58,10 +71,6 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 	js.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
-}
-
-type marshallerNode interface {
-	GetKeyNodeOrRoot(rootNode *yaml.Node) *yaml.Node
 }
 
 func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
@@ -77,13 +86,22 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 				continue
 			}
 
-			mn, ok := t.(marshallerNode)
-			if !ok {
-				// TODO will this be possible? Maybe if the issue is in an extension?
-				panic(errors.New("expected marshallerNode"))
+			valueNode := js.RootNode
+
+			type marshallerNode interface {
+				GetValueNodeOrRoot(rootNode *yaml.Node) *yaml.Node
 			}
 
-			errs = append(errs, validation.NewNodeError("jsonschema validation error: "+cause.Error(), mn.GetKeyNodeOrRoot(js.RootNode)))
+			if mn, ok := t.(marshallerNode); ok {
+				valueNode = mn.GetValueNodeOrRoot(js.RootNode)
+			} else if ra, ok := t.(marshaller.RootNodeAccessor); ok {
+				modelRootNode := ra.GetRootNode()
+				if modelRootNode != nil {
+					valueNode = modelRootNode
+				}
+			}
+
+			errs = append(errs, validation.NewNodeError(validation.NewValueValidationError("jsonschema validation error: %s", cause.Error()), valueNode))
 		} else {
 			errs = append(errs, getRootCauses(cause, js)...)
 		}

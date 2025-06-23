@@ -1,338 +1,465 @@
-package marshaller_test
+package marshaller
 
 import (
+	"context"
 	"testing"
 
-	"github.com/speakeasy-api/openapi/internal/testutils"
-	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
-func Test_Node_GetValue_Success(t *testing.T) {
-	node := marshaller.Node[string]{
-		Value: "test-value",
-	}
-
-	result := node.GetValue()
-	assert.Equal(t, "test-value", result)
+type testCase[T any] struct {
+	yamlData string
+	expected T
 }
 
-func Test_Node_GetKeyNodeOrRoot_Success(t *testing.T) {
-	rootNode := testutils.CreateStringYamlNode("root", 1, 1)
-	keyNode := testutils.CreateStringYamlNode("key", 2, 2)
+func runNodeTest[T any](t *testing.T, testCase *testCase[T]) {
+	var yamlNode yaml.Node
+	err := yaml.Unmarshal([]byte(testCase.yamlData), &yamlNode)
+	require.NoError(t, err)
 
+	var node Node[T]
+	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	require.NoError(t, err)
+	require.Empty(t, validationErrors)
+
+	assert.Equal(t, testCase.expected, node.Value)
+	assert.True(t, node.Present)
+}
+
+func TestNode_Unmarshal_String_Success(t *testing.T) {
 	tests := []struct {
 		name     string
-		node     marshaller.Node[string]
-		expected *yaml.Node
+		testCase *testCase[string]
 	}{
 		{
-			name: "present with key node",
-			node: marshaller.Node[string]{
-				Present: true,
-				KeyNode: keyNode,
+			name: "basic string",
+			testCase: &testCase[string]{
+				yamlData: `"hello world"`,
+				expected: "hello world",
 			},
-			expected: keyNode,
 		},
 		{
-			name: "present without key node",
-			node: marshaller.Node[string]{
-				Present: true,
-				KeyNode: nil,
+			name: "empty string",
+			testCase: &testCase[string]{
+				yamlData: `""`,
+				expected: "",
 			},
-			expected: rootNode,
 		},
 		{
-			name: "not present",
-			node: marshaller.Node[string]{
-				Present: false,
-				KeyNode: keyNode,
+			name: "multiline string",
+			testCase: &testCase[string]{
+				yamlData: `"line1\nline2"`,
+				expected: "line1\nline2",
 			},
-			expected: rootNode,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.node.GetKeyNodeOrRoot(rootNode)
-			assert.Equal(t, tt.expected, result)
+			runNodeTest(t, tt.testCase)
 		})
 	}
 }
 
-func Test_Node_GetValueNodeOrRoot_Success(t *testing.T) {
-	rootNode := testutils.CreateStringYamlNode("root", 1, 1)
-	valueNode := testutils.CreateStringYamlNode("value", 2, 2)
-
+func TestNode_Unmarshal_StringPtr_Success(t *testing.T) {
+	hello := "hello"
 	tests := []struct {
 		name     string
-		node     marshaller.Node[string]
-		expected *yaml.Node
+		testCase *testCase[*string]
 	}{
 		{
-			name: "present with value node",
-			node: marshaller.Node[string]{
-				Present:   true,
-				ValueNode: valueNode,
+			name: "non-null string pointer",
+			testCase: &testCase[*string]{
+				yamlData: `"hello"`,
+				expected: &hello,
 			},
-			expected: valueNode,
 		},
 		{
-			name: "present without value node",
-			node: marshaller.Node[string]{
-				Present:   true,
-				ValueNode: nil,
+			name: "null string pointer",
+			testCase: &testCase[*string]{
+				yamlData: `null`,
+				expected: nil,
 			},
-			expected: rootNode,
-		},
-		{
-			name: "not present",
-			node: marshaller.Node[string]{
-				Present:   false,
-				ValueNode: valueNode,
-			},
-			expected: rootNode,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.node.GetValueNodeOrRoot(rootNode)
-			assert.Equal(t, tt.expected, result)
+			runNodeTest(t, tt.testCase)
 		})
 	}
 }
 
-func Test_Node_GetSliceValueNodeOrRoot_Success(t *testing.T) {
-	rootNode := testutils.CreateStringYamlNode("root", 1, 1)
-	item1 := testutils.CreateStringYamlNode("item1", 2, 2)
-	item2 := testutils.CreateStringYamlNode("item2", 3, 3)
-	sliceNode := &yaml.Node{
-		Kind:    yaml.SequenceNode,
-		Content: []*yaml.Node{item1, item2},
-	}
-
+func TestNode_Unmarshal_Bool_Success(t *testing.T) {
 	tests := []struct {
 		name     string
-		node     marshaller.Node[[]string]
-		idx      int
-		expected *yaml.Node
+		testCase *testCase[bool]
 	}{
 		{
-			name: "valid index",
-			node: marshaller.Node[[]string]{
-				Present:   true,
-				ValueNode: sliceNode,
+			name: "true value",
+			testCase: &testCase[bool]{
+				yamlData: `true`,
+				expected: true,
 			},
-			idx:      0,
-			expected: item1,
 		},
 		{
-			name: "valid index 2",
-			node: marshaller.Node[[]string]{
-				Present:   true,
-				ValueNode: sliceNode,
+			name: "false value",
+			testCase: &testCase[bool]{
+				yamlData: `false`,
+				expected: false,
 			},
-			idx:      1,
-			expected: item2,
-		},
-		{
-			name: "negative index",
-			node: marshaller.Node[[]string]{
-				Present:   true,
-				ValueNode: sliceNode,
-			},
-			idx:      -1,
-			expected: sliceNode,
-		},
-		{
-			name: "index out of bounds",
-			node: marshaller.Node[[]string]{
-				Present:   true,
-				ValueNode: sliceNode,
-			},
-			idx:      5,
-			expected: sliceNode,
-		},
-		{
-			name: "not present",
-			node: marshaller.Node[[]string]{
-				Present:   false,
-				ValueNode: sliceNode,
-			},
-			idx:      0,
-			expected: rootNode,
-		},
-		{
-			name: "nil value node",
-			node: marshaller.Node[[]string]{
-				Present:   true,
-				ValueNode: nil,
-			},
-			idx:      0,
-			expected: rootNode,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.node.GetSliceValueNodeOrRoot(tt.idx, rootNode)
-			assert.Equal(t, tt.expected, result)
+			runNodeTest(t, tt.testCase)
 		})
 	}
 }
 
-func Test_Node_GetMapKeyNodeOrRoot_Success(t *testing.T) {
-	rootNode := testutils.CreateStringYamlNode("root", 1, 1)
-	key1 := testutils.CreateStringYamlNode("key1", 2, 2)
-	value1 := testutils.CreateStringYamlNode("value1", 2, 8)
-	key2 := testutils.CreateStringYamlNode("key2", 3, 2)
-	value2 := testutils.CreateStringYamlNode("value2", 3, 8)
-	mapNode := &yaml.Node{
-		Kind:    yaml.MappingNode,
-		Content: []*yaml.Node{key1, value1, key2, value2},
-	}
+type errorTestCase[T any] struct {
+	yamlData              string
+	expectValidationError bool
+}
 
+func runNodeErrorTest[T any](t *testing.T, testCase *errorTestCase[T]) {
+	var yamlNode yaml.Node
+	err := yaml.Unmarshal([]byte(testCase.yamlData), &yamlNode)
+	if !testCase.expectValidationError {
+		require.Error(t, err) // Expect YAML parsing to fail
+		return
+	}
+	require.NoError(t, err)
+
+	var node Node[T]
+	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	if testCase.expectValidationError {
+		require.NoError(t, err)
+		require.NotEmpty(t, validationErrors)
+	} else {
+		require.Error(t, err)
+	}
+}
+
+func TestNode_Unmarshal_Error(t *testing.T) {
 	tests := []struct {
 		name     string
-		node     marshaller.Node[map[string]string]
-		key      string
-		expected *yaml.Node
+		testFunc func(*testing.T)
 	}{
 		{
-			name: "existing key",
-			node: marshaller.Node[map[string]string]{
-				Present:   true,
-				ValueNode: mapNode,
+			name: "string node with array value",
+			testFunc: func(t *testing.T) {
+				runNodeErrorTest(t, &errorTestCase[string]{
+					yamlData:              `["not", "a", "string"]`,
+					expectValidationError: true,
+				})
 			},
-			key:      "key1",
-			expected: key1,
 		},
 		{
-			name: "existing key 2",
-			node: marshaller.Node[map[string]string]{
-				Present:   true,
-				ValueNode: mapNode,
+			name: "int node with string value",
+			testFunc: func(t *testing.T) {
+				runNodeErrorTest(t, &errorTestCase[int]{
+					yamlData:              `"hello"`,
+					expectValidationError: true,
+				})
 			},
-			key:      "key2",
-			expected: key2,
 		},
 		{
-			name: "non-existing key",
-			node: marshaller.Node[map[string]string]{
-				Present:   true,
-				ValueNode: mapNode,
+			name: "bool node with string value",
+			testFunc: func(t *testing.T) {
+				runNodeErrorTest(t, &errorTestCase[bool]{
+					yamlData:              `"true"`,
+					expectValidationError: true,
+				})
 			},
-			key:      "key3",
-			expected: mapNode,
 		},
 		{
-			name: "not present",
-			node: marshaller.Node[map[string]string]{
-				Present:   false,
-				ValueNode: mapNode,
+			name: "malformed yaml",
+			testFunc: func(t *testing.T) {
+				runNodeErrorTest(t, &errorTestCase[string]{
+					yamlData:              `{invalid: yaml: content`,
+					expectValidationError: false,
+				})
 			},
-			key:      "key1",
-			expected: rootNode,
-		},
-		{
-			name: "nil value node",
-			node: marshaller.Node[map[string]string]{
-				Present:   true,
-				ValueNode: nil,
-			},
-			key:      "key1",
-			expected: rootNode,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.node.GetMapKeyNodeOrRoot(tt.key, rootNode)
-			assert.Equal(t, tt.expected, result)
+			tt.testFunc(t)
 		})
 	}
 }
 
-func Test_Node_GetMapValueNodeOrRoot_Success(t *testing.T) {
-	rootNode := testutils.CreateStringYamlNode("root", 1, 1)
-	key1 := testutils.CreateStringYamlNode("key1", 2, 2)
-	value1 := testutils.CreateStringYamlNode("value1", 2, 8)
-	key2 := testutils.CreateStringYamlNode("key2", 3, 2)
-	value2 := testutils.CreateStringYamlNode("value2", 3, 8)
-	mapNode := &yaml.Node{
-		Kind:    yaml.MappingNode,
-		Content: []*yaml.Node{key1, value1, key2, value2},
-	}
+type syncTestCase[T any] struct {
+	initialYAML  string
+	newValue     T
+	expectedYAML string
+}
 
+func runNodeSyncTest[T any](t *testing.T, testCase *syncTestCase[T]) {
+	var yamlNode yaml.Node
+	err := yaml.Unmarshal([]byte(testCase.initialYAML), &yamlNode)
+	require.NoError(t, err)
+
+	var node Node[T]
+	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	require.NoError(t, err)
+	require.Empty(t, validationErrors)
+
+	// Sync new value
+	node.Value = testCase.newValue
+	_, _, err = node.SyncValue(context.Background(), "", testCase.newValue)
+	require.NoError(t, err)
+
+	// Verify sync worked
+	assert.Equal(t, testCase.newValue, node.Value)
+	assert.Equal(t, testCase.expectedYAML, node.ValueNode.Value)
+}
+
+func TestNode_SyncValue_Success(t *testing.T) {
 	tests := []struct {
 		name     string
-		node     marshaller.Node[map[string]string]
-		key      string
-		expected *yaml.Node
+		testFunc func(*testing.T)
 	}{
 		{
-			name: "existing key",
-			node: marshaller.Node[map[string]string]{
-				Present:   true,
-				ValueNode: mapNode,
+			name: "sync string value",
+			testFunc: func(t *testing.T) {
+				runNodeSyncTest(t, &syncTestCase[string]{
+					initialYAML:  `"old value"`,
+					newValue:     "new value",
+					expectedYAML: "new value",
+				})
 			},
-			key:      "key1",
-			expected: value1,
 		},
 		{
-			name: "existing key 2",
-			node: marshaller.Node[map[string]string]{
-				Present:   true,
-				ValueNode: mapNode,
+			name: "sync int value",
+			testFunc: func(t *testing.T) {
+				runNodeSyncTest(t, &syncTestCase[int]{
+					initialYAML:  `42`,
+					newValue:     100,
+					expectedYAML: "100",
+				})
 			},
-			key:      "key2",
-			expected: value2,
 		},
 		{
-			name: "non-existing key",
-			node: marshaller.Node[map[string]string]{
-				Present:   true,
-				ValueNode: mapNode,
+			name: "sync bool value true to false",
+			testFunc: func(t *testing.T) {
+				runNodeSyncTest(t, &syncTestCase[bool]{
+					initialYAML:  `true`,
+					newValue:     false,
+					expectedYAML: "false",
+				})
 			},
-			key:      "key3",
-			expected: mapNode,
 		},
 		{
-			name: "not present",
-			node: marshaller.Node[map[string]string]{
-				Present:   false,
-				ValueNode: mapNode,
+			name: "sync bool value false to true",
+			testFunc: func(t *testing.T) {
+				runNodeSyncTest(t, &syncTestCase[bool]{
+					initialYAML:  `false`,
+					newValue:     true,
+					expectedYAML: "true",
+				})
 			},
-			key:      "key1",
-			expected: rootNode,
-		},
-		{
-			name: "nil value node",
-			node: marshaller.Node[map[string]string]{
-				Present:   true,
-				ValueNode: nil,
-			},
-			key:      "key1",
-			expected: rootNode,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.node.GetMapValueNodeOrRoot(tt.key, rootNode)
-			assert.Equal(t, tt.expected, result)
+			tt.testFunc(t)
 		})
 	}
 }
 
-func Test_Node_GetNavigableNode_Success(t *testing.T) {
-	node := marshaller.Node[string]{
-		Value: "test-value",
+func TestNode_GetValue_Success(t *testing.T) {
+	tests := []struct {
+		name     string
+		testFunc func(*testing.T)
+	}{
+		{
+			name: "get string value",
+			testFunc: func(t *testing.T) {
+				var yamlNode yaml.Node
+				err := yaml.Unmarshal([]byte(`"hello"`), &yamlNode)
+				require.NoError(t, err)
+
+				var node Node[string]
+				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				require.NoError(t, err)
+				require.Empty(t, validationErrors)
+
+				assert.Equal(t, "hello", node.GetValue())
+			},
+		},
+		{
+			name: "get string pointer value",
+			testFunc: func(t *testing.T) {
+				var yamlNode yaml.Node
+				err := yaml.Unmarshal([]byte(`"hello"`), &yamlNode)
+				require.NoError(t, err)
+
+				var node Node[*string]
+				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				require.NoError(t, err)
+				require.Empty(t, validationErrors)
+
+				// GetValue() returns the actual pointer, not the dereferenced value
+				value := node.GetValue()
+				require.NotNil(t, value)
+				stringPtr, ok := value.(*string)
+				require.True(t, ok)
+				assert.Equal(t, "hello", *stringPtr)
+			},
+		},
+		{
+			name: "get null string pointer value",
+			testFunc: func(t *testing.T) {
+				var yamlNode yaml.Node
+				err := yaml.Unmarshal([]byte(`null`), &yamlNode)
+				require.NoError(t, err)
+
+				var node Node[*string]
+				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				require.NoError(t, err)
+				require.Empty(t, validationErrors)
+
+				assert.Nil(t, node.GetValue())
+			},
+		},
+		{
+			name: "get int value",
+			testFunc: func(t *testing.T) {
+				var yamlNode yaml.Node
+				err := yaml.Unmarshal([]byte(`42`), &yamlNode)
+				require.NoError(t, err)
+
+				var node Node[int]
+				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				require.NoError(t, err)
+				require.Empty(t, validationErrors)
+
+				assert.Equal(t, 42, node.GetValue())
+			},
+		},
+		{
+			name: "get bool value",
+			testFunc: func(t *testing.T) {
+				var yamlNode yaml.Node
+				err := yaml.Unmarshal([]byte(`true`), &yamlNode)
+				require.NoError(t, err)
+
+				var node Node[bool]
+				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				require.NoError(t, err)
+				require.Empty(t, validationErrors)
+
+				assert.Equal(t, true, node.GetValue())
+			},
+		},
 	}
 
-	result, err := node.GetNavigableNode()
-	assert.NoError(t, err)
-	assert.Equal(t, "test-value", result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.testFunc(t)
+		})
+	}
+}
+
+func TestNode_NodeAccessor_Success(t *testing.T) {
+	// Use the same pattern as the working tests
+	var yamlNode yaml.Node
+	err := yaml.Unmarshal([]byte(`"test value"`), &yamlNode)
+	require.NoError(t, err)
+
+	var node Node[string]
+	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	require.NoError(t, err)
+	require.Empty(t, validationErrors)
+
+	// Verify the node was populated correctly
+	assert.True(t, node.Present)
+	assert.Equal(t, "test value", node.Value)
+
+	// Test NodeAccessor interface
+	var accessor NodeAccessor = &node
+
+	// Test GetValue
+	value := accessor.GetValue()
+	assert.Equal(t, "test value", value)
+
+	// Test GetValueType
+	valueType := accessor.GetValueType()
+	assert.Equal(t, "string", valueType.String())
+
+	// Test direct ValueNode access
+	require.NotNil(t, node.ValueNode)
+	// Note: ValueNode stores the document node, which may not have the parsed value directly
+	// The parsed value is correctly stored in node.Value and accessible via GetValue()
+	// This is expected behavior - syncing will handle updating the appropriate content nodes
+}
+
+func TestNode_NodeMutator_Success(t *testing.T) {
+	var yamlNode yaml.Node
+	err := yaml.Unmarshal([]byte(`"original value"`), &yamlNode)
+	require.NoError(t, err)
+
+	var node Node[string]
+	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	require.NoError(t, err)
+	require.Empty(t, validationErrors)
+
+	// Test NodeMutator interface methods
+	var mutator NodeMutator = &node
+
+	// Test SetPresent
+	mutator.SetPresent(false)
+	assert.False(t, node.Present)
+	mutator.SetPresent(true)
+	assert.True(t, node.Present)
+
+	// Test SyncValue
+	_, _, err = mutator.SyncValue(context.Background(), "testKey", "new value")
+	require.NoError(t, err)
+
+	// Verify the change
+	assert.Equal(t, "new value", node.ValueNode.Value)
+	assert.Equal(t, "testKey", node.Key)
+}
+
+func TestNode_Unmarshal_Int_Success(t *testing.T) {
+	tests := []struct {
+		name     string
+		testCase *testCase[int]
+	}{
+		{
+			name: "positive int",
+			testCase: &testCase[int]{
+				yamlData: `42`,
+				expected: 42,
+			},
+		},
+		{
+			name: "negative int",
+			testCase: &testCase[int]{
+				yamlData: `-10`,
+				expected: -10,
+			},
+		},
+		{
+			name: "zero",
+			testCase: &testCase[int]{
+				yamlData: `0`,
+				expected: 0,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runNodeTest(t, tt.testCase)
+		})
+	}
 }

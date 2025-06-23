@@ -9,13 +9,19 @@ import (
 // Error represents a validation error and the line and column where it occurred
 // TODO allow getting the JSON path for line/column for validation errors
 type Error struct {
-	Line    int
-	Column  int
-	Message string
+	UnderlyingError error
+	Line            int
+	Column          int
 }
 
+var _ error = (*Error)(nil)
+
 func (e Error) Error() string {
-	return fmt.Sprintf("[%d:%d] %s", e.Line, e.Column, e.Message)
+	return fmt.Sprintf("[%d:%d] %s", e.Line, e.Column, e.UnderlyingError.Error())
+}
+
+func (e Error) Unwrap() error {
+	return e.UnderlyingError
 }
 
 type valueNodeGetter interface {
@@ -34,11 +40,11 @@ type mapValueNodeGetter interface {
 	GetMapValueNodeOrRoot(key string, root *yaml.Node) *yaml.Node
 }
 
-func NewNodeError(msg string, node *yaml.Node) error {
+func NewNodeError(err error, node *yaml.Node) error {
 	return &Error{
-		Message: msg,
-		Line:    node.Line,
-		Column:  node.Column,
+		UnderlyingError: err,
+		Line:            node.Line,
+		Column:          node.Column,
 	}
 }
 
@@ -46,78 +52,150 @@ type CoreModeler interface {
 	GetRootNode() *yaml.Node
 }
 
-func NewValueError(msg string, core CoreModeler, node valueNodeGetter) error {
+func NewValueError(err error, core CoreModeler, node valueNodeGetter) error {
 	rootNode := core.GetRootNode()
 
 	if rootNode == nil {
 		// Fallback if RootNode is not available
 		return &Error{
-			Message: msg,
+			UnderlyingError: err,
 			// Default to line 0, column 0 if we can't get location info
 		}
 	}
 	valueNode := node.GetValueNodeOrRoot(rootNode)
 
 	return &Error{
-		Message: msg,
-		Line:    valueNode.Line,
-		Column:  valueNode.Column,
+		UnderlyingError: err,
+		Line:            valueNode.Line,
+		Column:          valueNode.Column,
 	}
 }
 
-func NewSliceError(msg string, core CoreModeler, node sliceNodeGetter, index int) error {
+func NewSliceError(err error, core CoreModeler, node sliceNodeGetter, index int) error {
 	rootNode := core.GetRootNode()
 
 	if rootNode == nil {
 		// Fallback if RootNode is not available
 		return &Error{
-			Message: msg,
+			UnderlyingError: err,
 			// Default to line 0, column 0 if we can't get location info
 		}
 	}
 	valueNode := node.GetSliceValueNodeOrRoot(index, rootNode)
 
 	return &Error{
-		Message: msg,
-		Line:    valueNode.Line,
-		Column:  valueNode.Column,
+		UnderlyingError: err,
+		Line:            valueNode.Line,
+		Column:          valueNode.Column,
 	}
 }
 
-func NewMapKeyError(msg string, core CoreModeler, node mapKeyNodeGetter, key string) error {
+func NewMapKeyError(err error, core CoreModeler, node mapKeyNodeGetter, key string) error {
 	rootNode := core.GetRootNode()
 
 	if rootNode == nil {
 		// Fallback if RootNode is not available
 		return &Error{
-			Message: msg,
+			UnderlyingError: err,
 			// Default to line 0, column 0 if we can't get location info
 		}
 	}
 	valueNode := node.GetMapKeyNodeOrRoot(key, rootNode)
 
 	return &Error{
-		Message: msg,
-		Line:    valueNode.Line,
-		Column:  valueNode.Column,
+		UnderlyingError: err,
+		Line:            valueNode.Line,
+		Column:          valueNode.Column,
 	}
 }
 
-func NewMapValueError(msg string, core CoreModeler, node mapValueNodeGetter, key string) error {
+func NewMapValueError(err error, core CoreModeler, node mapValueNodeGetter, key string) error {
 	rootNode := core.GetRootNode()
 
 	if rootNode == nil {
 		// Fallback if RootNode is not available
 		return &Error{
-			Message: msg,
+			UnderlyingError: err,
 			// Default to line 0, column 0 if we can't get location info
 		}
 	}
 	valueNode := node.GetMapValueNodeOrRoot(key, rootNode)
 
 	return &Error{
-		Message: msg,
-		Line:    valueNode.Line,
-		Column:  valueNode.Column,
+		UnderlyingError: err,
+		Line:            valueNode.Line,
+		Column:          valueNode.Column,
 	}
+}
+
+type TypeMismatchError struct {
+	Msg string
+}
+
+var _ error = (*TypeMismatchError)(nil)
+
+func NewTypeMismatchError(msg string, args ...any) *TypeMismatchError {
+	if len(args) > 0 {
+		msg = fmt.Sprintf(msg, args...)
+	}
+
+	return &TypeMismatchError{
+		Msg: msg,
+	}
+}
+
+func (e TypeMismatchError) Error() string {
+	return e.Msg
+}
+
+type MissingFieldError struct {
+	Msg string
+}
+
+var _ error = (*MissingFieldError)(nil)
+
+func NewMissingFieldError(msg string, args ...any) *MissingFieldError {
+	return &MissingFieldError{
+		Msg: fmt.Sprintf(msg, args...),
+	}
+}
+
+func (e MissingFieldError) Error() string {
+	return e.Msg
+}
+
+type MissingValueError struct {
+	Msg string
+}
+
+var _ error = (*MissingValueError)(nil)
+
+func NewMissingValueError(msg string, args ...any) *MissingValueError {
+	return &MissingValueError{
+		Msg: fmt.Sprintf(msg, args...),
+	}
+}
+
+func (e MissingValueError) Error() string {
+	return e.Msg
+}
+
+type ValueValidationError struct {
+	Msg string
+}
+
+var _ error = (*ValueValidationError)(nil)
+
+func NewValueValidationError(msg string, args ...any) *ValueValidationError {
+	if len(args) > 0 {
+		msg = fmt.Sprintf(msg, args...)
+	}
+
+	return &ValueValidationError{
+		Msg: msg,
+	}
+}
+
+func (e ValueValidationError) Error() string {
+	return e.Msg
 }

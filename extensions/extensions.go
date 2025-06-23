@@ -86,28 +86,28 @@ func (e *Extensions) Populate(source any) error {
 }
 
 // UnmarshalExtensionModel will unmarshal the extension into a model and its associated core model.
-func UnmarshalExtensionModel[H any, L any](ctx context.Context, e *Extensions, ext string, m *H) error {
+func UnmarshalExtensionModel[H any, L any](ctx context.Context, e *Extensions, ext string, m *H) ([]error, error) {
 	if e == nil {
-		return ErrNotFound.Wrap(errors.New("extensions is nil"))
+		return nil, ErrNotFound.Wrap(errors.New("extensions is nil"))
 	}
 
 	if !e.Has(ext) {
-		return ErrNotFound
+		return nil, ErrNotFound
 	}
 
-	c, err := core.UnmarshalExtensionModel[L](ctx, e.core, ext)
+	c, validationErrs, err := core.UnmarshalExtensionModel[L](ctx, e.core, ext)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var mV H
 
 	if err := marshaller.Populate(*c, &mV); err != nil {
-		return err
+		return nil, err
 	}
 	*m = mV
 
-	return nil
+	return validationErrs, nil
 }
 
 // GetExtensionValue will return the value of the extension. Useful for scalar values or where a model without a core is required.

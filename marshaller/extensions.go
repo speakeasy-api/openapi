@@ -8,7 +8,6 @@ import (
 	"slices"
 	"unsafe"
 
-	"github.com/speakeasy-api/openapi/errors"
 	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
@@ -34,25 +33,30 @@ type ExtensionSourceIterator interface {
 }
 
 func UnmarshalExtension(keyNode *yaml.Node, valueNode *yaml.Node, extensionsField reflect.Value) error {
+	resolvedKeyNode := yml.ResolveAlias(keyNode)
+	resolvedValueNode := yml.ResolveAlias(valueNode)
+
 	if !extensionsField.CanSet() {
-		return errors.New("Extensions field is not settable")
+		return fmt.Errorf("Extensions field is not settable (field type: %v) at line %d, column %d",
+			extensionsField.Type(), resolvedKeyNode.Line, resolvedKeyNode.Column)
 	}
 
 	if extensionsField.IsNil() {
-		extensionsField.Set(reflect.New(extensionsField.Type().Elem()))
+		extensionsField.Set(CreateInstance(extensionsField.Type().Elem()))
 	}
 
 	exts, ok := extensionsField.Interface().(ExtensionCoreMap)
 	if !ok {
-		return fmt.Errorf("expected ExtensionCoreMap, got %v", extensionsField.Type())
+		return fmt.Errorf("expected ExtensionCoreMap, got %v (field type: %v) at line %d, column %d",
+			extensionsField.Type(), extensionsField.Type(), resolvedKeyNode.Line, resolvedKeyNode.Column)
 	}
 
 	exts.Init()
 
-	exts.Set(keyNode.Value, Node[Extension]{
-		Key:       keyNode.Value,
+	exts.Set(resolvedKeyNode.Value, Node[Extension]{
+		Key:       resolvedKeyNode.Value,
 		KeyNode:   keyNode,
-		Value:     valueNode,
+		Value:     resolvedValueNode,
 		ValueNode: valueNode,
 	})
 
@@ -77,7 +81,7 @@ func syncExtensions(ctx context.Context, source any, target reflect.Value, mapNo
 	}
 
 	if target.Kind() == reflect.Ptr && target.IsNil() {
-		target.Set(reflect.New(target.Type().Elem()))
+		target.Set(CreateInstance(target.Type().Elem()))
 	}
 
 	targetMap, ok := target.Interface().(ExtensionCoreMap)
@@ -104,11 +108,23 @@ func syncExtensions(ctx context.Context, source any, target reflect.Value, mapNo
 				ValueNode: extNode,
 			}
 		} else {
+			if node.Value != extNode {
+				node.Value = extNode
+				if node.ValueNode.Kind == yaml.AliasNode {
+					node.ValueNode.Alias = node.Value
+				} else {
+					node.ValueNode = node.Value
+				}
+			}
+
 			var err error
-			keyNode, valueNode, err = node.SyncValue(ctx, key, extNode)
+			keyNode, valueNode, err = node.SyncValue(ctx, key, node.ValueNode)
 			if err != nil {
 				return nil, err
 			}
+			node.KeyNode = keyNode
+			node.Value = yml.ResolveAlias(valueNode)
+			node.ValueNode = valueNode
 		}
 
 		mapNode = yml.CreateOrUpdateMapNodeElement(ctx, key, keyNode, valueNode, mapNode)

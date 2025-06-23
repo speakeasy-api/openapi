@@ -16,19 +16,19 @@ func validateJSONSchema(ctx context.Context, js oas31.JSONSchema, line, column i
 
 	if a == nil {
 		return []error{
-			validation.Error{
-				Message: "An Arazzo object must be passed via validation options to validate a JSONSchema",
-				Line:    line,
-				Column:  column,
+			&validation.Error{
+				UnderlyingError: validation.NewValueValidationError("An Arazzo object must be passed via validation options to validate a JSONSchema"),
+				Line:            line,
+				Column:          column,
 			},
 		}
 	}
 
 	if js.IsRight() {
 		errs = append(errs, &validation.Error{
-			Message: "inputs schema must represent an object with specific properties for inputs",
-			Line:    line,
-			Column:  column,
+			UnderlyingError: validation.NewValueValidationError("inputs schema must represent an object with specific properties for inputs"),
+			Line:            line,
+			Column:          column,
 		})
 	} else {
 		errs = append(errs, js.Left.Validate(ctx, opts...)...)
@@ -42,27 +42,27 @@ func validateJSONSchema(ctx context.Context, js oas31.JSONSchema, line, column i
 				types := js.Left.Type.GetLeft()
 				if len(types) != 1 || types[0] != "object" {
 					errs = append(errs, &validation.Error{
-						Message: "inputs schema must represent an object with specific properties for inputs",
-						Line:    line,
-						Column:  column,
+						UnderlyingError: validation.NewValueValidationError("inputs schema must represent an object with specific properties for inputs"),
+						Line:            line,
+						Column:          column,
 					})
 				}
 			}
 			if js.Left.Type.IsRight() {
 				if js.Left.Type.GetRight() != "object" {
 					errs = append(errs, &validation.Error{
-						Message: "inputs schema must represent an object with specific properties for inputs",
-						Line:    line,
-						Column:  column,
+						UnderlyingError: validation.NewValueValidationError("inputs schema must represent an object with specific properties for inputs"),
+						Line:            line,
+						Column:          column,
 					})
 				}
 			}
 		} else {
 			if js.Left.Properties.Len() == 0 {
 				errs = append(errs, &validation.Error{
-					Message: "inputs schema must represent an object with specific properties for inputs",
-					Line:    line,
-					Column:  column,
+					UnderlyingError: validation.NewValueValidationError("inputs schema must represent an object with specific properties for inputs"),
+					Line:            line,
+					Column:          column,
 				})
 			}
 		}

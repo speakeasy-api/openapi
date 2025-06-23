@@ -52,8 +52,9 @@ x-speakeasy-test:
   value: 1`)
 
 	var testModel TestModel
-	err := extensions.UnmarshalExtensionModel[TestModel, TestCoreModel](ctx, m.Extensions, "x-speakeasy-test", &testModel)
+	validationErrs, err := extensions.UnmarshalExtensionModel[TestModel, TestCoreModel](ctx, m.Extensions, "x-speakeasy-test", &testModel)
 	require.NoError(t, err)
+	require.Empty(t, validationErrs)
 
 	assert.Equal(t, "test", testModel.Name)
 	assert.Equal(t, *testutils.CreateIntYamlNode(1, 5, 10), testModel.Value)
@@ -112,8 +113,9 @@ func getTestModelWithExtensions(ctx context.Context, t *testing.T, data string) 
 	require.NoError(t, err)
 
 	var c CoreModelWithExtensions
-	err = marshaller.Unmarshal(ctx, &root, &c)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, &root, &c)
 	require.NoError(t, err)
+	require.Empty(t, validationErrs)
 
 	m := &ModelWithExtensions{}
 	err = marshaller.Populate(c, m)

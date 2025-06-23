@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/speakeasy-api/openapi/arazzo/expression"
+	"github.com/speakeasy-api/openapi/expression"
 	"github.com/stretchr/testify/assert"
 )
 

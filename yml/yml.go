@@ -8,7 +8,9 @@ import (
 
 func CreateOrUpdateKeyNode(ctx context.Context, key string, keyNode *yaml.Node) *yaml.Node {
 	if keyNode != nil {
-		keyNode.Value = key
+		resolvedKeyNode := ResolveAlias(keyNode)
+
+		resolvedKeyNode.Value = key
 		return keyNode
 	}
 
@@ -28,8 +30,10 @@ func CreateOrUpdateScalarNode(ctx context.Context, value any, valueNode *yaml.No
 		return nil
 	}
 
-	if valueNode != nil {
-		valueNode.Value = convNode.Value
+	resolvedValueNode := ResolveAlias(valueNode)
+
+	if resolvedValueNode != nil {
+		resolvedValueNode.Value = convNode.Value
 		return valueNode
 	}
 
@@ -43,16 +47,18 @@ func CreateOrUpdateScalarNode(ctx context.Context, value any, valueNode *yaml.No
 }
 
 func CreateOrUpdateMapNodeElement(ctx context.Context, key string, keyNode, valueNode, mapNode *yaml.Node) *yaml.Node {
-	if mapNode != nil {
-		for i := 0; i < len(mapNode.Content); i += 2 {
-			if mapNode.Content[i].Value == key {
-				mapNode.Content[i+1] = valueNode
+	resolvedMapNode := ResolveAlias(mapNode)
+
+	if resolvedMapNode != nil {
+		for i := 0; i < len(resolvedMapNode.Content); i += 2 {
+			if resolvedMapNode.Content[i].Value == key {
+				resolvedMapNode.Content[i+1] = valueNode
 				return mapNode
 			}
 		}
 
-		mapNode.Content = append(mapNode.Content, CreateOrUpdateKeyNode(ctx, key, keyNode))
-		mapNode.Content = append(mapNode.Content, valueNode)
+		resolvedMapNode.Content = append(resolvedMapNode.Content, CreateOrUpdateKeyNode(ctx, key, keyNode))
+		resolvedMapNode.Content = append(resolvedMapNode.Content, valueNode)
 
 		return mapNode
 	}
@@ -72,13 +78,14 @@ func CreateMapNode(ctx context.Context, content []*yaml.Node) *yaml.Node {
 }
 
 func DeleteMapNodeElement(ctx context.Context, key string, mapNode *yaml.Node) *yaml.Node {
-	if mapNode == nil {
+	resolvedMapNode := ResolveAlias(mapNode)
+	if resolvedMapNode == nil {
 		return nil
 	}
 
-	for i := 0; i < len(mapNode.Content); i += 2 {
-		if mapNode.Content[i].Value == key {
-			mapNode.Content = append(mapNode.Content[:i], mapNode.Content[i+2:]...)
+	for i := 0; i < len(resolvedMapNode.Content); i += 2 {
+		if resolvedMapNode.Content[i].Value == key {
+			mapNode.Content = append(resolvedMapNode.Content[:i], resolvedMapNode.Content[i+2:]...)
 			return mapNode
 		}
 	}
@@ -87,8 +94,9 @@ func DeleteMapNodeElement(ctx context.Context, key string, mapNode *yaml.Node) *
 }
 
 func CreateOrUpdateSliceNode(ctx context.Context, elements []*yaml.Node, valueNode *yaml.Node) *yaml.Node {
-	if valueNode != nil {
-		valueNode.Content = elements
+	resolvedValueNode := ResolveAlias(valueNode)
+	if resolvedValueNode != nil {
+		resolvedValueNode.Content = elements
 		return valueNode
 	}
 
@@ -100,19 +108,33 @@ func CreateOrUpdateSliceNode(ctx context.Context, elements []*yaml.Node, valueNo
 }
 
 func GetMapElementNodes(ctx context.Context, mapNode *yaml.Node, key string) (*yaml.Node, *yaml.Node, bool) {
-	if mapNode == nil {
+	resolvedMapNode := ResolveAlias(mapNode)
+	if resolvedMapNode == nil {
 		return nil, nil, false
 	}
 
-	if mapNode.Kind != yaml.MappingNode {
+	if resolvedMapNode.Kind != yaml.MappingNode {
 		return nil, nil, false
 	}
 
-	for i := 0; i < len(mapNode.Content); i += 2 {
-		if mapNode.Content[i].Value == key {
-			return mapNode.Content[i], mapNode.Content[i+1], true
+	for i := 0; i < len(resolvedMapNode.Content); i += 2 {
+		if resolvedMapNode.Content[i].Value == key {
+			return resolvedMapNode.Content[i], resolvedMapNode.Content[i+1], true
 		}
 	}
 
 	return nil, nil, false
+}
+
+func ResolveAlias(node *yaml.Node) *yaml.Node {
+	if node == nil {
+		return nil
+	}
+
+	switch node.Kind {
+	case yaml.AliasNode:
+		return ResolveAlias(node.Alias)
+	default:
+		return node
+	}
 }

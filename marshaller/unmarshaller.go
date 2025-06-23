@@ -2,25 +2,65 @@ package marshaller
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/speakeasy-api/openapi/validation"
+	"github.com/speakeasy-api/openapi/yml"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 )
 
+// Unmarshallable is an interface that can be implemented by types that can be unmarshalled from a YAML document.
+// These types should handle the node being an alias node and resolve it to the actual value (retaining the original node where needed).
 type Unmarshallable interface {
-	Unmarshal(ctx context.Context, value *yaml.Node) error
+	Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error)
 }
 
-func Unmarshal(ctx context.Context, node *yaml.Node, out any) error {
+func Unmarshal[T any](ctx context.Context, doc io.Reader, out CoreAccessor[T]) ([]error, error) {
+	data, err := io.ReadAll(doc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read document: %w", err)
+	}
+
+	if len(data) == 0 {
+		return nil, errors.New("empty document")
+	}
+
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal document: %w", err)
+	}
+
+	core := out.GetCore()
+	validationErrs, err := UnmarshalCore(ctx, &root, core)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if the core implements CoreModeler interface
+	if coreModeler, ok := any(core).(CoreModeler); ok {
+		coreModeler.SetConfig(yml.GetConfigFromDoc(data, &root))
+	}
+
+	if err := Populate(*core, out); err != nil {
+		return nil, err
+	}
+
+	return validationErrs, nil
+}
+
+func UnmarshalCore(ctx context.Context, node *yaml.Node, out any) ([]error, error) {
 	if node.Kind == yaml.DocumentNode {
 		if len(node.Content) != 1 {
-			return fmt.Errorf("expected 1 node, got %d", len(node.Content))
+			return nil, fmt.Errorf("expected 1 node, got %d at line %d, column %d", len(node.Content), node.Line, node.Column)
 		}
 
-		return Unmarshal(ctx, node.Content[0], out)
+		return UnmarshalCore(ctx, node.Content[0], out)
 	}
 
 	v := reflect.ValueOf(out)
@@ -34,9 +74,159 @@ func Unmarshal(ctx context.Context, node *yaml.Node, out any) error {
 	return unmarshal(ctx, node, v)
 }
 
-func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
-	if node.Kind != yaml.MappingNode {
-		return fmt.Errorf("expected a mapping node, got %v", node.Kind)
+func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]error, error) {
+	return unmarshalModel(ctx, node, structPtr)
+}
+
+func UnmarshalKeyValuePair(ctx context.Context, keyNode, valueNode *yaml.Node, outValue any) ([]error, error) {
+	out := reflect.ValueOf(outValue)
+
+	if implementsInterface[NodeMutator](out) {
+		return unmarshalNode(ctx, keyNode, valueNode, "value", out)
+	} else {
+		return UnmarshalCore(ctx, valueNode, outValue)
+	}
+}
+
+// DecodeNode attempts to decode a YAML node into the provided output value.
+// It differentiates between type mismatch errors (returned as validation errors)
+// and YAML syntax errors (returned as standard errors).
+//
+// Returns:
+//   - []error: validation errors for type mismatches
+//   - error: syntax errors or other decode failures
+func DecodeNode(ctx context.Context, node *yaml.Node, out any) ([]error, error) {
+	return decodeNode(ctx, node, out)
+}
+
+func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) ([]error, error) {
+	resolvedNode := yml.ResolveAlias(node)
+
+	switch {
+	case out.Type() == reflect.TypeOf((*yaml.Node)(nil)):
+		out.Set(reflect.ValueOf(node))
+		return nil, nil
+	case out.Type() == reflect.TypeOf(yaml.Node{}):
+		out.Set(reflect.ValueOf(*node))
+		return nil, nil
+	}
+
+	if implementsInterface[NodeMutator](out) {
+		if out.Kind() != reflect.Ptr {
+			out = out.Addr()
+		}
+
+		if out.IsNil() {
+			out.Set(CreateInstance(out.Type().Elem()))
+		}
+
+		nodeMutator, ok := out.Interface().(NodeMutator)
+		if !ok {
+			return nil, fmt.Errorf("expected NodeMutator, got %s at line %d, column %d", out.Type(), resolvedNode.Line, resolvedNode.Column)
+		}
+
+		return nodeMutator.Unmarshal(ctx, nil, node)
+	}
+
+	if isEmbeddedSequencedMap(out) {
+		return unmarshalMapping(ctx, node, out)
+	}
+
+	if implementsInterface[Unmarshallable](out) {
+		if out.Kind() != reflect.Ptr {
+			out = out.Addr()
+		}
+
+		if out.IsNil() {
+			out.Set(CreateInstance(out.Type().Elem()))
+		}
+
+		unmarshallable, ok := out.Interface().(Unmarshallable)
+		if !ok {
+			return nil, fmt.Errorf("expected Unmarshallable, got %s at line %d, column %d", out.Type(), resolvedNode.Line, resolvedNode.Column)
+		}
+
+		return unmarshallable.Unmarshal(ctx, node)
+	}
+
+	if implementsInterface[sequencedMapInterface](out) {
+		if out.Kind() != reflect.Ptr {
+			out = out.Addr()
+		}
+
+		if out.IsNil() {
+			out.Set(CreateInstance(out.Type().Elem()))
+		}
+
+		seqMapInterface, ok := out.Interface().(sequencedMapInterface)
+		if !ok {
+			return nil, fmt.Errorf("expected sequencedMapInterface, got %s at line %d, column %d", out.Type(), resolvedNode.Line, resolvedNode.Column)
+		}
+
+		return unmarshalSequencedMap(ctx, node, seqMapInterface)
+	}
+
+	// Type-guided unmarshalling: check target type first, then validate node compatibility
+	switch {
+	case isStructType(out):
+		// Target expects a struct/object
+		if validationErrs, err := validateNodeKind(resolvedNode, yaml.MappingNode, "struct"); err != nil || validationErrs != nil {
+			return validationErrs, err
+		}
+		return unmarshalMapping(ctx, node, out)
+
+	case isSliceType(out):
+		// Target expects a slice/array
+		if validationErrs, err := validateNodeKind(resolvedNode, yaml.SequenceNode, "slice"); err != nil || validationErrs != nil {
+			return validationErrs, err
+		}
+		return unmarshalSequence(ctx, node, out)
+
+	case isMapType(out):
+		// Target expects a map
+		if validationErrs, err := validateNodeKind(resolvedNode, yaml.MappingNode, "map"); err != nil || validationErrs != nil {
+			return validationErrs, err
+		}
+		return unmarshalMapping(ctx, node, out)
+
+	default:
+		// Target expects a scalar value (string, int, bool, etc.)
+		if validationErrs, err := validateNodeKind(resolvedNode, yaml.ScalarNode, out.Type().String()); err != nil || validationErrs != nil {
+			return validationErrs, err
+		}
+		return decodeNode(ctx, resolvedNode, out.Addr().Interface())
+	}
+}
+
+func unmarshalMapping(ctx context.Context, node *yaml.Node, out reflect.Value) ([]error, error) {
+	if out.Kind() == reflect.Ptr {
+		out.Set(CreateInstance(out.Type().Elem()))
+		out = out.Elem()
+	}
+
+	resolvedNode := yml.ResolveAlias(node)
+
+	switch {
+	case out.Kind() == reflect.Struct:
+		if implementsInterface[CoreModeler](out) {
+			return unmarshalModel(ctx, node, out.Addr().Interface())
+		} else {
+			return unmarshalStruct(ctx, node, out.Addr().Interface())
+		}
+	case out.Kind() == reflect.Map:
+		return nil, fmt.Errorf("currently unsupported out kind: %v (type: %s) at line %d, column %d", out.Kind(), out.Type(), resolvedNode.Line, resolvedNode.Column)
+	default:
+		return nil, fmt.Errorf("expected struct or map, got %s (type: %s) at line %d, column %d", out.Kind(), out.Type(), resolvedNode.Line, resolvedNode.Column)
+	}
+}
+
+func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]error, error) {
+	resolvedNode := yml.ResolveAlias(node)
+
+	if resolvedNode.Kind != yaml.MappingNode {
+		return []error{
+			validation.NewNodeError(validation.NewTypeMismatchError("expected a mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+		}, nil
 	}
 
 	out := reflect.ValueOf(structPtr)
@@ -46,7 +236,7 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 	}
 
 	if out.Kind() != reflect.Struct {
-		return fmt.Errorf("expected a struct, got %s", out.Kind())
+		return nil, fmt.Errorf("expected a struct, got %s (type: %s) at line %d, column %d", out.Kind(), out.Type(), resolvedNode.Line, resolvedNode.Column)
 	}
 
 	var unmarshallable CoreModeler
@@ -56,10 +246,10 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 		var ok bool
 		unmarshallable, ok = out.Addr().Interface().(CoreModeler)
 		if !ok {
-			return fmt.Errorf("expected CoreModeler, got %s", out.Type())
+			return nil, fmt.Errorf("expected CoreModeler, got %s at line %d, column %d", out.Type(), resolvedNode.Line, resolvedNode.Column)
 		}
 	} else {
-		return fmt.Errorf("expected struct to implement CoreModeler, got %s", out.Type())
+		return nil, fmt.Errorf("expected struct to implement CoreModeler, got %s at line %d, column %d", out.Type(), resolvedNode.Line, resolvedNode.Column)
 	}
 
 	unmarshallable.SetRootNode(node)
@@ -75,8 +265,24 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 	var extensionsField *reflect.Value
 	requiredFields := map[string]Field{} // Track required fields separately
 
+	var embeddedMap sequencedMapInterface
+
 	for i := 0; i < out.NumField(); i++ {
 		field := out.Type().Field(i)
+
+		if field.Anonymous {
+			fieldVal := out.Field(i)
+
+			// Check if the field is a embedded sequenced map
+			if implementsInterface[sequencedMapInterface](fieldVal) {
+				if fieldVal.IsNil() {
+					fieldVal.Set(CreateInstance(fieldVal.Type().Elem()))
+				}
+				embeddedMap = fieldVal.Interface().(sequencedMapInterface)
+			}
+			continue
+		}
+
 		if !field.IsExported() {
 			continue
 		}
@@ -120,149 +326,184 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) error {
 	}
 
 	// Process YAML nodes and validate required fields in one pass
-	valid := true
-	foundRequiredFields := map[string]bool{}
+	foundRequiredFields := sync.Map{}
 
-	for i := 0; i < len(node.Content); i += 2 {
-		keyNode := node.Content[i]
-		valueNode := node.Content[i+1]
+	numJobs := len(resolvedNode.Content) / 2
 
-		key := keyNode.Value
+	var mapNode *yaml.Node
+	var jobMapContent [][]*yaml.Node
 
-		field, ok := fields[key]
-		if !ok {
-			if !strings.HasPrefix(key, "x-") {
-				continue
-			}
+	if embeddedMap != nil {
+		copy := *resolvedNode
+		mapNode = &copy
+		jobMapContent = make([][]*yaml.Node, numJobs)
+	}
 
-			if extensionsField != nil {
-				if err := UnmarshalExtension(keyNode, valueNode, *extensionsField); err != nil {
+	jobValidationErrs := make([][]error, numJobs)
+
+	// Mutex to protect concurrent access to extensionsField
+	var extensionsMutex sync.Mutex
+
+	// TODO allow concurrency to be configurable
+	g, ctx := errgroup.WithContext(ctx)
+
+	for i := 0; i < len(resolvedNode.Content); i += 2 {
+		i := i
+		g.Go(func() error {
+			keyNode := resolvedNode.Content[i]
+			valueNode := resolvedNode.Content[i+1]
+
+			key := keyNode.Value
+
+			field, ok := fields[key]
+			if !ok {
+				if strings.HasPrefix(key, "x-") && extensionsField != nil {
+					// Lock access to extensionsField to prevent concurrent modification
+					extensionsMutex.Lock()
+					defer extensionsMutex.Unlock()
+					err := UnmarshalExtension(keyNode, valueNode, *extensionsField)
+					if err != nil {
+						return err
+					}
+				} else if embeddedMap != nil {
+					// Skip alias definitions - these are nodes where:
+					// 1. The value node has an anchor (e.g., &keyAlias)
+					// 2. The key is not an alias reference (doesn't start with *)
+					if valueNode.Anchor != "" && !strings.HasPrefix(key, "*") {
+						// This is an alias definition, skip it from embedded map processing
+						// but it should still be preserved at the document level
+						return nil
+					}
+					jobMapContent[i/2] = append(jobMapContent[i/2], keyNode, valueNode)
+				}
+			} else if implementsInterface[NodeMutator](field.Field) {
+				fieldValidationErrs, err := unmarshalNode(ctx, keyNode, valueNode, field.Name, field.Field)
+				if err != nil {
 					return err
 				}
-			}
-		} else if implementsInterface[NodeMutator](field.Field) {
-			if err := unmarshalNode(ctx, keyNode, valueNode, field.Name, field.Field); err != nil {
-				return err
+				jobValidationErrs[i/2] = append(jobValidationErrs[i/2], fieldValidationErrs...)
+
+				// Mark required field as found
+				if field.Required {
+					foundRequiredFields.Store(key, true)
+				}
+			} else {
+				return fmt.Errorf("expected field '%s' to be marshaller.Node, got %s at line %d, column %d (key: %s)", field.Name, field.Field.Type(), keyNode.Line, keyNode.Column, key)
 			}
 
-			// Mark required field as found
-			if field.Required {
-				foundRequiredFields[key] = true
-			}
-		} else {
-			return fmt.Errorf("expected field to be marshaller.Node, got %s", field.Field.Type())
-		}
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	var validationErrs []error
+
+	for _, jobValidationErrs := range jobValidationErrs {
+		validationErrs = append(validationErrs, jobValidationErrs...)
+	}
+
+	var mapContent []*yaml.Node
+	for _, jobMapContent := range jobMapContent {
+		mapContent = append(mapContent, jobMapContent...)
 	}
 
 	// Check for missing required fields
 	for tag := range requiredFields {
-		if !foundRequiredFields[tag] {
-			unmarshallable.AddValidationError(validation.NewNodeError(fmt.Sprintf("field %s is missing", tag), node))
-			valid = false
+		if _, ok := foundRequiredFields.Load(tag); !ok {
+			validationErrs = append(validationErrs, validation.NewNodeError(validation.NewMissingFieldError("field %s is missing", tag), resolvedNode))
 		}
 	}
 
-	unmarshallable.SetValid(valid)
-
-	return nil
-}
-
-func UnmarshalKeyValuePair(ctx context.Context, keyNode, valueNode *yaml.Node, outValue any) error {
-	out := reflect.ValueOf(outValue)
-
-	if implementsInterface[NodeMutator](out) {
-		return unmarshalNode(ctx, keyNode, valueNode, "value", out)
-	} else {
-		return Unmarshal(ctx, valueNode, outValue)
-	}
-}
-
-func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) error {
-	switch {
-	case out.Type() == reflect.TypeOf((*yaml.Node)(nil)):
-		out.Set(reflect.ValueOf(node))
-		return nil
-	case out.Type() == reflect.TypeOf(yaml.Node{}):
-		out.Set(reflect.ValueOf(*node))
-		return nil
-	}
-
-	if implementsInterface[Unmarshallable](out) {
-		if out.Kind() != reflect.Ptr {
-			out = out.Addr()
+	if embeddedMap != nil {
+		mapNode.Content = mapContent
+		embeddedMapValidationErrs, err := unmarshalSequencedMap(ctx, mapNode, embeddedMap)
+		if err != nil {
+			return nil, err
 		}
-
-		if out.IsNil() {
-			out.Set(reflect.New(out.Type().Elem()))
-		}
-
-		unmarshallable, ok := out.Interface().(Unmarshallable)
-		if !ok {
-			return fmt.Errorf("expected Unmarshallable, got %s", out.Type())
-		}
-
-		return unmarshallable.Unmarshal(ctx, node)
+		validationErrs = append(validationErrs, embeddedMapValidationErrs...)
 	}
 
-	switch node.Kind {
-	case yaml.MappingNode:
-		return unmarshalMapping(ctx, node, out)
-	case yaml.ScalarNode:
-		return node.Decode(out.Addr().Interface())
-	case yaml.SequenceNode:
-		return unmarshalSequence(ctx, node, out)
-	case yaml.AliasNode:
-		return fmt.Errorf("currently unsupported node kind: %v", node.Kind)
-	default:
-		return fmt.Errorf("invalid node kind: %v", node.Kind)
-	}
+	// Use the errors to determine the validity of the model
+	unmarshallable.DetermineValidity(validationErrs)
+
+	return validationErrs, nil
 }
 
-func unmarshalMapping(ctx context.Context, node *yaml.Node, out reflect.Value) error {
-	if out.Kind() == reflect.Ptr {
-		out.Set(reflect.New(out.Type().Elem()))
-		out = out.Elem()
-	}
-
-	switch {
-	case out.Kind() == reflect.Struct:
-		if implementsInterface[CoreModeler](out) {
-			return UnmarshalModel(ctx, node, out.Addr().Interface())
-		} else {
-			return unmarshalStruct(ctx, node, out.Addr().Interface())
-		}
-	case out.Kind() == reflect.Map:
-		return fmt.Errorf("currently unsupported out kind: %v", out.Kind())
-	default:
-		return fmt.Errorf("expected struct or map, got %s", out.Kind())
-	}
+func unmarshalStruct(ctx context.Context, node *yaml.Node, structPtr any) ([]error, error) {
+	return decodeNode(ctx, node, structPtr)
 }
 
-func unmarshalStruct(_ context.Context, node *yaml.Node, structPtr any) error {
-	// TODO do we need a custom implementation for this? This implementation will treat any child of a normal struct as also a normal struct unless it implements a custom unmarshaller
-	return node.Decode(structPtr)
+func decodeNode(_ context.Context, node *yaml.Node, out any) ([]error, error) {
+	resolvedNode := yml.ResolveAlias(node)
+	if resolvedNode == nil {
+		return nil, fmt.Errorf("node is nil")
+	}
+
+	// Attempt to decode the node
+	err := resolvedNode.Decode(out)
+	if err == nil {
+		return nil, nil // Success
+	}
+
+	// Check if this is a type mismatch error
+	if isTypeMismatchError(err) {
+		// Convert type mismatch to validation error
+		validationErr := validation.NewNodeError(validation.NewTypeMismatchError(err.Error()), resolvedNode)
+		return []error{validationErr}, nil
+	}
+
+	// For all other errors (syntax, etc.), return as standard error
+	return nil, err
 }
 
-func unmarshalSequence(ctx context.Context, node *yaml.Node, out reflect.Value) error {
+func unmarshalSequence(ctx context.Context, node *yaml.Node, out reflect.Value) ([]error, error) {
+	resolvedNode := yml.ResolveAlias(node)
+
 	if out.Kind() != reflect.Slice {
-		return fmt.Errorf("expected slice, got %s", out.Kind())
+		return nil, fmt.Errorf("expected slice, got %s (type: %s) at line %d, column %d", out.Kind(), out.Type(), resolvedNode.Line, resolvedNode.Column)
 	}
 
-	out.Set(reflect.MakeSlice(out.Type(), len(node.Content), len(node.Content)))
+	out.Set(reflect.MakeSlice(out.Type(), len(resolvedNode.Content), len(resolvedNode.Content)))
 
-	for i := 0; i < len(node.Content); i++ {
-		valueNode := node.Content[i]
+	g, ctx := errgroup.WithContext(ctx)
 
-		if err := unmarshal(ctx, valueNode, out.Index(i)); err != nil {
-			return err
-		}
+	numJobs := len(resolvedNode.Content)
+
+	jobValidationErrs := make([][]error, numJobs)
+
+	for i := 0; i < numJobs; i++ {
+		i := i
+		g.Go(func() error {
+			valueNode := resolvedNode.Content[i]
+
+			elementValidationErrs, err := unmarshal(ctx, valueNode, out.Index(i))
+			if err != nil {
+				return err
+			}
+			jobValidationErrs[i] = append(jobValidationErrs[i], elementValidationErrs...)
+			return nil
+		})
 	}
 
-	return nil
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	var validationErrs []error
+
+	for _, jobValidationErrs := range jobValidationErrs {
+		validationErrs = append(validationErrs, jobValidationErrs...)
+	}
+
+	return validationErrs, nil
 }
 
-func unmarshalNode(ctx context.Context, keyNode, valueNode *yaml.Node, fieldName string, out reflect.Value) error {
+func unmarshalNode(ctx context.Context, keyNode, valueNode *yaml.Node, fieldName string, out reflect.Value) ([]error, error) {
 	ref := out
+	resolvedKeyNode := yml.ResolveAlias(keyNode)
 
 	if out.Kind() != reflect.Ptr {
 		if out.CanSet() {
@@ -277,17 +518,18 @@ func unmarshalNode(ctx context.Context, keyNode, valueNode *yaml.Node, fieldName
 			out.Set(reflect.New(out.Type().Elem()))
 			ref = out.Elem().Addr()
 		} else {
-			return fmt.Errorf("field %s is a nil pointer and cannot be set", fieldName)
+			return nil, fmt.Errorf("field %s is a nil pointer and cannot be set at line %d, column %d", fieldName, resolvedKeyNode.Line, resolvedKeyNode.Column)
 		}
 	}
 
 	unmarshallable, ok := ref.Interface().(NodeMutator)
 	if !ok {
-		return fmt.Errorf("expected field to be marshaller.Node, got %s", ref.Type())
+		return nil, fmt.Errorf("expected field '%s' to be marshaller.Node, got %s at line %d, column %d", fieldName, ref.Type(), resolvedKeyNode.Line, resolvedKeyNode.Column)
 	}
 
-	if err := unmarshallable.Unmarshal(ctx, keyNode, valueNode); err != nil {
-		return err
+	validationErrs, err := unmarshallable.Unmarshal(ctx, keyNode, valueNode)
+	if err != nil {
+		return nil, err
 	}
 
 	// Fix: Only set the value if the original field can be set
@@ -304,7 +546,7 @@ func unmarshalNode(ctx context.Context, keyNode, valueNode *yaml.Node, fieldName
 		}
 	}
 
-	return nil
+	return validationErrs, nil
 }
 
 func implementsInterface[T any](out reflect.Value) bool {
@@ -326,4 +568,54 @@ func implementsInterface[T any](out reflect.Value) bool {
 	}
 
 	return out.Type().Implements(reflect.TypeOf((*T)(nil)).Elem())
+}
+
+func isEmbeddedSequencedMap(out reflect.Value) bool {
+	return implementsInterface[sequencedMapInterface](out) && implementsInterface[CoreModeler](out)
+}
+
+// isStructType checks if the reflect.Value represents a struct type (direct or pointer to struct)
+func isStructType(out reflect.Value) bool {
+	return out.Kind() == reflect.Struct || (out.Kind() == reflect.Ptr && out.Type().Elem().Kind() == reflect.Struct)
+}
+
+// isSliceType checks if the reflect.Value represents a slice type (direct or pointer to slice)
+func isSliceType(out reflect.Value) bool {
+	return out.Kind() == reflect.Slice || (out.Kind() == reflect.Ptr && out.Type().Elem().Kind() == reflect.Slice)
+}
+
+// isMapType checks if the reflect.Value represents a map type (direct or pointer to map)
+func isMapType(out reflect.Value) bool {
+	return out.Kind() == reflect.Map || (out.Kind() == reflect.Ptr && out.Type().Elem().Kind() == reflect.Map)
+}
+
+// validateNodeKind checks if the node kind matches the expected kind and returns appropriate error
+func validateNodeKind(resolvedNode *yaml.Node, expectedKind yaml.Kind, expectedType string) ([]error, error) {
+	if resolvedNode.Kind != expectedKind {
+		expectedKindStr := yml.NodeKindToString(expectedKind)
+		actualKindStr := yml.NodeKindToString(resolvedNode.Kind)
+
+		return []error{
+			validation.NewNodeError(validation.NewTypeMismatchError("expected %s for %s, got %s",
+				expectedKindStr, expectedType, actualKindStr), resolvedNode),
+		}, nil
+	}
+	return nil, nil
+}
+
+// isTypeMismatchError checks if the error is a YAML type mismatch error
+// using proper type checking instead of string matching
+func isTypeMismatchError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check if it's a yaml.TypeError directly
+	if _, ok := err.(*yaml.TypeError); ok {
+		return true
+	}
+
+	// Check using errors.As for wrapped errors
+	var yamlTypeErr *yaml.TypeError
+	return errors.As(err, &yamlTypeErr)
 }

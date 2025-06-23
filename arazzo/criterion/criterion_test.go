@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/arazzo/criterion"
-	"github.com/speakeasy-api/openapi/arazzo/expression"
+	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"

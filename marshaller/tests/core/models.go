@@ -1,0 +1,153 @@
+package core
+
+import (
+	"context"
+
+	"github.com/speakeasy-api/openapi/extensions/core"
+	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/sequencedmap"
+	valuescore "github.com/speakeasy-api/openapi/values/core"
+	"gopkg.in/yaml.v3"
+)
+
+// TestPrimitiveModel covers all primitive marshaller.Node field types
+type TestPrimitiveModel struct {
+	marshaller.CoreModel
+	StringField     marshaller.Node[string]   `key:"stringField"`
+	StringPtrField  marshaller.Node[*string]  `key:"stringPtrField"`
+	BoolField       marshaller.Node[bool]     `key:"boolField"`
+	BoolPtrField    marshaller.Node[*bool]    `key:"boolPtrField"`
+	IntField        marshaller.Node[int]      `key:"intField"`
+	IntPtrField     marshaller.Node[*int]     `key:"intPtrField"`
+	Float64Field    marshaller.Node[float64]  `key:"float64Field"`
+	Float64PtrField marshaller.Node[*float64] `key:"float64PtrField"`
+	Extensions      core.Extensions           `key:"extensions"`
+}
+
+// TestRequiredPointerModel specifically tests required pointer field behavior
+type TestRequiredPointerModel struct {
+	marshaller.CoreModel
+	RequiredPtr marshaller.Node[*string] `key:"requiredPtr" required:"true"`
+	OptionalPtr marshaller.Node[*string] `key:"optionalPtr"`
+	Extensions  core.Extensions          `key:"extensions"`
+}
+
+// TestComplexModel covers complex marshaller.Node field types
+type TestComplexModel struct {
+	marshaller.CoreModel
+	NestedModel            marshaller.Node[*TestPrimitiveModel]                                `key:"nestedModel"`
+	NestedModelValue       marshaller.Node[TestPrimitiveModel]                                 `key:"nestedModelValue"`
+	ArrayField             marshaller.Node[[]string]                                           `key:"arrayField"`
+	NodeArrayField         marshaller.Node[[]marshaller.Node[string]]                          `key:"nodeArrayField"`
+	StructArrayField       marshaller.Node[[]*TestPrimitiveModel]                              `key:"structArrayField"`
+	MapPrimitiveField      marshaller.Node[*sequencedmap.Map[string, string]]                  `key:"mapField"`
+	MapNodeField           marshaller.Node[*sequencedmap.Map[string, marshaller.Node[string]]] `key:"mapNodeField"`
+	MapStructField         marshaller.Node[*sequencedmap.Map[string, *TestPrimitiveModel]]     `key:"mapStructField"`
+	EitherField            marshaller.Node[*valuescore.EitherValue[string, int]]               `key:"eitherField"`
+	EitherModelOrPrimitive marshaller.Node[*valuescore.EitherValue[TestPrimitiveModel, int]]   `key:"eitherModelOrPrimitive" required:"true"`
+	RawNodeField           marshaller.Node[*yaml.Node]                                         `key:"rawNodeField"`
+	ValueField             marshaller.Node[valuescore.Value]                                   `key:"valueField"`
+	ValuesField            marshaller.Node[[]marshaller.Node[valuescore.Value]]                `key:"valuesField"`
+	Extensions             core.Extensions                                                     `key:"extensions"`
+}
+
+// TestEmbeddedMapModel covers embedded sequenced map scenarios with no extra fields
+type TestEmbeddedMapModel struct {
+	marshaller.CoreModel
+	*sequencedmap.Map[string, marshaller.Node[string]]
+}
+
+// TestEmbeddedMapWithFieldsModel covers embedded sequenced map with additional fields
+type TestEmbeddedMapWithFieldsModel struct {
+	marshaller.CoreModel
+	*sequencedmap.Map[string, marshaller.Node[*TestPrimitiveModel]]
+	NameField  marshaller.Node[string] `key:"name"`
+	Extensions core.Extensions         `key:"extensions"`
+}
+
+// TestEmbeddedMapWithExtensionsModel covers embedded sequenced map with extensions only
+type TestEmbeddedMapWithExtensionsModel struct {
+	marshaller.CoreModel
+	*sequencedmap.Map[string, marshaller.Node[string]]
+	Extensions core.Extensions `key:"extensions"`
+}
+
+// TestNonCoreModel represents a normal Go struct (not implementing CoreModeler)
+type TestNonCoreModel struct {
+	Name        string  `json:"name"`
+	Value       int     `json:"value"`
+	Description *string `json:"description,omitempty"`
+}
+
+// TestCustomUnmarshalModel implements custom Unmarshal method
+type TestCustomUnmarshalModel struct {
+	marshaller.CoreModel
+	CustomField marshaller.Node[string] `key:"customField"`
+	Extensions  core.Extensions         `key:"extensions"`
+
+	// Custom state for testing
+	UnmarshalCalled bool
+}
+
+// Unmarshal implements custom unmarshalling logic
+func (m *TestCustomUnmarshalModel) Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error) {
+	m.UnmarshalCalled = true
+
+	// Use standard unmarshalling for the base
+	return marshaller.UnmarshalModel(ctx, node, m)
+}
+
+// TestEitherValueModel covers EitherValue scenarios
+type TestEitherValueModel struct {
+	marshaller.CoreModel
+	StringOrInt    marshaller.Node[*valuescore.EitherValue[string, int]]                `key:"stringOrInt"`
+	ArrayOrString  marshaller.Node[*valuescore.EitherValue[[]string, string]]           `key:"arrayOrString"`
+	StructOrString marshaller.Node[*valuescore.EitherValue[TestPrimitiveModel, string]] `key:"structOrString"`
+	Extensions     core.Extensions                                                      `key:"extensions"`
+}
+
+// TestValidationModel covers field validation scenarios
+type TestValidationModel struct {
+	marshaller.CoreModel
+	RequiredField  marshaller.Node[string]              `key:"requiredField" required:"true"`
+	OptionalField  marshaller.Node[*string]             `key:"optionalField"`
+	RequiredArray  marshaller.Node[[]string]            `key:"requiredArray" required:"true"`
+	OptionalArray  marshaller.Node[[]string]            `key:"optionalArray"`
+	RequiredStruct marshaller.Node[*TestPrimitiveModel] `key:"requiredStruct" required:"true"`
+	OptionalStruct marshaller.Node[*TestPrimitiveModel] `key:"optionalStruct"`
+	Extensions     core.Extensions                      `key:"extensions"`
+}
+
+// TestAliasModel covers alias scenarios
+type TestAliasModel struct {
+	marshaller.CoreModel
+	AliasField  marshaller.Node[string]              `key:"aliasField"`
+	AliasArray  marshaller.Node[[]string]            `key:"aliasArray"`
+	AliasStruct marshaller.Node[*TestPrimitiveModel] `key:"aliasStruct"`
+	Extensions  core.Extensions                      `key:"extensions"`
+}
+
+// TestRequiredNilableModel specifically tests required tag with nilable types
+type TestRequiredNilableModel struct {
+	marshaller.CoreModel
+	RequiredPtr     marshaller.Node[*string]                              `key:"requiredPtr" required:"true"`
+	RequiredSlice   marshaller.Node[[]string]                             `key:"requiredSlice" required:"true"`
+	RequiredMap     marshaller.Node[*sequencedmap.Map[string, string]]    `key:"requiredMap" required:"true"`
+	RequiredStruct  marshaller.Node[*TestPrimitiveModel]                  `key:"requiredStruct" required:"true"`
+	RequiredEither  marshaller.Node[*valuescore.EitherValue[string, int]] `key:"requiredEither" required:"true"`
+	RequiredRawNode marshaller.Node[*yaml.Node]                           `key:"requiredRawNode" required:"true"`
+	OptionalPtr     marshaller.Node[*string]                              `key:"optionalPtr"`
+	OptionalSlice   marshaller.Node[[]string]                             `key:"optionalSlice"`
+	OptionalMap     marshaller.Node[*sequencedmap.Map[string, string]]    `key:"optionalMap"`
+	OptionalStruct  marshaller.Node[*TestPrimitiveModel]                  `key:"optionalStruct"`
+	Extensions      core.Extensions                                       `key:"extensions"`
+}
+
+// TestTypeConversionCoreModel represents core model with string keys (like openapi/core/paths.go)
+// This simulates the issue where core uses string keys but high-level model expects HTTPMethod keys
+type TestTypeConversionCoreModel struct {
+	marshaller.CoreModel
+	*sequencedmap.Map[string, marshaller.Node[*TestPrimitiveModel]]
+	HTTPMethodField marshaller.Node[*string] `key:"httpMethodField"`
+	Extensions      core.Extensions          `key:"extensions"`
+}

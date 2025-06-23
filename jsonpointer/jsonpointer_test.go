@@ -553,3 +553,89 @@ func TestGetTarget_WithInterfaces_Error(t *testing.T) {
 		})
 	}
 }
+
+func TestEscapeString_Success(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "no special characters",
+			input:    "hello",
+			expected: "hello",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "tilde only",
+			input:    "~",
+			expected: "~0",
+		},
+		{
+			name:     "slash only",
+			input:    "/",
+			expected: "~1",
+		},
+		{
+			name:     "both tilde and slash",
+			input:    "~/",
+			expected: "~0~1",
+		},
+		{
+			name:     "slash then tilde",
+			input:    "/~",
+			expected: "~1~0",
+		},
+		{
+			name:     "multiple tildes",
+			input:    "~~",
+			expected: "~0~0",
+		},
+		{
+			name:     "multiple slashes",
+			input:    "//",
+			expected: "~1~1",
+		},
+		{
+			name:     "complex string with path-like structure",
+			input:    "a/b~c",
+			expected: "a~1b~0c",
+		},
+		{
+			name:     "string with mixed characters",
+			input:    "hello/world~test",
+			expected: "hello~1world~0test",
+		},
+		{
+			name:     "RFC6901 example - a/b",
+			input:    "a/b",
+			expected: "a~1b",
+		},
+		{
+			name:     "RFC6901 example - m~n",
+			input:    "m~n",
+			expected: "m~0n",
+		},
+		{
+			name:     "edge case - ~01 sequence",
+			input:    "~01",
+			expected: "~001",
+		},
+		{
+			name:     "edge case - ~10 sequence",
+			input:    "~10",
+			expected: "~010",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := EscapeString(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

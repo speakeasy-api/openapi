@@ -9,9 +9,9 @@ type Step struct {
 	marshaller.CoreModel
 	StepID          marshaller.Node[string]                      `key:"stepId"`
 	Description     marshaller.Node[*string]                     `key:"description"`
-	OperationID     marshaller.Node[*Expression]                 `key:"operationId"`
+	OperationID     marshaller.Node[*string]                     `key:"operationId"`
 	OperationPath   marshaller.Node[*string]                     `key:"operationPath"`
-	WorkflowID      marshaller.Node[*Expression]                 `key:"workflowId"`
+	WorkflowID      marshaller.Node[*string]                     `key:"workflowId"`
 	Parameters      marshaller.Node[[]*Reusable[*Parameter]]     `key:"parameters"`
 	RequestBody     marshaller.Node[*RequestBody]                `key:"requestBody"`
 	SuccessCriteria marshaller.Node[[]*Criterion]                `key:"successCriteria"`

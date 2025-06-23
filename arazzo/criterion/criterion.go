@@ -8,7 +8,7 @@ import (
 
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
 	"github.com/speakeasy-api/openapi/arazzo/core"
-	"github.com/speakeasy-api/openapi/arazzo/expression"
+	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
@@ -52,14 +52,14 @@ type CriterionExpressionType struct {
 // Validate will validate the criterion expression type object against the Arazzo specification.
 func (c *CriterionExpressionType) Validate(opts ...validation.Option) []error {
 	core := c.GetCore()
-	errs := core.GetValidationErrors()
+	errs := []error{}
 
 	switch c.Type {
 	case CriterionTypeJsonPath:
 		switch c.Version {
 		case CriterionTypeVersionDraftGoesnerDispatchJsonPath00:
 		default:
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionDraftGoesnerDispatchJsonPath00)}, ", ")), core, core.Version))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionDraftGoesnerDispatchJsonPath00)}, ", ")), core, core.Version))
 		}
 	case CriterionTypeXPath:
 		switch c.Version {
@@ -67,10 +67,10 @@ func (c *CriterionExpressionType) Validate(opts ...validation.Option) []error {
 		case CriterionTypeVersionXPath20:
 		case CriterionTypeVersionXPath10:
 		default:
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionXPath30), string(CriterionTypeVersionXPath20), string(CriterionTypeVersionXPath10)}, ", ")), core, core.Version))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionXPath30), string(CriterionTypeVersionXPath20), string(CriterionTypeVersionXPath10)}, ", ")), core, core.Version))
 		}
 	default:
-		errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("type must be one of [%s]", strings.Join([]string{string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
 	}
 
 	if len(errs) == 0 {
@@ -187,10 +187,10 @@ func (c *Criterion) GetCondition() (*Condition, error) {
 // Validate will validate the criterion object against the Arazzo specification.
 func (c *Criterion) Validate(opts ...validation.Option) []error {
 	core := c.GetCore()
-	errs := core.GetValidationErrors()
+	errs := []error{}
 
 	if c.Condition == "" {
-		errs = append(errs, validation.NewValueError("condition is required", core, core.Condition))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("condition is required"), core, core.Condition))
 	}
 
 	if c.Type.Type != nil {
@@ -200,19 +200,19 @@ func (c *Criterion) Validate(opts ...validation.Option) []error {
 		case CriterionTypeJsonPath:
 		case CriterionTypeXPath:
 		default:
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{string(CriterionTypeSimple), string(CriterionTypeRegex), string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("type must be one of [%s]", strings.Join([]string{string(CriterionTypeSimple), string(CriterionTypeRegex), string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
 		}
 	} else if c.Type.ExpressionType != nil {
 		errs = append(errs, c.Type.ExpressionType.Validate(opts...)...)
 	}
 
 	if c.Type.IsTypeProvided() && c.Context == nil {
-		errs = append(errs, validation.NewValueError("context is required, if type is set", core, core.Context))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("context is required, if type is set"), core, core.Context))
 	}
 
 	if c.Context != nil {
 		if err := c.Context.Validate(true); err != nil {
-			errs = append(errs, validation.NewValueError(err.Error(), core, core.Context))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Context))
 		}
 	}
 
@@ -226,8 +226,8 @@ func (c *Criterion) Validate(opts ...validation.Option) []error {
 }
 
 func (c *Criterion) validateCondition(opts ...validation.Option) []error {
-	errs := []error{}
 	core := c.GetCore()
+	errs := []error{}
 
 	conditionLine := core.Condition.GetValueNodeOrRoot(core.RootNode).Line
 	conditionColumn := core.Condition.GetValueNodeOrRoot(core.RootNode).Column
@@ -236,18 +236,18 @@ func (c *Criterion) validateCondition(opts ...validation.Option) []error {
 	case CriterionTypeSimple:
 		cond, err := newCondition(c.Condition)
 		if err != nil && c.Context == nil {
-			errs = append(errs, validation.NewValueError(err.Error(), core, core.Condition))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Condition))
 		} else if cond != nil {
 			errs = append(errs, cond.Validate(conditionLine, conditionColumn, opts...)...)
 		}
 	case CriterionTypeRegex:
 		_, err := regexp.Compile(c.Condition)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(fmt.Errorf("invalid regex expression: %w", err).Error(), core, core.Condition))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("invalid regex expression: %s", err.Error()), core, core.Condition))
 		}
 	case CriterionTypeJsonPath:
 		if _, err := jsonpath.NewPath(c.Condition); err != nil {
-			errs = append(errs, validation.NewValueError(fmt.Errorf("invalid jsonpath expression: %w", err).Error(), core, core.Condition))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("invalid jsonpath expression: %s", err), core, core.Condition))
 		}
 	case CriterionTypeXPath:
 		// TODO validate xpath

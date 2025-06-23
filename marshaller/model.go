@@ -53,6 +53,12 @@ func (m *Model[T]) GetCore() *T {
 	return &m.core
 }
 
+// GetCoreAny will return the low level representation of the model untyped.
+// Useful for using with interfaces and reflection.
+func (m *Model[T]) GetCoreAny() any {
+	return &m.core
+}
+
 // GetRootNode implements RootNodeAccessor interface by delegating to the core model.
 //
 // This method provides access to the unique YAML node that was originally parsed for this

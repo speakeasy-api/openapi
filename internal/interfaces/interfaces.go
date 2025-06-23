@@ -18,5 +18,5 @@ type Model[C any] interface {
 }
 
 type CoreModel interface {
-	Unmarshal(ctx context.Context, node *yaml.Node) error
+	Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error)
 }

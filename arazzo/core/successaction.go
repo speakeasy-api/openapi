@@ -9,7 +9,7 @@ type SuccessAction struct {
 	marshaller.CoreModel
 	Name       marshaller.Node[string]       `key:"name"`
 	Type       marshaller.Node[string]       `key:"type"`
-	WorkflowID marshaller.Node[*Expression]  `key:"workflowId"`
+	WorkflowID marshaller.Node[*string]      `key:"workflowId"`
 	StepID     marshaller.Node[*string]      `key:"stepId"`
 	Criteria   marshaller.Node[[]*Criterion] `key:"criteria"`
 	Extensions core.Extensions               `key:"extensions"`

@@ -3,6 +3,21 @@ package marshaller
 import (
 	"fmt"
 	"reflect"
+
+	"gopkg.in/yaml.v3"
+)
+
+// Pre-computed reflection types for performance
+var (
+	nodeAccessorType   = reflect.TypeOf((*NodeAccessor)(nil)).Elem()
+	populatorType      = reflect.TypeOf((*Populator)(nil)).Elem()
+	sequencedMapType   = reflect.TypeOf((*sequencedMapInterface)(nil)).Elem()
+	coreModelerType    = reflect.TypeOf((*CoreModeler)(nil)).Elem()
+	yamlNodePtrType    = reflect.TypeOf((*yaml.Node)(nil))
+	yamlNodeType       = reflect.TypeOf(yaml.Node{})
+	yamlNodePtrPtrType = reflect.TypeOf((**yaml.Node)(nil))
+	populatorValueTag  = "populatorValue"
+	populatorValueTrue = "true"
 )
 
 type Populator interface {
@@ -13,15 +28,34 @@ func Populate(source any, target any) error {
 	t := reflect.ValueOf(target)
 
 	if t.Kind() == reflect.Ptr && t.IsNil() {
-		t.Set(reflect.New(t.Type().Elem()))
+		t.Set(CreateInstance(t.Type().Elem()))
 	}
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 
 	s := reflect.ValueOf(source)
-	if s.Type().Implements(reflect.TypeOf((*NodeAccessor)(nil)).Elem()) {
+	if s.Type().Implements(nodeAccessorType) {
 		source = source.(NodeAccessor).GetValue()
+	}
+
+	// Special case for yaml.Node conversion (similar to unmarshaller.go:216-223)
+	switch {
+	case t.Type() == yamlNodePtrType:
+		if node, ok := source.(yaml.Node); ok {
+			t.Set(reflect.ValueOf(&node))
+			return nil
+		}
+	case t.Type() == yamlNodeType:
+		if node, ok := source.(*yaml.Node); ok {
+			t.Set(reflect.ValueOf(*node))
+			return nil
+		}
+	case t.Type() == yamlNodePtrPtrType:
+		if node, ok := source.(*yaml.Node); ok {
+			t.Set(reflect.ValueOf(&node))
+			return nil
+		}
 	}
 
 	return populateValue(source, t)
@@ -38,7 +72,7 @@ func populateModel(source any, target any) error {
 		s = s.Elem()
 	}
 	if t.Kind() == reflect.Ptr && t.IsNil() {
-		t.Set(reflect.New(t.Type().Elem()))
+		t.Set(CreateInstance(t.Type().Elem()))
 	}
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -48,18 +82,31 @@ func populateModel(source any, target any) error {
 		return fmt.Errorf("expected struct, got %s", s.Kind())
 	}
 
-	for i := 0; i < s.NumField(); i++ {
-		field := s.Type().Field(i)
+	sType := s.Type()
+	numFields := s.NumField()
+
+	for i := 0; i < numFields; i++ {
+		field := sType.Field(i)
 		if !field.IsExported() {
 			continue
 		}
 
-		tField := t.FieldByName(field.Name)
+		useFieldValue := field.Tag.Get(populatorValueTag) == populatorValueTrue
+		tField := t.FieldByIndex(field.Index)
 		if !tField.IsValid() {
 			continue
 		}
 
 		fieldVal := s.Field(i)
+
+		if field.Anonymous {
+			if implementsInterface[sequencedMapInterface](fieldVal) {
+				useFieldValue = true
+			} else {
+				continue
+			}
+		}
+
 		if fieldVal.Kind() == reflect.Ptr {
 			if fieldVal.IsNil() {
 				continue
@@ -73,16 +120,18 @@ func populateModel(source any, target any) error {
 		if field.Name == "Extensions" {
 			sem, ok := fieldInt.(ExtensionCoreMap)
 			if !ok {
-				return fmt.Errorf("expected ExtensionCoreMap, got %v", fieldVal.Type())
+				return fmt.Errorf("expected ExtensionCoreMap, got %v (interface type: %v, field name: %s.%s)",
+					fieldVal.Type(), reflect.TypeOf(fieldInt), sType.Name(), field.Name)
 			}
 
 			if tField.Kind() == reflect.Ptr {
-				tField.Set(reflect.New(tField.Type().Elem()))
+				tField.Set(CreateInstance(tField.Type().Elem()))
 			}
 
 			tem, ok := tField.Interface().(ExtensionMap)
 			if !ok {
-				return fmt.Errorf("expected ExtensionMap, got %v", tField.Type())
+				return fmt.Errorf("expected ExtensionMap, got %v (interface type: %v, target field: %s)",
+					tField.Type(), reflect.TypeOf(tField.Interface()), field.Name)
 			}
 			tem.Init()
 
@@ -97,7 +146,7 @@ func populateModel(source any, target any) error {
 
 		var nodeValue any
 
-		if field.Tag.Get("populatorValue") == "true" {
+		if useFieldValue {
 			nodeValue = fieldInt
 		} else {
 			nodeAccessor, ok := fieldInt.(NodeAccessor)
@@ -118,20 +167,34 @@ func populateModel(source any, target any) error {
 
 func populateValue(source any, target reflect.Value) error {
 	value := reflect.ValueOf(source)
+	valueType := value.Type()
+	valueKind := value.Kind()
 
-	if value.Kind() == reflect.Ptr && value.IsNil() && target.Kind() == reflect.Ptr {
+	// Skip NodeAccessor check if already extracted in Populate()
+	if valueType.Implements(nodeAccessorType) {
+		source = source.(NodeAccessor).GetValue()
+		value = reflect.ValueOf(source)
+	}
+
+	if valueKind == reflect.Ptr && value.IsNil() && target.Kind() == reflect.Ptr {
 		target.Set(reflect.Zero(target.Type()))
 		return nil
 	}
 
 	if target.Kind() == reflect.Ptr {
-		target.Set(reflect.New(target.Type().Elem()))
+		target.Set(CreateInstance(target.Type().Elem()))
 	} else {
 		target = target.Addr()
 	}
 
-	if target.Type().Implements(reflect.TypeOf((*Populator)(nil)).Elem()) {
+	targetType := target.Type()
+	if targetType.Implements(populatorType) {
 		return target.Interface().(Populator).Populate(value.Interface())
+	}
+
+	// Check if target is a sequenced map and handle it specially
+	if targetType.Implements(sequencedMapType) && !isEmbeddedSequencedMapType(value.Type()) {
+		return populateSequencedMap(value.Interface(), target.Interface().(sequencedMapInterface))
 	}
 
 	// Check if target implements CoreSetter interface
@@ -147,7 +210,7 @@ func populateValue(source any, target reflect.Value) error {
 	target = target.Elem()
 
 	valueDerefed := value
-	if value.Kind() == reflect.Ptr {
+	if valueKind == reflect.Ptr {
 		valueDerefed = value.Elem()
 	}
 
@@ -160,11 +223,25 @@ func populateValue(source any, target reflect.Value) error {
 		target.Set(reflect.MakeSlice(target.Type(), valueDerefed.Len(), valueDerefed.Len()))
 
 		for i := 0; i < valueDerefed.Len(); i++ {
-			if err := populateValue(valueDerefed.Index(i).Interface(), target.Index(i)); err != nil {
+			elementValue := valueDerefed.Index(i).Interface()
+
+			// Extract value from NodeAccessor if needed for array elements
+			if valueDerefed.Index(i).Type().Implements(nodeAccessorType) {
+				if nodeAccessor, ok := elementValue.(NodeAccessor); ok {
+					elementValue = nodeAccessor.GetValue()
+				}
+			}
+
+			if err := populateValue(elementValue, target.Index(i)); err != nil {
 				return err
 			}
 		}
 	default:
+		if !valueDerefed.IsValid() {
+			// Handle zero/invalid values
+			target.Set(reflect.Zero(target.Type()))
+			return nil
+		}
 		if valueDerefed.Type().AssignableTo(target.Type()) {
 			target.Set(valueDerefed)
 		} else if valueDerefed.CanConvert(target.Type()) {
@@ -175,4 +252,12 @@ func populateValue(source any, target reflect.Value) error {
 	}
 
 	return nil
+}
+
+func isEmbeddedSequencedMapType(t reflect.Type) bool {
+	// Check both value type and pointer type
+	implementsSequencedMap := t.Implements(sequencedMapType) || reflect.PtrTo(t).Implements(sequencedMapType)
+	implementsCoreModeler := t.Implements(coreModelerType) || reflect.PtrTo(t).Implements(coreModelerType)
+
+	return implementsSequencedMap && implementsCoreModeler
 }

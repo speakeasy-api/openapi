@@ -7,41 +7,52 @@ import (
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/validation"
+	values "github.com/speakeasy-api/openapi/values/core"
 	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
 
 type Reusable[T marshaller.CoreModeler] struct {
 	marshaller.CoreModel
-	Reference marshaller.Node[*Expression] `key:"reference"`
-	Value     marshaller.Node[Value]       `key:"value"`
-	Object    T                            `populatorValue:"true"`
+	Reference marshaller.Node[*string]      `key:"reference"`
+	Value     marshaller.Node[values.Value] `key:"value"`
+	Object    T                             `populatorValue:"true"`
 }
 
 var _ interfaces.CoreModel = (*Reusable[*Parameter])(nil)
 
-func (r *Reusable[T]) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	if node == nil {
-		return fmt.Errorf("node is nil")
+func (r *Reusable[T]) Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error) {
+	resolvedNode := yml.ResolveAlias(node)
+
+	if resolvedNode == nil {
+		return nil, fmt.Errorf("node is nil")
 	}
 
-	if node.Kind != yaml.MappingNode {
-		return fmt.Errorf("expected mapping node, got %v", node.Kind)
+	if resolvedNode.Kind != yaml.MappingNode {
+		r.SetValid(false, false)
+
+		r.SetValid(false, false)
+
+		return []error{
+			validation.NewNodeError(validation.NewTypeMismatchError("expected mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+		}, nil
 	}
 
-	if _, _, ok := yml.GetMapElementNodes(ctx, node, "reference"); ok {
+	if _, _, ok := yml.GetMapElementNodes(ctx, resolvedNode, "reference"); ok {
 		return marshaller.UnmarshalModel(ctx, node, r)
 	}
 
 	var obj T
-	if err := marshaller.Unmarshal(ctx, node, &obj); err != nil {
-		return err
+	validationErrs, err := marshaller.UnmarshalCore(ctx, node, &obj)
+	if err != nil {
+		return nil, err
 	}
 
 	r.Object = obj
-	r.SetValid(true)
+	r.DetermineValidity(validationErrs)
 
-	return nil
+	return validationErrs, nil
 }
 
 func (r *Reusable[T]) SyncChanges(ctx context.Context, model any, valueNode *yaml.Node) (*yaml.Node, error) {
@@ -62,7 +73,7 @@ func (r *Reusable[T]) SyncChanges(ctx context.Context, model any, valueNode *yam
 		if err != nil {
 			return nil, err
 		}
-		r.SetValid(true)
+		r.SetValid(true, true)
 	} else {
 		var err error
 		valueNode, err = marshaller.SyncValue(ctx, of.Interface(), &r.Object, valueNode, false)
@@ -71,7 +82,7 @@ func (r *Reusable[T]) SyncChanges(ctx context.Context, model any, valueNode *yam
 		}
 
 		// We are valid if the object is valid
-		r.SetValid(r.Object.GetValid())
+		r.SetValid(r.Object.GetValid(), r.Object.GetValidYaml())
 	}
 
 	r.SetRootNode(valueNode)

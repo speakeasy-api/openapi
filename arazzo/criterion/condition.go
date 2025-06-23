@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/speakeasy-api/openapi/arazzo/expression"
+	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -81,17 +81,17 @@ func (s *Condition) Validate(line, column int, opts ...validation.Option) []erro
 
 	if s.Expression == "" {
 		errs = append(errs, &validation.Error{
-			Message: "expression is required",
-			Line:    line,
-			Column:  column,
+			UnderlyingError: validation.NewMissingValueError("expression is required"),
+			Line:            line,
+			Column:          column,
 		})
 	}
 
 	if err := s.Expression.Validate(true); err != nil {
 		errs = append(errs, &validation.Error{
-			Message: err.Error(),
-			Line:    line,
-			Column:  column,
+			UnderlyingError: validation.NewValueValidationError(err.Error()),
+			Line:            line,
+			Column:          column,
 		})
 	}
 
@@ -99,17 +99,17 @@ func (s *Condition) Validate(line, column int, opts ...validation.Option) []erro
 	case OperatorLT, OperatorLTE, OperatorGT, OperatorGTE, OperatorEQ, OperatorNE, OperatorNot, OperatorAnd, OperatorOr:
 	default:
 		errs = append(errs, &validation.Error{
-			Message: fmt.Sprintf("operator must be one of [%s]", strings.Join([]string{string(OperatorLT), string(OperatorLTE), string(OperatorGT), string(OperatorGTE), string(OperatorEQ), string(OperatorNE), string(OperatorNot), string(OperatorAnd), string(OperatorOr)}, ", ")),
-			Line:    line,
-			Column:  column,
+			UnderlyingError: validation.NewValueValidationError("operator must be one of [%s]", strings.Join([]string{string(OperatorLT), string(OperatorLTE), string(OperatorGT), string(OperatorGTE), string(OperatorEQ), string(OperatorNE), string(OperatorNot), string(OperatorAnd), string(OperatorOr)}, ", ")),
+			Line:            line,
+			Column:          column,
 		})
 	}
 
 	if s.Value == "" {
 		errs = append(errs, &validation.Error{
-			Message: "value is required",
-			Line:    line,
-			Column:  column,
+			UnderlyingError: validation.NewMissingValueError("value is required"),
+			Line:            line,
+			Column:          column,
 		})
 	}
 

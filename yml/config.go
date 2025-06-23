@@ -28,6 +28,7 @@ type Config struct {
 	ValueStringStyle yaml.Style   // The default string style to use when creating new nodes
 	Indentation      int          // The indentation level of the document
 	OutputFormat     OutputFormat // The output format to use when marshalling
+	OriginalFormat   OutputFormat // The original input format, helps detect when we are changing formats
 }
 
 var defaultConfig = &Config{
@@ -65,8 +66,14 @@ func GetConfigFromDoc(data []byte, doc *yaml.Node) *Config {
 	cfg := *defaultConfig
 
 	cfg.OutputFormat, cfg.Indentation = inspectData(data)
+	cfg.OriginalFormat = cfg.OutputFormat
 
-	getGlobalStringStyle(doc, &cfg)
+	// Only extract string styles from the document if it's YAML
+	// For JSON input, keep the default YAML styles
+	if cfg.OriginalFormat == OutputFormatYAML {
+		getGlobalStringStyle(doc, &cfg)
+	}
+
 	return &cfg
 }
 
@@ -93,7 +100,7 @@ func inspectData(data []byte) (OutputFormat, int) {
 			docFormat = OutputFormatJSON
 			foundDocFormat = true
 		default:
-			if len(line) != len(trimLine) {
+			if len(line) != len(trimLine) && !foundIndentation {
 				indentation = len(line) - len(trimLine)
 				foundIndentation = true
 			}
@@ -146,7 +153,7 @@ func getGlobalStringStyle(doc *yaml.Node, cfg *Config) {
 		case yaml.AliasNode:
 			navigate(node.Alias)
 		default:
-			panic(fmt.Sprintf("unknown node kind: %v", node.Kind))
+			panic(fmt.Sprintf("unknown node kind: %s", NodeKindToString(node.Kind)))
 		}
 	}
 

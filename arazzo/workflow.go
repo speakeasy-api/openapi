@@ -3,11 +3,10 @@ package arazzo
 import (
 	"context"
 	"errors"
-	"fmt"
 	"regexp"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
-	"github.com/speakeasy-api/openapi/arazzo/expression"
+	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31"
@@ -76,10 +75,10 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 	opts = append(opts, validation.WithContextObject(w))
 
 	core := w.GetCore()
-	errs := core.GetValidationErrors()
+	errs := []error{}
 
 	if core.WorkflowID.Present && w.WorkflowID == "" {
-		errs = append(errs, validation.NewValueError("workflowId is required", core, core.WorkflowID))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("workflowId is required"), core, core.WorkflowID))
 	}
 
 	if w.Inputs != nil {
@@ -89,22 +88,22 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	for i, dependsOn := range w.DependsOn {
 		if err := dependsOn.Validate(false); err != nil {
-			errs = append(errs, validation.NewSliceError(err.Error(), core, core.DependsOn, i))
+			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError(err.Error()), core, core.DependsOn, i))
 		}
 
 		if dependsOn.IsExpression() {
 			typ, sourceDescriptionName, _, _ := dependsOn.GetParts()
 
 			if typ != expression.ExpressionTypeSourceDescriptions {
-				errs = append(errs, validation.NewSliceError(fmt.Sprintf("dependsOn must be a sourceDescriptions expression if not a workflowId, got %s", typ), core, core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("dependsOn must be a sourceDescriptions expression if not a workflowId, got %s", typ), core, core.DependsOn, i))
 			}
 
 			if a.SourceDescriptions.Find(sourceDescriptionName) == nil {
-				errs = append(errs, validation.NewSliceError(fmt.Sprintf("dependsOn sourceDescription %s not found", sourceDescriptionName), core, core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("dependsOn sourceDescription %s not found", sourceDescriptionName), core, core.DependsOn, i))
 			}
 		} else {
 			if a.Workflows.Find(string(dependsOn)) == nil {
-				errs = append(errs, validation.NewSliceError(fmt.Sprintf("dependsOn workflowId %s not found", dependsOn), core, core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("dependsOn workflowId %s not found", dependsOn), core, core.DependsOn, i))
 			}
 		}
 	}
@@ -123,11 +122,11 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	for name, output := range w.Outputs.All() {
 		if !outputNameRegex.MatchString(name) {
-			errs = append(errs, validation.NewMapKeyError(fmt.Sprintf("output name must be a valid name [%s]: %s", outputNameRegex.String(), name), core, core.Outputs, name))
+			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("output name must be a valid name [%s]: %s", outputNameRegex.String(), name), core, core.Outputs, name))
 		}
 
 		if err := output.Validate(true); err != nil {
-			errs = append(errs, validation.NewMapValueError(err.Error(), core, core.Outputs, name))
+			errs = append(errs, validation.NewMapValueError(validation.NewValueValidationError(err.Error()), core, core.Outputs, name))
 		}
 	}
 

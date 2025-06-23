@@ -15,7 +15,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo"
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/arazzo/criterion"
-	"github.com/speakeasy-api/openapi/arazzo/expression"
+	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/jsonschema/oas31"
@@ -292,11 +292,11 @@ sourceDescriptions:
 	require.NoError(t, err)
 
 	assert.Equal(t, []error{
-		&validation.Error{Line: 1, Column: 1, Message: "field workflows is missing"},
-		&validation.Error{Line: 1, Column: 9, Message: "only Arazzo version 1.0.1 and below is supported"},
-		&validation.Error{Line: 4, Column: 3, Message: "field version is missing"},
-		&validation.Error{Line: 6, Column: 5, Message: "field url is missing"},
-		&validation.Error{Line: 7, Column: 11, Message: "type must be one of [openapi, arazzo]"},
+		&validation.Error{Line: 1, Column: 1, UnderlyingError: validation.NewMissingFieldError("field workflows is missing")},
+		&validation.Error{Line: 1, Column: 9, UnderlyingError: validation.NewValueValidationError("only Arazzo version 1.0.1 and below is supported")},
+		&validation.Error{Line: 4, Column: 3, UnderlyingError: validation.NewMissingFieldError("field version is missing")},
+		&validation.Error{Line: 6, Column: 5, UnderlyingError: validation.NewMissingFieldError("field url is missing")},
+		&validation.Error{Line: 7, Column: 11, UnderlyingError: validation.NewValueValidationError("type must be one of [openapi, arazzo]")},
 	}, validationErrs)
 
 	expected := &arazzo.Arazzo{

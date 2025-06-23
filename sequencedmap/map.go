@@ -3,16 +3,11 @@ package sequencedmap
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"iter"
 	"reflect"
 	"slices"
-
-	"github.com/speakeasy-api/openapi/marshaller"
-	"github.com/speakeasy-api/openapi/yml"
-	"gopkg.in/yaml.v3"
 )
 
 // Element is a key-value pair that is stored in a sequenced map.
@@ -95,11 +90,67 @@ func (m *Map[K, V]) Len() int {
 
 // Set sets the value for the specified key.
 func (m *Map[K, V]) Set(key K, value V) {
-	m.m[key] = &Element[K, V]{
+	element := &Element[K, V]{
 		Key:   key,
 		Value: value,
 	}
-	m.l = append(m.l, m.m[key])
+
+	// Check if key already exists
+	if existingElement, exists := m.m[key]; exists {
+		// Update existing element in place
+		existingElement.Value = value
+	} else {
+		// Add new element
+		m.m[key] = element
+		m.l = append(m.l, element)
+	}
+}
+
+// Set with any type
+func (m *Map[K, V]) SetAny(key, value any) {
+	k, ok := key.(K)
+	if !ok {
+		return // silently ignore type mismatches
+	}
+	v, ok := value.(V)
+	if !ok {
+		return // silently ignore type mismatches
+	}
+	m.Set(k, v)
+}
+
+// Get with any type
+func (m *Map[K, V]) GetAny(key any) (any, bool) {
+	k, ok := key.(K)
+	if !ok {
+		return nil, false
+	}
+	v, found := m.Get(k)
+	return v, found
+}
+
+// Delete with any type
+func (m *Map[K, V]) DeleteAny(key any) {
+	k, ok := key.(K)
+	if !ok {
+		return // silently ignore type mismatches
+	}
+	m.Delete(k)
+}
+
+// Keys with any type
+func (m *Map[K, V]) KeysAny() iter.Seq[any] {
+	return func(yield func(any) bool) {
+		if m == nil {
+			return
+		}
+
+		for _, element := range m.l {
+			if !yield(element.Key) {
+				return
+			}
+		}
+	}
 }
 
 // SetUntyped sets the value for the specified key with untyped key and value.
@@ -108,12 +159,14 @@ func (m *Map[K, V]) Set(key K, value V) {
 func (m *Map[K, V]) SetUntyped(key, value any) error {
 	k, ok := key.(K)
 	if !ok {
-		return fmt.Errorf("expected key to be of type %T, got %T", reflect.TypeOf(k), reflect.TypeOf(key))
+		var zeroK K
+		return fmt.Errorf("expected key to be of type %T, got %T (value: %v)", zeroK, key, key)
 	}
 
 	v, ok := value.(V)
 	if !ok {
-		return fmt.Errorf("expected value to be of type %T, got %T", reflect.TypeOf(v), reflect.TypeOf(value))
+		var zeroV V
+		return fmt.Errorf("expected value to be of type %T, got %T (value: %v)", zeroV, value, value)
 	}
 
 	m.Set(k, v)
@@ -300,31 +353,6 @@ func (m *Map[K, V]) NavigateWithKey(key string) (any, error) {
 	return v, nil
 }
 
-func (m *Map[K, V]) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	m.Init()
-
-	for i := 0; i < len(node.Content); i += 2 {
-		keyNode := node.Content[i]
-		valueNode := node.Content[i+1]
-
-		key := keyNode.Value
-
-		var concreteValue V
-
-		// Unmarshal into the concrete value
-		if err := marshaller.UnmarshalKeyValuePair(ctx, keyNode, valueNode, &concreteValue); err != nil {
-			return err
-		}
-
-		// Extract the value from the pointer and set it in the map
-		if err := m.SetUntyped(key, concreteValue); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // MarshalJSON returns the JSON representation of the map.
 func (m *Map[K, V]) MarshalJSON() ([]byte, error) {
 	if m == nil {
@@ -358,105 +386,4 @@ func (m *Map[K, V]) MarshalJSON() ([]byte, error) {
 	buf.WriteString("}")
 
 	return buf.Bytes(), nil
-}
-
-func (m *Map[K, V]) Populate(source any) error {
-	if source == nil {
-		return nil
-	}
-
-	type SequencedMap interface {
-		Init()
-		SetUntyped(key, value any) error
-		AllUntyped() iter.Seq2[any, any]
-		GetValueType() reflect.Type
-	}
-
-	sourceValue := reflect.ValueOf(source)
-
-	var sm SequencedMap
-	var ok bool
-
-	// Handle both pointer and non-pointer cases
-	if sourceValue.Kind() == reflect.Ptr {
-		// Source is already a pointer
-		sm, ok = source.(SequencedMap)
-	} else if sourceValue.CanAddr() {
-		// Source is addressable, get a pointer to it
-		sm, ok = sourceValue.Addr().Interface().(SequencedMap)
-	} else {
-		// Source is neither a pointer nor addressable
-		return fmt.Errorf("expected source to be addressable or a pointer to SequencedMap, got %s", sourceValue.Type())
-	}
-
-	if !ok {
-		return fmt.Errorf("expected source to be SequencedMap, got %s", sourceValue.Type())
-	}
-
-	m.Init()
-
-	for key, value := range sm.AllUntyped() {
-		var targetValue V
-
-		if err := marshaller.Populate(value, &targetValue); err != nil {
-			return err
-		}
-		if err := m.SetUntyped(key, targetValue); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-type mapGetter interface {
-	AllUntyped() iter.Seq2[any, any]
-}
-
-func (m *Map[K, V]) SyncChangesWithSyncFunc(ctx context.Context, model any, valueNode *yaml.Node, syncFunc func(context.Context, any, any, *yaml.Node, bool) (*yaml.Node, error)) (*yaml.Node, error) {
-	m.Init()
-
-	mg, ok := (model).(mapGetter)
-	if !ok {
-		return nil, fmt.Errorf("Map.SyncChangesWithSyncFunc expected model to be a Map, got %s", reflect.TypeOf(model))
-	}
-
-	remainingKeys := []string{}
-
-	for k, v := range mg.AllUntyped() {
-		// TODO this might panic if the key types don't match and need some sort of transformation
-		key := k.(K)
-		keyStr := fmt.Sprintf("%v", k) // TODO this might not work with non string keys
-
-		lv, _ := m.Get(key)
-
-		kn, vn, _ := yml.GetMapElementNodes(ctx, valueNode, keyStr)
-
-		vn, err := syncFunc(ctx, v, &lv, vn, false)
-		if err != nil {
-			return nil, err
-		}
-
-		m.Set(key, lv)
-
-		valueNode = yml.CreateOrUpdateMapNodeElement(ctx, keyStr, yml.CreateOrUpdateKeyNode(ctx, keyStr, kn), vn, valueNode)
-		remainingKeys = append(remainingKeys, keyStr)
-	}
-
-	keysToDelete := []K{}
-
-	for k := range m.Keys() {
-		key := fmt.Sprintf("%v", k) // TODO this might not work with non string keys
-
-		if !slices.Contains(remainingKeys, key) {
-			keysToDelete = append(keysToDelete, k)
-		}
-	}
-
-	for _, key := range keysToDelete {
-		m.Delete(key)
-		valueNode = yml.DeleteMapNodeElement(ctx, fmt.Sprintf("%v", key), valueNode)
-	}
-
-	return valueNode, nil
 }

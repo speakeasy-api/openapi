@@ -10,7 +10,7 @@ import (
 	"github.com/speakeasy-api/openapi/pointer"
 )
 
-// The below examples should be copied into the README.md file if every changed TODO: automate this
+// The below examples should be copied into the README.md file if ever changed TODO: automate this
 func Example_readAndMutate() {
 	ctx := context.Background()
 
@@ -48,7 +48,7 @@ func Example_readAndMutate() {
 func Example_creating() {
 	ctx := context.Background()
 
-	arazzo := &arazzo.Arazzo{
+	a := &arazzo.Arazzo{
 		Arazzo: arazzo.Version,
 		Info: arazzo.Info{
 			Title:   "My Workflow",
@@ -60,7 +60,7 @@ func Example_creating() {
 
 	buf := bytes.NewBuffer([]byte{})
 
-	err := arazzo.Marshal(ctx, buf)
+	err := arazzo.Marshal(ctx, a, buf)
 	if err != nil {
 		panic(err)
 	}
@@ -76,16 +76,16 @@ func Example_mutating() {
 		panic(err)
 	}
 
-	arazzo, _, err := arazzo.Unmarshal(ctx, f)
+	a, _, err := arazzo.Unmarshal(ctx, f)
 	if err != nil {
 		panic(err)
 	}
 
-	arazzo.Info.Title = "My updated workflow title"
+	a.Info.Title = "My updated workflow title"
 
 	buf := bytes.NewBuffer([]byte{})
 
-	if err := arazzo.Marshal(ctx, buf); err != nil {
+	if err := arazzo.Marshal(ctx, a, buf); err != nil {
 		panic(err)
 	}
 

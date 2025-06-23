@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/speakeasy-api/openapi/sequencedmap"
+	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
 
@@ -38,7 +39,7 @@ func handleYAMLNode(node *yaml.Node) (any, error) {
 	case yaml.AliasNode:
 		return handleYAMLNode(node.Alias)
 	default:
-		return nil, fmt.Errorf("unknown node kind: %v", node.Kind)
+		return nil, fmt.Errorf("unknown node kind: %s", yml.NodeKindToString(node.Kind))
 	}
 }
 

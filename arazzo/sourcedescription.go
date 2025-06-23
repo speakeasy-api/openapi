@@ -2,7 +2,6 @@ package arazzo
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"strings"
 
@@ -55,17 +54,17 @@ var _ interfaces.Model[core.SourceDescription] = (*SourceDescription)(nil)
 // Validate will validate the source description object against the Arazzo specification.
 func (s *SourceDescription) Validate(ctx context.Context, opts ...validation.Option) []error {
 	core := s.GetCore()
-	errs := core.GetValidationErrors()
+	errs := []error{}
 
 	if core.Name.Present && s.Name == "" {
-		errs = append(errs, validation.NewValueError("name is required", core, core.Name))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("name is required"), core, core.Name))
 	}
 
 	if core.URL.Present && s.URL == "" {
-		errs = append(errs, validation.NewValueError("url is required", core, core.URL))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("url is required"), core, core.URL))
 	} else if core.URL.Present {
 		if _, err := url.Parse(s.URL); err != nil {
-			errs = append(errs, validation.NewValueError(fmt.Sprintf("url is not a valid url/uri according to RFC 3986: %s", err), core, core.URL))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("url is not a valid url/uri according to RFC 3986: %s", err), core, core.URL))
 		}
 	}
 
@@ -73,7 +72,7 @@ func (s *SourceDescription) Validate(ctx context.Context, opts ...validation.Opt
 	case SourceDescriptionTypeOpenAPI:
 	case SourceDescriptionTypeArazzo:
 	default:
-		errs = append(errs, validation.NewValueError(fmt.Sprintf("type must be one of [%s]", strings.Join([]string{SourceDescriptionTypeOpenAPI, SourceDescriptionTypeArazzo}, ", ")), core, core.Type))
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("type must be one of [%s]", strings.Join([]string{SourceDescriptionTypeOpenAPI, SourceDescriptionTypeArazzo}, ", ")), core, core.Type))
 	}
 
 	s.Valid = len(errs) == 0 && core.GetValid()

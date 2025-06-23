@@ -1,7 +1,7 @@
 package arazzo
 
 import (
-	"github.com/speakeasy-api/openapi/arazzo/expression"
+	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 )
 

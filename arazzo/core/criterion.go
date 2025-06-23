@@ -8,6 +8,8 @@ import (
 	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/validation"
+	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
 
@@ -25,21 +27,44 @@ type CriterionTypeUnion struct {
 
 var _ interfaces.CoreModel = (*CriterionTypeUnion)(nil)
 
-func (c *CriterionTypeUnion) Unmarshal(ctx context.Context, node *yaml.Node) error {
-	c.SetRootNode(node)
-	c.SetValid(true)
+func (c *CriterionTypeUnion) Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error) {
+	resolvedNode := yml.ResolveAlias(node)
 
-	switch node.Kind {
+	if resolvedNode == nil {
+		return nil, fmt.Errorf("node is nil")
+	}
+
+	c.SetRootNode(node)
+
+	var validationErrs []error
+
+	switch resolvedNode.Kind {
 	case yaml.ScalarNode:
-		return node.Decode(&c.Type)
+		var err error
+		validationErrs, err = marshaller.DecodeNode(ctx, resolvedNode, &c.Type)
+		if err != nil {
+			return nil, err
+		}
+
+		c.DetermineValidity(validationErrs)
 	case yaml.MappingNode:
 		if c.ExpressionType == nil {
 			c.ExpressionType = &CriterionExpressionType{}
 		}
-		return marshaller.UnmarshalModel(ctx, node, c.ExpressionType)
+		var err error
+		validationErrs, err = marshaller.UnmarshalModel(ctx, node, c.ExpressionType)
+		if err != nil {
+			return nil, err
+		}
+
+		c.DetermineValidity(validationErrs)
 	default:
-		return fmt.Errorf("expected scalar or mapping node, got %v", node.Kind)
+		return []error{
+			validation.NewNodeError(validation.NewTypeMismatchError("expected scalar or mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+		}, nil
 	}
+
+	return validationErrs, nil
 }
 
 func (c *CriterionTypeUnion) SyncChanges(ctx context.Context, model any, valueNode *yaml.Node) (*yaml.Node, error) {
@@ -77,7 +102,7 @@ func (c *CriterionTypeUnion) SyncChanges(ctx context.Context, model any, valueNo
 
 type Criterion struct {
 	marshaller.CoreModel
-	Context    marshaller.Node[*Expression]        `key:"context"`
+	Context    marshaller.Node[*string]            `key:"context"`
 	Condition  marshaller.Node[string]             `key:"condition"`
 	Type       marshaller.Node[CriterionTypeUnion] `key:"type" required:"false"`
 	Extensions core.Extensions                     `key:"extensions"`

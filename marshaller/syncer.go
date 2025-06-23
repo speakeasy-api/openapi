@@ -13,10 +13,9 @@ type Syncer interface {
 	SyncChanges(ctx context.Context, model any, valueNode *yaml.Node) (*yaml.Node, error)
 }
 
-type SyncerWithSyncFunc interface {
-	SyncChangesWithSyncFunc(ctx context.Context, model any, valueNode *yaml.Node, syncFunc func(context.Context, any, any, *yaml.Node, bool) (*yaml.Node, error)) (*yaml.Node, error)
-}
-
+// SyncValue syncs changes from source to target and returns the updated YAML node.
+// For proper YAML node styling (quoted strings, etc.), ensure the context contains
+// the config via yml.ContextWithConfig(ctx, config) before calling this function.
 func SyncValue(ctx context.Context, source any, target any, valueNode *yaml.Node, skipCustomSyncer bool) (node *yaml.Node, err error) {
 	s := reflect.ValueOf(source)
 	t := reflect.ValueOf(target)
@@ -33,6 +32,18 @@ func SyncValue(ctx context.Context, source any, target any, valueNode *yaml.Node
 			t.Elem().Set(reflect.Zero(t.Type().Elem()))
 		}
 		return nil, nil
+	}
+
+	// Handle NodeMutator types (like marshaller.Node[T]) by using their SyncValue method
+	if t.CanInterface() {
+		if nodeMutator, ok := t.Interface().(NodeMutator); ok {
+			// Use the NodeMutator's SyncValue method which handles addressability correctly
+			_, valueNode, err := nodeMutator.SyncValue(ctx, "", source)
+			if err != nil {
+				return nil, err
+			}
+			return valueNode, nil
+		}
 	}
 
 	sUnderlying := getUnderlyingValue(s)
@@ -55,11 +66,13 @@ func SyncValue(ctx context.Context, source any, target any, valueNode *yaml.Node
 				return syncer.SyncChanges(ctx, sv, valueNode)
 			}
 
-			syncerWithSyncFunc, ok := t.Interface().(SyncerWithSyncFunc)
-			if ok {
-				sv := s.Interface()
+			// If this is an embedded sequenced map, skip the SyncerWithSyncFunc method and use syncChanges instead
+			if isEmbeddedSequencedMap(t) {
+				return syncChanges(ctx, s.Interface(), t.Interface(), valueNode)
+			}
 
-				return syncerWithSyncFunc.SyncChangesWithSyncFunc(ctx, sv, valueNode, SyncValue)
+			if implementsInterface[sequencedMapInterface](t) {
+				return syncSequencedMapChanges(ctx, t.Interface().(sequencedMapInterface), s.Interface(), valueNode, SyncValue)
 			}
 		}
 
@@ -75,7 +88,7 @@ func SyncValue(ctx context.Context, source any, target any, valueNode *yaml.Node
 			sUnderlying = sUnderlying.Convert(tUnderlyingType)
 		}
 		if !t.Elem().IsValid() {
-			t.Set(reflect.New(tUnderlyingType))
+			t.Set(CreateInstance(tUnderlyingType))
 		}
 		t.Elem().Set(sUnderlying)
 		out := yml.CreateOrUpdateScalarNode(ctx, sUnderlying.Interface(), valueNode)
@@ -100,7 +113,14 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 	}
 
 	if t.IsNil() {
-		t.Set(reflect.New(t.Elem().Type()))
+		t.Set(CreateInstance(t.Elem().Type()))
+	}
+
+	// Handle NodeAccessor types (like marshaller.Node[T]) by extracting their values from target
+	if t.CanInterface() {
+		if nodeAccessor, ok := t.Interface().(NodeAccessor); ok {
+			t = reflect.ValueOf(nodeAccessor.GetValue())
+		}
 	}
 
 	sUnderlying := getUnderlyingValue(s)
@@ -117,6 +137,36 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 		if !field.IsExported() {
 			continue
 		}
+
+		// Handle embedded fields (anonymous fields)
+		if field.Anonymous {
+			// For embedded fields, we need to handle them specially
+			targetField := t.Field(i)
+			sourceField := sUnderlying.Field(i)
+
+			// Initialize embedded field if it's nil
+			if targetField.Kind() == reflect.Ptr && targetField.IsNil() {
+				targetField.Set(CreateInstance(targetField.Type().Elem()))
+			}
+
+			// Check if it implements SequencedMapInterface for syncing
+			if targetField.CanInterface() {
+				if seqMapInterface, ok := targetField.Interface().(sequencedMapInterface); ok {
+					var sourceInterface any
+					if sourceField.CanInterface() {
+						sourceInterface = sourceField.Interface()
+					}
+
+					newValueNode, err := syncSequencedMapChanges(ctx, seqMapInterface, sourceInterface, valueNode, SyncValue)
+					if err != nil {
+						return nil, err
+					}
+					valueNode = newValueNode
+				}
+			}
+			continue
+		}
+
 		sourceVal := sUnderlying.FieldByName(field.Name)
 
 		key := field.Tag.Get("key")
@@ -124,34 +174,34 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 			continue
 		}
 
-		target := t.Field(i)
-		if target.Kind() != reflect.Ptr {
-			if target.CanAddr() {
-				target = target.Addr()
+		fieldTarget := t.Field(i)
+		if fieldTarget.Kind() != reflect.Ptr {
+			if fieldTarget.CanAddr() {
+				fieldTarget = fieldTarget.Addr()
 			} else {
 				continue
 			}
 		}
 
 		// If both are nil, we don't need to sync
-		if target.IsNil() && sourceVal.IsNil() {
+		if fieldTarget.IsNil() && sourceVal.IsNil() {
 			continue
 		}
 
 		if key == "extensions" {
 			var err error
-			valueNode, err = syncExtensions(ctx, sourceVal.Interface(), target, valueNode)
+			valueNode, err = syncExtensions(ctx, sourceVal.Interface(), fieldTarget, valueNode)
 			if err != nil {
 				return nil, err
 			}
 			continue
 		}
 
-		if target.IsNil() {
-			target.Set(reflect.New(target.Type().Elem()))
+		if fieldTarget.IsNil() {
+			fieldTarget.Set(CreateInstance(fieldTarget.Type().Elem()))
 		}
 
-		targetInt := target.Interface()
+		targetInt := fieldTarget.Interface()
 		var sourceInt any
 		if !sourceVal.IsValid() {
 			continue
@@ -164,7 +214,7 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 
 		nodeMutator, ok := targetInt.(NodeMutator)
 		if !ok {
-			return nil, fmt.Errorf("syncChanges expected NodeMutator, got %s", target.Type())
+			return nil, fmt.Errorf("syncChanges expected NodeMutator, got %s", fieldTarget.Type())
 		}
 
 		keyNode, valNode, err := nodeMutator.SyncValue(ctx, key, sourceInt)
@@ -225,7 +275,7 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 
 	// Set validity on the core model
 	if coreModel, ok := t.Addr().Interface().(CoreModeler); ok {
-		coreModel.SetValid(valid)
+		coreModel.SetValid(valid, true)
 	}
 
 	return valueNode, nil
@@ -336,10 +386,12 @@ func reorderArrayElements(sourceVal, targetVal reflect.Value, valueNode *yaml.No
 	reorderedTargets := make([]any, sourceLen)
 	reorderedNodes := make([]*yaml.Node, sourceLen)
 
+	resolvedValueNode := yml.ResolveAlias(valueNode)
+
 	// Extract original YAML nodes for potential reuse
 	var originalNodes []*yaml.Node
-	if valueNode != nil && valueNode.Content != nil {
-		originalNodes = valueNode.Content
+	if resolvedValueNode != nil && resolvedValueNode.Content != nil {
+		originalNodes = resolvedValueNode.Content
 	}
 
 	for i := 0; i < sourceLen; i++ {
@@ -360,7 +412,7 @@ func reorderArrayElements(sourceVal, targetVal reflect.Value, valueNode *yaml.No
 				reorderedTargets[i] = targetVal.Index(i).Addr().Interface()
 			} else {
 				// This is a new element beyond the target array length - create a new target slot
-				reorderedTargets[i] = reflect.New(targetVal.Type().Elem()).Interface()
+				reorderedTargets[i] = CreateInstance(targetVal.Type().Elem()).Interface()
 			}
 			if i < len(originalNodes) {
 				reorderedNodes[i] = originalNodes[i]
@@ -379,16 +431,22 @@ func reorderArrayElements(sourceVal, targetVal reflect.Value, valueNode *yaml.No
 				continue
 			}
 
-			// Get the RootNode from the target element for comparison
+			type valueNodeAccessor interface {
+				GetValueNode() *yaml.Node
+			}
+
+			// Get the value node from the target element for comparison
 			var targetRootNode *yaml.Node
 			if targetElement.CanInterface() {
-				if rootNodeAccessor, ok := targetElement.Interface().(RootNodeAccessor); ok {
-					// Safely call GetRootNode() - it may return nil for uninitialized cores
-					targetRootNode = rootNodeAccessor.GetRootNode()
+				if rna, ok := targetElement.Interface().(RootNodeAccessor); ok {
+					targetRootNode = rna.GetRootNode()
+				} else if vna, ok := targetElement.Interface().(valueNodeAccessor); ok {
+					targetRootNode = vna.GetValueNode()
 				} else if targetElement.CanAddr() {
-					if rootNodeAccessor, ok := targetElement.Addr().Interface().(RootNodeAccessor); ok {
-						// Safely call GetRootNode() - it may return nil for uninitialized cores
-						targetRootNode = rootNodeAccessor.GetRootNode()
+					if rna, ok := targetElement.Addr().Interface().(RootNodeAccessor); ok {
+						targetRootNode = rna.GetRootNode()
+					} else if vna, ok := targetElement.Addr().Interface().(valueNodeAccessor); ok {
+						targetRootNode = vna.GetValueNode()
 					}
 				}
 			}
@@ -408,8 +466,13 @@ func reorderArrayElements(sourceVal, targetVal reflect.Value, valueNode *yaml.No
 		if !found {
 			// No matching target found - this is a new element that was added to the source array.
 			// Create a new target element to sync with.
-			reorderedTargets[i] = reflect.New(targetVal.Type().Elem()).Interface()
-			// reorderedNodes[i] remains nil for new elements, which will trigger creation of new YAML nodes
+			newTarget := CreateInstance(targetVal.Type().Elem()).Interface()
+
+			if i < len(originalNodes) {
+				reorderedNodes[i] = originalNodes[i]
+			}
+
+			reorderedTargets[i] = newTarget
 		}
 	}
 
@@ -420,7 +483,7 @@ func reorderArrayElements(sourceVal, targetVal reflect.Value, valueNode *yaml.No
 func dereferenceAndInitializeIfNeededToLastPtr(val reflect.Value, source reflect.Value) reflect.Value {
 	if val.Kind() == reflect.Ptr && val.IsNil() {
 		if (source.Kind() == reflect.Ptr && !source.IsNil()) || (source.Kind() != reflect.Ptr && source.IsValid()) {
-			val.Set(reflect.New(val.Type().Elem()))
+			val.Set(CreateInstance(val.Type().Elem()))
 		}
 	}
 	if val.Kind() == reflect.Ptr && val.Elem().Kind() == reflect.Ptr {

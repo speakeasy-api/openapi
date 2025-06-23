@@ -31,14 +31,14 @@ var _ interfaces.Model[core.Info] = (*Info)(nil)
 // Validate will validate the Info object against the Arazzo Specification.
 func (i *Info) Validate(ctx context.Context, opts ...validation.Option) []error {
 	core := i.GetCore()
-	errs := core.GetValidationErrors()
+	errs := []error{}
 
 	if core.Title.Present && i.Title == "" {
-		errs = append(errs, validation.NewValueError("title is required", core, core.Title))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("title is required"), core, core.Title))
 	}
 
 	if core.Version.Present && i.Version == "" {
-		errs = append(errs, validation.NewValueError("version is required", core, core.Version))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("version is required"), core, core.Version))
 	}
 
 	i.Valid = len(errs) == 0 && core.GetValid()

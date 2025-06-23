@@ -330,6 +330,14 @@ func buildPath(currentPath string, currentPart navigationPart) string {
 	return currentPath + currentPart.Value
 }
 
+// EscapeString escapes a string for use as a reference token in a JSON pointer according to RFC6901.
+// It replaces "~" with "~0" and "/" with "~1" as required by the specification.
+// This function should be used when constructing JSON pointers from string values that may contain
+// these special characters.
+func EscapeString(s string) string {
+	return escape(s)
+}
+
 func escape(part string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(part, "~", "~0"), "/", "~1")
 }

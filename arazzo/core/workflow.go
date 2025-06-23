@@ -13,7 +13,7 @@ type Workflow struct {
 	Description    marshaller.Node[*string]                     `key:"description"`
 	Parameters     marshaller.Node[[]*Reusable[*Parameter]]     `key:"parameters"`
 	Inputs         marshaller.Node[core.JSONSchema]             `key:"inputs"`
-	DependsOn      marshaller.Node[[]Expression]                `key:"dependsOn"`
+	DependsOn      marshaller.Node[[]marshaller.Node[string]]   `key:"dependsOn"`
 	Steps          marshaller.Node[[]*Step]                     `key:"steps" required:"true"`
 	SuccessActions marshaller.Node[[]*Reusable[*SuccessAction]] `key:"successActions"`
 	FailureActions marshaller.Node[[]*Reusable[*FailureAction]] `key:"failureActions"`
