@@ -131,11 +131,25 @@ func syncExtensions(ctx context.Context, source any, target reflect.Value, mapNo
 		targetMap.Set(key, node)
 	}
 
-	for key := range targetMap.All() {
-		if !slices.Contains(presentKeys, key) {
-			mapNode = yml.DeleteMapNodeElement(ctx, key, mapNode)
-			targetMap.Delete(key)
+	// Collect keys to delete safely before deletion to avoid iterator corruption
+	// This prevents issues when the target map contains stale entries from previous operations
+	keysToDelete := []string{}
+	for key, node := range targetMap.All() {
+		// Skip corrupted entries that may have nil values
+		if node.Value == nil {
+			keysToDelete = append(keysToDelete, key)
+			continue
 		}
+
+		if !slices.Contains(presentKeys, key) {
+			keysToDelete = append(keysToDelete, key)
+		}
+	}
+
+	// Now safely delete the collected keys
+	for _, key := range keysToDelete {
+		mapNode = yml.DeleteMapNodeElement(ctx, key, mapNode)
+		targetMap.Delete(key)
 	}
 
 	sUnderlying := getUnderlyingValue(reflect.ValueOf(source))

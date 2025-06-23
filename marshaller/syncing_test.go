@@ -771,3 +771,145 @@ x-sync: sync extension
 	require.NoError(t, err)
 	require.Equal(t, expectedYAML, string(actualYAML))
 }
+
+func TestSync_ExtensionModification_Success(t *testing.T) {
+	// Create a model with initial extensions
+	highModel := tests.TestPrimitiveHighModel{
+		StringField:  "model with extensions",
+		BoolField:    true,
+		IntField:     42,
+		Float64Field: 3.14,
+	}
+
+	// Initialize extensions
+	highModel.Extensions = &extensions.Extensions{}
+	highModel.Extensions.Init()
+	highModel.Extensions.Set("x-version", testutils.CreateStringYamlNode("1.0", 1, 1))
+	highModel.Extensions.Set("x-author", testutils.CreateStringYamlNode("developer", 1, 1))
+
+	// Perform initial sync
+	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	require.NoError(t, err)
+	require.NotNil(t, resultNode)
+
+	// Verify initial extensions were synced
+	coreModel := highModel.GetCore()
+	require.NotNil(t, coreModel.Extensions)
+
+	versionExt, ok := coreModel.Extensions.Get("x-version")
+	require.True(t, ok)
+	require.Equal(t, "1.0", versionExt.Value.Value)
+
+	authorExt, ok := coreModel.Extensions.Get("x-author")
+	require.True(t, ok)
+	require.Equal(t, "developer", authorExt.Value.Value)
+
+	// Modify extensions: update existing, add new, remove one
+	highModel.Extensions.Set("x-version", testutils.CreateStringYamlNode("2.0", 1, 1))   // Update
+	highModel.Extensions.Set("x-status", testutils.CreateStringYamlNode("active", 1, 1)) // Add new
+	highModel.Extensions.Delete("x-author")                                              // Remove
+
+	// Sync the changes
+	resultNode, err = marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	require.NoError(t, err)
+	require.NotNil(t, resultNode)
+
+	// Verify extensions were updated correctly
+	updatedVersionExt, ok := coreModel.Extensions.Get("x-version")
+	require.True(t, ok)
+	require.Equal(t, "2.0", updatedVersionExt.Value.Value)
+
+	statusExt, ok := coreModel.Extensions.Get("x-status")
+	require.True(t, ok)
+	require.Equal(t, "active", statusExt.Value.Value)
+
+	// Verify removed extension is gone
+	_, ok = coreModel.Extensions.Get("x-author")
+	require.False(t, ok)
+
+	// Verify the core model's RootNode contains the correct YAML
+	expectedYAML := `stringField: model with extensions
+boolField: true
+intField: 42
+float64Field: 3.14
+x-version: "2.0"
+x-status: active
+`
+
+	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
+	require.NoError(t, err)
+	require.Equal(t, expectedYAML, string(actualYAML))
+}
+
+func TestSync_ExtensionReplacement_Success(t *testing.T) {
+	// Create a model with extensions that will be completely replaced
+	highModel := tests.TestPrimitiveHighModel{
+		StringField:  "model for replacement",
+		BoolField:    false,
+		IntField:     100,
+		Float64Field: 1.5,
+	}
+
+	// Initialize with original extensions
+	highModel.Extensions = &extensions.Extensions{}
+	highModel.Extensions.Init()
+	highModel.Extensions.Set("x-original-id", testutils.CreateStringYamlNode("orig-123", 1, 1))
+	highModel.Extensions.Set("x-legacy-flag", testutils.CreateStringYamlNode("true", 1, 1))
+	highModel.Extensions.Set("x-deprecated", testutils.CreateStringYamlNode("soon", 1, 1))
+
+	// Perform initial sync
+	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	require.NoError(t, err)
+	require.NotNil(t, resultNode)
+
+	// Verify initial state
+	coreModel := highModel.GetCore()
+	require.NotNil(t, coreModel.Extensions)
+	require.Equal(t, 3, coreModel.Extensions.Len())
+
+	// Replace with completely new extensions (simulating workflow replacement scenario)
+	newExtensions := &extensions.Extensions{}
+	newExtensions.Init()
+	newExtensions.Set("x-new-id", testutils.CreateStringYamlNode("new-456", 1, 1))
+	newExtensions.Set("x-modern-flag", testutils.CreateStringYamlNode("enabled", 1, 1))
+
+	// Replace the extensions entirely
+	highModel.Extensions = newExtensions
+
+	// Sync the replacement
+	resultNode, err = marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	require.NoError(t, err)
+	require.NotNil(t, resultNode)
+
+	// Verify all old extensions are gone and new ones are present
+	require.Equal(t, 2, coreModel.Extensions.Len())
+
+	newIdExt, ok := coreModel.Extensions.Get("x-new-id")
+	require.True(t, ok)
+	require.Equal(t, "new-456", newIdExt.Value.Value)
+
+	modernFlagExt, ok := coreModel.Extensions.Get("x-modern-flag")
+	require.True(t, ok)
+	require.Equal(t, "enabled", modernFlagExt.Value.Value)
+
+	// Verify old extensions are completely removed
+	_, ok = coreModel.Extensions.Get("x-original-id")
+	require.False(t, ok)
+	_, ok = coreModel.Extensions.Get("x-legacy-flag")
+	require.False(t, ok)
+	_, ok = coreModel.Extensions.Get("x-deprecated")
+	require.False(t, ok)
+
+	// Verify the core model's RootNode contains only new extensions
+	expectedYAML := `stringField: model for replacement
+boolField: false
+intField: 100
+float64Field: 1.5
+x-new-id: new-456
+x-modern-flag: enabled
+`
+
+	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
+	require.NoError(t, err)
+	require.Equal(t, expectedYAML, string(actualYAML))
+}

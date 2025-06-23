@@ -222,9 +222,6 @@ func syncSequencedMapChanges(ctx context.Context, target sequencedMapInterface, 
 
 		kn, vn, _ := yml.GetMapElementNodes(ctx, valueNode, keyStr)
 
-		// Recreate the original behavior: lv, _ := m.Get(key); syncFunc(ctx, v, &lv, vn, false); m.Set(key, lv)
-		// The original lv was always the concrete type V (or zero value), and &lv was pointer to that type
-
 		valueType := target.GetValueType()
 
 		// Create a concrete typed variable (equivalent to original lv)
