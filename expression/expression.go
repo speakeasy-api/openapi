@@ -79,13 +79,11 @@ var (
 type Expression string
 
 // Validate will validate the expression is valid as per the OpenAPI & Arazzo specifications.
-func (e Expression) Validate(validateAsExpression bool) error {
-	if !e.IsExpression() {
-		if !validateAsExpression {
-			return nil
-		} else {
-			return fmt.Errorf("expression is not valid, must begin with $: %s", string(e))
-		}
+func (e Expression) Validate() error {
+	// First check basic format using ExtractExpressions
+	extractedExpressions := ExtractExpressions(string(e))
+	if len(extractedExpressions) == 0 {
+		return fmt.Errorf("expression is not valid, must begin with $: %s", string(e))
 	}
 
 	allowJsonPointers := false
@@ -178,19 +176,32 @@ func (e Expression) Validate(validateAsExpression bool) error {
 	return nil
 }
 
-// IsExpression will return true if the expression is a runtime expression or just an identifier/string.
+// IsExpression will return true if the expression is a runtime expression that starts with a valid expression type.
 func (e Expression) IsExpression() bool {
-	expressions := ExtractExpressions(string(e))
+	extractedExpressions := ExtractExpressions(string(e))
 
-	if len(expressions) != 1 {
+	if len(extractedExpressions) != 1 {
 		return false
 	}
 
-	if len(expressions[0]) != len(string(e)) {
+	if len(extractedExpressions[0]) != len(string(e)) {
 		return false
 	}
 
-	return true
+	// Check if the expression starts with a valid expression type
+	typ := e.GetType()
+	if string(typ) == "" {
+		return false
+	}
+
+	// Verify the type is in the list of valid expression types
+	for _, validType := range expressions {
+		if string(typ) == validType {
+			return true
+		}
+	}
+
+	return false
 }
 
 // GetType will return the type of the expression.

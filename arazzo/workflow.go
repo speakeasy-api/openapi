@@ -87,11 +87,11 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 	}
 
 	for i, dependsOn := range w.DependsOn {
-		if err := dependsOn.Validate(false); err != nil {
-			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError(err.Error()), core, core.DependsOn, i))
-		}
-
 		if dependsOn.IsExpression() {
+			if err := dependsOn.Validate(); err != nil {
+				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError(err.Error()), core, core.DependsOn, i))
+			}
+
 			typ, sourceDescriptionName, _, _ := dependsOn.GetParts()
 
 			if typ != expression.ExpressionTypeSourceDescriptions {
@@ -125,7 +125,7 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("output name must be a valid name [%s]: %s", outputNameRegex.String(), name), core, core.Outputs, name))
 		}
 
-		if err := output.Validate(true); err != nil {
+		if err := output.Validate(); err != nil {
 			errs = append(errs, validation.NewMapValueError(validation.NewValueValidationError(err.Error()), core, core.Outputs, name))
 		}
 	}

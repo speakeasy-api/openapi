@@ -132,7 +132,7 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 
 func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, opts ...validation.Option) []error {
 	core := r.GetCore()
-	if err := r.Reference.Validate(true); err != nil {
+	if err := r.Reference.Validate(); err != nil {
 		return []error{
 			validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Reference),
 		}

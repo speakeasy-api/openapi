@@ -12,8 +12,7 @@ import (
 
 func TestExpression_Validate_Success(t *testing.T) {
 	type args struct {
-		e                    Expression
-		validateAsExpression bool
+		e Expression
 	}
 	tests := []struct {
 		name string
@@ -22,213 +21,169 @@ func TestExpression_Validate_Success(t *testing.T) {
 		{
 			name: "$url",
 			args: args{
-				e:                    Expression("$url"),
-				validateAsExpression: true,
+				e: Expression("$url"),
 			},
 		},
 		{
 			name: "{$url}",
 			args: args{
-				e:                    Expression("{$url}"),
-				validateAsExpression: true,
+				e: Expression("{$url}"),
 			},
 		},
 		{
 			name: "$method",
 			args: args{
-				e:                    Expression("$method"),
-				validateAsExpression: true,
+				e: Expression("$method"),
 			},
 		},
 		{
 			name: "$statusCode",
 			args: args{
-				e:                    Expression("$statusCode"),
-				validateAsExpression: true,
+				e: Expression("$statusCode"),
 			},
 		},
 		{
 			name: "request body without json pointer",
 			args: args{
-				e:                    Expression("$request.body"),
-				validateAsExpression: true,
+				e: Expression("$request.body"),
 			},
 		},
 		{
 			name: "request body enclosed in {} without json pointer",
 			args: args{
-				e:                    Expression("{$request.body}"),
-				validateAsExpression: true,
+				e: Expression("{$request.body}"),
 			},
 		},
 		{
 			name: "request body with json pointer",
 			args: args{
-				e:                    Expression("$request.body#/some/path"),
-				validateAsExpression: true,
+				e: Expression("$request.body#/some/path"),
 			},
 		},
 		{
 			name: "request body enclosed in {} with json pointer",
 			args: args{
-				e:                    Expression("{$request.body}#/some/path"),
-				validateAsExpression: true,
+				e: Expression("{$request.body}#/some/path"),
 			},
 		},
 		{
 			name: "request header",
 			args: args{
-				e:                    Expression("$request.header.some-header"),
-				validateAsExpression: true,
+				e: Expression("$request.header.some-header"),
 			},
 		},
 		{
 			name: "request query",
 			args: args{
-				e:                    Expression("$request.query.someQueryParam"),
-				validateAsExpression: true,
+				e: Expression("$request.query.someQueryParam"),
 			},
 		},
 		{
 			name: "request path",
 			args: args{
-				e:                    Expression("$request.path.somePathParam"),
-				validateAsExpression: true,
+				e: Expression("$request.path.somePathParam"),
 			},
 		},
 		{
 			name: "response body",
 			args: args{
-				e:                    Expression("$response.body"),
-				validateAsExpression: true,
+				e: Expression("$response.body"),
 			},
 		},
 		{
 			"response body with json pointer",
 			args{
-				e:                    Expression("$response.body#/some/path"),
-				validateAsExpression: true,
+				e: Expression("$response.body#/some/path"),
 			},
 		},
 		{
 			name: "response header",
 			args: args{
-				e:                    Expression("$response.header.some-header"),
-				validateAsExpression: true,
+				e: Expression("$response.header.some-header"),
 			},
 		},
 		{
 			name: "response header enclose in {}",
 			args: args{
-				e:                    Expression("{$response.header.some-header}"),
-				validateAsExpression: true,
+				e: Expression("{$response.header.some-header}"),
 			},
 		},
 		{
 			name: "inputs",
 			args: args{
-				e:                    Expression("$inputs.someInput"),
-				validateAsExpression: true,
+				e: Expression("$inputs.someInput"),
 			},
 		},
 		{
 			name: "outputs",
 			args: args{
-				e:                    Expression("$outputs.someOutput"),
-				validateAsExpression: true,
+				e: Expression("$outputs.someOutput"),
 			},
 		},
 		{
 			name: "outputs with json pointer",
 			args: args{
-				e:                    Expression("$outputs.someOutput#/some/path"),
-				validateAsExpression: true,
+				e: Expression("$outputs.someOutput#/some/path"),
 			},
 		},
 		{
 			name: "steps",
 			args: args{
-				e:                    Expression("$steps.someStep"),
-				validateAsExpression: true,
+				e: Expression("$steps.someStep"),
 			},
 		},
 		{
 			name: "step outputs with json pointer",
 			args: args{
-				e:                    Expression("$steps.someStep.outputs.someOutput#/some/path"),
-				validateAsExpression: true,
+				e: Expression("$steps.someStep.outputs.someOutput#/some/path"),
 			},
 		},
 		{
 			name: "workflows",
 			args: args{
-				e:                    Expression("$workflows.someWorkflow"),
-				validateAsExpression: true,
+				e: Expression("$workflows.someWorkflow"),
 			},
 		},
 		{
 			name: "workflow outputs with json pointer",
 			args: args{
-				e:                    Expression("$workflows.someWorkflow.outputs.someOutput#/some/path"),
-				validateAsExpression: true,
+				e: Expression("$workflows.someWorkflow.outputs.someOutput#/some/path"),
 			},
 		},
 		{
 			name: "source descriptions",
 			args: args{
-				e:                    Expression("$sourceDescriptions.someSourceDescription"),
-				validateAsExpression: true,
+				e: Expression("$sourceDescriptions.someSourceDescription"),
 			},
 		},
 		{
 			name: "source descriptions sub path",
 			args: args{
-				e:                    Expression("$sourceDescriptions.someSourceDescription.url"),
-				validateAsExpression: true,
+				e: Expression("$sourceDescriptions.someSourceDescription.url"),
 			},
 		},
 		{
 			name: "source descriptions sub path with json pointer",
 			args: args{
-				e:                    Expression("{$sourceDescriptions.petStoreDescription.url}#/paths/~1pet~1findByStatus/get"),
-				validateAsExpression: true,
+				e: Expression("{$sourceDescriptions.petStoreDescription.url}#/paths/~1pet~1findByStatus/get"),
 			},
 		},
 		{
 			name: "components",
 			args: args{
-				e:                    Expression("$components.parameters.someParameter"),
-				validateAsExpression: true,
-			},
-		},
-		{
-			name: "non expression validates okay if validateAsExpression is false",
-			args: args{
-				e:                    Expression("some-expression"),
-				validateAsExpression: false,
+				e: Expression("$components.parameters.someParameter"),
 			},
 		},
 		{
 			name: "complex expression with jsonpath",
 			args: args{
-				e:                    Expression("$sourceDescriptions.museum-api.url#/paths/~1special-events~1{eventId}/get"),
-				validateAsExpression: true,
-			},
-		},
-		{
-			name: "multiline empty json objects expression",
-			args: args{
-				e: Expression(`
-[
-  {}
-]`),
-				validateAsExpression: false,
+				e: Expression("$sourceDescriptions.museum-api.url#/paths/~1special-events~1{eventId}/get"),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.args.e.Validate(tt.args.validateAsExpression)
+			err := tt.args.e.Validate()
 			require.NoError(t, err)
 		})
 	}
@@ -372,7 +327,7 @@ func TestExpression_Validate_Failure(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.args.e.Validate(true)
+			err := tt.args.e.Validate()
 			assert.EqualError(t, err, tt.wantErr.Error())
 		})
 	}

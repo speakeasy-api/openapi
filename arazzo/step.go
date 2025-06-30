@@ -137,7 +137,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("operationId must be a valid expression if there are multiple OpenAPI source descriptions"), core, core.OperationID))
 		}
 		if s.OperationID.IsExpression() {
-			if err := s.OperationID.Validate(false); err != nil {
+			if err := s.OperationID.Validate(); err != nil {
 				errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.OperationID))
 			}
 
@@ -154,7 +154,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 	}
 
 	if s.OperationPath != nil {
-		if err := s.OperationPath.Validate(true); err != nil {
+		if err := s.OperationPath.Validate(); err != nil {
 			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.OperationPath))
 		}
 
@@ -178,7 +178,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 
 	if s.WorkflowID != nil {
 		if s.WorkflowID.IsExpression() {
-			if err := s.WorkflowID.Validate(false); err != nil {
+			if err := s.WorkflowID.Validate(); err != nil {
 				errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.WorkflowID))
 			}
 
@@ -281,7 +281,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("output name must be a valid name [%s]: %s", outputNameRegex.String(), name), core, core.Outputs, name))
 		}
 
-		if err := output.Validate(true); err != nil {
+		if err := output.Validate(); err != nil {
 			errs = append(errs, validation.NewMapValueError(validation.NewValueValidationError(err.Error()), core, core.Outputs, name))
 		}
 	}

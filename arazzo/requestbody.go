@@ -10,7 +10,6 @@ import (
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
-	"gopkg.in/yaml.v3"
 )
 
 // RequestBody represents the request body to pass to an operation represented by a step
@@ -41,18 +40,17 @@ func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) [
 		}
 	}
 
+	// Validate payload only if it is a top-level Arazzo runtime expression
+	// Skip validation for values containing embedded expressions or arbitrary data
 	if r.Payload != nil {
-		payloadData, err := yaml.Marshal(r.Payload)
-		if err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Payload))
-		}
-
-		expressions := expression.ExtractExpressions(string(payloadData))
-		for _, expression := range expressions {
-			if err := expression.Validate(true); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Payload))
+		_, exp, err := expression.GetValueOrExpressionValue(r.Payload)
+		if err == nil && exp != nil {
+			// Only validate if the entire payload IS an expression (not just contains expressions)
+			if err := exp.Validate(); err != nil {
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("payload expression is not valid: %s", err), core, core.Payload))
 			}
 		}
+		// If exp is nil, the payload is a value (not an expression) - no validation needed
 	}
 
 	for _, replacement := range r.Replacements {

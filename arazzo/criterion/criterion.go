@@ -211,7 +211,7 @@ func (c *Criterion) Validate(opts ...validation.Option) []error {
 	}
 
 	if c.Context != nil {
-		if err := c.Context.Validate(true); err != nil {
+		if err := c.Context.Validate(); err != nil {
 			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Context))
 		}
 	}

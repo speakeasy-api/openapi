@@ -87,7 +87,7 @@ func (s *Condition) Validate(line, column int, opts ...validation.Option) []erro
 		})
 	}
 
-	if err := s.Expression.Validate(true); err != nil {
+	if err := s.Expression.Validate(); err != nil {
 		errs = append(errs, &validation.Error{
 			UnderlyingError: validation.NewValueValidationError(err.Error()),
 			Line:            line,

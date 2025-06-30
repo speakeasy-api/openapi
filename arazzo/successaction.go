@@ -132,7 +132,7 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, params validationA
 	}
 	if params.workflowID != nil {
 		if params.workflowID.IsExpression() {
-			if err := params.workflowID.Validate(false); err != nil {
+			if err := params.workflowID.Validate(); err != nil {
 				errs = append(errs, &validation.Error{
 					UnderlyingError: validation.NewValueValidationError(err.Error()),
 					Line:            params.workflowIDLine,

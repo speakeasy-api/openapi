@@ -88,7 +88,7 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Value))
 		}
 		if expression != nil {
-			if err := expression.Validate(true); err != nil {
+			if err := expression.Validate(); err != nil {
 				errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Value))
 			}
 		}
