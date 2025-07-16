@@ -32,11 +32,11 @@ const (
 type CriterionTypeVersion string
 
 const (
-	CriterionTypeVersionNone                           CriterionTypeVersion = ""
-	CriterionTypeVersionDraftGoesnerDispatchJsonPath00 CriterionTypeVersion = "draft-goessner-dispatch-jsonpath-00"
-	CriterionTypeVersionXPath30                        CriterionTypeVersion = "xpath-30"
-	CriterionTypeVersionXPath20                        CriterionTypeVersion = "xpath-20"
-	CriterionTypeVersionXPath10                        CriterionTypeVersion = "xpath-10"
+	CriterionTypeVersionNone                            CriterionTypeVersion = ""
+	CriterionTypeVersionDraftGoessnerDispatchJsonPath00 CriterionTypeVersion = "draft-goessner-dispatch-jsonpath-00"
+	CriterionTypeVersionXPath30                         CriterionTypeVersion = "xpath-30"
+	CriterionTypeVersionXPath20                         CriterionTypeVersion = "xpath-20"
+	CriterionTypeVersionXPath10                         CriterionTypeVersion = "xpath-10"
 )
 
 // CriterionExpressionType represents the type of expression used to evaluate the criterion.
@@ -57,9 +57,9 @@ func (c *CriterionExpressionType) Validate(opts ...validation.Option) []error {
 	switch c.Type {
 	case CriterionTypeJsonPath:
 		switch c.Version {
-		case CriterionTypeVersionDraftGoesnerDispatchJsonPath00:
+		case CriterionTypeVersionDraftGoessnerDispatchJsonPath00:
 		default:
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionDraftGoesnerDispatchJsonPath00)}, ", ")), core, core.Version))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionDraftGoessnerDispatchJsonPath00)}, ", ")), core, core.Version))
 		}
 	case CriterionTypeXPath:
 		switch c.Version {
