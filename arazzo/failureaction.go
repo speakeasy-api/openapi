@@ -30,7 +30,7 @@ const (
 type FailureAction struct {
 	marshaller.Model[core.FailureAction]
 
-	// Name is the case sensitive name of the failure action.
+	// Name is the case-sensitive name of the failure action.
 	Name string
 	// Type is the type of action to take on failure.
 	Type FailureActionType
