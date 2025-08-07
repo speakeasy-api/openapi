@@ -7,6 +7,12 @@ echo "🧹 Running golangci-lint (includes go vet)..."
 golangci-lint run
 
 echo "🛡️  Running nilaway..."
-nilaway -test=false ./...
+if command -v nilaway >/dev/null 2>&1; then
+    nilaway -test=false ./...
+else
+    echo "⚠️  nilaway not found, installing..."
+    go install go.uber.org/nilaway/cmd/nilaway@8ad05f0
+    nilaway -test=false ./...
+fi
 
 echo "✅ All linting checks passed!"
