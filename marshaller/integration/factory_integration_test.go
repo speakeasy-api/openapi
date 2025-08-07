@@ -13,6 +13,8 @@ import (
 
 // TestFactoryRegistration verifies that all test model types are registered
 func TestFactoryRegistration(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name     string
 		typeFunc func() reflect.Type
@@ -49,6 +51,7 @@ func TestFactoryRegistration(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			typ := tc.typeFunc()
 			assert.True(t, marshaller.IsRegistered(typ), "Type %s should be registered with factory system", tc.name)
 
@@ -87,11 +90,14 @@ func BenchmarkFactoryVsReflection(b *testing.B) {
 
 // TestFactoryPerformanceImprovement validates the expected performance gain
 func TestFactoryPerformanceImprovement(t *testing.T) {
+	t.Parallel()
+
 	const iterations = 100000
 	primitiveType := reflect.TypeOf((*tests.TestPrimitiveHighModel)(nil)).Elem()
 
 	// Test factory creation
 	t.Run("FactoryCreation", func(t *testing.T) {
+		t.Parallel()
 		for i := 0; i < iterations; i++ {
 			model := marshaller.CreateInstance(primitiveType).Interface().(*tests.TestPrimitiveHighModel)
 			require.NotNil(t, model, "Factory should not return nil")
@@ -100,6 +106,7 @@ func TestFactoryPerformanceImprovement(t *testing.T) {
 
 	// Test reflection creation
 	t.Run("ReflectionCreation", func(t *testing.T) {
+		t.Parallel()
 		for i := 0; i < iterations; i++ {
 			model := reflect.New(primitiveType).Interface().(*tests.TestPrimitiveHighModel)
 			require.NotNil(t, model, "Reflection should not return nil")
@@ -109,6 +116,8 @@ func TestFactoryPerformanceImprovement(t *testing.T) {
 
 // TestFactoryIntegrationWithMarshaller tests that the factory works in real marshalling scenarios
 func TestFactoryIntegrationWithMarshaller(t *testing.T) {
+	t.Parallel()
+
 	// This test verifies that the factory system is properly integrated
 	// and that types are created using factories instead of reflection
 
@@ -126,6 +135,8 @@ func TestFactoryIntegrationWithMarshaller(t *testing.T) {
 
 // TestUnregisteredTypeFallback tests that unregistered types fall back to reflection
 func TestUnregisteredTypeFallback(t *testing.T) {
+	t.Parallel()
+
 	// Create a type that's not registered
 	type UnregisteredType struct {
 		Field string

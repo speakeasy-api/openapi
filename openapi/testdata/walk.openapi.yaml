@@ -1,0 +1,501 @@
+openapi: 3.1.0
+info:
+  title: Comprehensive API
+  version: 1.0.0
+  description: A comprehensive API for testing walk functionality
+  contact:
+    name: API Team
+    email: api@example.com
+    url: https://example.com/contact
+    x-custom: contact-extension
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+    x-custom: license-extension
+  x-custom: info-extension
+
+externalDocs:
+  url: https://example.com/docs
+  description: Additional documentation
+  x-custom: external-docs-extension
+
+tags:
+  - name: users
+    description: User operations
+    externalDocs:
+      url: https://example.com/users
+      x-custom: tag-external-docs-extension
+    x-custom: users-tag-extension
+  - name: pets
+    description: Pet operations
+    x-custom: pets-tag-extension
+
+servers:
+  - url: https://api.example.com/{version}
+    description: Production server
+    variables:
+      version:
+        default: v1
+        description: API version
+        enum:
+          - v1
+          - v2
+        x-custom: server-variable-extension
+    x-custom: production-server-extension
+  - url: https://staging.example.com
+    description: Staging server
+    x-custom: staging-server-extension
+
+security:
+  - apiKey: []
+
+paths:
+  /users/{id}:
+    summary: User operations
+    description: Operations on user resources
+    servers:
+      - url: https://api.example.com/{version}
+        description: Production server
+        variables:
+          version:
+            default: v1
+            description: API version
+            enum:
+              - v1
+              - v2
+            x-custom: path-server-variable-extension
+        x-custom: path-server-extension
+    parameters:
+      - name: id
+        in: path
+        description: User ID
+        required: true
+        schema:
+          type: integer
+          description: User identifier
+        examples:
+          user-id-example:
+            summary: User ID example
+            description: Example user ID
+            value: 123
+            x-custom: path-parameter-example-extension
+        x-custom: path-parameter-extension
+    get:
+      operationId: getUser
+      summary: Get user by ID
+      description: Retrieve a user by their ID
+      tags:
+        - users
+      servers:
+        - url: https://api.example.com/{version}
+          description: Production server
+          variables:
+            version:
+              default: v1
+              description: API version
+              enum:
+                - v1
+                - v2
+              x-custom: operation-server-variable-extension
+          x-custom: operation-server-extension
+      security:
+        - apiKey: []
+      parameters:
+        - name: include
+          in: query
+          description: Fields to include
+          required: false
+          schema:
+            type: string
+            description: Comma-separated list of fields
+          content:
+            application/json:
+              schema:
+                type: string
+                description: JSON string parameter
+              examples:
+                include-example:
+                  summary: Include example
+                  description: Example include parameter
+                  value: "name,email"
+                  x-custom: operation-parameter-example-extension
+              encoding:
+                profileImage:
+                  contentType: image/png
+                  headers:
+                    X-Rate-Limit:
+                      description: Rate limit header
+                      schema:
+                        type: integer
+                        description: Rate limit value
+                      x-custom: encoding-header-extension
+                  x-custom: encoding-extension
+              x-custom: operation-parameter-content-extension
+          x-custom: operation-parameter-extension
+      requestBody:
+        description: User data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+            examples:
+              user-example:
+                summary: User example
+                description: Example user object
+                value:
+                  id: 123
+                  name: John Doe
+                  email: john@example.com
+                x-custom: request-body-example-extension
+            x-custom: request-body-content-extension
+        x-custom: request-body-extension
+      responses:
+        "200":
+          description: Successful response
+          headers:
+            X-Rate-Limit:
+              description: Rate limit header
+              schema:
+                type: integer
+                description: Rate limit value
+              x-custom: response-header-extension
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              examples:
+                user-response-example:
+                  summary: User response example
+                  description: Example user response
+                  value:
+                    id: 123
+                    name: John Doe
+                    email: john@example.com
+                  x-custom: response-example-extension
+              x-custom: response-content-extension
+          links:
+            GetUserByUserId:
+              operationId: getUser
+              description: Get user by ID
+              server:
+                url: https://api.example.com/{version}
+                description: Production server
+                variables:
+                  version:
+                    default: v1
+                    description: API version
+                    enum:
+                      - v1
+                      - v2
+                    x-custom: link-server-variable-extension
+                x-custom: link-server-extension
+              x-custom: response-link-extension
+          x-custom: response-extension
+        default:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Error object
+                properties:
+                  error:
+                    type: string
+                    description: Error message
+              x-custom: default-response-content-extension
+          x-custom: default-response-extension
+        x-custom: responses-extension
+      callbacks:
+        webhook:
+          "{$request.body#/callbackUrl}":
+            post:
+              summary: Webhook callback
+              description: Callback operation
+              requestBody:
+                description: Callback data
+                content:
+                  application/json:
+                    schema:
+                      type: object
+                      description: Callback payload
+                    x-custom: callback-content-extension
+                x-custom: callback-request-body-extension
+              responses:
+                "200":
+                  description: Callback acknowledged
+                  x-custom: callback-response-extension
+              x-custom: callback-operation-extension
+            x-custom: callback-path-item-extension
+          x-custom: callback-extension
+      externalDocs:
+        url: https://example.com/get-user
+        description: Get user documentation
+        x-custom: operation-external-docs-extension
+      x-custom: operation-extension
+    x-custom: path-item-extension
+  x-custom: paths-extension
+
+webhooks:
+  newUser:
+    summary: New user webhook
+    description: Webhook for new user events
+    post:
+      summary: New user created
+      description: Called when a new user is created
+      requestBody:
+        description: New user data
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+            x-custom: webhook-content-extension
+        x-custom: webhook-request-body-extension
+      responses:
+        "200":
+          description: Webhook acknowledged
+          x-custom: webhook-response-extension
+      x-custom: webhook-operation-extension
+    x-custom: webhook-path-item-extension
+
+components:
+  schemas:
+    User:
+      type: object
+      description: User object
+      properties:
+        id:
+          type: integer
+          description: User identifier
+        name:
+          type: string
+          description: User name
+        email:
+          type: string
+          description: User email
+          format: email
+        type:
+          type: string
+          description: User type
+          enum: [admin, user, guest]
+      required:
+        - id
+        - name
+        - type
+      discriminator:
+        propertyName: type
+        mapping:
+          admin: "#/components/schemas/AdminUser"
+          user: "#/components/schemas/RegularUser"
+        x-custom: discriminator-extension
+      xml:
+        name: user
+        namespace: https://example.com/user
+        prefix: usr
+        attribute: false
+        wrapped: false
+        x-custom: xml-extension
+      x-custom: user-schema-extension
+
+    AdminUser:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            permissions:
+              type: array
+              items:
+                type: string
+              description: Admin permissions
+          required:
+            - permissions
+
+    RegularUser:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            lastLogin:
+              type: string
+              format: date-time
+              description: Last login timestamp
+
+    ComplexSchema:
+      oneOf:
+        - type: string
+        - type: integer
+      anyOf:
+        - type: object
+          properties:
+            name:
+              type: string
+        - type: array
+          items:
+            type: string
+      if:
+        properties:
+          type:
+            const: conditional
+      then:
+        properties:
+          value:
+            type: string
+      else:
+        properties:
+          value:
+            type: number
+      not:
+        type: "null"
+      patternProperties:
+        "^x-":
+          type: string
+      additionalProperties:
+        type: string
+      contains:
+        type: string
+      prefixItems:
+        - type: string
+        - type: integer
+      items:
+        type: object
+      propertyNames:
+        pattern: "^[a-zA-Z_][a-zA-Z0-9_]*$"
+      dependentSchemas:
+        name:
+          properties:
+            fullName:
+              type: string
+
+  responses:
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            type: object
+            description: Error object
+            properties:
+              error:
+                type: string
+                description: Error message
+          x-custom: component-response-content-extension
+      x-custom: component-response-extension
+
+  parameters:
+    UserIdParam:
+      name: userId
+      in: path
+      description: User identifier parameter
+      required: true
+      schema:
+        type: integer
+        description: User ID value
+      x-custom: component-parameter-extension
+
+  examples:
+    UserExample:
+      summary: User example
+      description: Example user object
+      value:
+        id: 123
+        name: John Doe
+        email: john@example.com
+      x-custom: component-example-extension
+
+  requestBodies:
+    UserRequest:
+      description: User request body
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/User"
+          x-custom: component-request-body-content-extension
+      x-custom: component-request-body-extension
+
+  headers:
+    X-Rate-Limit:
+      description: Rate limit header
+      schema:
+        type: integer
+        description: Rate limit value
+      x-custom: component-header-extension
+
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      name: X-API-Key
+      in: header
+      description: API key authentication
+      x-custom: component-security-scheme-extension
+    oauth2:
+      type: oauth2
+      description: OAuth2 authentication
+      flows:
+        implicit:
+          authorizationUrl: https://example.com/oauth/authorize
+          scopes:
+            read: Read access
+            write: Write access
+          x-custom: implicit-flow-extension
+        password:
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read: Read access
+            write: Write access
+          x-custom: password-flow-extension
+        clientCredentials:
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read: Read access
+            write: Write access
+          x-custom: client-credentials-flow-extension
+        authorizationCode:
+          authorizationUrl: https://example.com/oauth/authorize
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read: Read access
+            write: Write access
+          x-custom: authorization-code-flow-extension
+        x-custom: flows-extension
+      x-custom: oauth2-security-scheme-extension
+
+  links:
+    GetUserByUserId:
+      operationId: getUser
+      description: Get user by ID link
+      x-custom: component-link-extension
+
+  callbacks:
+    UserCallback:
+      "{$request.body#/callbackUrl}":
+        post:
+          summary: User callback
+          description: Callback for user events
+          responses:
+            "200":
+              description: Callback acknowledged
+              x-custom: component-callback-response-extension
+          x-custom: component-callback-operation-extension
+        x-custom: component-callback-path-item-extension
+      x-custom: component-callback-extension
+
+  pathItems:
+    UserPath:
+      summary: User path item
+      description: Reusable user path item
+      get:
+        summary: Get user
+        description: Get user operation
+        responses:
+          "200":
+            description: User retrieved
+            x-custom: component-path-item-response-extension
+        x-custom: component-path-item-operation-extension
+      x-custom: component-path-item-extension
+
+  x-custom: components-extension
+
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+
+x-custom: root-extension

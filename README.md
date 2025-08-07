@@ -38,6 +38,10 @@
 
 The `arazzo` package provides an API for working with Arazzo documents including reading, creating, mutating, walking and validating them.
 
+### [openapi](./openapi)
+
+The `openapi` package provides an API for working with OpenAPI documents including reading, creating, mutating, walking, validating and upgrading them. Supports both OpenAPI 3.0.x and 3.1.x specifications.
+
 ## Sub Packages
 
 This repository also contains a number of sub packages that are used by the main packages to provide the required functionality. The below packages may be moved into their own repository in the future, depending on future needs.

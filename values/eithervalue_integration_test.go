@@ -9,6 +9,8 @@ import (
 )
 
 func TestEitherValue_JSONPointer_Integration(t *testing.T) {
+	t.Parallel()
+
 	// Create a complex structure with EitherValue that supports navigation
 	leftValue := &MockBothNavigable{
 		MapData: map[string]interface{}{
@@ -74,6 +76,8 @@ func TestEitherValue_JSONPointer_Integration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result, err := jsonpointer.GetTarget(eitherValue, jsonpointer.JSONPointer(tt.pointer))
 
 			if tt.wantErr {
@@ -88,6 +92,8 @@ func TestEitherValue_JSONPointer_Integration(t *testing.T) {
 }
 
 func TestEitherValue_JSONPointer_RightValue(t *testing.T) {
+	t.Parallel()
+
 	// Test with Right value set
 	rightValue := &MockKeyNavigable{
 		Data: map[string]interface{}{
@@ -111,6 +117,8 @@ func TestEitherValue_JSONPointer_RightValue(t *testing.T) {
 }
 
 func TestEitherValue_JSONPointer_UnsupportedNavigation(t *testing.T) {
+	t.Parallel()
+
 	// Test with value that doesn't support the requested navigation type
 	eitherValue := &EitherValue[string, string, string, string]{
 		Left: stringPtr("simple string"),
@@ -120,10 +128,12 @@ func TestEitherValue_JSONPointer_UnsupportedNavigation(t *testing.T) {
 	result, err := jsonpointer.GetTarget(eitherValue, jsonpointer.JSONPointer("/somekey"))
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "expected map, slice, or struct, got string")
+	assert.Contains(t, err.Error(), "expected map, slice, struct, or yaml.Node, got string")
 }
 
 func TestEitherValue_JSONPointer_RootPointer(t *testing.T) {
+	t.Parallel()
+
 	// Test with root pointer "/" - this actually returns the EitherValue itself since "/" means empty path
 	leftValue := &MockKeyNavigable{
 		Data: map[string]interface{}{"test": "value"},

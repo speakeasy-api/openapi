@@ -13,6 +13,7 @@ import (
 )
 
 func TestCriterion_Validate_Success(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		c    *criterion.Criterion
 		opts []validation.Option
@@ -39,6 +40,7 @@ func TestCriterion_Validate_Success(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := tt.args.c.Sync(context.Background())
 			require.NoError(t, err)
 			errs := tt.args.c.Validate(tt.args.opts...)

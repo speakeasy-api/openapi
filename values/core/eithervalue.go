@@ -112,13 +112,37 @@ func (v *EitherValue[L, R]) SyncChanges(ctx context.Context, model any, valueNod
 	leftIsNil := lf.IsNil()
 	rightIsNil := rf.IsNil()
 
+	// Track the original state to detect side switches
+	originalIsLeft := v.IsLeft
+	originalIsRight := v.IsRight
+
+	// Detect if we're switching sides
+	switchingSides := false
+	if !leftIsNil && originalIsRight {
+		// Switching from Right to Left
+		switchingSides = true
+	} else if !rightIsNil && originalIsLeft {
+		// Switching from Left to Right
+		switchingSides = true
+	}
+
+	// Determine which valueNode to use
+	var nodeToUse *yaml.Node
+	if switchingSides {
+		// Force creation of new node when switching sides
+		// This prevents reusing the old node structure which may be incompatible
+		nodeToUse = nil
+	} else {
+		nodeToUse = valueNode
+	}
+
 	// Reset flags
 	v.IsLeft = false
 	v.IsRight = false
 
 	if !leftIsNil {
 		// Left is active - sync left value and set flag
-		lv, err := marshaller.SyncValue(ctx, lf.Interface(), &v.Left.Value, valueNode, false)
+		lv, err := marshaller.SyncValue(ctx, lf.Interface(), &v.Left.Value, nodeToUse, false)
 		if err != nil {
 			return nil, err
 		}
@@ -127,10 +151,11 @@ func (v *EitherValue[L, R]) SyncChanges(ctx context.Context, model any, valueNod
 		return lv, nil
 	} else if !rightIsNil {
 		// Right is active - sync right value and set flag
-		rv, err := marshaller.SyncValue(ctx, rf.Interface(), &v.Right.Value, valueNode, false)
+		rv, err := marshaller.SyncValue(ctx, rf.Interface(), &v.Right.Value, nodeToUse, false)
 		if err != nil {
 			return nil, err
 		}
+
 		v.IsRight = true
 		v.SetRootNode(rv)
 		return rv, nil

@@ -18,8 +18,8 @@ import (
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/jsonpointer"
-	"github.com/speakeasy-api/openapi/jsonschema/oas31"
-	jsonschema_core "github.com/speakeasy-api/openapi/jsonschema/oas31/core"
+	"github.com/speakeasy-api/openapi/jsonschema/oas3"
+	jsonschema_core "github.com/speakeasy-api/openapi/jsonschema/oas3/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/sequencedmap"
@@ -31,211 +31,215 @@ import (
 )
 
 // TODO make it possible to choose json or yaml output
-var testArazzoInstance = &arazzo.Arazzo{
-	Arazzo: arazzo.Version,
-	Info: arazzo.Info{
-		Title:   "My Workflow",
-		Summary: pointer.From("A summary"),
-		Version: "1.0.0",
-		Extensions: extensions.New(extensions.NewElem("x-test", &yaml.Node{
-			Value:  "some-value",
-			Kind:   yaml.ScalarNode,
-			Tag:    "!!str",
-			Line:   6,
-			Column: 11,
-		})),
-		Model: marshaller.Model[core.Info]{
-			Valid: true,
-		},
-	},
-	SourceDescriptions: []*arazzo.SourceDescription{
-		{
-			Name: "openapi",
-			URL:  "https://openapi.com",
-			Type: "openapi",
+// getTestArazzoInstance returns a fresh copy of the test instance to avoid data races in parallel tests
+func getTestArazzoInstance() *arazzo.Arazzo {
+	return &arazzo.Arazzo{
+		Arazzo: arazzo.Version,
+		Info: arazzo.Info{
+			Title:   "My Workflow",
+			Summary: pointer.From("A summary"),
+			Version: "1.0.0",
 			Extensions: extensions.New(extensions.NewElem("x-test", &yaml.Node{
 				Value:  "some-value",
 				Kind:   yaml.ScalarNode,
 				Tag:    "!!str",
-				Line:   11,
-				Column: 13,
+				Line:   6,
+				Column: 11,
 			})),
-			Model: marshaller.Model[core.SourceDescription]{
+			Model: marshaller.Model[core.Info]{
 				Valid: true,
 			},
 		},
-	},
-	Workflows: []*arazzo.Workflow{
-		{
-			WorkflowID:  "workflow1",
-			Summary:     pointer.From("A summary"),
-			Description: pointer.From("A description"),
-			Parameters: []*arazzo.ReusableParameter{
-				{
-					Object: &arazzo.Parameter{
-						Name:  "parameter1",
-						In:    pointer.From(arazzo.InQuery),
-						Value: &yaml.Node{Value: "123", Kind: yaml.ScalarNode, Tag: "!!str", Line: 19, Column: 16, Style: yaml.DoubleQuotedStyle},
-						Model: marshaller.Model[core.Parameter]{
-							Valid: true,
-						},
-					},
-					Model: marshaller.Model[core.Reusable[*core.Parameter]]{
-						Valid: true,
-					},
-				},
-			},
-			Inputs: oas31.NewJSONSchemaFromSchema(&oas31.Schema{
-				Type: oas31.NewTypeFromString("object"),
-				Properties: sequencedmap.New(sequencedmap.NewElem("input1", oas31.NewJSONSchemaFromSchema(&oas31.Schema{
-					Type: oas31.NewTypeFromString("string"),
-					Model: marshaller.Model[jsonschema_core.Schema]{
-						Valid: true,
-					},
-				}))),
-				Required: []string{"input1"},
-				Model: marshaller.Model[jsonschema_core.Schema]{
+		SourceDescriptions: []*arazzo.SourceDescription{
+			{
+				Name: "openapi",
+				URL:  "https://openapi.com",
+				Type: "openapi",
+				Extensions: extensions.New(extensions.NewElem("x-test", &yaml.Node{
+					Value:  "some-value",
+					Kind:   yaml.ScalarNode,
+					Tag:    "!!str",
+					Line:   11,
+					Column: 13,
+				})),
+				Model: marshaller.Model[core.SourceDescription]{
 					Valid: true,
 				},
-			}),
-			Steps: []*arazzo.Step{
-				{
-					StepID:      "step1",
-					Description: pointer.From("A description"),
-					OperationID: pointer.From[expression.Expression]("operation1"),
-					Parameters: []*arazzo.ReusableParameter{
-						{
-							Reference: pointer.From[expression.Expression]("$components.parameters.userId"),
-							Value:     &yaml.Node{Value: "456", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle, Line: 33, Column: 20},
-							Model: marshaller.Model[core.Reusable[*core.Parameter]]{
+			},
+		},
+		Workflows: []*arazzo.Workflow{
+			{
+				WorkflowID:  "workflow1",
+				Summary:     pointer.From("A summary"),
+				Description: pointer.From("A description"),
+				Parameters: []*arazzo.ReusableParameter{
+					{
+						Object: &arazzo.Parameter{
+							Name:  "parameter1",
+							In:    pointer.From(arazzo.InQuery),
+							Value: &yaml.Node{Value: "123", Kind: yaml.ScalarNode, Tag: "!!str", Line: 19, Column: 16, Style: yaml.DoubleQuotedStyle},
+							Model: marshaller.Model[core.Parameter]{
 								Valid: true,
 							},
 						},
+						Model: marshaller.Model[core.Reusable[*core.Parameter]]{
+							Valid: true,
+						},
 					},
-					RequestBody: &arazzo.RequestBody{
-						ContentType: pointer.From("application/json"),
-						Payload: &yaml.Node{Content: []*yaml.Node{
+				},
+				Inputs: oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{
+					Type: oas3.NewTypeFromString("object"),
+					Properties: sequencedmap.New(sequencedmap.NewElem("input1", oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{
+						Type: oas3.NewTypeFromString("string"),
+						Model: marshaller.Model[jsonschema_core.Schema]{
+							Valid: true,
+						},
+					}))),
+					Required: []string{"input1"},
+					Model: marshaller.Model[jsonschema_core.Schema]{
+						Valid: true,
+					},
+				}),
+				Steps: []*arazzo.Step{
+					{
+						StepID:      "step1",
+						Description: pointer.From("A description"),
+						OperationID: pointer.From[expression.Expression]("operation1"),
+						Parameters: []*arazzo.ReusableParameter{
 							{
-								Value:  "a",
-								Kind:   yaml.ScalarNode,
-								Tag:    "!!str",
-								Style:  yaml.DoubleQuotedStyle,
-								Line:   36,
-								Column: 21,
-							},
-							{
-								Value:  "1",
-								Kind:   yaml.ScalarNode,
-								Tag:    "!!int",
-								Line:   36,
-								Column: 26,
-							},
-							{
-								Value:  "b",
-								Kind:   yaml.ScalarNode,
-								Tag:    "!!str",
-								Style:  yaml.DoubleQuotedStyle,
-								Line:   36,
-								Column: 29,
-							},
-							{
-								Value:  "2",
-								Kind:   yaml.ScalarNode,
-								Tag:    "!!int",
-								Line:   36,
-								Column: 34,
-							},
-						}, Kind: yaml.MappingNode, Tag: "!!map", Style: yaml.FlowStyle, Line: 36, Column: 20},
-						Replacements: []*arazzo.PayloadReplacement{
-							{
-								Target: jsonpointer.JSONPointer("/b"),
-								Value:  &yaml.Node{Value: "3", Kind: yaml.ScalarNode, Tag: "!!int", Line: 39, Column: 22},
-								Model: marshaller.Model[core.PayloadReplacement]{
+								Reference: pointer.From[expression.Expression]("$components.parameters.userId"),
+								Value:     &yaml.Node{Value: "456", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle, Line: 33, Column: 20},
+								Model: marshaller.Model[core.Reusable[*core.Parameter]]{
 									Valid: true,
 								},
 							},
 						},
-						Model: marshaller.Model[core.RequestBody]{
+						RequestBody: &arazzo.RequestBody{
+							ContentType: pointer.From("application/json"),
+							Payload: &yaml.Node{Content: []*yaml.Node{
+								{
+									Value:  "a",
+									Kind:   yaml.ScalarNode,
+									Tag:    "!!str",
+									Style:  yaml.DoubleQuotedStyle,
+									Line:   36,
+									Column: 21,
+								},
+								{
+									Value:  "1",
+									Kind:   yaml.ScalarNode,
+									Tag:    "!!int",
+									Line:   36,
+									Column: 26,
+								},
+								{
+									Value:  "b",
+									Kind:   yaml.ScalarNode,
+									Tag:    "!!str",
+									Style:  yaml.DoubleQuotedStyle,
+									Line:   36,
+									Column: 29,
+								},
+								{
+									Value:  "2",
+									Kind:   yaml.ScalarNode,
+									Tag:    "!!int",
+									Line:   36,
+									Column: 34,
+								},
+							}, Kind: yaml.MappingNode, Tag: "!!map", Style: yaml.FlowStyle, Line: 36, Column: 20},
+							Replacements: []*arazzo.PayloadReplacement{
+								{
+									Target: jsonpointer.JSONPointer("/b"),
+									Value:  &yaml.Node{Value: "3", Kind: yaml.ScalarNode, Tag: "!!int", Line: 39, Column: 22},
+									Model: marshaller.Model[core.PayloadReplacement]{
+										Valid: true,
+									},
+								},
+							},
+							Model: marshaller.Model[core.RequestBody]{
+								Valid: true,
+							},
+						},
+						SuccessCriteria: []*criterion.Criterion{{Condition: "$statusCode == 200", Type: criterion.CriterionTypeUnion{}, Model: marshaller.Model[core.Criterion]{Valid: true}}},
+						OnSuccess: []*arazzo.ReusableSuccessAction{
+							{
+								Reference: pointer.From[expression.Expression]("$components.successActions.success"),
+								Model: marshaller.Model[core.Reusable[*core.SuccessAction]]{
+									Valid: true,
+								},
+							},
+						},
+						OnFailure: []*arazzo.ReusableFailureAction{
+							{
+								Reference: pointer.From[expression.Expression]("$components.failureActions.failure"),
+								Model: marshaller.Model[core.Reusable[*core.FailureAction]]{
+									Valid: true,
+								},
+							},
+						},
+						Outputs: sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("name", "$response.body#/name")),
+						Model: marshaller.Model[core.Step]{
 							Valid: true,
 						},
 					},
-					SuccessCriteria: []*criterion.Criterion{{Condition: "$statusCode == 200", Type: criterion.CriterionTypeUnion{}, Model: marshaller.Model[core.Criterion]{Valid: true}}},
-					OnSuccess: []*arazzo.ReusableSuccessAction{
-						{
-							Reference: pointer.From[expression.Expression]("$components.successActions.success"),
-							Model: marshaller.Model[core.Reusable[*core.SuccessAction]]{
-								Valid: true,
-							},
-						},
-					},
-					OnFailure: []*arazzo.ReusableFailureAction{
-						{
-							Reference: pointer.From[expression.Expression]("$components.failureActions.failure"),
-							Model: marshaller.Model[core.Reusable[*core.FailureAction]]{
-								Valid: true,
-							},
-						},
-					},
-					Outputs: sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("name", "$response.body#/name")),
-					Model: marshaller.Model[core.Step]{
-						Valid: true,
-					},
+				},
+				Outputs: sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("name", "$steps.step1.outputs.name")),
+				Model: marshaller.Model[core.Workflow]{
+					Valid: true,
 				},
 			},
-			Outputs: sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("name", "$steps.step1.outputs.name")),
-			Model: marshaller.Model[core.Workflow]{
+		},
+		Components: &arazzo.Components{
+			Parameters: sequencedmap.New(sequencedmap.NewElem("userId", &arazzo.Parameter{
+				Name:  "userId",
+				In:    pointer.From(arazzo.InQuery),
+				Value: &yaml.Node{Value: "123", Kind: yaml.ScalarNode, Tag: "!!str"},
+				Model: marshaller.Model[core.Parameter]{
+					Valid: true,
+				},
+			})),
+			SuccessActions: sequencedmap.New(sequencedmap.NewElem("success", &arazzo.SuccessAction{
+				Name: "success",
+				Type: arazzo.SuccessActionTypeEnd,
+				Criteria: []criterion.Criterion{{Context: pointer.From(expression.Expression("$statusCode")), Condition: "$statusCode == 200", Type: criterion.CriterionTypeUnion{
+					Type: pointer.From(criterion.CriterionTypeSimple),
+				}}},
+				Model: marshaller.Model[core.SuccessAction]{
+					Valid: true,
+				},
+			})),
+			FailureActions: sequencedmap.New(sequencedmap.NewElem("failure", &arazzo.FailureAction{
+				Name:       "failure",
+				Type:       arazzo.FailureActionTypeRetry,
+				RetryAfter: pointer.From(10.0),
+				RetryLimit: pointer.From(3),
+				Criteria: []criterion.Criterion{{Context: pointer.From(expression.Expression("$statusCode")), Condition: "$statusCode == 500", Type: criterion.CriterionTypeUnion{
+					Type: pointer.From(criterion.CriterionTypeSimple),
+				}}},
+				Model: marshaller.Model[core.FailureAction]{
+					Valid: true,
+				},
+			})),
+			Model: marshaller.Model[core.Components]{
 				Valid: true,
 			},
 		},
-	},
-	Components: &arazzo.Components{
-		Parameters: sequencedmap.New(sequencedmap.NewElem("userId", &arazzo.Parameter{
-			Name:  "userId",
-			In:    pointer.From(arazzo.InQuery),
-			Value: &yaml.Node{Value: "123", Kind: yaml.ScalarNode, Tag: "!!str"},
-			Model: marshaller.Model[core.Parameter]{
-				Valid: true,
-			},
+		Extensions: extensions.New(extensions.NewElem("x-test", &yaml.Node{
+			Value:  "some-value",
+			Kind:   yaml.ScalarNode,
+			Tag:    "!!str",
+			Line:   72,
+			Column: 9,
 		})),
-		SuccessActions: sequencedmap.New(sequencedmap.NewElem("success", &arazzo.SuccessAction{
-			Name: "success",
-			Type: arazzo.SuccessActionTypeEnd,
-			Criteria: []criterion.Criterion{{Context: pointer.From(expression.Expression("$statusCode")), Condition: "$statusCode == 200", Type: criterion.CriterionTypeUnion{
-				Type: pointer.From(criterion.CriterionTypeSimple),
-			}}},
-			Model: marshaller.Model[core.SuccessAction]{
-				Valid: true,
-			},
-		})),
-		FailureActions: sequencedmap.New(sequencedmap.NewElem("failure", &arazzo.FailureAction{
-			Name:       "failure",
-			Type:       arazzo.FailureActionTypeRetry,
-			RetryAfter: pointer.From(10.0),
-			RetryLimit: pointer.From(3),
-			Criteria: []criterion.Criterion{{Context: pointer.From(expression.Expression("$statusCode")), Condition: "$statusCode == 500", Type: criterion.CriterionTypeUnion{
-				Type: pointer.From(criterion.CriterionTypeSimple),
-			}}},
-			Model: marshaller.Model[core.FailureAction]{
-				Valid: true,
-			},
-		})),
-		Model: marshaller.Model[core.Components]{
+		Model: marshaller.Model[core.Arazzo]{
 			Valid: true,
 		},
-	},
-	Extensions: extensions.New(extensions.NewElem("x-test", &yaml.Node{
-		Value:  "some-value",
-		Kind:   yaml.ScalarNode,
-		Tag:    "!!str",
-		Line:   72,
-		Column: 9,
-	})),
-	Model: marshaller.Model[core.Arazzo]{
-		Valid: true,
-	},
+	}
 }
 
 func TestArazzo_Unmarshal_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/test.arazzo.yaml")
@@ -245,7 +249,7 @@ func TestArazzo_Unmarshal_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
-	expected := testArazzoInstance
+	expected := getTestArazzoInstance()
 
 	assert.EqualExportedValues(t, expected, a)
 	assert.EqualExportedValues(t, expected.Extensions, a.Extensions)
@@ -256,6 +260,7 @@ func TestArazzo_Unmarshal_Success(t *testing.T) {
 }
 
 func TestArazzo_RoundTrip_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/test.arazzo.yaml")
@@ -276,6 +281,7 @@ func TestArazzo_RoundTrip_Success(t *testing.T) {
 }
 
 func TestArazzoUnmarshal_ValidationErrors(t *testing.T) {
+	t.Parallel()
 	data := []byte(`arazzo: 1.0.2
 x-test: some-value
 info:
@@ -339,6 +345,7 @@ sourceDescriptions:
 }
 
 func TestArazzo_Mutate_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/test.arazzo.yaml")
@@ -435,14 +442,16 @@ x-test: some-value
 }
 
 func TestArazzo_Create_Success(t *testing.T) {
+	t.Parallel()
 	outBuf := bytes.NewBuffer([]byte{})
 
 	ctx := context.Background()
 
-	err := arazzo.Marshal(ctx, testArazzoInstance, outBuf)
+	testInstance := getTestArazzoInstance()
+	err := arazzo.Marshal(ctx, testInstance, outBuf)
 	require.NoError(t, err)
 
-	errs := testArazzoInstance.Validate(ctx)
+	errs := testInstance.Validate(ctx)
 	require.Empty(t, errs)
 
 	data, err := os.ReadFile("testdata/test.arazzo.yaml")
@@ -452,6 +461,7 @@ func TestArazzo_Create_Success(t *testing.T) {
 }
 
 func TestArazzo_Deconstruct_Success(t *testing.T) {
+	t.Parallel()
 	data := []byte(`arazzo: 1.0.0
 x-test: some-value
 info:
@@ -686,8 +696,10 @@ var stressTests = []struct {
 }
 
 func TestArazzo_StressTests_Validate(t *testing.T) {
+	t.Parallel()
 	for _, tt := range stressTests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			ctx := context.Background()
 
 			var r io.ReadCloser
@@ -700,7 +712,7 @@ func TestArazzo_StressTests_Validate(t *testing.T) {
 				r, err = downloadFile(tt.args.location)
 				require.NoError(t, err)
 			}
-			defer r.Close()
+			defer r.Close() //nolint:errcheck
 
 			arazzo, validationErrs, err := arazzo.Unmarshal(ctx, r)
 			require.NoError(t, err)
@@ -713,8 +725,10 @@ func TestArazzo_StressTests_Validate(t *testing.T) {
 }
 
 func TestArazzo_StressTests_RoundTrip(t *testing.T) {
+	t.Parallel()
 	for _, tt := range stressTests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if tt.args.skipRoundTrip {
 				t.SkipNow()
 			}
@@ -731,7 +745,7 @@ func TestArazzo_StressTests_RoundTrip(t *testing.T) {
 				r, err = downloadFile(tt.args.location)
 				require.NoError(t, err)
 			}
-			defer r.Close()
+			defer r.Close() //nolint:errcheck
 
 			inBuf := bytes.NewBuffer([]byte{})
 			tee := io.TeeReader(r, inBuf)
@@ -779,7 +793,7 @@ func downloadFile(url string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	buf := bytes.NewBuffer([]byte{})
 	tee := io.TeeReader(resp.Body, buf)
@@ -788,7 +802,7 @@ func downloadFile(url string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	_, err = io.Copy(f, tee)
 

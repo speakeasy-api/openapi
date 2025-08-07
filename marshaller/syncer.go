@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
@@ -71,8 +72,8 @@ func SyncValue(ctx context.Context, source any, target any, valueNode *yaml.Node
 				return syncChanges(ctx, s.Interface(), t.Interface(), valueNode)
 			}
 
-			if implementsInterface[sequencedMapInterface](t) {
-				return syncSequencedMapChanges(ctx, t.Interface().(sequencedMapInterface), s.Interface(), valueNode, SyncValue)
+			if implementsInterface(t, sequencedMapType) {
+				return syncSequencedMapChanges(ctx, t.Interface().(interfaces.SequencedMapInterface), s.Interface(), valueNode, SyncValue)
 			}
 		}
 
@@ -140,29 +141,16 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 
 		// Handle embedded fields (anonymous fields)
 		if field.Anonymous {
-			// For embedded fields, we need to handle them specially
 			targetField := t.Field(i)
 			sourceField := sUnderlying.Field(i)
 
-			// Initialize embedded field if it's nil
-			if targetField.Kind() == reflect.Ptr && targetField.IsNil() {
-				targetField.Set(CreateInstance(targetField.Type().Elem()))
-			}
-
-			// Check if it implements SequencedMapInterface for syncing
-			if targetField.CanInterface() {
-				if seqMapInterface, ok := targetField.Interface().(sequencedMapInterface); ok {
-					var sourceInterface any
-					if sourceField.CanInterface() {
-						sourceInterface = sourceField.Interface()
-					}
-
-					newValueNode, err := syncSequencedMapChanges(ctx, seqMapInterface, sourceInterface, valueNode, SyncValue)
-					if err != nil {
-						return nil, err
-					}
-					valueNode = newValueNode
+			if seqMapInterface := initializeAndGetSequencedMapInterface(targetField); seqMapInterface != nil {
+				sourceInterface := getSourceInterface(sourceField)
+				newValueNode, err := syncSequencedMapChanges(ctx, seqMapInterface, sourceInterface, valueNode, SyncValue)
+				if err != nil {
+					return nil, err
 				}
+				valueNode = newValueNode
 			}
 			continue
 		}
@@ -270,7 +258,7 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 
 	// Update the core of the source with the updated value
 	if coreSetter, ok := s.Interface().(CoreSetter); ok {
-		coreSetter.SetCoreValue(t.Interface())
+		coreSetter.SetCoreAny(t.Interface())
 	}
 
 	// Set validity on the core model
@@ -452,7 +440,7 @@ func reorderArrayElements(sourceVal, targetVal reflect.Value, valueNode *yaml.No
 			}
 
 			// Only match if both RootNodes are non-nil and equal
-			if targetRootNode != nil && sourceRootNode != nil && targetRootNode == sourceRootNode {
+			if targetRootNode != nil && targetRootNode == sourceRootNode {
 				// Found the matching target element - reuse it to preserve its core state
 				reorderedTargets[i] = targetElement.Addr().Interface()
 				if j < len(originalNodes) {
@@ -512,6 +500,64 @@ func getUnderlyingValue(v reflect.Value) reflect.Value {
 		v = v.Elem()
 	}
 	return v
+}
+
+// initializeAndGetSequencedMapInterface handles initialization and returns SequencedMapInterface for embedded fields
+func initializeAndGetSequencedMapInterface(targetField reflect.Value) interfaces.SequencedMapInterface {
+	// Handle both pointer and value embeds
+	if targetField.Kind() == reflect.Ptr {
+		// Pointer embed - initialize if nil
+		if targetField.IsNil() {
+			targetField.Set(CreateInstance(targetField.Type().Elem()))
+		}
+	} else {
+		// Value embed - check if it needs initialization using IsInitialized method
+		if targetField.CanAddr() {
+			if seqMapInterface, ok := targetField.Addr().Interface().(interfaces.SequencedMapInterface); ok {
+				if !seqMapInterface.IsInitialized() {
+					// Initialize the value embed by creating a new instance and copying it
+					newInstance := CreateInstance(targetField.Type())
+					targetField.Set(newInstance.Elem())
+				}
+			}
+		}
+	}
+
+	// Check if it implements SequencedMapInterface for syncing
+	if targetField.CanInterface() {
+		var seqMapInterface interfaces.SequencedMapInterface
+		var ok bool
+
+		// Try direct interface check first (for pointer embeds)
+		seqMapInterface, ok = targetField.Interface().(interfaces.SequencedMapInterface)
+
+		// If that fails and the field is addressable, try getting a pointer to it (for value embeds)
+		if !ok && targetField.CanAddr() {
+			seqMapInterface, ok = targetField.Addr().Interface().(interfaces.SequencedMapInterface)
+		}
+
+		if ok {
+			return seqMapInterface
+		}
+	}
+	return nil
+}
+
+// getSourceInterface prepares the source field interface for syncing
+func getSourceInterface(sourceField reflect.Value) any {
+	if sourceField.CanInterface() {
+		// For pointer embeds, use the field directly (it's already a pointer)
+		if sourceField.Kind() == reflect.Ptr {
+			return sourceField.Interface()
+		}
+		// For value embeds, we need to pass a pointer to the source field so it implements MapGetter
+		if sourceField.CanAddr() {
+			return sourceField.Addr().Interface()
+		} else {
+			return sourceField.Interface()
+		}
+	}
+	return nil
 }
 
 func dereferenceType(typ reflect.Type) reflect.Type {

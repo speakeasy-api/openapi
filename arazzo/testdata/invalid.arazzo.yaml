@@ -1,0 +1,24 @@
+arazzo: 1.0.0
+info:
+  title: Invalid Workflow
+  # Missing required version field
+sourceDescriptions:
+  - name: api
+    url: https://api.example.com/openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: invalidWorkflow
+    summary: A workflow with validation errors
+    steps:
+      - stepId: step1
+        # Missing required operationId field
+        parameters:
+          - name: id
+            in: path
+            value: "123"
+      - stepId: step2
+        operationId: getUser
+        parameters:
+          - name: invalidParam
+            # Missing required 'in' field
+            value: "test"

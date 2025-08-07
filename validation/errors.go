@@ -41,10 +41,19 @@ type mapValueNodeGetter interface {
 }
 
 func NewNodeError(err error, node *yaml.Node) error {
+	line := -1
+	column := -1
+
+	// If the node is nil, use the line/column from the error
+	if node != nil {
+		line = node.Line
+		column = node.Column
+	}
+
 	return &Error{
 		UnderlyingError: err,
-		Line:            node.Line,
-		Column:          node.Column,
+		Line:            line,
+		Column:          column,
 	}
 }
 

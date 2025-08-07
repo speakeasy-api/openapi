@@ -9,10 +9,18 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
+)
+
+// Pre-computed reflection types for performance (reusing from populator.go where possible)
+var (
+	nodeMutatorType    = reflect.TypeOf((*NodeMutator)(nil)).Elem()
+	unmarshallableType = reflect.TypeOf((*Unmarshallable)(nil)).Elem()
+	// sequencedMapType and coreModelerType are already defined in populator.go
 )
 
 // Unmarshallable is an interface that can be implemented by types that can be unmarshalled from a YAML document.
@@ -21,6 +29,7 @@ type Unmarshallable interface {
 	Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error)
 }
 
+// Unmarshal will unmarshal the provided document into the specified model.
 func Unmarshal[T any](ctx context.Context, doc io.Reader, out CoreAccessor[T]) ([]error, error) {
 	data, err := io.ReadAll(doc)
 	if err != nil {
@@ -37,14 +46,23 @@ func Unmarshal[T any](ctx context.Context, doc io.Reader, out CoreAccessor[T]) (
 	}
 
 	core := out.GetCore()
-	validationErrs, err := UnmarshalCore(ctx, &root, core)
-	if err != nil {
-		return nil, err
-	}
 
 	// Check if the core implements CoreModeler interface
 	if coreModeler, ok := any(core).(CoreModeler); ok {
 		coreModeler.SetConfig(yml.GetConfigFromDoc(data, &root))
+	}
+
+	return UnmarshalNode(ctx, &root, out)
+}
+
+// UnmarshalNode will unmarshal the provided node into the provided model.
+// This method is useful for unmarshaling partial documents, for a full document use Unmarshal as it will retain the full document structure.
+func UnmarshalNode[T any](ctx context.Context, node *yaml.Node, out CoreAccessor[T]) ([]error, error) {
+	core := out.GetCore()
+
+	validationErrs, err := UnmarshalCore(ctx, node, core)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := Populate(*core, out); err != nil {
@@ -81,7 +99,7 @@ func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 func UnmarshalKeyValuePair(ctx context.Context, keyNode, valueNode *yaml.Node, outValue any) ([]error, error) {
 	out := reflect.ValueOf(outValue)
 
-	if implementsInterface[NodeMutator](out) {
+	if implementsInterface(out, nodeMutatorType) {
 		return unmarshalNode(ctx, keyNode, valueNode, "value", out)
 	} else {
 		return UnmarshalCore(ctx, valueNode, outValue)
@@ -101,6 +119,9 @@ func DecodeNode(ctx context.Context, node *yaml.Node, out any) ([]error, error) 
 
 func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) ([]error, error) {
 	resolvedNode := yml.ResolveAlias(node)
+	if resolvedNode == nil {
+		return nil, nil
+	}
 
 	switch {
 	case out.Type() == reflect.TypeOf((*yaml.Node)(nil)):
@@ -111,7 +132,7 @@ func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) ([]error
 		return nil, nil
 	}
 
-	if implementsInterface[NodeMutator](out) {
+	if implementsInterface(out, nodeMutatorType) {
 		if out.Kind() != reflect.Ptr {
 			out = out.Addr()
 		}
@@ -132,7 +153,7 @@ func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) ([]error
 		return unmarshalMapping(ctx, node, out)
 	}
 
-	if implementsInterface[Unmarshallable](out) {
+	if implementsInterface(out, unmarshallableType) {
 		if out.Kind() != reflect.Ptr {
 			out = out.Addr()
 		}
@@ -149,7 +170,7 @@ func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) ([]error
 		return unmarshallable.Unmarshal(ctx, node)
 	}
 
-	if implementsInterface[sequencedMapInterface](out) {
+	if implementsInterface(out, sequencedMapType) {
 		if out.Kind() != reflect.Ptr {
 			out = out.Addr()
 		}
@@ -158,7 +179,7 @@ func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) ([]error
 			out.Set(CreateInstance(out.Type().Elem()))
 		}
 
-		seqMapInterface, ok := out.Interface().(sequencedMapInterface)
+		seqMapInterface, ok := out.Interface().(interfaces.SequencedMapInterface)
 		if !ok {
 			return nil, fmt.Errorf("expected sequencedMapInterface, got %s at line %d, column %d", out.Type(), resolvedNode.Line, resolvedNode.Column)
 		}
@@ -170,29 +191,29 @@ func unmarshal(ctx context.Context, node *yaml.Node, out reflect.Value) ([]error
 	switch {
 	case isStructType(out):
 		// Target expects a struct/object
-		if validationErrs, err := validateNodeKind(resolvedNode, yaml.MappingNode, "struct"); err != nil || validationErrs != nil {
-			return validationErrs, err
+		if err := validateNodeKind(resolvedNode, yaml.MappingNode, "struct"); err != nil {
+			return []error{err}, nil
 		}
 		return unmarshalMapping(ctx, node, out)
 
 	case isSliceType(out):
 		// Target expects a slice/array
-		if validationErrs, err := validateNodeKind(resolvedNode, yaml.SequenceNode, "slice"); err != nil || validationErrs != nil {
-			return validationErrs, err
+		if err := validateNodeKind(resolvedNode, yaml.SequenceNode, "slice"); err != nil {
+			return []error{err}, nil
 		}
 		return unmarshalSequence(ctx, node, out)
 
 	case isMapType(out):
 		// Target expects a map
-		if validationErrs, err := validateNodeKind(resolvedNode, yaml.MappingNode, "map"); err != nil || validationErrs != nil {
-			return validationErrs, err
+		if err := validateNodeKind(resolvedNode, yaml.MappingNode, "map"); err != nil {
+			return []error{err}, nil
 		}
 		return unmarshalMapping(ctx, node, out)
 
 	default:
 		// Target expects a scalar value (string, int, bool, etc.)
-		if validationErrs, err := validateNodeKind(resolvedNode, yaml.ScalarNode, out.Type().String()); err != nil || validationErrs != nil {
-			return validationErrs, err
+		if err := validateNodeKind(resolvedNode, yaml.ScalarNode, out.Type().String()); err != nil {
+			return []error{err}, nil
 		}
 		return decodeNode(ctx, resolvedNode, out.Addr().Interface())
 	}
@@ -205,10 +226,13 @@ func unmarshalMapping(ctx context.Context, node *yaml.Node, out reflect.Value) (
 	}
 
 	resolvedNode := yml.ResolveAlias(node)
+	if resolvedNode == nil {
+		return nil, nil
+	}
 
 	switch {
 	case out.Kind() == reflect.Struct:
-		if implementsInterface[CoreModeler](out) {
+		if implementsInterface(out, coreModelerType) {
 			return unmarshalModel(ctx, node, out.Addr().Interface())
 		} else {
 			return unmarshalStruct(ctx, node, out.Addr().Interface())
@@ -222,6 +246,9 @@ func unmarshalMapping(ctx context.Context, node *yaml.Node, out reflect.Value) (
 
 func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]error, error) {
 	resolvedNode := yml.ResolveAlias(node)
+	if resolvedNode == nil {
+		return nil, nil
+	}
 
 	if resolvedNode.Kind != yaml.MappingNode {
 		return []error{
@@ -242,7 +269,7 @@ func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 	var unmarshallable CoreModeler
 
 	// Check if struct implements CoreModeler
-	if implementsInterface[CoreModeler](out) {
+	if implementsInterface(out, coreModelerType) {
 		var ok bool
 		unmarshallable, ok = out.Addr().Interface().(CoreModeler)
 		if !ok {
@@ -254,74 +281,27 @@ func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 
 	unmarshallable.SetRootNode(node)
 
-	type Field struct {
-		Name     string
-		Field    reflect.Value
-		Required bool
+	// Get cached field information, build it if not available
+	structType := out.Type()
+	fieldMap := getFieldMapCached(structType)
+
+	// Handle extensions field using cached index
+	var extensionsField *reflect.Value
+	if fieldMap.HasExtensions {
+		extField := out.Field(fieldMap.ExtensionIndex)
+		extensionsField = &extField
 	}
 
-	// get fields by tag first
-	fields := map[string]Field{}
-	var extensionsField *reflect.Value
-	requiredFields := map[string]Field{} // Track required fields separately
-
-	var embeddedMap sequencedMapInterface
-
+	// Handle embedded maps (these need runtime reflection)
+	var embeddedMap interfaces.SequencedMapInterface
 	for i := 0; i < out.NumField(); i++ {
-		field := out.Type().Field(i)
-
+		field := structType.Field(i)
 		if field.Anonymous {
 			fieldVal := out.Field(i)
-
-			// Check if the field is a embedded sequenced map
-			if implementsInterface[sequencedMapInterface](fieldVal) {
-				if fieldVal.IsNil() {
-					fieldVal.Set(CreateInstance(fieldVal.Type().Elem()))
-				}
-				embeddedMap = fieldVal.Interface().(sequencedMapInterface)
+			if seqMap := initializeEmbeddedSequencedMap(fieldVal); seqMap != nil {
+				embeddedMap = seqMap
 			}
 			continue
-		}
-
-		if !field.IsExported() {
-			continue
-		}
-
-		tag := field.Tag.Get("key")
-		if tag == "" || tag == "extensions" {
-			if tag == "extensions" {
-				extField := out.Field(i)
-				extensionsField = &extField
-			}
-
-			continue
-		}
-
-		requiredTag := field.Tag.Get("required")
-		required := requiredTag == "true"
-
-		if requiredTag == "" {
-			nodeAccessor, ok := out.Field(i).Interface().(NodeAccessor)
-			if ok {
-				fieldType := nodeAccessor.GetValueType()
-
-				if fieldType.Kind() != reflect.Ptr {
-					required = fieldType.Kind() != reflect.Map && fieldType.Kind() != reflect.Slice && fieldType.Kind() != reflect.Array
-				}
-			}
-		}
-
-		fieldInfo := Field{
-			Name:     field.Name,
-			Field:    out.Field(i),
-			Required: required,
-		}
-
-		fields[tag] = fieldInfo
-
-		// Track required fields for validation
-		if required {
-			requiredFields[tag] = fieldInfo
 		}
 	}
 
@@ -330,12 +310,11 @@ func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 
 	numJobs := len(resolvedNode.Content) / 2
 
-	var mapNode *yaml.Node
+	var mapNode yaml.Node
 	var jobMapContent [][]*yaml.Node
 
 	if embeddedMap != nil {
-		copy := *resolvedNode
-		mapNode = &copy
+		mapNode = *resolvedNode
 		jobMapContent = make([][]*yaml.Node, numJobs)
 	}
 
@@ -355,7 +334,8 @@ func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 
 			key := keyNode.Value
 
-			field, ok := fields[key]
+			// Direct field index lookup (eliminates map[string]Field allocation)
+			fieldIndex, ok := fieldMap.FieldIndexes[key]
 			if !ok {
 				if strings.HasPrefix(key, "x-") && extensionsField != nil {
 					// Lock access to extensionsField to prevent concurrent modification
@@ -376,19 +356,25 @@ func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 					}
 					jobMapContent[i/2] = append(jobMapContent[i/2], keyNode, valueNode)
 				}
-			} else if implementsInterface[NodeMutator](field.Field) {
-				fieldValidationErrs, err := unmarshalNode(ctx, keyNode, valueNode, field.Name, field.Field)
-				if err != nil {
-					return err
-				}
-				jobValidationErrs[i/2] = append(jobValidationErrs[i/2], fieldValidationErrs...)
-
-				// Mark required field as found
-				if field.Required {
-					foundRequiredFields.Store(key, true)
-				}
 			} else {
-				return fmt.Errorf("expected field '%s' to be marshaller.Node, got %s at line %d, column %d (key: %s)", field.Name, field.Field.Type(), keyNode.Line, keyNode.Column, key)
+				// Get field info from cache and field value directly
+				cachedField := fieldMap.Fields[key]
+				fieldVal := out.Field(fieldIndex)
+
+				if implementsInterface(fieldVal, nodeMutatorType) {
+					fieldValidationErrs, err := unmarshalNode(ctx, keyNode, valueNode, cachedField.Name, fieldVal)
+					if err != nil {
+						return err
+					}
+					jobValidationErrs[i/2] = append(jobValidationErrs[i/2], fieldValidationErrs...)
+
+					// Mark required field as found
+					if fieldMap.RequiredFields[key] {
+						foundRequiredFields.Store(key, true)
+					}
+				} else {
+					return fmt.Errorf("expected field '%s' to be marshaller.Node, got %s at line %d, column %d (key: %s)", cachedField.Name, fieldVal.Type(), keyNode.Line, keyNode.Column, key)
+				}
 			}
 
 			return nil
@@ -410,8 +396,8 @@ func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 		mapContent = append(mapContent, jobMapContent...)
 	}
 
-	// Check for missing required fields
-	for tag := range requiredFields {
+	// Check for missing required fields using cached required field info
+	for tag := range fieldMap.RequiredFields {
 		if _, ok := foundRequiredFields.Load(tag); !ok {
 			validationErrs = append(validationErrs, validation.NewNodeError(validation.NewMissingFieldError("field %s is missing", tag), resolvedNode))
 		}
@@ -419,7 +405,7 @@ func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 
 	if embeddedMap != nil {
 		mapNode.Content = mapContent
-		embeddedMapValidationErrs, err := unmarshalSequencedMap(ctx, mapNode, embeddedMap)
+		embeddedMapValidationErrs, err := unmarshalSequencedMap(ctx, &mapNode, embeddedMap)
 		if err != nil {
 			return nil, err
 		}
@@ -461,6 +447,9 @@ func decodeNode(_ context.Context, node *yaml.Node, out any) ([]error, error) {
 
 func unmarshalSequence(ctx context.Context, node *yaml.Node, out reflect.Value) ([]error, error) {
 	resolvedNode := yml.ResolveAlias(node)
+	if resolvedNode == nil {
+		return nil, nil
+	}
 
 	if out.Kind() != reflect.Slice {
 		return nil, fmt.Errorf("expected slice, got %s (type: %s) at line %d, column %d", out.Kind(), out.Type(), resolvedNode.Line, resolvedNode.Column)
@@ -504,6 +493,9 @@ func unmarshalSequence(ctx context.Context, node *yaml.Node, out reflect.Value) 
 func unmarshalNode(ctx context.Context, keyNode, valueNode *yaml.Node, fieldName string, out reflect.Value) ([]error, error) {
 	ref := out
 	resolvedKeyNode := yml.ResolveAlias(keyNode)
+	if resolvedKeyNode == nil {
+		return nil, nil
+	}
 
 	if out.Kind() != reflect.Ptr {
 		if out.CanSet() {
@@ -549,7 +541,7 @@ func unmarshalNode(ctx context.Context, keyNode, valueNode *yaml.Node, fieldName
 	return validationErrs, nil
 }
 
-func implementsInterface[T any](out reflect.Value) bool {
+func implementsInterface(out reflect.Value, interfaceType reflect.Type) bool {
 	// Store original value to check directly
 	original := out
 
@@ -562,16 +554,16 @@ func implementsInterface[T any](out reflect.Value) bool {
 	if out.Kind() != reflect.Ptr {
 		if !out.CanAddr() {
 			// Try checking the original value directly
-			return original.Type().Implements(reflect.TypeOf((*T)(nil)).Elem())
+			return original.Type().Implements(interfaceType)
 		}
 		out = out.Addr()
 	}
 
-	return out.Type().Implements(reflect.TypeOf((*T)(nil)).Elem())
+	return out.Type().Implements(interfaceType)
 }
 
 func isEmbeddedSequencedMap(out reflect.Value) bool {
-	return implementsInterface[sequencedMapInterface](out) && implementsInterface[CoreModeler](out)
+	return implementsInterface(out, sequencedMapType) && implementsInterface(out, coreModelerType)
 }
 
 // isStructType checks if the reflect.Value represents a struct type (direct or pointer to struct)
@@ -590,17 +582,18 @@ func isMapType(out reflect.Value) bool {
 }
 
 // validateNodeKind checks if the node kind matches the expected kind and returns appropriate error
-func validateNodeKind(resolvedNode *yaml.Node, expectedKind yaml.Kind, expectedType string) ([]error, error) {
+func validateNodeKind(resolvedNode *yaml.Node, expectedKind yaml.Kind, expectedType string) error {
+	if resolvedNode == nil {
+		return validation.NewNodeError(validation.NewTypeMismatchError("expected %s for %s, got nil", expectedKind, expectedType), nil)
+	}
+
 	if resolvedNode.Kind != expectedKind {
 		expectedKindStr := yml.NodeKindToString(expectedKind)
 		actualKindStr := yml.NodeKindToString(resolvedNode.Kind)
 
-		return []error{
-			validation.NewNodeError(validation.NewTypeMismatchError("expected %s for %s, got %s",
-				expectedKindStr, expectedType, actualKindStr), resolvedNode),
-		}, nil
+		return validation.NewNodeError(validation.NewTypeMismatchError("expected %s for %s, got %s", expectedKindStr, expectedType, actualKindStr), resolvedNode)
 	}
-	return nil, nil
+	return nil
 }
 
 // isTypeMismatchError checks if the error is a YAML type mismatch error
@@ -618,4 +611,32 @@ func isTypeMismatchError(err error) bool {
 	// Check using errors.As for wrapped errors
 	var yamlTypeErr *yaml.TypeError
 	return errors.As(err, &yamlTypeErr)
+}
+
+// initializeEmbeddedSequencedMap handles initialization of embedded sequenced maps
+func initializeEmbeddedSequencedMap(fieldVal reflect.Value) interfaces.SequencedMapInterface {
+	// Check if the field is a embedded sequenced map
+	if !implementsInterface(fieldVal, sequencedMapType) {
+		return nil
+	}
+
+	// Handle both pointer and value embeds
+	if fieldVal.Kind() == reflect.Ptr {
+		// Pointer embed - check if nil and initialize if needed
+		if fieldVal.IsNil() {
+			fieldVal.Set(CreateInstance(fieldVal.Type().Elem()))
+		}
+		return fieldVal.Interface().(interfaces.SequencedMapInterface)
+	} else {
+		// Value embed - check if initialized and initialize if needed
+		if seqMapInterface, ok := fieldVal.Addr().Interface().(interfaces.SequencedMapInterface); ok {
+			if !seqMapInterface.IsInitialized() {
+				// Initialize the value embed by creating a new instance and copying it
+				newInstance := CreateInstance(fieldVal.Type())
+				fieldVal.Set(newInstance.Elem())
+			}
+			return seqMapInterface
+		}
+	}
+	return nil
 }

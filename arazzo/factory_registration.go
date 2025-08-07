@@ -3,7 +3,7 @@ package arazzo
 import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/expression"
-	"github.com/speakeasy-api/openapi/jsonschema/oas31"
+	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 )
@@ -41,8 +41,8 @@ func init() {
 	marshaller.RegisterType(func() *expression.Expression { return new(expression.Expression) })
 
 	// Register sequencedmap types used in arazzo package
-	marshaller.RegisterType(func() *sequencedmap.Map[string, oas31.JSONSchema] {
-		return &sequencedmap.Map[string, oas31.JSONSchema]{}
+	marshaller.RegisterType(func() *sequencedmap.Map[string, oas3.JSONSchema[oas3.Referenceable]] {
+		return &sequencedmap.Map[string, oas3.JSONSchema[oas3.Referenceable]]{}
 	})
 	marshaller.RegisterType(func() *sequencedmap.Map[string, *Parameter] {
 		return &sequencedmap.Map[string, *Parameter]{}

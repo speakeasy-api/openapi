@@ -61,7 +61,7 @@ func (f *FailureAction) Validate(ctx context.Context, opts ...validation.Option)
 
 	if a == nil {
 		return []error{
-			errors.New("An Arazzo object must be passed via validation options to validate a FailureAction"),
+			errors.New("an Arazzo object must be passed via validation options to validate a FailureAction"),
 		}
 	}
 
@@ -132,8 +132,8 @@ func (f *FailureAction) Validate(ctx context.Context, opts ...validation.Option)
 		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("type must be one of [%s]", strings.Join([]string{string(FailureActionTypeEnd), string(FailureActionTypeGoto), string(FailureActionTypeRetry)}, ", ")), core, core.Type))
 	}
 
-	for _, criterion := range f.Criteria {
-		errs = append(errs, criterion.Validate(opts...)...)
+	for i := range f.Criteria {
+		errs = append(errs, f.Criteria[i].Validate(opts...)...)
 	}
 
 	f.Valid = len(errs) == 0 && core.GetValid()

@@ -12,6 +12,8 @@ import (
 )
 
 func TestUnmarshal_PrimitiveTypes_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		yml      string
@@ -122,6 +124,7 @@ float64PtrField: null
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var model core.TestPrimitiveModel
 			validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
@@ -135,6 +138,8 @@ float64PtrField: null
 }
 
 func TestUnmarshal_PrimitiveTypes_Error(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		yml      string
@@ -208,6 +213,7 @@ intField: "not an int"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var model core.TestPrimitiveModel
 			validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
@@ -234,6 +240,8 @@ intField: "not an int"
 }
 
 func TestUnmarshal_CoreModelStructs_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		yml      string
@@ -321,6 +329,7 @@ eitherModelOrPrimitive:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var model core.TestComplexModel
 			validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
@@ -334,6 +343,8 @@ eitherModelOrPrimitive:
 }
 
 func TestUnmarshal_CoreModelStructs_Error(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		yml      string
@@ -407,6 +418,7 @@ structArrayField:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var model core.TestComplexModel
 			validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
@@ -433,6 +445,8 @@ structArrayField:
 }
 
 func TestUnmarshal_NonCoreModel_Success(t *testing.T) {
+	t.Parallel()
+
 	yml := `
 name: "test name"
 value: 42
@@ -451,6 +465,8 @@ description: "test description"
 }
 
 func TestUnmarshal_CustomUnmarshal_Success(t *testing.T) {
+	t.Parallel()
+
 	yml := `
 customField: "custom value"
 x-extension: "ext value"
@@ -480,6 +496,8 @@ x-extension: "ext value"
 }
 
 func TestUnmarshal_Aliases_Success(t *testing.T) {
+	t.Parallel()
+
 	yml := `
 aliasField: &alias "aliased value"
 aliasArray:
@@ -526,6 +544,8 @@ x-alias-ext: *alias
 }
 
 func TestUnmarshal_EmbeddedMap_Success(t *testing.T) {
+	t.Parallel()
+
 	yml := `
 dynamicKey1: "value1"
 dynamicKey2: "value2"
@@ -540,18 +560,20 @@ dynamicKey2: "value2"
 
 	// Check embedded map values
 	require.NotNil(t, model.Map)
-	val1, ok := model.Map.Get("dynamicKey1")
+	val1, ok := model.Get("dynamicKey1")
 	require.True(t, ok)
 	require.Equal(t, "value1", val1.Value)
 	require.True(t, val1.Present)
 
-	val2, ok := model.Map.Get("dynamicKey2")
+	val2, ok := model.Get("dynamicKey2")
 	require.True(t, ok)
 	require.Equal(t, "value2", val2.Value)
 	require.True(t, val2.Present)
 }
 
 func TestUnmarshal_EmbeddedMapWithFields_Success(t *testing.T) {
+	t.Parallel()
+
 	yml := `
 name: "test name"
 dynamicKey1:
@@ -580,12 +602,12 @@ x-extension: "ext value"
 
 	// Check embedded map values
 	require.NotNil(t, model.Map)
-	val1, ok := model.Map.Get("dynamicKey1")
+	val1, ok := model.Get("dynamicKey1")
 	require.True(t, ok)
 	require.NotNil(t, val1.Value)
 	require.Equal(t, "dynamic value 1", val1.Value.StringField.Value)
 
-	val2, ok := model.Map.Get("dynamicKey2")
+	val2, ok := model.Get("dynamicKey2")
 	require.True(t, ok)
 	require.NotNil(t, val2.Value)
 	require.Equal(t, "dynamic value 2", val2.Value.StringField.Value)
@@ -603,6 +625,8 @@ x-extension: "ext value"
 }
 
 func TestUnmarshal_RequiredPointer_Success(t *testing.T) {
+	t.Parallel()
+
 	yml := `
 requiredPtr: "required pointer value"
 optionalPtr: "optional pointer value"
@@ -627,6 +651,8 @@ optionalPtr: "optional pointer value"
 }
 
 func TestUnmarshal_RequiredPointer_Error(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		yml      string
@@ -650,6 +676,7 @@ requiredPtr: null
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var model core.TestRequiredPointerModel
 			validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
@@ -681,6 +708,8 @@ requiredPtr: null
 }
 
 func TestUnmarshal_RequiredNilableTypes_Success(t *testing.T) {
+	t.Parallel()
+
 	yml := `
 requiredPtr: "required pointer value"
 requiredSlice: ["item1", "item2"]
@@ -731,6 +760,8 @@ requiredRawNode: "raw node value"
 }
 
 func TestUnmarshal_RequiredNilableTypes_Error(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		yml      string
@@ -788,6 +819,7 @@ requiredRawNode: "raw value"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var model core.TestRequiredNilableModel
 			validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
@@ -814,6 +846,8 @@ requiredRawNode: "raw value"
 }
 
 func TestUnmarshal_TypeConversion_Error(t *testing.T) {
+	t.Parallel()
+
 	// This test reproduces the issue from openapi.Callback where:
 	// - Core model uses string keys (like "post", "get")
 	// - High-level model expects HTTPMethod keys
@@ -848,17 +882,17 @@ put:
 
 	// Verify core model populated correctly
 	require.NotNil(t, model.Map)
-	require.Equal(t, 3, model.Map.Len())
+	require.Equal(t, 3, model.Len())
 
-	postOp, exists := model.Map.Get("post")
+	postOp, exists := model.Get("post")
 	require.True(t, exists)
 	require.Equal(t, "POST operation", postOp.Value.StringField.Value)
 
-	getOp, exists := model.Map.Get("get")
+	getOp, exists := model.Get("get")
 	require.True(t, exists)
 	require.Equal(t, "GET operation", getOp.Value.StringField.Value)
 
-	putOp, exists := model.Map.Get("put")
+	putOp, exists := model.Get("put")
 	require.True(t, exists)
 	require.Equal(t, "PUT operation", putOp.Value.StringField.Value)
 }

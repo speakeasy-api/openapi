@@ -19,6 +19,8 @@ type TestEitherValue[L any, R any] struct {
 }
 
 func TestEitherValue_SyncChanges_Success(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	source := TestEitherValue[string, string]{
@@ -33,6 +35,8 @@ func TestEitherValue_SyncChanges_Success(t *testing.T) {
 }
 
 func TestEitherValue_Unmarshal_BooleanValue_Success(t *testing.T) {
+	t.Parallel()
+
 	// Test case that reproduces the additionalProperties: false issue
 	// This should unmarshal as a boolean (Right type) when Left type (complex object) fails with validation errors
 	ctx := context.Background()
@@ -66,6 +70,8 @@ func TestEitherValue_Unmarshal_BooleanValue_Success(t *testing.T) {
 // fail with validation errors (not unmarshalling errors). In this case, the EitherValue
 // should return the combined validation errors instead of an unmarshalling error.
 func TestEitherValue_BothTypesFailValidation(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	// Test case that reproduces the items array issue from burgershop.openapi-modified.yaml

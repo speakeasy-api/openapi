@@ -1,0 +1,22 @@
+type: object
+properties:
+  name:
+    type: string
+    description: "User's full name"
+  age:
+    type: integer
+    minimum: 0
+    maximum: 120
+  email:
+    type: string
+    format: email
+  nested:
+    type: object
+    properties:
+      value:
+        type: string
+      count:
+        type: integer
+required:
+  - name
+  - email

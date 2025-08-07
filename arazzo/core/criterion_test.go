@@ -30,6 +30,7 @@ func createCriterionExpressionTypeWithRootNode(cet CriterionExpressionType, root
 }
 
 func TestCriterion_Unmarshal_Success(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		testYaml string
 	}
@@ -103,7 +104,7 @@ type: jsonpath`,
 				Context: marshaller.Node[*string]{
 					Key:       "context",
 					KeyNode:   testutils.CreateStringYamlNode("context", 1, 1),
-					Value:     pointer.From[string]("$response.body"),
+					Value:     pointer.From("$response.body"),
 					ValueNode: testutils.CreateStringYamlNode("$response.body", 1, 10),
 					Present:   true,
 				},
@@ -143,7 +144,7 @@ type:
 				Context: marshaller.Node[*string]{
 					Key:       "context",
 					KeyNode:   testutils.CreateStringYamlNode("context", 1, 1),
-					Value:     pointer.From[string]("$response.body"),
+					Value:     pointer.From("$response.body"),
 					ValueNode: testutils.CreateStringYamlNode("$response.body", 1, 10),
 					Present:   true,
 				},
@@ -206,6 +207,7 @@ type:
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			var doc yaml.Node
 			err := yaml.Unmarshal([]byte(tt.args.testYaml), &doc)
 			require.NoError(t, err)

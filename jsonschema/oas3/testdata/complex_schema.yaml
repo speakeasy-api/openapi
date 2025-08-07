@@ -1,0 +1,35 @@
+type: object
+properties:
+  users:
+    type: array
+    items:
+      $ref: "#/definitions/User"
+  metadata:
+    type: object
+    properties:
+      version:
+        type: string
+      created:
+        type: string
+        format: date-time
+definitions:
+  User:
+    type: object
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      profile:
+        $ref: "#/definitions/Profile"
+    required:
+      - id
+      - name
+  Profile:
+    type: object
+    properties:
+      bio:
+        type: string
+      avatar:
+        type: string
+        format: uri

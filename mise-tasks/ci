@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "🚀 Running full CI pipeline locally..."
+
+echo "📋 Step 1: Checking code formatting..."
+mise run fmt-check
+
+echo "📦 Step 2: Checking module dependencies..."
+mise run mod-check
+
+echo "🔍 Step 3: Running linting checks..."
+mise run lint
+
+echo "📚 Step 4: Checking examples are up to date..."
+mise run examples-check
+
+echo "🧪 Step 5: Running tests..."
+mise run test
+
+echo "🔨 Step 6: Building project..."
+mise run build
+
+echo "✅ All CI checks passed! Ready for PR submission."

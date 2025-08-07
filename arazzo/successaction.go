@@ -12,6 +12,7 @@ import (
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
+	walkpkg "github.com/speakeasy-api/openapi/walk"
 )
 
 // SuccessActionType represents the type of action to take on success.
@@ -53,7 +54,7 @@ func (s *SuccessAction) Validate(ctx context.Context, opts ...validation.Option)
 
 	if a == nil {
 		return []error{
-			errors.New("An Arazzo object must be passed via validation options to validate a SuccessAction"),
+			errors.New("an Arazzo object must be passed via validation options to validate a SuccessAction"),
 		}
 	}
 
@@ -89,8 +90,8 @@ func (s *SuccessAction) Validate(ctx context.Context, opts ...validation.Option)
 		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("type must be one of [%s]", strings.Join([]string{string(SuccessActionTypeEnd), string(SuccessActionTypeGoto)}, ", ")), core, core.Type))
 	}
 
-	for _, criterion := range s.Criteria {
-		errs = append(errs, criterion.Validate(opts...)...)
+	for i := range s.Criteria {
+		errs = append(errs, s.Criteria[i].Validate(opts...)...)
 	}
 
 	s.Valid = len(errs) == 0 && core.GetValid()
@@ -174,14 +175,18 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, params validationA
 			if key != nil {
 				foundStepId := false
 
-				_ = Walk(ctx, params.arazzo, func(ctx context.Context, node, parent MatchFunc, arazzo *Arazzo) error {
-					if parent == nil {
-						return nil
+				for item := range Walk(ctx, params.arazzo) {
+					// Check if we have a parent location context
+					if len(item.Location) == 0 {
+						continue
 					}
 
-					return parent(Matcher{
+					// Get the parent match function from the location
+					parentLoc := item.Location[len(item.Location)-1]
+
+					err := parentLoc.Parent(Matcher{
 						Workflow: func(workflow *Workflow) error {
-							return node(Matcher{
+							return item.Match(Matcher{
 								Step: func(step *Step) error {
 									switch params.parentType {
 									case "successAction":
@@ -194,7 +199,7 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, params validationA
 											if len(expressionParts) > 0 && expressionParts[0] == key.name {
 												if workflow.Steps.Find(string(*params.stepID)) != nil {
 													foundStepId = true
-													return ErrTerminate
+													return walkpkg.ErrTerminate
 												}
 											}
 										}
@@ -208,7 +213,7 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, params validationA
 											if len(expressionParts) > 0 && expressionParts[0] == key.name {
 												if workflow.Steps.Find(string(*params.stepID)) != nil {
 													foundStepId = true
-													return ErrTerminate
+													return walkpkg.ErrTerminate
 												}
 											}
 										}
@@ -218,7 +223,11 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, params validationA
 							})
 						},
 					})
-				})
+
+					if err != nil && errors.Is(err, walkpkg.ErrTerminate) {
+						break
+					}
+				}
 
 				if !foundStepId {
 					errs = append(errs, &validation.Error{

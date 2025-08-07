@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "🔍 Checking Go code formatting..."
+
+# Check if any files need formatting
+UNFORMATTED=$(go fmt ./... 2>&1 || true)
+
+if [ -n "$UNFORMATTED" ]; then
+    echo "❌ The following files are not properly formatted:"
+    echo "$UNFORMATTED"
+    echo ""
+    echo "Please run 'mise run fmt' to fix formatting issues."
+    exit 1
+fi
+
+echo "✅ All Go files are properly formatted!"

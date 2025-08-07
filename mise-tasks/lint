@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "🔍 Running linting checks..."
+
+echo "🧹 Running golangci-lint (includes go vet)..."
+golangci-lint run
+
+echo "🛡️  Running nilaway..."
+nilaway -test=false ./...
+
+echo "✅ All linting checks passed!"

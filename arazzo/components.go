@@ -7,7 +7,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/jsonschema/oas31"
+	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
@@ -18,7 +18,7 @@ type Components struct {
 	marshaller.Model[core.Components]
 
 	// Inputs provides a list of reusable JSON Schemas that can be referenced from inputs and other JSON Schemas.
-	Inputs *sequencedmap.Map[string, oas31.JSONSchema]
+	Inputs *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]]
 	// Parameters provides a list of reusable parameters that can be referenced from workflows and steps.
 	Parameters *sequencedmap.Map[string, *Parameter]
 	// SuccessActions provides a list of reusable success actions that can be referenced from workflows and steps.

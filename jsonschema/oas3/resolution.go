@@ -1,0 +1,377 @@
+package oas3
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"unsafe"
+
+	"github.com/speakeasy-api/openapi/internal/utils"
+	"github.com/speakeasy-api/openapi/jsonpointer"
+	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/references"
+	"gopkg.in/yaml.v3"
+)
+
+// ResolveOptions represent the options available when resolving a JSON Schema reference.
+type ResolveOptions = references.ResolveOptions
+
+type JSONSchemaReferenceable = JSONSchema[Referenceable]
+
+func (s *JSONSchema[Referenceable]) IsResolved() bool {
+	if s == nil {
+		return false
+	}
+
+	return !s.IsReference() || s.resolvedSchemaCache != nil || (s.referenceResolutionCache != nil && s.referenceResolutionCache.Object != nil) || s.circularErrorFound
+}
+
+func (j *JSONSchema[Referenceable]) IsReference() bool {
+	if j == nil || j.IsRight() {
+		return false
+	}
+
+	return j.GetLeft().IsReference()
+}
+
+func (j *JSONSchema[Referenceable]) GetRef() references.Reference {
+	if j == nil || j.IsRight() {
+		return ""
+	}
+
+	return j.GetLeft().GetRef()
+}
+
+func (j *JSONSchema[Referenceable]) GetAbsRef() references.Reference {
+	if !j.IsReference() {
+		return ""
+	}
+
+	ref := j.GetRef()
+	if j.referenceResolutionCache == nil {
+		return ref
+	}
+	return references.Reference(j.referenceResolutionCache.AbsoluteReference + "#" + ref.GetJSONPointer().String())
+}
+
+// Resolve will fully resolve the reference and return the JSONSchema referenced. This will recursively resolve any intermediate references as well.
+func (s *JSONSchema[Referenceable]) Resolve(ctx context.Context, opts ResolveOptions) ([]error, error) {
+	return resolveJSONSchemaWithTracking(ctx, (*JSONSchemaReferenceable)(unsafe.Pointer(s)), references.ResolveOptions{
+		TargetLocation:      opts.TargetLocation,
+		RootDocument:        opts.RootDocument,
+		TargetDocument:      opts.RootDocument,
+		DisableExternalRefs: opts.DisableExternalRefs,
+		VirtualFS:           opts.VirtualFS,
+		HTTPClient:          opts.HTTPClient,
+	}, []string{})
+}
+
+// GetResolvedSchema will return either this schema or the referenced schema if previously resolved.
+func (s *JSONSchema[Referenceable]) GetResolvedSchema() *JSONSchema[Concrete] {
+	if s == nil || !s.IsResolved() {
+		return nil
+	}
+
+	if s.resolvedSchemaCache != nil {
+		return s.resolvedSchemaCache
+	}
+
+	var result *JSONSchema[Concrete]
+
+	if !s.IsReference() {
+		result = (*JSONSchema[Concrete])(unsafe.Pointer(s))
+	} else {
+		if s.referenceResolutionCache == nil || s.referenceResolutionCache.Object == nil {
+			return nil
+		}
+
+		// Get the resolved schema from the cache
+		resolvedSchema := s.referenceResolutionCache.Object
+
+		// If the resolved schema is itself a reference, we need to get its resolved form
+		if resolvedSchema.IsReference() {
+			// Get the final resolved schema from the referenced schema
+			result = resolvedSchema.GetResolvedSchema()
+			if result == nil {
+				return nil
+			}
+		} else {
+			result = (*JSONSchema[Concrete])(unsafe.Pointer(resolvedSchema))
+		}
+	}
+
+	s.resolvedSchemaCache = result
+	return result
+}
+
+// MustGetResolvedSchema will return the resolved schema. If this is a reference and its unresolved, this will panic.
+// Useful if references have been resolved before hand.
+func (s *JSONSchema[Referenceable]) MustGetResolvedSchema() *JSONSchema[Concrete] {
+	if s == nil {
+		return nil
+	}
+
+	obj := s.GetResolvedSchema()
+	if s.IsReference() && obj == nil {
+		panic("unresolved reference, resolve first")
+	}
+	return obj
+}
+
+func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references.ResolveOptions, referenceChain []string) ([]string, []error, error) {
+	if !s.IsReference() {
+		return referenceChain, nil, nil
+	}
+
+	// Check if we have a cached resolved schema don't bother resolving it again
+	if s.referenceResolutionCache != nil {
+		if s.referenceResolutionCache.Object != nil {
+			return nil, nil, nil
+		}
+
+		// For chained resolutions or refs found in external docs, we need to use the resolved document from the previous step
+		// The ResolveResult.ResolvedDocument should be used as the new TargetDocument
+		if s.referenceResolutionCache.ResolvedDocument != nil {
+			opts.TargetDocument = s.referenceResolutionCache.ResolvedDocument
+			opts.TargetLocation = s.referenceResolutionCache.AbsoluteReference
+		}
+	}
+
+	// Get the absolute reference string for tracking using the extracted logic
+	ref := s.GetRef()
+
+	absRefResult, err := references.ResolveAbsoluteReference(ref, opts.TargetLocation)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	jsonPtr := string(ref.GetJSONPointer())
+	absRef := utils.BuildAbsoluteReference(absRefResult.AbsoluteReference, jsonPtr)
+
+	// Special case: detect self-referencing schemas (references to root document)
+	// This catches cases like "#" which reference the root document itself
+	if ref.GetURI() == "" && ref.GetJSONPointer() == "" {
+		s.circularErrorFound = true
+		return nil, nil, fmt.Errorf("circular reference detected: self-referencing schema")
+	}
+
+	// Check for circular reference by looking for the current reference in the chain
+	for _, chainRef := range referenceChain {
+		if chainRef == absRef {
+			// Build circular reference error message showing the full chain
+			chainWithCurrent := append(referenceChain, absRef)
+			s.circularErrorFound = true
+			return nil, nil, fmt.Errorf("circular reference detected: %s", joinReferenceChain(chainWithCurrent))
+		}
+	}
+
+	// Add this reference to the chain
+	newChain := append(referenceChain, absRef)
+
+	var result *references.ResolveResult[JSONSchemaReferenceable]
+	var validationErrs []error
+
+	// Check if this is a $defs reference and handle it specially
+	if strings.HasPrefix(string(ref.GetJSONPointer()), "/$defs/") {
+		result, validationErrs, err = s.resolveDefsReference(ctx, ref, opts)
+	} else {
+		// Resolve as JSONSchema to handle both Schema and boolean cases
+		result, validationErrs, err = references.Resolve(ctx, ref, unmarshaller, opts)
+	}
+	if err != nil {
+		return nil, validationErrs, err
+	}
+
+	schema := result.Object
+	for item := range Walk(ctx, schema) {
+		_ = item.Match(SchemaMatcher{
+			Schema: func(js *JSONSchemaReferenceable) error {
+				if js.IsReference() {
+					js.referenceResolutionCache = &references.ResolveResult[JSONSchemaReferenceable]{
+						AbsoluteReference: result.AbsoluteReference,
+						ResolvedDocument:  result.ResolvedDocument,
+					}
+				}
+				return nil
+			},
+		})
+	}
+
+	s.referenceResolutionCache = result
+	s.validationErrsCache = validationErrs
+
+	return newChain, validationErrs, nil
+}
+
+// joinReferenceChain joins a chain of references with arrows for error messages
+func joinReferenceChain(chain []string) string {
+	if len(chain) == 0 {
+		return ""
+	}
+	if len(chain) == 1 {
+		return chain[0]
+	}
+	return strings.Join(chain, " -> ")
+}
+
+// resolveJSONSchemaWithTracking recursively resolves references while tracking visited references to detect cycles
+func resolveJSONSchemaWithTracking(ctx context.Context, schema *JSONSchema[Referenceable], opts references.ResolveOptions, referenceChain []string) ([]error, error) {
+	// If this is not a reference, return the inline object
+	if !schema.IsReference() {
+		return nil, nil
+	}
+
+	// Resolve the current reference
+	newChain, validationErrs, err := schema.resolve(ctx, opts, referenceChain)
+	if err != nil {
+		return validationErrs, err
+	}
+
+	var obj *JSONSchema[Referenceable]
+	if schema.referenceResolutionCache != nil {
+		obj = schema.referenceResolutionCache.Object
+	}
+
+	if obj == nil {
+		return validationErrs, fmt.Errorf("unable to resolve reference: %s", schema.GetRef())
+	}
+
+	if obj.IsRight() {
+		return validationErrs, nil
+	}
+
+	// Set parent links for the resolved object
+	// The resolved object's parent is the current schema (which is a reference)
+	// The top-level parent is either the current schema's top-level parent, or the current schema if it's the top-level
+	var topLevel *JSONSchema[Referenceable]
+	if schema.topLevelParent != nil {
+		topLevel = schema.topLevelParent
+	} else {
+		topLevel = schema
+	}
+	obj.SetParent(schema)
+	obj.SetTopLevelParent(topLevel)
+
+	// If we got another reference, recursively resolve it with the resolved document as the new target
+	if obj.IsReference() {
+		return resolveJSONSchemaWithTracking(ctx, obj, opts, newChain)
+	}
+
+	return validationErrs, nil
+}
+
+// resolveDefsReference handles special resolution for $defs references
+// It uses the standard references.Resolve infrastructure but adjusts the target document for $defs resolution
+func (s *JSONSchema[Referenceable]) resolveDefsReference(ctx context.Context, ref references.Reference, opts references.ResolveOptions) (*references.ResolveResult[JSONSchemaReferenceable], []error, error) {
+	jp := ref.GetJSONPointer()
+
+	// Validate this is a $defs reference
+	if !strings.HasPrefix(jp.String(), "/$defs/") {
+		return nil, nil, fmt.Errorf("not a $defs reference: %s", ref)
+	}
+
+	// First, try to resolve using the standard references.Resolve with the target document
+	// This handles external $defs, caching, and all standard resolution features
+	result, validationErrs, err := references.Resolve(ctx, ref, unmarshaller, opts)
+	if err == nil {
+		return result, validationErrs, nil
+	}
+
+	// If standard resolution failed and we have a parent, try resolving with the parent as target
+	if parent := s.GetParent(); parent != nil {
+		parentOpts := opts
+		parentOpts.TargetDocument = parent
+		parentOpts.TargetLocation = opts.TargetLocation // Keep the same location for caching
+
+		result, validationErrs, err := references.Resolve(ctx, ref, unmarshaller, parentOpts)
+		if err == nil {
+			return result, validationErrs, nil
+		}
+	}
+
+	// Fallback: try JSON pointer navigation when no parent chain exists
+	if s.GetParent() == nil && s.GetTopLevelParent() == nil {
+		result, validationErrs, err := s.tryResolveDefsUsingJSONPointerNavigation(ctx, ref, opts)
+		if err == nil && result != nil {
+			return result, validationErrs, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("definition not found: %s", ref)
+}
+
+type GetRootNoder interface {
+	GetRootNode() *yaml.Node
+}
+
+// tryResolveDefsUsingJSONPointerNavigation attempts to resolve $defs by walking up the JSON pointer structure
+// This is used when there's no parent chain available
+func (s *JSONSchema[Referenceable]) tryResolveDefsUsingJSONPointerNavigation(ctx context.Context, ref references.Reference, opts references.ResolveOptions) (*references.ResolveResult[JSONSchemaReferenceable], []error, error) {
+	// When we don't have a parent chain, we need to find our location in the document
+	// and walk up the JSON pointer chain to find parent schemas
+
+	// Get the top-level root node from the target document
+	var topLevelRootNode *yaml.Node
+	if targetDoc, ok := opts.TargetDocument.(GetRootNoder); ok {
+		topLevelRootNode = targetDoc.GetRootNode()
+	}
+
+	if topLevelRootNode == nil {
+		return nil, nil, nil
+	}
+
+	// Get our JSON pointer location within the document using the CoreModel
+	ourJSONPtr := s.GetCore().GetJSONPointer(topLevelRootNode)
+	if ourJSONPtr == "" {
+		return nil, nil, nil
+	}
+
+	// Walk up the parent JSON pointers
+	parentJSONPtr := getParentJSONPointer(ourJSONPtr)
+	for parentJSONPtr != "" {
+		// Get the parent target using JSON pointer
+		parentTarget, err := jsonpointer.GetTarget(opts.TargetDocument, jsonpointer.JSONPointer(parentJSONPtr), jsonpointer.WithStructTags("key"))
+		if err == nil {
+			parentOpts := opts
+			parentOpts.TargetDocument = parentTarget
+			parentOpts.TargetLocation = opts.TargetLocation // Keep the same location for caching
+
+			result, validationErrs, err := references.Resolve(ctx, ref, unmarshaller, parentOpts)
+			if err == nil {
+				return result, validationErrs, nil
+			}
+		}
+
+		// Move up to the next parent
+		parentJSONPtr = getParentJSONPointer(parentJSONPtr)
+	}
+
+	return nil, nil, fmt.Errorf("definition not found: %s", ref)
+}
+
+// getParentJSONPointer returns the parent JSON pointer by removing the last segment
+// e.g., "/properties/nested/properties/inner" -> "/properties/nested/properties"
+// Returns empty string when reaching the root
+func getParentJSONPointer(jsonPtr string) string {
+	if jsonPtr == "" || jsonPtr == "/" {
+		return ""
+	}
+
+	// Find the last slash
+	lastSlash := strings.LastIndex(jsonPtr, "/")
+	if lastSlash <= 0 {
+		return ""
+	}
+
+	return jsonPtr[:lastSlash]
+}
+
+func unmarshaller(ctx context.Context, node *yaml.Node) (*JSONSchema[Referenceable], []error, error) {
+	jsonSchema := &JSONSchema[Referenceable]{}
+	validationErrs, err := marshaller.UnmarshalNode(ctx, node, jsonSchema)
+	if err != nil {
+		return nil, validationErrs, err
+	}
+
+	return jsonSchema, validationErrs, nil
+}

@@ -104,7 +104,7 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 	a := validation.GetContextObject[Arazzo](o)
 	if a == nil {
 		return []error{
-			errors.New("An Arazzo object must be passed via validation options to validate a Reusable Object"),
+			errors.New("an Arazzo object must be passed via validation options to validate a Reusable Object"),
 		}
 	}
 

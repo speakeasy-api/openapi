@@ -4,9 +4,12 @@ package jsonpointer
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/errors"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -50,6 +53,12 @@ func getOptions(opts []option) *options {
 // JSONPointer represents a JSON Pointer value as defined by RFC6901 https://datatracker.ietf.org/doc/html/rfc6901
 type JSONPointer string
 
+var _ fmt.Stringer = (*JSONPointer)(nil)
+
+func (j JSONPointer) String() string {
+	return string(j)
+}
+
 // Validate will validate the JSONPointer is valid as per RFC6901.
 func (j JSONPointer) Validate() error {
 	_, err := j.getNavigationStack()
@@ -90,6 +99,13 @@ func PartsToJSONPointer(parts []string) JSONPointer {
 
 func getCurrentStackTarget(source any, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
 	if len(stack) == 0 {
+		// For YAML nodes, delegate to YAML implementation for proper root handling
+		if yamlNode, ok := source.(*yaml.Node); ok {
+			return getYamlNodeTarget(yamlNode, navigationPart{}, []navigationPart{}, currentPath, o)
+		}
+		if yamlNode, ok := source.(yaml.Node); ok {
+			return getYamlNodeTarget(&yamlNode, navigationPart{}, []navigationPart{}, currentPath, o)
+		}
 		return source, stack, nil
 	}
 
@@ -102,6 +118,14 @@ func getCurrentStackTarget(source any, stack []navigationPart, currentPath strin
 }
 
 func getTarget(source any, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
+	// Handle yaml.Node specially (both pointer and non-pointer versions)
+	if yamlNode, ok := source.(*yaml.Node); ok {
+		return getYamlNodeTarget(yamlNode, currentPart, stack, currentPath, o)
+	}
+	if yamlNode, ok := source.(yaml.Node); ok {
+		return getYamlNodeTarget(&yamlNode, currentPart, stack, currentPath, o)
+	}
+
 	sourceType := reflect.TypeOf(source)
 	sourceElemType := sourceType
 
@@ -117,28 +141,48 @@ func getTarget(source any, currentPart navigationPart, stack []navigationPart, c
 	case reflect.Struct:
 		return getStructTarget(reflect.ValueOf(source), currentPart, stack, currentPath, o)
 	default:
-		return nil, nil, ErrInvalidPath.Wrap(fmt.Errorf("expected map, slice, or struct, got %s at %s", sourceElemType.Kind(), currentPath))
+		return nil, nil, ErrInvalidPath.Wrap(fmt.Errorf("expected map, slice, struct, or yaml.Node, got %s at %s", sourceElemType.Kind(), currentPath))
 	}
 }
 
 func getMapTarget(sourceVal reflect.Value, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
 	sourceValElem := reflect.Indirect(sourceVal)
 
-	if currentPart.Type != partTypeKey {
-		return nil, nil, ErrInvalidPath.Wrap(fmt.Errorf("expected key, got %s at %s", currentPart.Type, currentPath))
-	}
-	if sourceValElem.Type().Key().Kind() != reflect.String {
-		return nil, nil, ErrInvalidPath.Wrap(fmt.Errorf("expected map key to be string, got %s at %s", sourceValElem.Type().Key().Kind(), currentPath))
+	// Allow both partTypeKey and partTypeIndex for maps (integer keys should be treated as string keys)
+	if currentPart.Type != partTypeKey && currentPart.Type != partTypeIndex {
+		return nil, nil, ErrInvalidPath.Wrap(fmt.Errorf("expected key or index, got %s at %s", currentPart.Type, currentPath))
 	}
 	if sourceValElem.IsNil() {
 		return nil, nil, ErrNotFound.Wrap(fmt.Errorf("map is nil at %s", currentPath))
 	}
 
-	key := currentPart.unescapeValue()
+	keyStr := currentPart.unescapeValue()
+	keyType := sourceValElem.Type().Key()
 
-	target := sourceValElem.MapIndex(reflect.ValueOf(key))
+	// Convert the string key to the appropriate type for the map
+	var keyValue reflect.Value
+	switch keyType.Kind() {
+	case reflect.String:
+		keyValue = reflect.ValueOf(keyStr)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if intKey, err := strconv.Atoi(keyStr); err == nil {
+			keyValue = reflect.ValueOf(intKey).Convert(keyType)
+		} else {
+			return nil, nil, ErrNotFound.Wrap(fmt.Errorf("key %s cannot be converted to %s at %s", keyStr, keyType.Kind(), currentPath))
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if uintKey, err := strconv.ParseUint(keyStr, 10, 64); err == nil {
+			keyValue = reflect.ValueOf(uintKey).Convert(keyType)
+		} else {
+			return nil, nil, ErrNotFound.Wrap(fmt.Errorf("key %s cannot be converted to %s at %s", keyStr, keyType.Kind(), currentPath))
+		}
+	default:
+		return nil, nil, ErrInvalidPath.Wrap(fmt.Errorf("unsupported map key type %s at %s", keyType.Kind(), currentPath))
+	}
+
+	target := sourceValElem.MapIndex(keyValue)
 	if !target.IsValid() || target.IsZero() {
-		return nil, nil, ErrNotFound.Wrap(fmt.Errorf("key %s not found in map at %s", key, currentPath))
+		return nil, nil, ErrNotFound.Wrap(fmt.Errorf("key %s not found in map at %s", keyStr, currentPath))
 	}
 
 	return getCurrentStackTarget(target.Interface(), stack, currentPath, o)
@@ -180,8 +224,19 @@ type NavigableNoder interface {
 }
 
 func getStructTarget(sourceVal reflect.Value, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
-	if sourceVal.Type().Implements(reflect.TypeOf((*NavigableNoder)(nil)).Elem()) {
+	if interfaces.ImplementsInterface[NavigableNoder](sourceVal.Type()) {
 		val, stack, err := getNavigableNoderTarget(sourceVal, currentPart, stack, currentPath, o)
+		if err != nil {
+			if !errors.Is(err, ErrSkipInterface) {
+				return nil, nil, err
+			}
+		} else {
+			return val, stack, nil
+		}
+	}
+
+	if interfaces.ImplementsInterface[model](sourceVal.Type()) {
+		val, stack, err := navigateModel(sourceVal, currentPart, stack, currentPath, o)
 		if err != nil {
 			if !errors.Is(err, ErrSkipInterface) {
 				return nil, nil, err
@@ -195,6 +250,21 @@ func getStructTarget(sourceVal reflect.Value, currentPart navigationPart, stack 
 	case partTypeKey:
 		return getKeyBasedStructTarget(sourceVal, currentPart, stack, currentPath, o)
 	case partTypeIndex:
+		// Try key-based navigation first for integer parts
+		keyPart := navigationPart{
+			Type:  partTypeKey,
+			Value: currentPart.Value,
+		}
+		result, nextVal, err := getKeyBasedStructTarget(sourceVal, keyPart, stack, currentPath, o)
+		if err == nil {
+			return result, nextVal, nil
+		}
+		// If key navigation fails but doesn't return a "not found" error,
+		// we should still return the error instead of trying index navigation
+		if !errors.Is(err, ErrNotFound) {
+			return nil, nil, err
+		}
+		// Fall back to index-based navigation
 		return getIndexBasedStructTarget(sourceVal, currentPart, stack, currentPath, o)
 	default:
 		return nil, nil, ErrInvalidPath.Wrap(fmt.Errorf("expected key or index, got %s at %s", currentPart.Type, currentPath))
@@ -202,7 +272,7 @@ func getStructTarget(sourceVal reflect.Value, currentPart navigationPart, stack 
 }
 
 func getKeyBasedStructTarget(sourceVal reflect.Value, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
-	if sourceVal.Type().Implements(reflect.TypeOf((*KeyNavigable)(nil)).Elem()) {
+	if interfaces.ImplementsInterface[KeyNavigable](sourceVal.Type()) {
 		val, stack, err := getNavigableWithKeyTarget(sourceVal, currentPart, stack, currentPath, o)
 		if err != nil {
 			if !errors.Is(err, ErrSkipInterface) {
@@ -250,7 +320,7 @@ func getKeyBasedStructTarget(sourceVal reflect.Value, currentPart navigationPart
 }
 
 func getIndexBasedStructTarget(sourceVal reflect.Value, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
-	if sourceVal.Type().Implements(reflect.TypeOf((*IndexNavigable)(nil)).Elem()) {
+	if interfaces.ImplementsInterface[IndexNavigable](sourceVal.Type()) {
 		val, stack, err := getNavigableWithIndexTarget(sourceVal, currentPart, stack, currentPath, o)
 		if err != nil {
 			if errors.Is(err, ErrSkipInterface) {

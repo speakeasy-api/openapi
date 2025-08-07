@@ -1,0 +1,8 @@
+openapi: 3.1.0
+info:
+  title: Test Schema
+  version: 1.0.0
+components:
+  schemas:
+    testChainedSchemaRef:
+      $ref: "./resolve_test_external.yaml#/components/schemas/ChainedExternal"

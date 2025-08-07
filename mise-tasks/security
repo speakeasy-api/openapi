@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "🔒 Running security checks..."
+
+# Check if govulncheck is available, install if not
+if ! command -v govulncheck &> /dev/null; then
+    echo "📦 Installing govulncheck..."
+    go install golang.org/x/vuln/cmd/govulncheck@latest
+fi
+
+echo "🔍 Scanning for known vulnerabilities..."
+govulncheck ./...
+
+echo "✅ Security scan completed!"
