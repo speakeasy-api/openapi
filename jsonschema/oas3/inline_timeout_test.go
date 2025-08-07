@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/stretchr/testify/assert"
@@ -19,12 +18,9 @@ func TestInline_ContextTimeout_Error(t *testing.T) {
 		Type: oas3.NewTypeFromString("string"),
 	})
 
-	// Create a context that times out immediately
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
-	defer cancel()
-
-	// Wait for context to timeout
-	time.Sleep(1 * time.Millisecond)
+	// Create a context that is already cancelled to ensure deterministic behavior
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately to ensure context is cancelled before Inline is called
 
 	opts := oas3.InlineOptions{
 		ResolveOptions: oas3.ResolveOptions{
