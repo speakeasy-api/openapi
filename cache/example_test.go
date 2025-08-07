@@ -3,7 +3,7 @@ package cache_test
 import (
 	"fmt"
 
-	"github.com/speakeasy-api/openapi/internal/cache"
+	"github.com/speakeasy-api/openapi/cache"
 	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/references"
 )

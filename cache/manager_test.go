@@ -87,8 +87,9 @@ func TestClearFieldCache_Success(t *testing.T) {
 	assert.Equal(t, int64(0), stats.FieldCacheSize, "Field cache should be empty")
 }
 
+// nolint:paralleltest
 func TestGetAllCacheStats_Success(t *testing.T) {
-	t.Parallel()
+	// Don't run in parallel since we're testing global cache state
 
 	// Clear all caches first
 	ClearAllCaches()

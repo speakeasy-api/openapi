@@ -176,8 +176,8 @@ func TestRefCache_Clear(t *testing.T) {
 	assert.Equal(t, int64(0), stats.Size)
 }
 
+//nolint:paralleltest // This test uses global cache and cannot be parallel
 func TestResolveAbsoluteReferenceCached_Global(t *testing.T) {
-	t.Parallel()
 	// Clear global cache before test
 	ClearGlobalRefCache()
 
@@ -203,8 +203,8 @@ func TestResolveAbsoluteReferenceCached_Global(t *testing.T) {
 	ClearGlobalRefCache()
 }
 
+//nolint:paralleltest // This test uses global cache and cannot be parallel
 func TestResolveAbsoluteReference_UsesCache(t *testing.T) {
-	t.Parallel()
 	// Clear global cache before test
 	ClearGlobalRefCache()
 

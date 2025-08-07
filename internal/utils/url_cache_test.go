@@ -129,8 +129,10 @@ func TestURLCache_Clear(t *testing.T) {
 	assert.Equal(t, int64(0), sizeAfter)
 }
 
+// nolint:paralleltest
 func TestParseURLCached_Global(t *testing.T) {
-	t.Parallel()
+	// Don't run in parallel since we're testing global cache state
+
 	// Clear global cache before test
 	ClearGlobalURLCache()
 
