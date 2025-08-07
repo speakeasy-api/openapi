@@ -795,18 +795,26 @@ func downloadFile(url string) (io.ReadCloser, error) {
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
-	buf := bytes.NewBuffer([]byte{})
-	tee := io.TeeReader(resp.Body, buf)
+	// Read all data from response body
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
 
+	// Write data to cache file
 	f, err := os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close() //nolint:errcheck
 
-	_, err = io.Copy(f, tee)
+	_, err = f.Write(data)
+	if err != nil {
+		return nil, err
+	}
 
-	return io.NopCloser(buf), err
+	// Return the data as a ReadCloser
+	return io.NopCloser(bytes.NewReader(data)), nil
 }
 
 func roundTripYamlOnly(data []byte) ([]byte, error) {

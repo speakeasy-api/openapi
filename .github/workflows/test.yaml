@@ -45,6 +45,16 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v2
 
+      - name: Cache downloaded test files
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/tmp/speakeasy-api_arazzo
+            ${{ runner.temp }}/speakeasy-api_arazzo
+          key: arazzo-test-files-${{ hashFiles('arazzo/arazzo_test.go') }}
+          restore-keys: |
+            arazzo-test-files-
+
       - name: Run tests with coverage
         if: matrix.os == 'ubuntu-latest'
         run: mise run test-coverage
