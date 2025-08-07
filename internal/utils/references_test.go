@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -393,7 +394,8 @@ func TestReferenceClassification_JoinWith_Success(t *testing.T) {
 
 			result, err := classification.JoinWith(tt.relative)
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
+			// Clean both paths to normalize separators for cross-platform compatibility
+			assert.Equal(t, filepath.Clean(tt.expected), filepath.Clean(result))
 		})
 	}
 }
@@ -459,7 +461,8 @@ func TestJoinReference_Success(t *testing.T) {
 			t.Parallel()
 			result, err := JoinReference(tt.base, tt.relative)
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
+			// Clean both paths to normalize separators for cross-platform compatibility
+			assert.Equal(t, filepath.Clean(tt.expected), filepath.Clean(result))
 		})
 	}
 }

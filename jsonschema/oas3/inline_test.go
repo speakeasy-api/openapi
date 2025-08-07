@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -31,11 +32,15 @@ func NewMockVirtualFS() *MockVirtualFS {
 }
 
 func (m *MockVirtualFS) AddFile(path, content string) {
-	m.files[path] = content
+	// Normalize path separators for cross-platform compatibility
+	normalizedPath := filepath.ToSlash(path)
+	m.files[normalizedPath] = content
 }
 
 func (m *MockVirtualFS) Open(name string) (fs.File, error) {
-	content, exists := m.files[name]
+	// Normalize path separators for cross-platform compatibility
+	normalizedName := filepath.ToSlash(name)
+	content, exists := m.files[normalizedName]
 	if !exists {
 		return nil, fmt.Errorf("file not found: %s", name)
 	}

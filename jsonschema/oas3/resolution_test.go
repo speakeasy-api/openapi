@@ -72,11 +72,15 @@ func NewMockVirtualFS() *MockVirtualFS {
 }
 
 func (m *MockVirtualFS) AddFile(path, content string) {
-	m.files[path] = content
+	// Normalize path separators for cross-platform compatibility
+	normalizedPath := filepath.ToSlash(path)
+	m.files[normalizedPath] = content
 }
 
 func (m *MockVirtualFS) Open(name string) (fs.File, error) {
-	content, exists := m.files[name]
+	// Normalize path separators for cross-platform compatibility
+	normalizedName := filepath.ToSlash(name)
+	content, exists := m.files[normalizedName]
 	if !exists {
 		return nil, fmt.Errorf("file not found: %s", name)
 	}
@@ -856,7 +860,13 @@ func TestJSONSchema_Resolve_FileSystemIntegration(t *testing.T) {
 		assert.Nil(t, validationErrs)
 		result := schema.GetResolvedSchema()
 		assert.Nil(t, result)
-		assert.Contains(t, err.Error(), "no such file or directory")
+		// Check for platform-agnostic file not found error
+		errMsg := err.Error()
+		assert.True(t,
+			strings.Contains(errMsg, "no such file or directory") ||
+				strings.Contains(errMsg, "The system cannot find the file specified") ||
+				strings.Contains(errMsg, "cannot find the file"),
+			"Expected file not found error, got: %s", errMsg)
 	})
 }
 

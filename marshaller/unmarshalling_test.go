@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/marshaller/tests"
 	"github.com/speakeasy-api/openapi/marshaller/tests/core"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -895,6 +896,70 @@ put:
 	putOp, exists := model.Get("put")
 	require.True(t, exists)
 	require.Equal(t, "PUT operation", putOp.Value.StringField.Value)
+}
+
+func TestUnmarshal_NilOut_Error(t *testing.T) {
+	t.Parallel()
+
+	tts := []struct {
+		name string
+		yml  string
+	}{
+		{
+			name: "simple yaml with nil out",
+			yml: `
+stringField: "test string"
+boolField: true
+intField: 42
+float64Field: 3.14
+`,
+		},
+		{
+			name: "empty yaml with nil out",
+			yml:  `{}`,
+		},
+	}
+
+	for _, tt := range tts {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Define a nil pointer to a high-level model
+			var model *tests.TestPrimitiveHighModel
+
+			// This should not panic and should return a proper error
+			validationErrs, err := marshaller.Unmarshal(context.Background(), strings.NewReader(tt.yml), model)
+
+			// We expect an error, not a panic
+			require.Error(t, err, "should return error when out is nil")
+			require.Nil(t, validationErrs, "validation errors should be nil when there's a fundamental error")
+			require.Contains(t, err.Error(), "out parameter cannot be nil", "error should indicate nil out parameter")
+		})
+	}
+}
+
+func TestUnmarshalNode_NilOut_Error(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+stringField: "test string"
+boolField: true
+intField: 42
+float64Field: 3.14
+`
+
+	node := parseYAML(t, yml)
+
+	// Define a nil pointer to a high-level model
+	var model *tests.TestPrimitiveHighModel
+
+	// This should not panic and should return a proper error
+	validationErrs, err := marshaller.UnmarshalNode(context.Background(), node, model)
+
+	// We expect an error, not a panic
+	require.Error(t, err, "should return error when out is nil")
+	require.Nil(t, validationErrs, "validation errors should be nil when there's a fundamental error")
+	require.Contains(t, err.Error(), "out parameter cannot be nil", "error should indicate nil out parameter")
 }
 
 // Helper functions

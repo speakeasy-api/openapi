@@ -31,6 +31,10 @@ type Unmarshallable interface {
 
 // Unmarshal will unmarshal the provided document into the specified model.
 func Unmarshal[T any](ctx context.Context, doc io.Reader, out CoreAccessor[T]) ([]error, error) {
+	if out == nil || reflect.ValueOf(out).IsNil() {
+		return nil, errors.New("out parameter cannot be nil")
+	}
+
 	data, err := io.ReadAll(doc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read document: %w", err)
@@ -58,6 +62,10 @@ func Unmarshal[T any](ctx context.Context, doc io.Reader, out CoreAccessor[T]) (
 // UnmarshalNode will unmarshal the provided node into the provided model.
 // This method is useful for unmarshaling partial documents, for a full document use Unmarshal as it will retain the full document structure.
 func UnmarshalNode[T any](ctx context.Context, node *yaml.Node, out CoreAccessor[T]) ([]error, error) {
+	if out == nil || reflect.ValueOf(out).IsNil() {
+		return nil, errors.New("out parameter cannot be nil")
+	}
+
 	core := out.GetCore()
 
 	validationErrs, err := UnmarshalCore(ctx, node, core)
