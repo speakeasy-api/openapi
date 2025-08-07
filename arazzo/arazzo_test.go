@@ -832,7 +832,7 @@ func roundTripYamlOnly(data []byte) ([]byte, error) {
 func handleValidationErrors(t *testing.T, errs []error, docSpecificIgnores []string) []error {
 	t.Helper()
 
-	errs = filterCurrentUncomfirmedValidationErrors(errs, docSpecificIgnores)
+	errs = filterCurrentUnconfirmedValidationErrors(errs, docSpecificIgnores)
 	if !assert.Empty(t, errs) {
 		for _, err := range errs {
 			t.Log(err.Error())
@@ -842,7 +842,7 @@ func handleValidationErrors(t *testing.T, errs []error, docSpecificIgnores []str
 	return errs
 }
 
-func filterCurrentUncomfirmedValidationErrors(validationErrs []error, docSpecificIgnores []string) []error {
+func filterCurrentUnconfirmedValidationErrors(validationErrs []error, docSpecificIgnores []string) []error {
 	var filteredValidationErrs []error
 
 	ignoreForNow := []string{

@@ -30,7 +30,7 @@ const (
 type Parameter struct {
 	marshaller.Model[core.Parameter]
 
-	// Name is the case sensitive name of the parameter.
+	// Name is the case-sensitive name of the parameter.
 	Name string
 	// In is the location of the parameter within an operation.
 	In *In
