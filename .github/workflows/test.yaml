@@ -244,3 +244,19 @@ jobs:
       - name: Build (Windows)
         if: matrix.os == 'windows-latest'
         run: go build -v ./...
+
+  # Summary job that depends on all matrix jobs
+  # This provides a single status check for branch protection
+  test-summary:
+    name: Test Summary
+    needs: [lint, test-and-build]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.test-and-build.result }}" != "success" ]; then
+            echo "Tests failed or were cancelled"
+            exit 1
+          fi
+          echo "All tests passed successfully"
