@@ -186,13 +186,16 @@ func (rc *ReferenceClassification) joinURL(relative string) (string, error) {
 // joinFilePath joins this file path reference with a relative path using Go's filepath package
 func (rc *ReferenceClassification) joinFilePath(relative string) (string, error) {
 	// If relative path is absolute, return it as-is
-	if filepath.IsAbs(relative) {
+	// Check for both OS-specific absolute paths and Unix-style absolute paths (for cross-platform compatibility)
+	if filepath.IsAbs(relative) || strings.HasPrefix(relative, "/") {
 		return relative, nil
 	}
 
 	// For all relative paths, join them with the base directory
-	// This will work correctly on the native OS (Windows paths on Windows, Unix paths on Unix)
-	return filepath.Join(filepath.Dir(rc.Original), relative), nil
+	// Use filepath.Join for proper path handling, then convert to forward slashes for OpenAPI/JSON Schema compatibility
+	joined := filepath.Join(filepath.Dir(rc.Original), relative)
+	// Convert backslashes to forward slashes for cross-platform compatibility in OpenAPI contexts
+	return strings.ReplaceAll(joined, "\\", "/"), nil
 }
 
 // JoinReference is a convenience function that classifies the base reference and joins it with a relative reference.
