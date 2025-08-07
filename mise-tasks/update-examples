@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Update Examples - Automatically copy examples from test files to READMEs
+# This script uses a Go program to extract Go example functions from *_examples_test.go files
+# and updates the corresponding README.md files between the usage example tags.
+
+echo "🔄 Updating examples in README files..."
+
+echo "🚀 Running update-examples tool..."
+go run ./cmd/update-examples
+
+echo "🎉 Examples updated successfully!"
+echo ""
+echo "📋 Summary:"
+echo "  • Updated openapi/README.md with examples from openapi/openapi_examples_test.go"
+echo "  • Updated arazzo/README.md with examples from arazzo/arazzo_examples_test.go"
+echo ""
+echo "💡 The examples are automatically extracted from the Example_* functions in the test files."
+echo "   To add new examples, create new Example_* functions in the respective *_examples_test.go files."
+echo "   Function names and comments are used to generate section titles and descriptions."

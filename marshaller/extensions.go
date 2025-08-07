@@ -36,8 +36,12 @@ func UnmarshalExtension(keyNode *yaml.Node, valueNode *yaml.Node, extensionsFiel
 	resolvedKeyNode := yml.ResolveAlias(keyNode)
 	resolvedValueNode := yml.ResolveAlias(valueNode)
 
+	if resolvedKeyNode == nil {
+		return nil
+	}
+
 	if !extensionsField.CanSet() {
-		return fmt.Errorf("Extensions field is not settable (field type: %v) at line %d, column %d",
+		return fmt.Errorf("the Extensions field is not settable (field type: %v) at line %d, column %d",
 			extensionsField.Type(), resolvedKeyNode.Line, resolvedKeyNode.Column)
 	}
 

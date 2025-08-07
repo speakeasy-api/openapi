@@ -1,0 +1,31 @@
+openapi: 3.1.0
+info:
+  title: Chained Schema
+  version: 1.0.0
+components:
+  responses:
+    ChainedResponse:
+      $ref: "#/components/responses/LocalChainedResponse"
+    LocalChainedResponse:
+      description: Local chained response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              nestedValue:
+                type: integer
+  schemas:
+    ChainedSchema:
+      type: object
+      properties:
+        chainedValue:
+          type: string
+        localRef:
+          $ref: "#/components/schemas/LocalChainedSchema"
+    LocalChainedSchema:
+      type: object
+      properties:
+        nestedValue:
+          type: integer
+paths: {}

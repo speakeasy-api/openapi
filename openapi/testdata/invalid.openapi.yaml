@@ -1,0 +1,31 @@
+openapi: 3.1.0
+info:
+  title: Invalid API
+  # Missing required version field
+paths:
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          # Missing schema definition
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              # Missing schema definition
+        # Missing required default response
+  /invalid:
+    post:
+      # Missing required responses field
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: invalid_type # Invalid schema type

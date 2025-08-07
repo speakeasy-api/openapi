@@ -1,0 +1,30 @@
+# Ensure consistent line endings across platforms
+# All text files should use LF (Unix) line endings
+
+# Default behavior: normalize line endings to LF on checkin, 
+# but allow platform-specific line endings on checkout
+* text=auto
+
+# Force LF line endings for specific file types that should always be consistent
+*.go text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.sh text eol=lf
+
+# Test data files should always use LF to match Go's YAML output
+testdata/**/*.yaml text eol=lf
+testdata/**/*.yml text eol=lf
+testdata/**/*.json text eol=lf
+
+# Binary files should not be normalized
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary

@@ -13,6 +13,7 @@ import (
 )
 
 func TestRequestBody_Validate_JSONPathInPayload_Success(t *testing.T) {
+	t.Parallel()
 	// This test reproduces the bug where JSONPath-like expressions in payload
 	// are incorrectly validated as Arazzo runtime expressions
 	ctx := context.Background()
@@ -61,6 +62,7 @@ func TestRequestBody_Validate_JSONPathInPayload_Success(t *testing.T) {
 }
 
 func TestRequestBody_Validate_AnyPayloadData_Success(t *testing.T) {
+	t.Parallel()
 	// This test ensures that ANY data in payloads is allowed, including invalid expressions
 	// since payloads are arbitrary user data and should not be validated as Arazzo expressions
 	ctx := context.Background()
@@ -93,6 +95,7 @@ func TestRequestBody_Validate_AnyPayloadData_Success(t *testing.T) {
 }
 
 func TestRequestBody_Validate_TopLevelExpression_ValidatesCorrectly(t *testing.T) {
+	t.Parallel()
 	// Test that top-level Arazzo expressions are properly validated
 
 	// Test valid top-level expression

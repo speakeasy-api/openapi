@@ -1,0 +1,368 @@
+openapi: 3.1.1
+info:
+  title: Test OpenAPI Document
+  summary: A summary
+  description: A description
+  termsOfService: https://example.com/terms
+  contact:
+    name: API Support
+    url: https://example.com/support
+    email: support@example.com
+    x-test: some-value
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+    x-test: some-value
+  version: 1.0.0
+  x-test: some-value
+security:
+  - ApiKeyAuth: []
+tags:
+  - name: test
+    description: Test tag
+    x-test: some-value
+servers:
+  - url: https://example.com/v1
+    description: Test Server
+    x-test: some-value
+  - url: https://{subdomain}.example.com/{version}
+    description: Test Server with variables
+    variables:
+      subdomain:
+        default: api
+      version:
+        default: v1
+        enum:
+          - v1
+          - v2
+    x-test: some-value
+paths:
+  /test:
+    summary: Test endpoint
+    description: A simple test endpoint for demonstration purposes
+    servers:
+      - url: https://test.example.com
+        description: Test-specific server
+        x-test: some-value
+      - url: https://staging.example.com/test
+        description: Staging server for test endpoint
+    parameters:
+      - name: appId
+        in: query
+        description: Application identifier
+        required: true
+        schema:
+          type: string
+        x-test: some-value
+    get:
+      operationId: test
+      tags:
+        - test
+      responses:
+        200:
+          description: OK
+      x-test: some-value
+    x-test: some-value
+  /users/{userId}:
+    summary: User management endpoint
+    description: Endpoint for managing user data with comprehensive parameter examples
+    parameters:
+      - name: userId
+        in: path
+        description: User identifier
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+        example: 123
+    post:
+      operationId: updateUser
+      summary: Update user data
+      description: Update user information with various parameter types and request body
+      tags:
+        - users
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: X-Request-ID
+          in: header
+          description: Request tracking identifier
+          required: false
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        - name: include
+          in: query
+          description: Fields to include in response
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [profile, preferences, activity]
+          style: form
+          explode: true
+          example: ["profile", "preferences"]
+        - name: notify
+          in: query
+          description: Send notification to user
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: version
+          in: query
+          description: API version for compatibility
+          required: false
+          schema:
+            type: string
+            pattern: "^v[0-9]+$"
+            default: v1
+          example: v2
+      requestBody:
+        description: User data to update
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdateRequest"
+            example:
+              name: "John Doe"
+              email: "john.doe@example.com"
+              preferences:
+                theme: "dark"
+                notifications: true
+      responses:
+        "200":
+          description: User updated successfully
+          headers:
+            X-Rate-Limit-Remaining:
+              $ref: "#/components/headers/X-Rate-Limit-Remaining"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              example:
+                id: 123
+                name: "John Doe"
+                email: "john.doe@example.com"
+                createdAt: "2023-01-15T10:30:00Z"
+                updatedAt: "2023-01-15T14:45:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+      callbacks:
+        userUpdated:
+          "{$request.body#/webhookUrl}":
+            post:
+              requestBody:
+                content:
+                  application/json:
+                    schema:
+                      $ref: "#/components/schemas/UserUpdateEvent"
+              responses:
+                "200":
+                  description: Webhook received successfully
+      x-test: some-value
+    x-test: some-value
+  x-test: some-value
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key authentication
+      x-test: some-value
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT bearer token
+      x-test: some-value
+  schemas:
+    User:
+      type: object
+      description: User information
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: User identifier
+          example: 123
+        name:
+          type: string
+          maxLength: 100
+          description: User's full name
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "john.doe@example.com"
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        preferences:
+          $ref: "#/components/schemas/UserPreferences"
+      x-test: some-value
+    UserUpdateRequest:
+      type: object
+      description: Request to update user data
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          description: Updated name
+        email:
+          type: string
+          format: email
+          description: Updated email address
+        preferences:
+          $ref: "#/components/schemas/UserPreferences"
+        webhookUrl:
+          type: string
+          format: uri
+          description: Callback URL for notifications
+      x-test: some-value
+    UserPreferences:
+      type: object
+      description: User preferences
+      properties:
+        theme:
+          type: string
+          enum: [light, dark, auto]
+          default: light
+        notifications:
+          type: boolean
+          default: true
+        language:
+          type: string
+          pattern: "^[a-z]{2}$"
+          default: en
+      x-test: some-value
+    UserUpdateEvent:
+      type: object
+      description: Event sent to webhook when user is updated
+      required:
+        - eventType
+        - userId
+        - timestamp
+      properties:
+        eventType:
+          type: string
+          enum: [user.updated]
+        userId:
+          type: integer
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        changes:
+          type: array
+          items:
+            type: string
+      x-test: some-value
+    ErrorResponse:
+      type: object
+      description: Standard error response
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Error message
+        details:
+          type: object
+          additionalProperties: true
+      x-test: some-value
+    ValidationError:
+      type: object
+      description: Validation error response
+      required:
+        - error
+        - message
+        - violations
+      properties:
+        error:
+          type: string
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          example: "Request validation failed"
+        violations:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+      x-test: some-value
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "BAD_REQUEST"
+            message: "Invalid request parameters"
+      x-test: some-value
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "UNAUTHORIZED"
+            message: "Authentication required"
+      x-test: some-value
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "NOT_FOUND"
+            message: "User not found"
+      x-test: some-value
+  headers:
+    X-Rate-Limit-Remaining:
+      description: Requests remaining in rate limit window
+      schema:
+        type: integer
+        minimum: 0
+      example: 99
+      x-test: some-value
+  x-test: some-value
+x-test: some-value

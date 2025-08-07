@@ -43,6 +43,7 @@ type TestCoreModel struct {
 }
 
 func TestUnmarshalExtensionModel_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	m := getTestModelWithExtensions(ctx, t, `
@@ -61,6 +62,7 @@ x-speakeasy-test:
 }
 
 func TestGetExtensionValue_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	m := getTestModelWithExtensions(ctx, t, `

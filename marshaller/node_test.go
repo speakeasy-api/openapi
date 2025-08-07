@@ -29,6 +29,8 @@ func runNodeTest[T any](t *testing.T, testCase *testCase[T]) {
 }
 
 func TestNode_Unmarshal_String_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testCase *testCase[string]
@@ -58,12 +60,16 @@ func TestNode_Unmarshal_String_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			runNodeTest(t, tt.testCase)
 		})
 	}
 }
 
 func TestNode_Unmarshal_StringPtr_Success(t *testing.T) {
+	t.Parallel()
+
 	hello := "hello"
 	tests := []struct {
 		name     string
@@ -87,12 +93,16 @@ func TestNode_Unmarshal_StringPtr_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			runNodeTest(t, tt.testCase)
 		})
 	}
 }
 
 func TestNode_Unmarshal_Bool_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testCase *testCase[bool]
@@ -115,6 +125,8 @@ func TestNode_Unmarshal_Bool_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			runNodeTest(t, tt.testCase)
 		})
 	}
@@ -145,6 +157,8 @@ func runNodeErrorTest[T any](t *testing.T, testCase *errorTestCase[T]) {
 }
 
 func TestNode_Unmarshal_Error(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testFunc func(*testing.T)
@@ -189,6 +203,8 @@ func TestNode_Unmarshal_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tt.testFunc(t)
 		})
 	}
@@ -221,6 +237,8 @@ func runNodeSyncTest[T any](t *testing.T, testCase *syncTestCase[T]) {
 }
 
 func TestNode_SyncValue_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testFunc func(*testing.T)
@@ -269,12 +287,16 @@ func TestNode_SyncValue_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tt.testFunc(t)
 		})
 	}
 }
 
 func TestNode_GetValue_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testFunc func(*testing.T)
@@ -363,12 +385,16 @@ func TestNode_GetValue_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tt.testFunc(t)
 		})
 	}
 }
 
 func TestNode_NodeAccessor_Success(t *testing.T) {
+	t.Parallel()
+
 	// Use the same pattern as the working tests
 	var yamlNode yaml.Node
 	err := yaml.Unmarshal([]byte(`"test value"`), &yamlNode)
@@ -402,6 +428,8 @@ func TestNode_NodeAccessor_Success(t *testing.T) {
 }
 
 func TestNode_NodeMutator_Success(t *testing.T) {
+	t.Parallel()
+
 	var yamlNode yaml.Node
 	err := yaml.Unmarshal([]byte(`"original value"`), &yamlNode)
 	require.NoError(t, err)
@@ -430,6 +458,8 @@ func TestNode_NodeMutator_Success(t *testing.T) {
 }
 
 func TestNode_Unmarshal_Int_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testCase *testCase[int]
@@ -459,6 +489,8 @@ func TestNode_Unmarshal_Int_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			runNodeTest(t, tt.testCase)
 		})
 	}

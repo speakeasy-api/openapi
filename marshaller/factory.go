@@ -13,8 +13,30 @@ import (
 // TypeFactory represents a function that creates a new instance of a specific type
 type TypeFactory func() interface{}
 
+// CachedFieldInfo contains the cached information about a struct field
+type CachedFieldInfo struct {
+	Name         string
+	Index        int
+	Required     bool
+	Tag          string
+	IsExported   bool
+	IsExtensions bool
+}
+
+// CachedFieldMaps contains the complete cached field processing result
+type CachedFieldMaps struct {
+	Fields         map[string]CachedFieldInfo
+	ExtensionIndex int             // Index of extensions field, -1 if none
+	HasExtensions  bool            // Whether there's an extensions field
+	FieldIndexes   map[string]int  // tag -> field index mapping
+	RequiredFields map[string]bool // tag -> required status for quick lookup
+}
+
 // Global factory registry using sync.Map for better performance
 var typeFactories sync.Map
+
+// Global field cache registry - built at type registration time
+var fieldCache sync.Map
 
 // RegisterType registers a factory function for a specific type
 // This should be called in init() functions of packages that define models
@@ -30,6 +52,11 @@ func RegisterType[T any](factory func() *T) {
 	typeFactories.Store(typ, TypeFactory(func() interface{} {
 		return factory()
 	}))
+
+	// Build field cache at registration time for struct types
+	if typ.Kind() == reflect.Struct {
+		buildFieldCacheForType(typ)
+	}
 }
 
 // CreateInstance creates a new instance using registered factory or falls back to reflection
@@ -119,4 +146,147 @@ func init() {
 	RegisterType(func() *sequencedmap.Map[string, Node[*yaml.Node]] {
 		return &sequencedmap.Map[string, Node[*yaml.Node]]{}
 	})
+
+	// Register common sequencedmap.Map types
+	RegisterType(func() *sequencedmap.Map[string, Node[string]] {
+		return &sequencedmap.Map[string, Node[string]]{}
+	})
+	RegisterType(func() *sequencedmap.Map[string, string] {
+		return &sequencedmap.Map[string, string]{}
+	})
+}
+
+// buildFieldCacheForType builds the field cache for a struct type at registration time
+func buildFieldCacheForType(structType reflect.Type) {
+	if structType.Kind() != reflect.Struct {
+		return
+	}
+
+	fields := make(map[string]CachedFieldInfo)
+	fieldIndexes := make(map[string]int)
+	requiredFields := make(map[string]bool)
+	extensionIndex := -1
+	hasExtensions := false
+
+	for i := 0; i < structType.NumField(); i++ {
+		field := structType.Field(i)
+
+		// Skip anonymous fields (embedded structs/maps are handled separately)
+		if field.Anonymous {
+			continue
+		}
+
+		// Skip unexported fields
+		if !field.IsExported() {
+			continue
+		}
+
+		tag := field.Tag.Get("key")
+		if tag == "" {
+			// Handle extensions field specially
+			if tag == "extensions" {
+				extensionIndex = i
+				hasExtensions = true
+				fields[tag] = CachedFieldInfo{
+					Name:         field.Name,
+					Index:        i,
+					Required:     false,
+					Tag:          tag,
+					IsExported:   true,
+					IsExtensions: true,
+				}
+			}
+			continue
+		}
+
+		// Determine if field is required
+		requiredTag := field.Tag.Get("required")
+		required := requiredTag == "true"
+
+		// If no explicit required tag, use the same logic as the original unmarshaller
+		if requiredTag == "" {
+			// Create a zero value of the field to check if it implements NodeAccessor
+			fieldVal := reflect.New(field.Type).Elem()
+			if nodeAccessor, ok := fieldVal.Interface().(NodeAccessor); ok {
+				fieldType := nodeAccessor.GetValueType()
+				if fieldType.Kind() != reflect.Ptr {
+					required = fieldType.Kind() != reflect.Map && fieldType.Kind() != reflect.Slice && fieldType.Kind() != reflect.Array
+				}
+			}
+		}
+
+		// Store the cached field info
+		fields[tag] = CachedFieldInfo{
+			Name:         field.Name,
+			Index:        i,
+			Required:     required,
+			Tag:          tag,
+			IsExported:   true,
+			IsExtensions: tag == "extensions",
+		}
+
+		// Track extensions field
+		if tag == "extensions" {
+			extensionIndex = i
+			hasExtensions = true
+		} else {
+			// Build field index maps at cache time (this is the expensive work we want to avoid)
+			fieldIndexes[tag] = i
+			if required {
+				requiredFields[tag] = true
+			}
+		}
+	}
+
+	// Store complete cached result including pre-built field indexes
+	cachedMaps := CachedFieldMaps{
+		Fields:         fields,
+		ExtensionIndex: extensionIndex,
+		HasExtensions:  hasExtensions,
+		FieldIndexes:   fieldIndexes,
+		RequiredFields: requiredFields,
+	}
+
+	fieldCache.Store(structType, cachedMaps)
+}
+
+// getFieldMapCached returns the cached field maps for a struct type
+// This is much faster than the reflection-heavy loop in unmarshalModel
+func getFieldMapCached(structType reflect.Type) CachedFieldMaps {
+	if cached, ok := fieldCache.Load(structType); ok {
+		return cached.(CachedFieldMaps)
+	}
+
+	if isTesting() {
+		log.Printf("CACHE MISS: building field cache on-demand for unregistered type: %s", structType.String())
+	}
+
+	// Build cache on-demand for unregistered types
+	buildFieldCacheForType(structType)
+
+	return getFieldMapCached(structType)
+}
+
+// ClearGlobalFieldCache clears the global field cache.
+// This is useful for testing or memory management when the cache is no longer needed.
+func ClearGlobalFieldCache() {
+	fieldCache.Range(func(key, value interface{}) bool {
+		fieldCache.Delete(key)
+		return true
+	})
+}
+
+// FieldCacheStats returns basic statistics about the field cache
+type FieldCacheStats struct {
+	Size int64
+}
+
+// GetFieldCacheStats returns statistics about the global field cache
+func GetFieldCacheStats() FieldCacheStats {
+	var size int64
+	fieldCache.Range(func(key, value interface{}) bool {
+		size++
+		return true
+	})
+	return FieldCacheStats{Size: size}
 }

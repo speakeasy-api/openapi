@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "🧪 Running tests with coverage using gotestsum..."
+gotestsum --format testname -- -race -coverprofile=coverage.out -covermode=atomic ./...
+go tool cover -html=coverage.out -o coverage.html
+echo "📊 Coverage report generated: coverage.html"
+echo "✅ Tests with coverage completed!"

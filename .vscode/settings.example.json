@@ -1,0 +1,16 @@
+{
+  "mise.configureExtensionsUseSymLinks": true,
+  "go.goroot": "${workspaceFolder}/.vscode/mise-tools/goRoot",
+  "go.alternateTools": {
+    "go": "${workspaceFolder}/.vscode/mise-tools/go",
+    "dlv": "${workspaceFolder}/.vscode/mise-tools/dlv",
+    "gopls": "${workspaceFolder}/.vscode/mise-tools/gopls",
+    "golangci-lint": "${workspaceFolder}/.vscode/mise-tools/golangci-lint",
+    "customFormatter": "${workspaceFolder}/.vscode/mise-tools/golangci-lint"
+  },
+  "go.lintTool": "golangci-lint",
+  "go.lintFlags": ["--path-mode=abs", "--fast-only"],
+  "go.formatTool": "custom",
+  "go.formatFlags": ["fmt", "--stdin"],
+  "go.lintOnSave": "package"
+}

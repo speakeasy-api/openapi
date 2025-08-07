@@ -74,6 +74,8 @@ func runSequencedMapErrorTest[K comparable, V any](t *testing.T, testCase *seque
 }
 
 func TestSequencedMap_Unmarshal_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testCase *sequencedMapTestCase[string, string]
@@ -124,12 +126,16 @@ beta: "middle"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			runSequencedMapTest(t, tt.testCase)
 		})
 	}
 }
 
 func TestSequencedMap_Unmarshal_IntValues_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testCase *sequencedMapTestCase[string, int]
@@ -162,12 +168,16 @@ negative: -10
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			runSequencedMapTest(t, tt.testCase)
 		})
 	}
 }
 
 func TestSequencedMap_Unmarshal_Error(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testCase *sequencedMapErrorTestCase[string, string]
@@ -194,12 +204,16 @@ func TestSequencedMap_Unmarshal_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			runSequencedMapErrorTest(t, tt.testCase)
 		})
 	}
 }
 
 func TestSequencedMap_Sync_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testFunc func(*testing.T)
@@ -282,12 +296,16 @@ second: "2"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tt.testFunc(t)
 		})
 	}
 }
 
 func TestSequencedMap_Population_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testFunc func(*testing.T)
@@ -325,12 +343,16 @@ func TestSequencedMap_Population_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tt.testFunc(t)
 		})
 	}
 }
 
 func TestSequencedMap_WithExtensions_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testFunc func(*testing.T)
@@ -381,6 +403,8 @@ x-vendor: "vendor extension"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tt.testFunc(t)
 		})
 	}

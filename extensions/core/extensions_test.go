@@ -24,6 +24,7 @@ func (t *TestCoreModel) Unmarshal(ctx context.Context, node *yaml.Node) ([]error
 }
 
 func TestUnmarshalExtensionModel_Success(t *testing.T) {
+	t.Parallel()
 	e := sequencedmap.New(
 		sequencedmap.NewElem("x-speakeasy-test", marshaller.Node[*yaml.Node]{
 			Value: testutils.CreateMapYamlNode([]*yaml.Node{

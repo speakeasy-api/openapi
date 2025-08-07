@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"gopkg.in/yaml.v3"
 )
 
@@ -11,7 +12,7 @@ import (
 var (
 	nodeAccessorType   = reflect.TypeOf((*NodeAccessor)(nil)).Elem()
 	populatorType      = reflect.TypeOf((*Populator)(nil)).Elem()
-	sequencedMapType   = reflect.TypeOf((*sequencedMapInterface)(nil)).Elem()
+	sequencedMapType   = reflect.TypeOf((*interfaces.SequencedMapInterface)(nil)).Elem()
 	coreModelerType    = reflect.TypeOf((*CoreModeler)(nil)).Elem()
 	yamlNodePtrType    = reflect.TypeOf((*yaml.Node)(nil))
 	yamlNodeType       = reflect.TypeOf(yaml.Node{})
@@ -99,14 +100,6 @@ func populateModel(source any, target any) error {
 
 		fieldVal := s.Field(i)
 
-		if field.Anonymous {
-			if implementsInterface[sequencedMapInterface](fieldVal) {
-				useFieldValue = true
-			} else {
-				continue
-			}
-		}
-
 		if fieldVal.Kind() == reflect.Ptr {
 			if fieldVal.IsNil() {
 				continue
@@ -116,6 +109,16 @@ func populateModel(source any, target any) error {
 		}
 
 		fieldInt := fieldVal.Interface()
+
+		if field.Anonymous {
+			if targetSeqMap := getSequencedMapInterface(tField); targetSeqMap != nil {
+				sourceForPopulation := getSourceForPopulation(s.Field(i), fieldInt)
+				if err := populateSequencedMap(sourceForPopulation, targetSeqMap); err != nil {
+					return err
+				}
+			}
+			continue
+		}
 
 		if field.Name == "Extensions" {
 			sem, ok := fieldInt.(ExtensionCoreMap)
@@ -167,6 +170,18 @@ func populateModel(source any, target any) error {
 
 func populateValue(source any, target reflect.Value) error {
 	value := reflect.ValueOf(source)
+
+	// Handle nil source early - when source is nil, reflect.ValueOf returns a zero Value
+	if !value.IsValid() {
+		// Set target to zero value and return
+		if target.Kind() == reflect.Ptr {
+			target.Set(reflect.Zero(target.Type()))
+		} else {
+			target.Set(reflect.Zero(target.Type()))
+		}
+		return nil
+	}
+
 	valueType := value.Type()
 	valueKind := value.Kind()
 
@@ -174,6 +189,19 @@ func populateValue(source any, target reflect.Value) error {
 	if valueType.Implements(nodeAccessorType) {
 		source = source.(NodeAccessor).GetValue()
 		value = reflect.ValueOf(source)
+
+		// Check again after extracting from NodeAccessor
+		if !value.IsValid() {
+			// Set target to zero value and return
+			if target.Kind() == reflect.Ptr {
+				target.Set(reflect.Zero(target.Type()))
+			} else {
+				target.Set(reflect.Zero(target.Type()))
+			}
+			return nil
+		}
+
+		valueKind = value.Kind()
 	}
 
 	if valueKind == reflect.Ptr && value.IsNil() && target.Kind() == reflect.Ptr {
@@ -194,7 +222,7 @@ func populateValue(source any, target reflect.Value) error {
 
 	// Check if target is a sequenced map and handle it specially
 	if targetType.Implements(sequencedMapType) && !isEmbeddedSequencedMapType(value.Type()) {
-		return populateSequencedMap(value.Interface(), target.Interface().(sequencedMapInterface))
+		return populateSequencedMap(value.Interface(), target.Interface().(interfaces.SequencedMapInterface))
 	}
 
 	// Check if target implements CoreSetter interface
@@ -203,7 +231,7 @@ func populateValue(source any, target reflect.Value) error {
 			return err
 		}
 
-		coreSetter.SetCoreValue(value.Interface())
+		coreSetter.SetCoreAny(value.Interface())
 		return nil
 	}
 
@@ -254,10 +282,78 @@ func populateValue(source any, target reflect.Value) error {
 	return nil
 }
 
+// getSequencedMapInterface checks if the field implements SequencedMapInterface and returns it
+// Handles both pointer and value embeds, initializing if necessary
+func getSequencedMapInterface(tField reflect.Value) interfaces.SequencedMapInterface {
+	// Check if the TARGET field implements SequencedMapInterface (either directly or via pointer)
+	implementsSeqMap := implementsInterface(tField, sequencedMapType)
+
+	if !implementsSeqMap && tField.CanAddr() {
+		// For value embeds, check if a pointer to the target field implements the interface
+		ptrType := tField.Addr().Type()
+		seqMapInterfaceType := reflect.TypeOf((*interfaces.SequencedMapInterface)(nil)).Elem()
+		implementsSeqMap = ptrType.Implements(seqMapInterfaceType)
+	}
+
+	if !implementsSeqMap {
+		return nil
+	}
+
+	// Handle embedded sequenced maps directly
+	var targetSeqMap interfaces.SequencedMapInterface
+	var ok bool
+
+	// For value embeds, initialize the target field if it's not initialized
+	if tField.Kind() != reflect.Ptr {
+		// This is a value embed - check if it needs initialization
+		if tField.CanAddr() {
+			if seqMapInterface, ok := tField.Addr().Interface().(interfaces.SequencedMapInterface); ok {
+				if !seqMapInterface.IsInitialized() {
+					// Initialize the value embed by creating a new instance and copying it
+					newInstance := CreateInstance(tField.Type())
+					tField.Set(newInstance.Elem())
+				}
+			}
+			targetSeqMap, ok = tField.Addr().Interface().(interfaces.SequencedMapInterface)
+		}
+	} else {
+		// Pointer embed
+		if tField.IsNil() {
+			tField.Set(CreateInstance(tField.Type().Elem()))
+		}
+		targetSeqMap, ok = tField.Interface().(interfaces.SequencedMapInterface)
+	}
+
+	if ok {
+		return targetSeqMap
+	}
+	return nil
+}
+
+// getSourceForPopulation prepares the source field for population
+// Handles addressability issues for value embeds
+func getSourceForPopulation(originalFieldVal reflect.Value, fieldInt any) any {
+	if originalFieldVal.CanAddr() {
+		return originalFieldVal.Addr().Interface()
+	} else if originalFieldVal.Kind() == reflect.Ptr {
+		return originalFieldVal.Interface()
+	} else {
+		// Create an addressable copy for value embeds so we can use the interface
+		ptrType := reflect.PointerTo(originalFieldVal.Type())
+		if ptrType.Implements(sequencedMapType) {
+			addressableCopy := reflect.New(originalFieldVal.Type())
+			addressableCopy.Elem().Set(originalFieldVal)
+			return addressableCopy.Interface()
+		} else {
+			return fieldInt
+		}
+	}
+}
+
 func isEmbeddedSequencedMapType(t reflect.Type) bool {
 	// Check both value type and pointer type
-	implementsSequencedMap := t.Implements(sequencedMapType) || reflect.PtrTo(t).Implements(sequencedMapType)
-	implementsCoreModeler := t.Implements(coreModelerType) || reflect.PtrTo(t).Implements(coreModelerType)
+	implementsSequencedMap := t.Implements(sequencedMapType) || reflect.PointerTo(t).Implements(sequencedMapType)
+	implementsCoreModeler := t.Implements(coreModelerType) || reflect.PointerTo(t).Implements(coreModelerType)
 
 	return implementsSequencedMap && implementsCoreModeler
 }

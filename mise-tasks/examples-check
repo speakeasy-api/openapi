@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Examples Check - Verify that examples in README files are up to date
+# This script checks if the examples in README files match what would be generated
+# from the current example test files.
+
+echo "🔍 Checking if examples in README files are up to date..."
+
+# Generate fresh examples
+echo "🚀 Generating fresh examples..."
+go run ./cmd/update-examples
+
+# Check if any files were modified
+if ! git diff --quiet openapi/README.md arazzo/README.md; then
+    echo "❌ Examples in README files are out of date!"
+    echo ""
+    echo "📄 Differences found:"
+    git diff openapi/README.md arazzo/README.md
+    echo ""
+    echo "💡 To fix this, run: mise run update-examples"
+    echo "   Then commit the updated README files."
+    exit 1
+else
+    echo "✅ All examples in README files are up to date!"
+fi

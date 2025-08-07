@@ -53,6 +53,8 @@ func (m *MockBothNavigable) NavigateWithIndex(index int) (any, error) {
 }
 
 func TestEitherValue_JSONPointer_LeftValue_KeyNavigation(t *testing.T) {
+	t.Parallel()
+
 	// Test with Left value that supports key navigation
 	leftValue := &MockKeyNavigable{
 		Data: map[string]interface{}{
@@ -77,6 +79,8 @@ func TestEitherValue_JSONPointer_LeftValue_KeyNavigation(t *testing.T) {
 }
 
 func TestEitherValue_JSONPointer_RightValue_KeyNavigation(t *testing.T) {
+	t.Parallel()
+
 	// Test with Right value that supports key navigation
 	rightValue := &MockKeyNavigable{
 		Data: map[string]interface{}{
@@ -95,6 +99,8 @@ func TestEitherValue_JSONPointer_RightValue_KeyNavigation(t *testing.T) {
 }
 
 func TestEitherValue_JSONPointer_UnsupportedType(t *testing.T) {
+	t.Parallel()
+
 	// Test with Left value that doesn't support key navigation
 	eitherValue := &EitherValue[string, string, string, string]{
 		Left: stringPtr("simple string"),
@@ -107,6 +113,8 @@ func TestEitherValue_JSONPointer_UnsupportedType(t *testing.T) {
 }
 
 func TestEitherValue_JSONPointer_LeftValue_IndexNavigation(t *testing.T) {
+	t.Parallel()
+
 	// Test with Left value that supports index navigation
 	leftValue := &MockIndexNavigable{
 		Data: []interface{}{"item0", "item1", "item2"},
@@ -128,6 +136,8 @@ func TestEitherValue_JSONPointer_LeftValue_IndexNavigation(t *testing.T) {
 }
 
 func TestEitherValue_JSONPointer_RightValue_IndexNavigation(t *testing.T) {
+	t.Parallel()
+
 	// Test with Right value that supports index navigation
 	rightValue := &MockIndexNavigable{
 		Data: []interface{}{"right0", "right1"},
@@ -144,6 +154,8 @@ func TestEitherValue_JSONPointer_RightValue_IndexNavigation(t *testing.T) {
 }
 
 func TestEitherValue_GetNavigableNode_NoValueSet(t *testing.T) {
+	t.Parallel()
+
 	// Test with neither Left nor Right set
 	eitherValue := &EitherValue[string, string, string, string]{}
 
@@ -155,6 +167,8 @@ func TestEitherValue_GetNavigableNode_NoValueSet(t *testing.T) {
 }
 
 func TestEitherValue_GetNavigableNode_LeftValue(t *testing.T) {
+	t.Parallel()
+
 	// Test GetNavigableNode with Left value
 	leftValue := &MockKeyNavigable{
 		Data: map[string]interface{}{"test": "value"},
@@ -170,6 +184,8 @@ func TestEitherValue_GetNavigableNode_LeftValue(t *testing.T) {
 }
 
 func TestEitherValue_GetNavigableNode_RightValue(t *testing.T) {
+	t.Parallel()
+
 	// Test GetNavigableNode with Right value
 	rightValue := &MockIndexNavigable{
 		Data: []interface{}{"item"},
@@ -185,6 +201,8 @@ func TestEitherValue_GetNavigableNode_RightValue(t *testing.T) {
 }
 
 func TestEitherValue_JSONPointer_BothNavigationTypes(t *testing.T) {
+	t.Parallel()
+
 	// Test with value that supports both key and index navigation
 	bothValue := &MockBothNavigable{
 		MapData:   map[string]interface{}{"key1": "mapvalue"},

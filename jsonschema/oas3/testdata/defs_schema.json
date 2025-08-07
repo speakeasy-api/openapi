@@ -1,0 +1,50 @@
+{
+  "type": "object",
+  "properties": {
+    "user": { "$ref": "#/$defs/User" },
+    "address": { "$ref": "#/$defs/Address" },
+    "chainedRef": { "$ref": "#/$defs/ChainedRef" },
+    "nonExistentRef": { "$ref": "#/$defs/NonExistent" }
+  },
+  "$defs": {
+    "User": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "age": { "type": "integer" },
+        "address": { "$ref": "#/$defs/Address" }
+      }
+    },
+    "Address": {
+      "type": "object",
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "country": { "type": "string" }
+      }
+    },
+    "ChainedRef": { "$ref": "#/$defs/ChainedTarget" },
+    "ChainedTarget": {
+      "type": "object",
+      "properties": {
+        "value": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "NestedSchema": {
+      "type": "object",
+      "properties": {
+        "value": { "type": "string" },
+        "localRef": { "$ref": "#/$defs/LocalDef" }
+      },
+      "$defs": {
+        "LocalDef": {
+          "type": "object",
+          "properties": {
+            "localValue": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

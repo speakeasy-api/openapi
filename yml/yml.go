@@ -9,6 +9,9 @@ import (
 func CreateOrUpdateKeyNode(ctx context.Context, key string, keyNode *yaml.Node) *yaml.Node {
 	if keyNode != nil {
 		resolvedKeyNode := ResolveAlias(keyNode)
+		if resolvedKeyNode == nil {
+			resolvedKeyNode = keyNode
+		}
 
 		resolvedKeyNode.Value = key
 		return keyNode
@@ -69,6 +72,14 @@ func CreateOrUpdateMapNodeElement(ctx context.Context, key string, keyNode, valu
 	})
 }
 
+func CreateStringNode(value string) *yaml.Node {
+	return &yaml.Node{
+		Value: value,
+		Kind:  yaml.ScalarNode,
+		Tag:   "!!str",
+	}
+}
+
 func CreateMapNode(ctx context.Context, content []*yaml.Node) *yaml.Node {
 	return &yaml.Node{
 		Content: content,
@@ -78,6 +89,10 @@ func CreateMapNode(ctx context.Context, content []*yaml.Node) *yaml.Node {
 }
 
 func DeleteMapNodeElement(ctx context.Context, key string, mapNode *yaml.Node) *yaml.Node {
+	if mapNode == nil {
+		return nil
+	}
+
 	resolvedMapNode := ResolveAlias(mapNode)
 	if resolvedMapNode == nil {
 		return nil
@@ -137,4 +152,49 @@ func ResolveAlias(node *yaml.Node) *yaml.Node {
 	default:
 		return node
 	}
+}
+
+// EqualNodes compares two yaml.Node instances for equality.
+// It performs a deep comparison of the essential fields.
+func EqualNodes(a, b *yaml.Node) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+
+	// Resolve aliases before comparison
+	resolvedA := ResolveAlias(a)
+	resolvedB := ResolveAlias(b)
+
+	if resolvedA == nil && resolvedB == nil {
+		return true
+	}
+	if resolvedA == nil || resolvedB == nil {
+		return false
+	}
+
+	// Compare essential fields
+	if resolvedA.Kind != resolvedB.Kind {
+		return false
+	}
+	if resolvedA.Tag != resolvedB.Tag {
+		return false
+	}
+	if resolvedA.Value != resolvedB.Value {
+		return false
+	}
+
+	// Compare content for complex nodes
+	if len(resolvedA.Content) != len(resolvedB.Content) {
+		return false
+	}
+	for i, contentA := range resolvedA.Content {
+		if !EqualNodes(contentA, resolvedB.Content[i]) {
+			return false
+		}
+	}
+
+	return true
 }

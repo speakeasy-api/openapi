@@ -15,6 +15,7 @@ import (
 )
 
 func TestArazzo_ArrayOrdering_ReorderWorkflows_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/ordering/input.arazzo.yaml")
@@ -40,6 +41,7 @@ func TestArazzo_ArrayOrdering_ReorderWorkflows_Success(t *testing.T) {
 }
 
 func TestArazzo_ArrayOrdering_BasicRoundTrip_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/ordering/input.arazzo.yaml")
@@ -58,6 +60,7 @@ func TestArazzo_ArrayOrdering_BasicRoundTrip_Success(t *testing.T) {
 }
 
 func TestArazzo_ArrayOrdering_ReorderWithoutSync_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/ordering/input.arazzo.yaml")
@@ -82,6 +85,7 @@ func TestArazzo_ArrayOrdering_ReorderWithoutSync_Success(t *testing.T) {
 }
 
 func TestArazzo_ArrayOrdering_AddWorkflow_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/ordering/input.arazzo.yaml")
@@ -115,6 +119,7 @@ func TestArazzo_ArrayOrdering_AddWorkflow_Success(t *testing.T) {
 }
 
 func TestArazzo_ArrayOrdering_DeleteWorkflow_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/ordering/input.arazzo.yaml")
@@ -139,6 +144,7 @@ func TestArazzo_ArrayOrdering_DeleteWorkflow_Success(t *testing.T) {
 }
 
 func TestArazzo_ArrayOrdering_ComplexOperations_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/ordering/input.arazzo.yaml")
@@ -217,6 +223,7 @@ func TestArazzo_ArrayOrdering_ComplexOperations_Success(t *testing.T) {
 }
 
 func TestArazzo_MapOrdering_StressModification_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/ordering/input.arazzo.yaml")
@@ -282,6 +289,7 @@ func TestArazzo_MapOrdering_StressModification_Success(t *testing.T) {
 }
 
 func TestArazzo_MapOrdering_AddParameter_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/ordering/input.arazzo.yaml")
@@ -311,6 +319,7 @@ func TestArazzo_MapOrdering_AddParameter_Success(t *testing.T) {
 }
 
 func TestArazzo_MapOrdering_DeleteParameter_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/ordering/input.arazzo.yaml")
@@ -336,6 +345,7 @@ func TestArazzo_MapOrdering_DeleteParameter_Success(t *testing.T) {
 }
 
 func TestArazzo_MapOrdering_ReorderComponents_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	data, err := os.ReadFile("testdata/ordering/input.arazzo.yaml")

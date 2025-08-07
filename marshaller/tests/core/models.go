@@ -54,13 +54,13 @@ type TestComplexModel struct {
 // TestEmbeddedMapModel covers embedded sequenced map scenarios with no extra fields
 type TestEmbeddedMapModel struct {
 	marshaller.CoreModel
-	*sequencedmap.Map[string, marshaller.Node[string]]
+	sequencedmap.Map[string, marshaller.Node[string]]
 }
 
 // TestEmbeddedMapWithFieldsModel covers embedded sequenced map with additional fields
 type TestEmbeddedMapWithFieldsModel struct {
 	marshaller.CoreModel
-	*sequencedmap.Map[string, marshaller.Node[*TestPrimitiveModel]]
+	sequencedmap.Map[string, marshaller.Node[*TestPrimitiveModel]]
 	NameField  marshaller.Node[string] `key:"name"`
 	Extensions core.Extensions         `key:"extensions"`
 }
@@ -68,7 +68,7 @@ type TestEmbeddedMapWithFieldsModel struct {
 // TestEmbeddedMapWithExtensionsModel covers embedded sequenced map with extensions only
 type TestEmbeddedMapWithExtensionsModel struct {
 	marshaller.CoreModel
-	*sequencedmap.Map[string, marshaller.Node[string]]
+	sequencedmap.Map[string, marshaller.Node[string]]
 	Extensions core.Extensions `key:"extensions"`
 }
 
@@ -118,6 +118,22 @@ type TestValidationModel struct {
 	Extensions     core.Extensions                      `key:"extensions"`
 }
 
+// TestEmbeddedMapPointerModel represents core model with pointer embedded sequenced map
+// This tests the legacy pointer embed pattern to ensure backward compatibility
+type TestEmbeddedMapPointerModel struct {
+	marshaller.CoreModel
+	*sequencedmap.Map[string, marshaller.Node[string]]
+}
+
+// TestEmbeddedMapWithFieldsPointerModel represents core model with pointer embedded sequenced map and additional fields
+// This tests the legacy pointer embed pattern with fields to ensure backward compatibility
+type TestEmbeddedMapWithFieldsPointerModel struct {
+	marshaller.CoreModel
+	*sequencedmap.Map[string, marshaller.Node[*TestPrimitiveModel]]
+	NameField  marshaller.Node[string] `key:"name"`
+	Extensions core.Extensions         `key:"extensions"`
+}
+
 // TestAliasModel covers alias scenarios
 type TestAliasModel struct {
 	marshaller.CoreModel
@@ -147,7 +163,7 @@ type TestRequiredNilableModel struct {
 // This simulates the issue where core uses string keys but high-level model expects HTTPMethod keys
 type TestTypeConversionCoreModel struct {
 	marshaller.CoreModel
-	*sequencedmap.Map[string, marshaller.Node[*TestPrimitiveModel]]
+	sequencedmap.Map[string, marshaller.Node[*TestPrimitiveModel]]
 	HTTPMethodField marshaller.Node[*string] `key:"httpMethodField"`
 	Extensions      core.Extensions          `key:"extensions"`
 }

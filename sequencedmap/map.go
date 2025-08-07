@@ -8,6 +8,23 @@ import (
 	"iter"
 	"reflect"
 	"slices"
+	"sort"
+
+	"github.com/speakeasy-api/openapi/internal/interfaces"
+)
+
+// OrderType represents the different ways to order iteration through the map
+type OrderType int
+
+const (
+	// OrderAdded iterates in the order items were added (default behavior)
+	OrderAdded OrderType = iota
+	// OrderAddedReverse iterates in reverse order of when items were added
+	OrderAddedReverse
+	// OrderKeyAsc iterates with keys in alphabetical ascending order
+	OrderKeyAsc
+	// OrderKeyDesc iterates with keys in alphabetical descending order
+	OrderKeyDesc
 )
 
 // Element is a key-value pair that is stored in a sequenced map.
@@ -29,6 +46,8 @@ type Map[K comparable, V any] struct {
 	m map[K]*Element[K, V]
 	l []*Element[K, V]
 }
+
+var _ interfaces.SequencedMapInterface = (*Map[any, any])(nil)
 
 // New creates a new map with the specified elements.
 func New[K comparable, V any](elements ...*Element[K, V]) *Map[K, V] {
@@ -78,6 +97,14 @@ func (m *Map[K, V]) Init() {
 		m.m = make(map[K]*Element[K, V])
 		m.l = make([]*Element[K, V], 0)
 	}
+}
+
+// IsInitialized returns true if the map has been initialized.
+func (m *Map[K, V]) IsInitialized() bool {
+	if m == nil {
+		return false
+	}
+	return m.m != nil && m.l != nil
 }
 
 // Len returns the number of elements in the map. nil safe.
@@ -268,6 +295,60 @@ func (m *Map[K, V]) All() iter.Seq2[K, V] {
 	}
 }
 
+// AllOrdered returns an iterator that iterates over all elements in the map in the specified order.
+func (m *Map[K, V]) AllOrdered(order OrderType) iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		if m == nil {
+			return
+		}
+
+		switch order {
+		case OrderAdded:
+			// Same as All() - iterate in insertion order
+			for _, element := range m.l {
+				if !yield(element.Key, element.Value) {
+					return
+				}
+			}
+
+		case OrderAddedReverse:
+			// Iterate in reverse insertion order
+			for i := len(m.l) - 1; i >= 0; i-- {
+				element := m.l[i]
+				if !yield(element.Key, element.Value) {
+					return
+				}
+			}
+
+		case OrderKeyAsc:
+			// Sort by key in ascending order
+			sortedElements := make([]*Element[K, V], len(m.l))
+			copy(sortedElements, m.l)
+			sort.Slice(sortedElements, func(i, j int) bool {
+				return compareKeys(sortedElements[i].Key, sortedElements[j].Key) < 0
+			})
+			for _, element := range sortedElements {
+				if !yield(element.Key, element.Value) {
+					return
+				}
+			}
+
+		case OrderKeyDesc:
+			// Sort by key in descending order
+			sortedElements := make([]*Element[K, V], len(m.l))
+			copy(sortedElements, m.l)
+			sort.Slice(sortedElements, func(i, j int) bool {
+				return compareKeys(sortedElements[i].Key, sortedElements[j].Key) > 0
+			})
+			for _, element := range sortedElements {
+				if !yield(element.Key, element.Value) {
+					return
+				}
+			}
+		}
+	}
+}
+
 // AllUntyped returns an iterator that iterates over all elements in the map with untyped key and value.
 // This allows for using the map in generic code.
 func (m *Map[K, V]) AllUntyped() iter.Seq2[any, any] {
@@ -342,7 +423,13 @@ func (m *Map[K, V]) NavigateWithKey(key string) (any, error) {
 	var ka any = key
 	k, ok := ka.(K)
 	if !ok {
-		return nil, fmt.Errorf("key not convertible to sequencedmap.Map key type %v", keyType)
+		// Try to convert if the underlying types are the same
+		var zero K
+		if reflect.TypeOf(ka).ConvertibleTo(reflect.TypeOf(zero)) {
+			k = reflect.ValueOf(ka).Convert(reflect.TypeOf(zero)).Interface().(K)
+		} else {
+			return nil, fmt.Errorf("key not convertible to sequencedmap.Map key type %v", keyType)
+		}
 	}
 
 	v, ok := m.Get(k)
@@ -386,4 +473,99 @@ func (m *Map[K, V]) MarshalJSON() ([]byte, error) {
 	buf.WriteString("}")
 
 	return buf.Bytes(), nil
+}
+
+// compareKeys provides a generic comparison function for keys
+func compareKeys[K comparable](a, b K) int {
+	// Convert to strings for comparison
+	aStr := fmt.Sprintf("%v", a)
+	bStr := fmt.Sprintf("%v", b)
+
+	if aStr < bStr {
+		return -1
+	} else if aStr > bStr {
+		return 1
+	}
+	return 0
+}
+
+// IsEqual compares two Map instances for equality.
+// It compares both the keys and values, and requires them to be in the same order.
+// Treats both empty and nil maps as equal.
+func (m *Map[K, V]) IsEqual(other *Map[K, V]) bool {
+	if m == nil && other == nil {
+		return true
+	}
+
+	// Treat nil and empty maps as equal
+	mLen := 0
+	if m != nil {
+		mLen = m.Len()
+	}
+	otherLen := 0
+	if other != nil {
+		otherLen = other.Len()
+	}
+
+	if mLen == 0 && otherLen == 0 {
+		return true
+	}
+
+	if mLen != otherLen {
+		return false
+	}
+
+	// Compare all key-value pairs in order
+	for key, valueA := range m.All() {
+		valueB, exists := other.Get(key)
+		if !exists {
+			return false
+		}
+
+		// Use reflect.DeepEqual for value comparison
+		if !reflect.DeepEqual(valueA, valueB) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsEqualFunc compares two Map instances for equality using a custom comparison function.
+// This is useful when you need custom comparison logic for the values.
+// Treats both empty and nil maps as equal.
+func (m *Map[K, V]) IsEqualFunc(other *Map[K, V], equalFunc func(V, V) bool) bool {
+	if m == nil && other == nil {
+		return true
+	}
+
+	// Treat nil and empty maps as equal
+	mLen := 0
+	if m != nil {
+		mLen = m.Len()
+	}
+	otherLen := 0
+	if other != nil {
+		otherLen = other.Len()
+	}
+
+	if mLen == 0 && otherLen == 0 {
+		return true
+	}
+
+	if mLen != otherLen {
+		return false
+	}
+
+	// Compare all key-value pairs using the custom function
+	for key, valueA := range m.All() {
+		valueB, exists := other.Get(key)
+		if !exists {
+			return false
+		}
+
+		if !equalFunc(valueA, valueB) {
+			return false
+		}
+	}
+	return true
 }

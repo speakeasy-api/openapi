@@ -9,7 +9,7 @@ import (
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/jsonschema/oas31"
+	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 )
@@ -40,7 +40,7 @@ type Workflow struct {
 	// Parameters is a list of Parameters that will be passed to the referenced operation or workflow.
 	Parameters []*ReusableParameter
 	// Inputs is a JSON Schema containing a set of inputs that will be passed to the referenced workflow.
-	Inputs oas31.JSONSchema
+	Inputs *oas3.JSONSchema[oas3.Referenceable]
 	// DependsOn is a list of workflowIds (or expressions to workflows) that must succeed before this workflow can be executed.
 	DependsOn []expression.Expression
 	// Steps is a list of steps that will be executed in the order they are listed.
@@ -68,7 +68,7 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	if a == nil {
 		return []error{
-			errors.New("An Arazzo object must be passed via validation options to validate a Workflow"),
+			errors.New("an Arazzo object must be passed via validation options to validate a Workflow"),
 		}
 	}
 

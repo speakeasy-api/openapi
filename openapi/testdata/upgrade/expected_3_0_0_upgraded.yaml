@@ -1,0 +1,78 @@
+openapi: 3.1.1
+info:
+  title: Test API for Upgrade
+  version: 1.0.0
+  description: API to test upgrading from 3.0.0 to 3.1.1
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+components:
+  schemas:
+    User:
+      type:
+        - object
+        - "null"
+      properties:
+        id:
+          type: integer
+          examples:
+            - 123
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+          examples:
+            - "user@example.com"
+        age:
+          type: integer
+          minimum: 0
+          maximum: 150
+        score:
+          type: number
+          exclusiveMinimum: 0
+          exclusiveMaximum: 100
+    Product:
+      type:
+        - object
+        - "null"
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          examples:
+            - "Product Name"
+        price:
+          type: number
+          minimum: 0
+          maximum: 10000
+    Category:
+      anyOf:
+        - type: string
+        - type: integer
+        - type:
+            - "null"
+    Tag:
+      oneOf:
+        - type: string
+        - type: integer
+        - type:
+            - "null"
+    SimpleNullable:
+      type:
+        - string
+        - "null"

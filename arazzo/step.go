@@ -73,13 +73,13 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 
 	if a == nil {
 		return []error{
-			errors.New("An Arazzo object must be passed via validation options to validate a Step"),
+			errors.New("an Arazzo object must be passed via validation options to validate a Step"),
 		}
 	}
 
 	if w == nil {
 		return []error{
-			errors.New("A Workflow object must be passed via validation options to validate a Step"),
+			errors.New("a Workflow object must be passed via validation options to validate a Step"),
 		}
 	}
 

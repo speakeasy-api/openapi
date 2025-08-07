@@ -1,0 +1,168 @@
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+    # Test chained external reference that should expose the bug
+    testChainedSchemaRef:
+      $ref: "./external.yaml#/components/schemas/ChainedExternal"
+
+  parameters:
+    # Test parameter reference
+    testParamRef:
+      $ref: "#/components/parameters/UserIdParam"
+    testExternalParamRef:
+      $ref: "./external.yaml#/components/parameters/ExternalParam"
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: integer
+
+    # Test references with tricky JSON pointers
+    # Reference to parameter within a specific operation
+    trickyOperationParamRef:
+      $ref: "#/paths/~1users~1{userId}/get/parameters/1"
+    # Reference to parameter within POST operation
+    trickyPostParamRef:
+      $ref: "#/paths/~1users/post/parameters/0"
+
+  responses:
+    # Test response reference
+    testResponseRef:
+      $ref: "#/components/responses/UserResponse"
+    testExternalResponseRef:
+      $ref: "./external.yaml#/components/responses/ExternalResponse"
+    testChainedResponseRef:
+      $ref: "./external.yaml#/components/responses/ChainedExternalResponse"
+    UserResponse:
+      description: User response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/User"
+
+    # Test references with tricky JSON pointers for responses
+    # Reference to response within operation
+    trickyOperationResponseRef:
+      $ref: "#/paths/~1users~1{userId}/get/responses/200"
+
+  examples:
+    # Test example reference
+    testExampleRef:
+      $ref: "#/components/examples/UserExample"
+    testExternalExampleRef:
+      $ref: "./external.yaml#/components/examples/ExternalExample"
+    UserExample:
+      summary: Example user
+      value:
+        id: 1
+        name: John Doe
+
+  requestBodies:
+    # Test request body reference
+    testRequestBodyRef:
+      $ref: "#/components/requestBodies/UserRequestBody"
+    testExternalRequestBodyRef:
+      $ref: "./external.yaml#/components/requestBodies/ExternalRequestBody"
+    UserRequestBody:
+      description: User data
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/User"
+
+  headers:
+    # Test header reference
+    testHeaderRef:
+      $ref: "#/components/headers/UserHeader"
+    testExternalHeaderRef:
+      $ref: "./external.yaml#/components/headers/ExternalHeader"
+    UserHeader:
+      description: User header
+      schema:
+        type: string
+
+  securitySchemes:
+    # Test security scheme reference
+    testSecurityRef:
+      $ref: "#/components/securitySchemes/ApiKeyAuth"
+    testExternalSecurityRef:
+      $ref: "./external.yaml#/components/securitySchemes/ExternalAuth"
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  links:
+    # Test link reference
+    testLinkRef:
+      $ref: "#/components/links/UserLink"
+    testExternalLinkRef:
+      $ref: "./external.yaml#/components/links/ExternalLink"
+    UserLink:
+      operationId: getUser
+      parameters:
+        userId: $response.body#/id
+
+  callbacks:
+    # Test callback reference
+    testCallbackRef:
+      $ref: "#/components/callbacks/UserCallback"
+    testExternalCallbackRef:
+      $ref: "./external.yaml#/components/callbacks/ExternalCallback"
+    UserCallback:
+      "{$request.body#/callbackUrl}":
+        post:
+          requestBody:
+            content:
+              application/json:
+                schema:
+                  type: object
+          responses:
+            "200":
+              description: Callback successful
+
+paths:
+  /users/{userId}:
+    get:
+      operationId: getUser
+      parameters:
+        - $ref: "#/components/parameters/testParamRef"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          $ref: "#/components/responses/testResponseRef"
+  /users:
+    post:
+      operationId: createUser
+      parameters:
+        - name: apiVersion
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: ["v1", "v2"]
+      requestBody:
+        $ref: "#/components/requestBodies/testRequestBodyRef"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"

@@ -11,6 +11,8 @@ import (
 )
 
 func TestJSONPointer_Validate_Success(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		j JSONPointer
 	}
@@ -51,6 +53,8 @@ func TestJSONPointer_Validate_Success(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := tt.args.j.Validate()
 			require.NoError(t, err)
 		})
@@ -58,6 +62,8 @@ func TestJSONPointer_Validate_Success(t *testing.T) {
 }
 
 func TestJSONPointer_Validate_Error(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		j JSONPointer
 	}
@@ -97,6 +103,8 @@ func TestJSONPointer_Validate_Error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := tt.args.j.Validate()
 			assert.EqualError(t, err, tt.wantErr.Error())
 		})
@@ -104,6 +112,8 @@ func TestJSONPointer_Validate_Error(t *testing.T) {
 }
 
 func TestGetTarget_Success(t *testing.T) {
+	t.Parallel()
+
 	type TestSimpleStructNoTags struct {
 		A int
 		B string
@@ -266,6 +276,8 @@ func TestGetTarget_Success(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			target, err := GetTarget(tt.args.source, tt.args.pointer, tt.args.opts...)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, target)
@@ -274,6 +286,8 @@ func TestGetTarget_Success(t *testing.T) {
 }
 
 func TestGetTarget_Error(t *testing.T) {
+	t.Parallel()
+
 	type TestStruct struct {
 		a int // unexported field should be ignored
 	}
@@ -309,7 +323,7 @@ func TestGetTarget_Error(t *testing.T) {
 				source:  map[string]any{"key1": 1},
 				pointer: JSONPointer("/0"),
 			},
-			wantErr: errors.New("invalid path -- expected key, got index at /0"),
+			wantErr: errors.New("not found -- key 0 not found in map at /0"),
 		},
 		{
 			name: "nil map",
@@ -341,7 +355,7 @@ func TestGetTarget_Error(t *testing.T) {
 				source:  1,
 				pointer: JSONPointer("/a"),
 			},
-			wantErr: errors.New("invalid path -- expected map, slice, or struct, got int at /a"),
+			wantErr: errors.New("invalid path -- expected map, slice, struct, or yaml.Node, got int at /a"),
 		},
 		{
 			name: "non string key in map",
@@ -349,7 +363,7 @@ func TestGetTarget_Error(t *testing.T) {
 				source:  map[any]any{1: 1},
 				pointer: JSONPointer("/a"),
 			},
-			wantErr: errors.New("invalid path -- expected map key to be string, got interface at /a"),
+			wantErr: errors.New("invalid path -- unsupported map key type interface at /a"),
 		},
 		{
 			name: "key not found in map",
@@ -388,6 +402,8 @@ func TestGetTarget_Error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			target, err := GetTarget(tt.args.source, tt.args.pointer, tt.args.opts...)
 			assert.EqualError(t, err, tt.wantErr.Error())
 			assert.Nil(t, target)
@@ -457,6 +473,8 @@ func (n NavigableNodeWrapper) GetNavigableNode() (any, error) {
 }
 
 func TestGetTarget_WithInterfaces_Success(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		source  any
 		pointer JSONPointer
@@ -510,6 +528,8 @@ func TestGetTarget_WithInterfaces_Success(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			target, err := GetTarget(tt.args.source, tt.args.pointer, tt.args.opts...)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, target)
@@ -518,6 +538,8 @@ func TestGetTarget_WithInterfaces_Success(t *testing.T) {
 }
 
 func TestGetTarget_WithInterfaces_Error(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		source  any
 		pointer JSONPointer
@@ -547,6 +569,8 @@ func TestGetTarget_WithInterfaces_Error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			target, err := GetTarget(tt.args.source, tt.args.pointer, tt.args.opts...)
 			assert.EqualError(t, err, tt.wantErr.Error())
 			assert.Nil(t, target)
@@ -555,6 +579,8 @@ func TestGetTarget_WithInterfaces_Error(t *testing.T) {
 }
 
 func TestEscapeString_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		input    string
@@ -634,6 +660,8 @@ func TestEscapeString_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := EscapeString(tt.input)
 			assert.Equal(t, tt.expected, result)
 		})

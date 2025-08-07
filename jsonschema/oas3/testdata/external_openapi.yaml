@@ -1,0 +1,28 @@
+openapi: 3.1.0
+info:
+  title: External API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+          format: float
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"

@@ -1,0 +1,22 @@
+openapi: 3.1.0
+info:
+  title: Circular References
+  version: 1.0.0
+components:
+  schemas:
+    CircularSchema:
+      $ref: "#/components/schemas/IntermediateSchema"
+    IntermediateSchema:
+      $ref: "#/components/schemas/CircularSchema"
+
+paths:
+  /users/{userId}:
+    get:
+      operationId: getUser
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CircularSchema"

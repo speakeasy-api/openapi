@@ -2,7 +2,7 @@ package core
 
 import (
 	"github.com/speakeasy-api/openapi/expression"
-	"github.com/speakeasy-api/openapi/jsonschema/oas31/core"
+	"github.com/speakeasy-api/openapi/jsonschema/oas3/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 )

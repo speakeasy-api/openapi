@@ -213,6 +213,9 @@ func (e Expression) GetType() ExpressionType {
 // GetParts will return the type, reference, expression parts and jsonpointer of the expression.
 func (e Expression) GetParts() (ExpressionType, string, []string, jsonpointer.JSONPointer) {
 	parts := strings.Split(string(e), "#")
+	if len(parts) < 1 {
+		return "", "", nil, jsonpointer.JSONPointer("")
+	}
 	expressionParts, typ := getType(parts[0])
 
 	reference := ""

@@ -1,0 +1,82 @@
+openapi: 3.1.1
+info:
+  title: Test API for Upgrade 3.0.3
+  version: 1.0.0
+  description: API to test upgrading from 3.0.3 to 3.1.1
+paths:
+  /products:
+    post:
+      operationId: createProduct
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+components:
+  schemas:
+    ProductRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          examples:
+            - "New Product"
+        description:
+          type:
+            - string
+            - "null"
+        price:
+          type: number
+          minimum: 0.01
+          exclusiveMaximum: 999999.99
+        category:
+          type: string
+          enum: ["electronics", "clothing", "books"]
+          examples:
+            - "electronics"
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          examples:
+            - 456
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - "null"
+        price:
+          type: number
+          exclusiveMinimum: 0
+        createdAt:
+          type: string
+          format: date-time
+          examples:
+            - "2023-01-01T00:00:00Z"
+    ComplexNullable:
+      type:
+        - object
+        - "null"
+      properties:
+        data:
+          anyOf:
+            - type: string
+            - type: number
+            - type:
+                - "null"
+        metadata:
+          oneOf:
+            - type: object
+            - type: array
+            - type:
+                - "null"
