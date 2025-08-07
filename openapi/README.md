@@ -1,6 +1,6 @@
 <p align="center">
   <p align="center">
-    <img  width="200px" alt="OpenAPI" src="https://github.com/user-attachments/assets/ded936d5-3fd9-439f-925a-a2959735b71a">
+    <img  width="200px" alt="OpenAPI" src="https://github.com/user-attachments/assets/555a0899-5719-42ee-b4b1-ece8d1d812ea">
   </p>
   <h1 align="center"><b>OpenAPI Parser</b></h1>
   <p align="center">An API for working with <a href="https://spec.openapis.org/oas/v3.1.1">OpenAPI documents</a> including: read, walk, create, mutate, validate, and upgrade

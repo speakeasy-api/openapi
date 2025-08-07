@@ -4,7 +4,8 @@ set -euo pipefail
 echo "🔍 Checking Go code formatting..."
 
 # Check if any files need formatting
-UNFORMATTED=$(go fmt ./... 2>&1 || true)
+# Only capture stdout (actual formatting output), let stderr (dependency downloads) go to terminal
+UNFORMATTED=$(go fmt ./... 2>/dev/null || true)
 
 if [ -n "$UNFORMATTED" ]; then
     echo "❌ The following files are not properly formatted:"
