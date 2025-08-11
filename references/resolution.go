@@ -39,7 +39,7 @@ func ResolveAbsoluteReference(ref Reference, targetLocation string) (*AbsoluteRe
 	return ResolveAbsoluteReferenceCached(ref, targetLocation)
 }
 
-type Unmarshal[T any] func(ctx context.Context, node *yaml.Node) (*T, []error, error)
+type Unmarshal[T any] func(ctx context.Context, node *yaml.Node, skipValidation bool) (*T, []error, error)
 
 // ResolveResult contains the result of a reference resolution operation
 type ResolveResult[T any] struct {
@@ -65,6 +65,8 @@ type ResolveOptions struct {
 	VirtualFS system.VirtualFS
 	// HTTPClient is an optional HTTP client that will be used for any HTTP based references. If not provided http.DefaultClient will be used.
 	HTTPClient system.Client
+	// SkipValidation will skip validation of the target document during resolution.
+	SkipValidation bool
 }
 
 func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T], opts ResolveOptions) (*ResolveResult[T], []error, error) {
@@ -234,7 +236,7 @@ func resolveAgainstDocument[T any](ctx context.Context, jp jsonpointer.JSONPoint
 	}
 
 	if node, ok := target.(*yaml.Node); ok {
-		return unmarshaler(ctx, node)
+		return unmarshaler(ctx, node, opts.SkipValidation)
 	}
 
 	t, err := cast[T](target)
@@ -274,7 +276,7 @@ func resolveAgainstData[T any](ctx context.Context, absRef string, reader io.Rea
 		return nil, nil, nil, fmt.Errorf("target is not a *yaml.Node")
 	}
 
-	resolved, validationErrs, err := unmarshaler(ctx, targetNode)
+	resolved, validationErrs, err := unmarshaler(ctx, targetNode, opts.SkipValidation)
 	if err != nil {
 		return nil, nil, validationErrs, err
 	}

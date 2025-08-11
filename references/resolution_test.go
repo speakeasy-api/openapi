@@ -145,13 +145,13 @@ func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 // Test unmarshalers
-func testComplexUnmarshaler(ctx context.Context, node *yaml.Node) (*tests.TestComplexHighModel, []error, error) {
+func testComplexUnmarshaler(ctx context.Context, node *yaml.Node, skipValidation bool) (*tests.TestComplexHighModel, []error, error) {
 	model := &tests.TestComplexHighModel{}
 	model.ArrayField = []string{"test1", "test2", "test3"}
 	return model, nil, nil
 }
 
-func testPrimitiveUnmarshaler(ctx context.Context, node *yaml.Node) (*tests.TestPrimitiveHighModel, []error, error) {
+func testPrimitiveUnmarshaler(ctx context.Context, node *yaml.Node, skipValidation bool) (*tests.TestPrimitiveHighModel, []error, error) {
 	model := &tests.TestPrimitiveHighModel{}
 	model.StringField = "test-string"
 	intVal := 42
@@ -159,11 +159,11 @@ func testPrimitiveUnmarshaler(ctx context.Context, node *yaml.Node) (*tests.Test
 	return model, nil, nil
 }
 
-func testErrorUnmarshaler(ctx context.Context, node *yaml.Node) (*tests.TestComplexHighModel, []error, error) {
+func testErrorUnmarshaler(ctx context.Context, node *yaml.Node, skipValidation bool) (*tests.TestComplexHighModel, []error, error) {
 	return nil, nil, fmt.Errorf("unmarshaling failed")
 }
 
-func testNilUnmarshaler(ctx context.Context, node *yaml.Node) (*tests.TestComplexHighModel, []error, error) {
+func testNilUnmarshaler(ctx context.Context, node *yaml.Node, skipValidation bool) (*tests.TestComplexHighModel, []error, error) {
 	return nil, nil, nil
 }
 
@@ -212,7 +212,7 @@ func TestResolve_RootDocument(t *testing.T) {
 			TargetDocument: root,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference(""), func(ctx context.Context, node *yaml.Node) (*TestResolutionTarget, []error, error) {
+		result, validationErrs, err := Resolve(context.Background(), Reference(""), func(ctx context.Context, node *yaml.Node, skipValidation bool) (*TestResolutionTarget, []error, error) {
 			return root, nil, nil
 		}, opts)
 
@@ -770,7 +770,7 @@ func TestResolve_AbsoluteVsRelativeReferenceHandling(t *testing.T) {
 			}
 
 			// Test resolution using the Resolve function
-			result, validationErrs, err := Resolve(context.Background(), Reference(tt.referenceURI), func(ctx context.Context, node *yaml.Node) (*TestResolutionTarget, []error, error) {
+			result, validationErrs, err := Resolve(context.Background(), Reference(tt.referenceURI), func(ctx context.Context, node *yaml.Node, skipValidation bool) (*TestResolutionTarget, []error, error) {
 				target := NewTestResolutionTarget()
 				target.InitCache()
 				return target, nil, nil
@@ -1130,7 +1130,7 @@ func TestResolve_ObjectCaching_Success(t *testing.T) {
 		root := NewMockResolutionTarget()
 
 		// Use a custom unmarshaler that returns a modifiable object
-		customUnmarshaler := func(ctx context.Context, node *yaml.Node) (*tests.TestComplexHighModel, []error, error) {
+		customUnmarshaler := func(ctx context.Context, node *yaml.Node, skipValidation bool) (*tests.TestComplexHighModel, []error, error) {
 			model := &tests.TestComplexHighModel{}
 			model.ArrayField = []string{"original"}
 			return model, nil, nil
@@ -1182,7 +1182,7 @@ func TestResolve_ObjectCaching_Success(t *testing.T) {
 
 		// Counter to track unmarshaler calls
 		callCount := 0
-		countingUnmarshaler := func(ctx context.Context, node *yaml.Node) (*tests.TestComplexHighModel, []error, error) {
+		countingUnmarshaler := func(ctx context.Context, node *yaml.Node, skipValidation bool) (*tests.TestComplexHighModel, []error, error) {
 			callCount++
 			model := &tests.TestComplexHighModel{}
 			model.ArrayField = []string{"test1", "test2", "test3"}

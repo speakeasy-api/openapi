@@ -55,6 +55,8 @@ func (j *JSONSchema[Referenceable]) GetAbsRef() references.Reference {
 }
 
 // Resolve will fully resolve the reference and return the JSONSchema referenced. This will recursively resolve any intermediate references as well.
+// Validation errors can be skipped by setting the skipValidation flag to true. This will skip the missing field errors that occur during unmarshaling.
+// Resolution doesn't run the Validate function on the resolved object. So if you want to fully validate the object after resolution, you need to call the Validate function manually.
 func (s *JSONSchema[Referenceable]) Resolve(ctx context.Context, opts ResolveOptions) ([]error, error) {
 	return resolveJSONSchemaWithTracking(ctx, (*JSONSchemaReferenceable)(unsafe.Pointer(s)), references.ResolveOptions{
 		TargetLocation:      opts.TargetLocation,
@@ -366,9 +368,12 @@ func getParentJSONPointer(jsonPtr string) string {
 	return jsonPtr[:lastSlash]
 }
 
-func unmarshaller(ctx context.Context, node *yaml.Node) (*JSONSchema[Referenceable], []error, error) {
+func unmarshaller(ctx context.Context, node *yaml.Node, skipValidation bool) (*JSONSchema[Referenceable], []error, error) {
 	jsonSchema := &JSONSchema[Referenceable]{}
 	validationErrs, err := marshaller.UnmarshalNode(ctx, node, jsonSchema)
+	if skipValidation {
+		validationErrs = nil
+	}
 	if err != nil {
 		return nil, validationErrs, err
 	}
