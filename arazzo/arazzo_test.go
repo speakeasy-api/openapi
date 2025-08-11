@@ -297,13 +297,28 @@ sourceDescriptions:
 	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewBuffer(data))
 	require.NoError(t, err)
 
-	assert.Equal(t, []error{
-		&validation.Error{Line: 1, Column: 1, UnderlyingError: validation.NewMissingFieldError("field workflows is missing")},
-		&validation.Error{Line: 1, Column: 9, UnderlyingError: validation.NewValueValidationError("only Arazzo version 1.0.1 and below is supported")},
-		&validation.Error{Line: 4, Column: 3, UnderlyingError: validation.NewMissingFieldError("field version is missing")},
-		&validation.Error{Line: 6, Column: 5, UnderlyingError: validation.NewMissingFieldError("field url is missing")},
-		&validation.Error{Line: 7, Column: 11, UnderlyingError: validation.NewValueValidationError("type must be one of [openapi, arazzo]")},
-	}, validationErrs)
+	expectedErrors := []struct {
+		line            int
+		column          int
+		underlyingError error
+	}{
+		{line: 1, column: 1, underlyingError: validation.NewMissingFieldError("field workflows is missing")},
+		{line: 1, column: 9, underlyingError: validation.NewValueValidationError("only Arazzo version 1.0.1 and below is supported")},
+		{line: 4, column: 3, underlyingError: validation.NewMissingFieldError("field version is missing")},
+		{line: 6, column: 5, underlyingError: validation.NewMissingFieldError("field url is missing")},
+		{line: 7, column: 11, underlyingError: validation.NewValueValidationError("type must be one of [openapi, arazzo]")},
+	}
+
+	require.Len(t, validationErrs, len(expectedErrors), "number of validation errors should match")
+
+	for i, expectedErr := range expectedErrors {
+		validationErr, ok := validationErrs[i].(*validation.Error)
+		require.True(t, ok, "error at index %d should be a validation.Error", i)
+
+		assert.Equal(t, expectedErr.line, validationErr.GetLineNumber(), "line number should match for error %d", i)
+		assert.Equal(t, expectedErr.column, validationErr.GetColumnNumber(), "column number should match for error %d", i)
+		assert.Equal(t, expectedErr.underlyingError.Error(), validationErr.UnderlyingError.Error(), "underlying error message should match for error %d", i)
+	}
 
 	expected := &arazzo.Arazzo{
 		Arazzo: "1.0.2",

@@ -260,7 +260,7 @@ func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 
 	if resolvedNode.Kind != yaml.MappingNode {
 		return []error{
-			validation.NewNodeError(validation.NewTypeMismatchError("expected a mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+			validation.NewValidationError(validation.NewTypeMismatchError("expected a mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
 		}, nil
 	}
 
@@ -407,7 +407,7 @@ func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 	// Check for missing required fields using cached required field info
 	for tag := range fieldMap.RequiredFields {
 		if _, ok := foundRequiredFields.Load(tag); !ok {
-			validationErrs = append(validationErrs, validation.NewNodeError(validation.NewMissingFieldError("field %s is missing", tag), resolvedNode))
+			validationErrs = append(validationErrs, validation.NewValidationError(validation.NewMissingFieldError("field %s is missing", tag), resolvedNode))
 		}
 	}
 
@@ -445,7 +445,7 @@ func decodeNode(_ context.Context, node *yaml.Node, out any) ([]error, error) {
 	// Check if this is a type mismatch error
 	if isTypeMismatchError(err) {
 		// Convert type mismatch to validation error
-		validationErr := validation.NewNodeError(validation.NewTypeMismatchError(err.Error()), resolvedNode)
+		validationErr := validation.NewValidationError(validation.NewTypeMismatchError(err.Error()), resolvedNode)
 		return []error{validationErr}, nil
 	}
 
@@ -592,14 +592,14 @@ func isMapType(out reflect.Value) bool {
 // validateNodeKind checks if the node kind matches the expected kind and returns appropriate error
 func validateNodeKind(resolvedNode *yaml.Node, expectedKind yaml.Kind, expectedType string) error {
 	if resolvedNode == nil {
-		return validation.NewNodeError(validation.NewTypeMismatchError("expected %s for %s, got nil", expectedKind, expectedType), nil)
+		return validation.NewValidationError(validation.NewTypeMismatchError("expected %s for %s, got nil", expectedKind, expectedType), nil)
 	}
 
 	if resolvedNode.Kind != expectedKind {
 		expectedKindStr := yml.NodeKindToString(expectedKind)
 		actualKindStr := yml.NodeKindToString(resolvedNode.Kind)
 
-		return validation.NewNodeError(validation.NewTypeMismatchError("expected %s for %s, got %s", expectedKindStr, expectedType, actualKindStr), resolvedNode)
+		return validation.NewValidationError(validation.NewTypeMismatchError("expected %s for %s, got %s", expectedKindStr, expectedType, actualKindStr), resolvedNode)
 	}
 	return nil
 }

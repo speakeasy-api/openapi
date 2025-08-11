@@ -106,7 +106,7 @@ func (r *Responses) Validate(ctx context.Context, opts ...validation.Option) []e
 	}
 
 	if r.Len() == 0 {
-		errs = append(errs, validation.NewNodeError(validation.NewValueValidationError("responses must have at least one response code"), core.RootNode))
+		errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("responses must have at least one response code"), core.RootNode))
 	}
 
 	for _, response := range r.All() {

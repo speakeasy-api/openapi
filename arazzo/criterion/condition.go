@@ -6,6 +6,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/validation"
+	"gopkg.in/yaml.v3"
 )
 
 // Operator represents the operator used to compare the value of a criterion.
@@ -76,41 +77,25 @@ func newCondition(rawCondition string) (*Condition, error) {
 }
 
 // Validate will validate the condition is valid as per the Arazzo specification.
-func (s *Condition) Validate(line, column int, opts ...validation.Option) []error {
+func (s *Condition) Validate(valueNode *yaml.Node, opts ...validation.Option) []error {
 	errs := []error{}
 
 	if s.Expression == "" {
-		errs = append(errs, &validation.Error{
-			UnderlyingError: validation.NewMissingValueError("expression is required"),
-			Line:            line,
-			Column:          column,
-		})
+		errs = append(errs, validation.NewValidationError(validation.NewMissingValueError("expression is required"), valueNode))
 	}
 
 	if err := s.Expression.Validate(); err != nil {
-		errs = append(errs, &validation.Error{
-			UnderlyingError: validation.NewValueValidationError(err.Error()),
-			Line:            line,
-			Column:          column,
-		})
+		errs = append(errs, validation.NewValidationError(validation.NewValueValidationError(err.Error()), valueNode))
 	}
 
 	switch s.Operator {
 	case OperatorLT, OperatorLTE, OperatorGT, OperatorGTE, OperatorEQ, OperatorNE, OperatorNot, OperatorAnd, OperatorOr:
 	default:
-		errs = append(errs, &validation.Error{
-			UnderlyingError: validation.NewValueValidationError("operator must be one of [%s]", strings.Join([]string{string(OperatorLT), string(OperatorLTE), string(OperatorGT), string(OperatorGTE), string(OperatorEQ), string(OperatorNE), string(OperatorNot), string(OperatorAnd), string(OperatorOr)}, ", ")),
-			Line:            line,
-			Column:          column,
-		})
+		errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("operator must be one of [%s]", strings.Join([]string{string(OperatorLT), string(OperatorLTE), string(OperatorGT), string(OperatorGTE), string(OperatorEQ), string(OperatorNE), string(OperatorNot), string(OperatorAnd), string(OperatorOr)}, ", ")), valueNode))
 	}
 
 	if s.Value == "" {
-		errs = append(errs, &validation.Error{
-			UnderlyingError: validation.NewMissingValueError("value is required"),
-			Line:            line,
-			Column:          column,
-		})
+		errs = append(errs, validation.NewValidationError(validation.NewMissingValueError("value is required"), valueNode))
 	}
 
 	return errs

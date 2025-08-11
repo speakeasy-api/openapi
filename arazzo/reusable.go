@@ -211,20 +211,20 @@ func validateComponentReference[T any, V interfaces.Validator[T]](ctx context.Co
 
 	if args.typ != typ {
 		return []error{
-			validation.NewNodeError(validation.NewValueValidationError("expected a %s reference got %s", typeToComponentType(args.typ), args.componentType), args.referenceValueNode),
+			validation.NewValidationError(validation.NewValueValidationError("expected a %s reference got %s", typeToComponentType(args.typ), args.componentType), args.referenceValueNode),
 		}
 	}
 
 	if args.components == nil {
 		return []error{
-			validation.NewNodeError(validation.NewValueValidationError("components.%s not present, reference to missing component %s", args.componentType, *args.reference), args.referenceValueNode),
+			validation.NewValidationError(validation.NewValueValidationError("components.%s not present, reference to missing component %s", args.componentType, *args.reference), args.referenceValueNode),
 		}
 	}
 
 	component, ok := args.components.Get(args.componentName)
 	if !ok {
 		return []error{
-			validation.NewNodeError(validation.NewValueValidationError("components.%s.%s not present, reference to missing component %s", args.componentType, args.componentName, *args.reference), args.referenceValueNode),
+			validation.NewValidationError(validation.NewValueValidationError("components.%s.%s not present, reference to missing component %s", args.componentType, args.componentName, *args.reference), args.referenceValueNode),
 		}
 	}
 

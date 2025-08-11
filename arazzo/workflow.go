@@ -83,7 +83,7 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	if w.Inputs != nil {
 		inputsValNode := core.Inputs.GetValueNodeOrRoot(core.RootNode)
-		errs = append(errs, validateJSONSchema(ctx, w.Inputs, inputsValNode.Line, inputsValNode.Column, opts...)...)
+		errs = append(errs, validateJSONSchema(ctx, w.Inputs, inputsValNode, opts...)...)
 	}
 
 	for i, dependsOn := range w.DependsOn {

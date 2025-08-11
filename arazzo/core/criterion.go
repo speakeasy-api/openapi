@@ -60,7 +60,7 @@ func (c *CriterionTypeUnion) Unmarshal(ctx context.Context, node *yaml.Node) ([]
 		c.DetermineValidity(validationErrs)
 	default:
 		return []error{
-			validation.NewNodeError(validation.NewTypeMismatchError("expected scalar or mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+			validation.NewValidationError(validation.NewTypeMismatchError("expected scalar or mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
 		}, nil
 	}
 

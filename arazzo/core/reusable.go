@@ -35,7 +35,7 @@ func (r *Reusable[T]) Unmarshal(ctx context.Context, node *yaml.Node) ([]error, 
 		r.SetValid(false, false)
 
 		return []error{
-			validation.NewNodeError(validation.NewTypeMismatchError("expected mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+			validation.NewValidationError(validation.NewTypeMismatchError("expected mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
 		}, nil
 	}
 

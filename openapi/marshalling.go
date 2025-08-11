@@ -52,10 +52,10 @@ func Unmarshal(ctx context.Context, doc io.Reader, opts ...Option[UnmarshalOptio
 			aIsValidationErr := errors.As(a, &aValidationErr)
 			bIsValidationErr := errors.As(b, &bValidationErr)
 			if aIsValidationErr && bIsValidationErr {
-				if aValidationErr.Line == bValidationErr.Line {
-					return aValidationErr.Column - bValidationErr.Column
+				if aValidationErr.GetLineNumber() == bValidationErr.GetLineNumber() {
+					return aValidationErr.GetColumnNumber() - bValidationErr.GetColumnNumber()
 				}
-				return aValidationErr.Line - bValidationErr.Line
+				return aValidationErr.GetLineNumber() - bValidationErr.GetLineNumber()
 			} else if aIsValidationErr {
 				return -1
 			} else if bIsValidationErr {

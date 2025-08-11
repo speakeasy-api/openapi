@@ -120,10 +120,10 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 	}
 	switch numSet {
 	case 0:
-		errs = append(errs, validation.NewNodeError(validation.NewMissingValueError("at least one of operationId, operationPath or workflowId must be set"), core.RootNode))
+		errs = append(errs, validation.NewValidationError(validation.NewMissingValueError("at least one of operationId, operationPath or workflowId must be set"), core.RootNode))
 	case 1:
 	default:
-		errs = append(errs, validation.NewNodeError(validation.NewValueValidationError("only one of operationId, operationPath or workflowId can be set"), core.RootNode))
+		errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("only one of operationId, operationPath or workflowId can be set"), core.RootNode))
 	}
 
 	if s.OperationID != nil {

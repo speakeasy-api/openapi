@@ -45,14 +45,14 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	if err := json.YAMLToJSON(core.RootNode, 0, buf); err != nil {
 		return []error{
-			validation.NewNodeError(validation.NewValueValidationError(err.Error()), core.RootNode),
+			validation.NewValidationError(validation.NewValueValidationError(err.Error()), core.RootNode),
 		}
 	}
 
 	jsAny, err := jsValidator.UnmarshalJSON(buf)
 	if err != nil {
 		return []error{
-			validation.NewNodeError(validation.NewValueValidationError(err.Error()), core.RootNode),
+			validation.NewValidationError(validation.NewValueValidationError(err.Error()), core.RootNode),
 		}
 	}
 
@@ -64,7 +64,7 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 			errs = getRootCauses(validationErr, *core)
 		} else {
 			errs = []error{
-				validation.NewNodeError(validation.NewValueValidationError(err.Error()), core.RootNode),
+				validation.NewValidationError(validation.NewValueValidationError(err.Error()), core.RootNode),
 			}
 		}
 	}
@@ -102,7 +102,7 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 				}
 			}
 
-			errs = append(errs, validation.NewNodeError(validation.NewValueValidationError("jsonschema validation error: %s", cause.Error()), valueNode))
+			errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("jsonschema validation error: %s", cause.Error()), valueNode))
 		} else {
 			errs = append(errs, getRootCauses(cause, js)...)
 		}

@@ -5,9 +5,10 @@ import (
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/validation"
+	"gopkg.in/yaml.v3"
 )
 
-func validateJSONSchema(ctx context.Context, js *oas3.JSONSchema[oas3.Referenceable], line, column int, opts ...validation.Option) []error {
+func validateJSONSchema(ctx context.Context, js *oas3.JSONSchema[oas3.Referenceable], valueNode *yaml.Node, opts ...validation.Option) []error {
 	errs := []error{}
 
 	o := validation.NewOptions(opts...)
@@ -16,20 +17,12 @@ func validateJSONSchema(ctx context.Context, js *oas3.JSONSchema[oas3.Referencea
 
 	if a == nil {
 		return []error{
-			&validation.Error{
-				UnderlyingError: validation.NewValueValidationError("An Arazzo object must be passed via validation options to validate a JSONSchema"),
-				Line:            line,
-				Column:          column,
-			},
+			validation.NewValidationError(validation.NewValueValidationError("An Arazzo object must be passed via validation options to validate a JSONSchema"), valueNode),
 		}
 	}
 
 	if js.IsRight() {
-		errs = append(errs, &validation.Error{
-			UnderlyingError: validation.NewValueValidationError("inputs schema must represent an object with specific properties for inputs"),
-			Line:            line,
-			Column:          column,
-		})
+		errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("inputs schema must represent an object with specific properties for inputs"), valueNode))
 	} else {
 		errs = append(errs, js.Left.Validate(ctx, opts...)...)
 
@@ -41,29 +34,17 @@ func validateJSONSchema(ctx context.Context, js *oas3.JSONSchema[oas3.Referencea
 			if js.Left.Type != nil && js.Left.Type.IsLeft() {
 				types := js.Left.Type.LeftValue()
 				if len(types) != 1 || types[0] != "object" {
-					errs = append(errs, &validation.Error{
-						UnderlyingError: validation.NewValueValidationError("inputs schema must represent an object with specific properties for inputs"),
-						Line:            line,
-						Column:          column,
-					})
+					errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("inputs schema must represent an object with specific properties for inputs"), valueNode))
 				}
 			}
 			if js.Left.Type.IsRight() {
 				if js.Left.Type.RightValue() != "object" {
-					errs = append(errs, &validation.Error{
-						UnderlyingError: validation.NewValueValidationError("inputs schema must represent an object with specific properties for inputs"),
-						Line:            line,
-						Column:          column,
-					})
+					errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("inputs schema must represent an object with specific properties for inputs"), valueNode))
 				}
 			}
 		} else {
 			if js.Left.Properties.Len() == 0 {
-				errs = append(errs, &validation.Error{
-					UnderlyingError: validation.NewValueValidationError("inputs schema must represent an object with specific properties for inputs"),
-					Line:            line,
-					Column:          column,
-				})
+				errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("inputs schema must represent an object with specific properties for inputs"), valueNode))
 			}
 		}
 	}

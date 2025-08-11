@@ -229,8 +229,7 @@ func (c *Criterion) validateCondition(opts ...validation.Option) []error {
 	core := c.GetCore()
 	errs := []error{}
 
-	conditionLine := core.Condition.GetValueNodeOrRoot(core.RootNode).Line
-	conditionColumn := core.Condition.GetValueNodeOrRoot(core.RootNode).Column
+	valueNode := core.Condition.GetValueNodeOrRoot(core.RootNode)
 
 	switch c.Type.GetType() {
 	case CriterionTypeSimple:
@@ -238,7 +237,7 @@ func (c *Criterion) validateCondition(opts ...validation.Option) []error {
 		if err != nil && c.Context == nil {
 			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Condition))
 		} else if cond != nil {
-			errs = append(errs, cond.Validate(conditionLine, conditionColumn, opts...)...)
+			errs = append(errs, cond.Validate(valueNode, opts...)...)
 		}
 	case CriterionTypeRegex:
 		_, err := regexp.Compile(c.Condition)

@@ -32,7 +32,7 @@ func (r *Reference[T]) Unmarshal(ctx context.Context, node *yaml.Node) ([]error,
 	if resolvedNode.Kind != yaml.MappingNode {
 		r.SetValid(false, false)
 
-		return []error{validation.NewNodeError(validation.NewTypeMismatchError("expected mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode)}, nil
+		return []error{validation.NewValidationError(validation.NewTypeMismatchError("expected mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode)}, nil
 	}
 
 	if _, _, ok := yml.GetMapElementNodes(ctx, resolvedNode, "$ref"); ok {

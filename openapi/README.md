@@ -734,9 +734,12 @@ if err != nil {
 	panic(err)
 }
 
-err = openapi.Upgrade(ctx, doc)
+upgraded, err := openapi.Upgrade(ctx, doc)
 if err != nil {
 	panic(err)
+}
+if !upgraded {
+	panic("upgrade should have been performed")
 }
 
 fmt.Printf("Upgraded OpenAPI Version: %s\n", doc.OpenAPI)
