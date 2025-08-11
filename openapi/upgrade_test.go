@@ -70,8 +70,9 @@ func TestUpgrade_Success(t *testing.T) {
 			require.Empty(t, validationErrs, "original document should not have validation errors")
 
 			// Perform upgrade with options
-			err = openapi.Upgrade(ctx, originalDoc, tt.options...)
+			upgraded, err := openapi.Upgrade(ctx, originalDoc, tt.options...)
 			require.NoError(t, err, "upgrade should not fail: %s", tt.description)
+			assert.True(t, upgraded, "upgrade should have been performed")
 
 			// Marshal the upgraded document
 			var actualBuf bytes.Buffer
@@ -165,8 +166,9 @@ func TestUpgrade_NoUpgradeNeeded(t *testing.T) {
 			}
 
 			// Perform upgrade with options
-			err := openapi.Upgrade(ctx, doc, tt.options...)
+			upgraded, err := openapi.Upgrade(ctx, doc, tt.options...)
 			require.NoError(t, err, "upgrade should not fail")
+			require.Equal(t, tt.shouldUpgrade, upgraded)
 
 			// Check expected version
 			assert.Equal(t, tt.expectedVersion, doc.OpenAPI, "version should match expected for %s", tt.name)
@@ -228,9 +230,10 @@ components:
 	assert.Equal(t, "3.0.1", doc1.OpenAPI, "original version should be 3.0.1")
 
 	// Upgrade (no options needed for 3.0.x documents)
-	err = openapi.Upgrade(ctx, doc1)
+	upgraded, err := openapi.Upgrade(ctx, doc1)
 	require.NoError(t, err, "upgrade should not fail")
 	assert.Equal(t, openapi.Version, doc1.OpenAPI, "upgraded version should be 3.1.1")
+	assert.True(t, upgraded, "upgrade should have been performed")
 
 	// Marshal back
 	var buf1 bytes.Buffer

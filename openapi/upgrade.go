@@ -23,9 +23,9 @@ func WithUpgradeSamePatchVersion() Option[UpgradeOptions] {
 
 // Upgrade upgrades any OpenAPI 3x document to OpenAPI 3.1.1 (the latest version currently supported).
 // It currently won't resolve any external references, so only this document itself will be upgraded.
-func Upgrade(ctx context.Context, doc *OpenAPI, opts ...Option[UpgradeOptions]) error {
+func Upgrade(ctx context.Context, doc *OpenAPI, opts ...Option[UpgradeOptions]) (bool, error) {
 	if doc == nil {
-		return nil
+		return false, nil
 	}
 
 	o := UpgradeOptions{}
@@ -42,7 +42,7 @@ func Upgrade(ctx context.Context, doc *OpenAPI, opts ...Option[UpgradeOptions]) 
 		// Upgrade 3.1.x versions to 3.1.1 if option is set and not already 3.1.1
 	} else {
 		// Don't upgrade other versions
-		return nil
+		return false, nil
 	}
 
 	for item := range Walk(ctx, doc) {
@@ -59,7 +59,7 @@ func Upgrade(ctx context.Context, doc *OpenAPI, opts ...Option[UpgradeOptions]) 
 	}
 
 	_, err := marshaller.Sync(ctx, doc)
-	return err
+	return true, err
 }
 
 func upgradeSchema(js *oas3.JSONSchema[oas3.Referenceable]) {
