@@ -8,6 +8,8 @@ import (
 )
 
 func TestTypeToComponentType_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		input    reflect.Type
@@ -32,6 +34,8 @@ func TestTypeToComponentType_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			actual := typeToComponentType(tt.input)
 			assert.Equal(t, tt.expected, actual, "type conversion should match expected component type")
 		})
