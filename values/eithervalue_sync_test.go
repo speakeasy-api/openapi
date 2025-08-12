@@ -19,7 +19,7 @@ type TestSchema struct {
 }
 
 type TestCore struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"testCore"`
 
 	Type marshaller.Node[string] `key:"type"`
 	Ref  marshaller.Node[string] `key:"$ref"`

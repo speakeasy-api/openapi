@@ -6,7 +6,8 @@ import (
 )
 
 type FailureAction struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"failureAction"`
+
 	Name       marshaller.Node[string]       `key:"name"`
 	Type       marshaller.Node[string]       `key:"type"`
 	WorkflowID marshaller.Node[*string]      `key:"workflowId"`

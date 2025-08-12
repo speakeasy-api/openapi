@@ -7,14 +7,15 @@ import (
 )
 
 type Responses struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"responses"`
 	*sequencedmap.Map[string, *Reference[*Response]]
+
 	Default    marshaller.Node[*Reference[*Response]] `key:"default"`
 	Extensions core.Extensions                        `key:"extensions"`
 }
 
 type Response struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"response"`
 
 	Description marshaller.Node[string]                                         `key:"description"`
 	Headers     marshaller.Node[*sequencedmap.Map[string, *Reference[*Header]]] `key:"headers"`

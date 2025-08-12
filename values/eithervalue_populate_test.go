@@ -19,7 +19,7 @@ type TestModel struct {
 }
 
 type TestCoreModel struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"testCoreModel"`
 
 	Name        marshaller.Node[*string] `key:"name"`
 	Description marshaller.Node[*string] `key:"description"`

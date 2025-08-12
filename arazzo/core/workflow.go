@@ -7,7 +7,8 @@ import (
 )
 
 type Workflow struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"workflow"`
+
 	WorkflowID     marshaller.Node[string]                      `key:"workflowId"`
 	Summary        marshaller.Node[*string]                     `key:"summary"`
 	Description    marshaller.Node[*string]                     `key:"description"`

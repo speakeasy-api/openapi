@@ -9,7 +9,7 @@ import (
 )
 
 type MediaType struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"mediaType"`
 
 	Schema     marshaller.Node[oascore.JSONSchema]                              `key:"schema"`
 	Encoding   marshaller.Node[*sequencedmap.Map[string, *Encoding]]            `key:"encoding"`

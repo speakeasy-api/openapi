@@ -28,7 +28,7 @@ func TestNodeKindToString(t *testing.T) {
 		{
 			name:     "mapping node",
 			kind:     yaml.MappingNode,
-			expected: "mapping",
+			expected: "object",
 		},
 		{
 			name:     "scalar node",

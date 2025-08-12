@@ -211,12 +211,12 @@ func Example_validating() {
 	if len(validationErrs) == 0 && len(additionalErrs) == 0 {
 		fmt.Println("Document is valid!")
 	}
-	// Output: Validation error: [3:3] field version is missing
-	// Validation error: [18:30] expected mapping for struct, got scalar
-	// Validation error: [31:25] jsonschema validation error: at '/properties/name/type': value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
-	// Validation error: [31:25] jsonschema validation error: at '/properties/name/type': got string, want array
-	// Additional validation error: [31:25] jsonschema validation error: at '/properties/name/type': value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
-	// Additional validation error: [31:25] jsonschema validation error: at '/properties/name/type': got string, want array
+	// Output: Validation error: [3:3] info field version is missing
+	// Validation error: [18:30] response expected object, got scalar
+	// Validation error: [31:25] schema field properties.name.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
+	// Validation error: [31:25] schema field properties.name.type got string, want array
+	// Additional validation error: [31:25] schema field properties.name.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
+	// Additional validation error: [31:25] schema field properties.name.type got string, want array
 }
 
 // Example_mutating demonstrates how to read and modify an OpenAPI document.

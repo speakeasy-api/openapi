@@ -128,7 +128,7 @@ schema:
   type: invalid-type
 description: Header with invalid schema
 `,
-			wantErrs: []string{"jsonschema validation error: at '/type': value must be one of"},
+			wantErrs: []string{"schema field type value must be one of"},
 		},
 	}
 

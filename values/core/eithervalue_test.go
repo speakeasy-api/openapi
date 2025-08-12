@@ -43,7 +43,8 @@ func TestEitherValue_Unmarshal_BooleanValue_Success(t *testing.T) {
 
 	// Create a simple struct for Left type that would fail validation on a boolean
 	type ComplexType struct {
-		marshaller.CoreModel
+		marshaller.CoreModel `model:"complexType"`
+
 		Name marshaller.Node[string] `key:"name" required:"true"`
 	}
 
@@ -54,7 +55,7 @@ func TestEitherValue_Unmarshal_BooleanValue_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	var target EitherValue[ComplexType, bool]
-	validationErrs, err := marshaller.UnmarshalCore(ctx, node.Content[0], &target)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, "", node.Content[0], &target)
 
 	// Should succeed without syntax errors
 	require.NoError(t, err, "Should not have syntax errors")
@@ -87,7 +88,7 @@ func TestEitherValue_BothTypesFailValidation(t *testing.T) {
 	// Create an EitherValue[string, bool] to test the logic
 	// An array should fail validation for both string (expects scalar) and bool (expects scalar)
 	var target EitherValue[string, bool]
-	validationErrs, err := marshaller.UnmarshalCore(ctx, node.Content[0], &target)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, "", node.Content[0], &target)
 
 	// Should NOT have an unmarshalling error - this is the key fix
 	require.NoError(t, err, "Should not have unmarshalling errors when both types fail validation")

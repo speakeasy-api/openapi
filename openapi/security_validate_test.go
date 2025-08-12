@@ -295,7 +295,7 @@ func TestSecurityRequirement_Validate_Error(t *testing.T) {
 			yml: `
 undefined_scheme: []
 `,
-			expectedErr: "securityScheme undefined_scheme is not defined in components.securitySchemes",
+			expectedErr: "securityRequirement scheme undefined_scheme is not defined in components.securitySchemes",
 		},
 	}
 

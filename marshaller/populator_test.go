@@ -27,7 +27,7 @@ x-custom: "extension value"
 
 	// First unmarshal to core model
 	var coreModel core.TestPrimitiveModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -67,7 +67,7 @@ float64Field: 3.14
 
 	// First unmarshal to core model
 	var coreModel core.TestPrimitiveModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -125,7 +125,7 @@ x-extension: "ext value"
 
 	// First unmarshal to core model
 	var coreModel core.TestComplexModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -201,7 +201,7 @@ requiredRawNode: "raw node value"
 
 	// First unmarshal to core model
 	var coreModel core.TestRequiredNilableModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -253,7 +253,7 @@ optionalPtr: "optional pointer value"
 
 	// First unmarshal to core model
 	var coreModel core.TestRequiredPointerModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -288,7 +288,7 @@ float64PtrField: null
 
 	// First unmarshal to core model
 	var coreModel core.TestPrimitiveModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -331,7 +331,7 @@ x-extension: "ext value"
 
 	// First unmarshal to core model
 	var coreModel core.TestEmbeddedMapWithFieldsModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -383,7 +383,7 @@ dynamicKey3: "value3"
 
 	// First unmarshal to core model
 	var coreModel core.TestEmbeddedMapModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -437,7 +437,7 @@ x-extension: "ext value"
 
 	// First unmarshal to core model
 	var coreModel core.TestValidationModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -507,7 +507,7 @@ put:
 
 	// First unmarshal to core model (this should work fine)
 	var coreModel core.TestTypeConversionCoreModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -578,7 +578,7 @@ httpMethodField: "post"
 
 	// First unmarshal to core model (string field)
 	var coreModel core.TestTypeConversionCoreModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)

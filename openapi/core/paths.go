@@ -7,7 +7,7 @@ import (
 )
 
 type Paths struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"paths"`
 	sequencedmap.Map[string, *Reference[*PathItem]]
 
 	Extensions core.Extensions `key:"extensions"`
@@ -20,7 +20,7 @@ func NewPaths() *Paths {
 }
 
 type PathItem struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"pathItem"`
 	sequencedmap.Map[string, *Operation]
 
 	Summary     marshaller.Node[*string] `key:"summary"`

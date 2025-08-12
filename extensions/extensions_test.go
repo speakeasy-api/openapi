@@ -23,7 +23,8 @@ type ModelWithExtensions struct {
 }
 
 type CoreModelWithExtensions struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"coreModelWithExtensions"`
+
 	Test       marshaller.Node[string]   `key:"test"`
 	Extensions coreExtensions.Extensions `key:"extensions"`
 }
@@ -36,7 +37,7 @@ type TestModel struct {
 }
 
 type TestCoreModel struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"testCoreModel"`
 
 	Name  marshaller.Node[string]     `key:"name"`
 	Value marshaller.Node[*yaml.Node] `key:"value" required:"true"`
@@ -115,7 +116,7 @@ func getTestModelWithExtensions(ctx context.Context, t *testing.T, data string) 
 	require.NoError(t, err)
 
 	var c CoreModelWithExtensions
-	validationErrs, err := marshaller.UnmarshalCore(ctx, &root, &c)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, "", &root, &c)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 

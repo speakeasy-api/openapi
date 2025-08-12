@@ -9,7 +9,7 @@ import (
 )
 
 type Header struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"header"`
 
 	Description marshaller.Node[*string]                                         `key:"description"`
 	Required    marshaller.Node[*bool]                                           `key:"required"`

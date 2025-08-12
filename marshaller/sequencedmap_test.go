@@ -31,7 +31,7 @@ func runSequencedMapTest[K comparable, V any](t *testing.T, testCase *sequencedM
 	require.NoError(t, err)
 
 	var node marshaller.Node[*sequencedmap.Map[K, V]]
-	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 	require.NoError(t, err)
 	require.Empty(t, validationErrors)
 
@@ -65,7 +65,7 @@ func runSequencedMapErrorTest[K comparable, V any](t *testing.T, testCase *seque
 	}
 
 	var node marshaller.Node[*sequencedmap.Map[K, V]]
-	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 	if len(validationErrors) > 0 {
 		require.NotEmpty(t, validationErrors)
 	} else {
@@ -230,7 +230,7 @@ original2: "value2"
 				require.NoError(t, err)
 
 				var node marshaller.Node[*sequencedmap.Map[string, string]]
-				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -275,7 +275,7 @@ second: "2"
 				require.NoError(t, err)
 
 				var node marshaller.Node[*sequencedmap.Map[string, string]]
-				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -371,7 +371,7 @@ x-vendor: "vendor extension"
 				require.NoError(t, err)
 
 				var node marshaller.Node[*sequencedmap.Map[string, string]]
-				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 

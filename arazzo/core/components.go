@@ -8,7 +8,8 @@ import (
 )
 
 type Components struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"components"`
+
 	Inputs         marshaller.Node[*sequencedmap.Map[string, core.JSONSchema]] `key:"inputs"`
 	Parameters     marshaller.Node[*sequencedmap.Map[string, *Parameter]]      `key:"parameters"`
 	SuccessActions marshaller.Node[*sequencedmap.Map[string, *SuccessAction]]  `key:"successActions"`

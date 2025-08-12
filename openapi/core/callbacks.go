@@ -7,7 +7,7 @@ import (
 )
 
 type Callback struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"callback"`
 	sequencedmap.Map[string, *Reference[*PathItem]]
 
 	Extensions core.Extensions `key:"extensions"`

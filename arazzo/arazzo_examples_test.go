@@ -190,6 +190,6 @@ func Example_validating() {
 		fmt.Printf("%s\n", err.Error())
 	}
 	// Output:
-	// [3:3] field version is missing
-	// [13:9] at least one of operationId, operationPath or workflowId must be set
+	// [3:3] info field version is missing
+	// [13:9] step at least one of operationId, operationPath or workflowId fields must be set
 }

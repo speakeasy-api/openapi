@@ -148,7 +148,7 @@ in: query
 schema:
   type: string
 `,
-			wantErrs: []string{"[2:1] field name is missing"},
+			wantErrs: []string{"[2:1] parameter field name is missing"},
 		},
 		{
 			name: "empty name",
@@ -158,7 +158,7 @@ in: query
 schema:
   type: string
 `,
-			wantErrs: []string{"[2:7] name is required"},
+			wantErrs: []string{"[2:7] parameter field name is required"},
 		},
 		{
 			name: "missing in",
@@ -167,7 +167,7 @@ name: test
 schema:
   type: string
 `,
-			wantErrs: []string{"[2:1] field in is missing"},
+			wantErrs: []string{"[2:1] parameter field in is missing"},
 		},
 		{
 			name: "path parameter not required",
@@ -178,7 +178,7 @@ required: false
 schema:
   type: string
 `,
-			wantErrs: []string{"[4:11] in=path requires required=true"},
+			wantErrs: []string{"[4:11] parameter field in=path requires required=true"},
 		},
 		{
 			name: "invalid parameter location",
@@ -188,7 +188,7 @@ in: invalid
 schema:
   type: string
 `,
-			wantErrs: []string{"[3:5] in must be one of [query, header, path, cookie]"},
+			wantErrs: []string{"[3:5] parameter field in must be one of [query, header, path, cookie]"},
 		},
 		{
 			name: "multiple validation errors",
@@ -198,8 +198,8 @@ in: path
 required: false
 `,
 			wantErrs: []string{
-				"[2:7] name is required",
-				"[4:11] in=path requires required=true",
+				"[2:7] parameter field name is required",
+				"[4:11] parameter field in=path requires required=true",
 			},
 		},
 	}

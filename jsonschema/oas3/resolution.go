@@ -370,7 +370,7 @@ func getParentJSONPointer(jsonPtr string) string {
 
 func unmarshaller(ctx context.Context, node *yaml.Node, skipValidation bool) (*JSONSchema[Referenceable], []error, error) {
 	jsonSchema := &JSONSchema[Referenceable]{}
-	validationErrs, err := marshaller.UnmarshalNode(ctx, node, jsonSchema)
+	validationErrs, err := marshaller.UnmarshalNode(ctx, "", node, jsonSchema)
 	if skipValidation {
 		validationErrs = nil
 	}

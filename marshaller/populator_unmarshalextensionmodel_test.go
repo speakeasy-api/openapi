@@ -33,7 +33,7 @@ type CustomSecurityConfig struct {
 
 // CoreCustomSecurityConfig represents the core model for custom security configuration
 type CoreCustomSecurityConfig struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"coreCustomSecurityConfig"`
 
 	UsesScopes marshaller.Node[*bool]              `key:"usesScopes"`
 	Schema     marshaller.Node[oascore.JSONSchema] `key:"schema" required:"true"`
@@ -49,7 +49,8 @@ type ModelWithExtensions struct {
 
 // CoreModelWithExtensions represents the core model with extensions
 type CoreModelWithExtensions struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"coreModelWithExtensions"`
+
 	Test       marshaller.Node[string]                                `key:"test"`
 	Extensions *sequencedmap.Map[string, marshaller.Node[*yaml.Node]] `key:"extensions"`
 }
@@ -108,7 +109,7 @@ func getTestModelWithExtensions(ctx context.Context, t *testing.T, data string) 
 	require.NoError(t, err)
 
 	var c CoreModelWithExtensions
-	validationErrs, err := marshaller.UnmarshalCore(ctx, &root, &c)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, "", &root, &c)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 

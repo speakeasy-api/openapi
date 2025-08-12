@@ -20,7 +20,7 @@ type MapGetter interface {
 }
 
 // unmarshalSequencedMap unmarshals a YAML node into a sequenced map
-func unmarshalSequencedMap(ctx context.Context, node *yaml.Node, target interfaces.SequencedMapInterface) ([]error, error) {
+func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.Node, target interfaces.SequencedMapInterface) ([]error, error) {
 	resolvedNode := yml.ResolveAlias(node)
 	if resolvedNode == nil {
 		return nil, fmt.Errorf("node is nil")
@@ -28,7 +28,7 @@ func unmarshalSequencedMap(ctx context.Context, node *yaml.Node, target interfac
 
 	// Check if the node is actually a mapping node
 	if resolvedNode.Kind != yaml.MappingNode {
-		validationErr := validation.NewTypeMismatchError("expected mapping node for sequenced map, got %v", resolvedNode.Kind)
+		validationErr := validation.NewTypeMismatchError("%sexpected mapping node for sequenced map, got %v", getOptionalParentName(parentName), resolvedNode.Kind)
 		return []error{validationErr}, nil
 	}
 
@@ -71,7 +71,7 @@ func unmarshalSequencedMap(ctx context.Context, node *yaml.Node, target interfac
 			}
 
 			// Unmarshal into the concrete value
-			validationErrs, err := UnmarshalKeyValuePair(ctx, keyNode, valueNode, concreteValue)
+			validationErrs, err := UnmarshalKeyValuePair(ctx, parentName, keyNode, valueNode, concreteValue)
 			if err != nil {
 				return err
 			}

@@ -8,7 +8,7 @@ import (
 )
 
 type OpenAPI struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"openapi"`
 
 	OpenAPI      marshaller.Node[string]                                           `key:"openapi"`
 	Info         marshaller.Node[Info]                                             `key:"info"`

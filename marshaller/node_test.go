@@ -20,7 +20,7 @@ func runNodeTest[T any](t *testing.T, testCase *testCase[T]) {
 	require.NoError(t, err)
 
 	var node Node[T]
-	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 	require.NoError(t, err)
 	require.Empty(t, validationErrors)
 
@@ -147,7 +147,7 @@ func runNodeErrorTest[T any](t *testing.T, testCase *errorTestCase[T]) {
 	require.NoError(t, err)
 
 	var node Node[T]
-	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 	if testCase.expectValidationError {
 		require.NoError(t, err)
 		require.NotEmpty(t, validationErrors)
@@ -222,7 +222,7 @@ func runNodeSyncTest[T any](t *testing.T, testCase *syncTestCase[T]) {
 	require.NoError(t, err)
 
 	var node Node[T]
-	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 	require.NoError(t, err)
 	require.Empty(t, validationErrors)
 
@@ -309,7 +309,7 @@ func TestNode_GetValue_Success(t *testing.T) {
 				require.NoError(t, err)
 
 				var node Node[string]
-				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -324,7 +324,7 @@ func TestNode_GetValue_Success(t *testing.T) {
 				require.NoError(t, err)
 
 				var node Node[*string]
-				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -344,7 +344,7 @@ func TestNode_GetValue_Success(t *testing.T) {
 				require.NoError(t, err)
 
 				var node Node[*string]
-				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -359,7 +359,7 @@ func TestNode_GetValue_Success(t *testing.T) {
 				require.NoError(t, err)
 
 				var node Node[int]
-				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -374,7 +374,7 @@ func TestNode_GetValue_Success(t *testing.T) {
 				require.NoError(t, err)
 
 				var node Node[bool]
-				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -401,7 +401,7 @@ func TestNode_NodeAccessor_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	var node Node[string]
-	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 	require.NoError(t, err)
 	require.Empty(t, validationErrors)
 
@@ -435,7 +435,7 @@ func TestNode_NodeMutator_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	var node Node[string]
-	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
 	require.NoError(t, err)
 	require.Empty(t, validationErrors)
 

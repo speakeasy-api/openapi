@@ -258,7 +258,7 @@ func (r *Reference[T, V, C]) Validate(ctx context.Context, opts ...validation.Op
 
 	if core.Reference.Present {
 		if err := r.Reference.Validate(); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Reference))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("reference field $ref is invalid: %s", err.Error()), core, core.Reference))
 		}
 	} else if r.Object != nil {
 		// Use the validator interface V to validate the object
@@ -460,7 +460,7 @@ func joinReferenceChain(chain []string) string {
 func unmarshaller[T any, V interfaces.Validator[T], C marshaller.CoreModeler](o *OpenAPI) func(context.Context, *yaml.Node, bool) (*Reference[T, V, C], []error, error) {
 	return func(ctx context.Context, node *yaml.Node, skipValidation bool) (*Reference[T, V, C], []error, error) {
 		var ref Reference[T, V, C]
-		validationErrs, err := marshaller.UnmarshalNode(ctx, node, &ref)
+		validationErrs, err := marshaller.UnmarshalNode(ctx, "reference", node, &ref)
 		if skipValidation {
 			validationErrs = nil
 		}

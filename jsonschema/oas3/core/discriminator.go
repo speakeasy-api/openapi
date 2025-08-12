@@ -7,7 +7,8 @@ import (
 )
 
 type Discriminator struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"discriminator"`
+
 	PropertyName marshaller.Node[string]                                             `key:"propertyName"`
 	Mapping      marshaller.Node[*sequencedmap.Map[string, marshaller.Node[string]]] `key:"mapping"`
 	Extensions   core.Extensions                                                     `key:"extensions"`

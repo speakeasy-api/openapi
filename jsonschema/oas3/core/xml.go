@@ -6,7 +6,7 @@ import (
 )
 
 type XML struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"xml"`
 
 	Name       marshaller.Node[*string] `key:"name"`
 	Namespace  marshaller.Node[*string] `key:"namespace"`

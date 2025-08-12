@@ -302,11 +302,11 @@ sourceDescriptions:
 		column          int
 		underlyingError error
 	}{
-		{line: 1, column: 1, underlyingError: validation.NewMissingFieldError("field workflows is missing")},
-		{line: 1, column: 9, underlyingError: validation.NewValueValidationError("only Arazzo version 1.0.1 and below is supported")},
-		{line: 4, column: 3, underlyingError: validation.NewMissingFieldError("field version is missing")},
-		{line: 6, column: 5, underlyingError: validation.NewMissingFieldError("field url is missing")},
-		{line: 7, column: 11, underlyingError: validation.NewValueValidationError("type must be one of [openapi, arazzo]")},
+		{line: 1, column: 1, underlyingError: validation.NewMissingFieldError("arazzo field workflows is missing")},
+		{line: 1, column: 9, underlyingError: validation.NewValueValidationError("arazzo field version only 1.0.1 and below is supported")},
+		{line: 4, column: 3, underlyingError: validation.NewMissingFieldError("info field version is missing")},
+		{line: 6, column: 5, underlyingError: validation.NewMissingFieldError("sourceDescription field url is missing")},
+		{line: 7, column: 11, underlyingError: validation.NewValueValidationError("sourceDescription field type must be one of [openapi, arazzo]")},
 	}
 
 	require.Len(t, validationErrs, len(expectedErrors), "number of validation errors should match")

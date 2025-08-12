@@ -148,7 +148,7 @@ content:
     schema:
       type: object
 `,
-			wantErrs: []string{"[2:1] field description is missing"},
+			wantErrs: []string{"[2:1] response field description is missing"},
 		},
 		{
 			name: "empty description",
@@ -159,7 +159,7 @@ content:
     schema:
       type: object
 `,
-			wantErrs: []string{"[2:14] description is required"},
+			wantErrs: []string{"[2:14] response field description is required"},
 		},
 		{
 			name: "invalid schema in content",
@@ -170,7 +170,7 @@ content:
     schema:
       type: invalid-type
 `,
-			wantErrs: []string{"jsonschema validation error: at '/type': value must be one of"},
+			wantErrs: []string{"schema field type value must be one of"},
 		},
 	}
 

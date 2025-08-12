@@ -56,7 +56,7 @@ func (c *Callback) Validate(ctx context.Context, opts ...validation.Option) []er
 				}
 			}
 
-			errs = append(errs, validation.NewValidationError(validation.NewValueValidationError(err.Error()), node))
+			errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("callback expression is invalid: %s", err.Error()), node))
 		}
 
 		errs = append(errs, pathItem.Validate(ctx, opts...)...)

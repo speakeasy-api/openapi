@@ -7,7 +7,7 @@ import (
 )
 
 type Example struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"example"`
 
 	Summary       marshaller.Node[*string]      `key:"summary"`
 	Description   marshaller.Node[*string]      `key:"description"`

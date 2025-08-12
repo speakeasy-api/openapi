@@ -149,41 +149,41 @@ func (s *SecurityScheme) Validate(ctx context.Context, opts ...validation.Option
 
 	if core.Type.Present {
 		if s.Type == "" {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("type is required"), core, core.Type))
+			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("securityScheme field type is required"), core, core.Type))
 		} else {
 			switch s.Type {
 			case SecuritySchemeTypeAPIKey:
 				if !core.Name.Present || *s.Name == "" {
-					errs = append(errs, validation.NewValueError(validation.NewMissingValueError("name is required for type=apiKey"), core, core.Name))
+					errs = append(errs, validation.NewValueError(validation.NewMissingValueError("securityScheme field name is required for type=apiKey"), core, core.Name))
 				}
 				if !core.In.Present || *s.In == "" {
-					errs = append(errs, validation.NewValueError(validation.NewMissingValueError("in is required for type=apiKey"), core, core.In))
+					errs = append(errs, validation.NewValueError(validation.NewMissingValueError("securityScheme field in is required for type=apiKey"), core, core.In))
 				} else {
 					switch *s.In {
 					case SecuritySchemeInHeader:
 					case SecuritySchemeInQuery:
 					case SecuritySchemeInCookie:
 					default:
-						errs = append(errs, validation.NewValueError(validation.NewValueValidationError("in must be one of [%s] for type=apiKey", strings.Join([]string{string(SecuritySchemeInHeader), string(SecuritySchemeInQuery), string(SecuritySchemeInCookie)}, ", ")), core, core.In))
+						errs = append(errs, validation.NewValueError(validation.NewValueValidationError("securityScheme field in must be one of [%s] for type=apiKey", strings.Join([]string{string(SecuritySchemeInHeader), string(SecuritySchemeInQuery), string(SecuritySchemeInCookie)}, ", ")), core, core.In))
 					}
 				}
 			case SecuritySchemeTypeHTTP:
 				if !core.Scheme.Present || *s.Scheme == "" {
-					errs = append(errs, validation.NewValueError(validation.NewMissingValueError("scheme is required for type=http"), core, core.Scheme))
+					errs = append(errs, validation.NewValueError(validation.NewMissingValueError("securityScheme field scheme is required for type=http"), core, core.Scheme))
 				}
 			case SecuritySchemeTypeMutualTLS:
 			case SecuritySchemeTypeOAuth2:
 				if !core.Flows.Present || s.Flows == nil {
-					errs = append(errs, validation.NewValueError(validation.NewMissingValueError("flows is required for type=oauth2"), core, core.Flows))
+					errs = append(errs, validation.NewValueError(validation.NewMissingValueError("securityScheme field flows is required for type=oauth2"), core, core.Flows))
 				} else {
 					errs = append(errs, s.Flows.Validate(ctx, opts...)...)
 				}
 			case SecuritySchemeTypeOpenIDConnect:
 				if !core.OpenIdConnectUrl.Present || *s.OpenIdConnectUrl == "" {
-					errs = append(errs, validation.NewValueError(validation.NewMissingValueError("openIdConnectUrl is required for type=openIdConnect"), core, core.OpenIdConnectUrl))
+					errs = append(errs, validation.NewValueError(validation.NewMissingValueError("securityScheme field openIdConnectUrl is required for type=openIdConnect"), core, core.OpenIdConnectUrl))
 				}
 			default:
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("type must be one of [%s]", strings.Join([]string{string(SecuritySchemeTypeAPIKey), string(SecuritySchemeTypeHTTP), string(SecuritySchemeTypeMutualTLS), string(SecuritySchemeTypeOAuth2), string(SecuritySchemeTypeOpenIDConnect)}, ", ")), core, core.Type))
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("securityScheme field type must be one of [%s]", strings.Join([]string{string(SecuritySchemeTypeAPIKey), string(SecuritySchemeTypeHTTP), string(SecuritySchemeTypeMutualTLS), string(SecuritySchemeTypeOAuth2), string(SecuritySchemeTypeOpenIDConnect)}, ", ")), core, core.Type))
 			}
 		}
 	}
@@ -259,7 +259,7 @@ func (s *SecurityRequirement) Validate(ctx context.Context, opts ...validation.O
 
 	for securityScheme := range s.Keys() {
 		if openapi.Components == nil || !openapi.Components.SecuritySchemes.Has(securityScheme) {
-			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("securityScheme %s is not defined in components.securitySchemes", securityScheme), core, core, securityScheme))
+			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("securityRequirement scheme %s is not defined in components.securitySchemes", securityScheme), core, core, securityScheme))
 		}
 	}
 
@@ -432,53 +432,53 @@ func (o *OAuthFlow) Validate(ctx context.Context, opts ...validation.Option) []e
 	switch *oAuthFlowType {
 	case OAuthFlowTypeImplicit:
 		if !core.AuthorizationURL.Present || *o.AuthorizationURL == "" {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("authorizationUrl is required for type=implicit"), core, core.AuthorizationURL))
+			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("oAuthFlow field authorizationUrl is required for type=implicit"), core, core.AuthorizationURL))
 		} else {
 			if _, err := url.Parse(*o.AuthorizationURL); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("authorizationUrl is not a valid uri: %s", err), core, core.AuthorizationURL))
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("oAuthFlow field authorizationUrl is not a valid uri: %s", err), core, core.AuthorizationURL))
 			}
 		}
 	case OAuthFlowTypePassword:
 		if !core.TokenURL.Present || *o.TokenURL == "" {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("tokenUrl is required for type=password"), core, core.TokenURL))
+			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("oAuthFlow field tokenUrl is required for type=password"), core, core.TokenURL))
 		} else {
 			if _, err := url.Parse(*o.TokenURL); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("tokenUrl is not a valid uri: %s", err), core, core.TokenURL))
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("oAuthFlow field tokenUrl is not a valid uri: %s", err), core, core.TokenURL))
 			}
 		}
 	case OAuthFlowTypeClientCredentials:
 		if !core.TokenURL.Present || *o.TokenURL == "" {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("tokenUrl is required for type=clientCredentials"), core, core.TokenURL))
+			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("oAuthFlow field tokenUrl is required for type=clientCredentials"), core, core.TokenURL))
 		} else {
 			if _, err := url.Parse(*o.TokenURL); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("tokenUrl is not a valid uri: %s", err), core, core.TokenURL))
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("oAuthFlow field tokenUrl is not a valid uri: %s", err), core, core.TokenURL))
 			}
 		}
 	case OAuthFlowTypeAuthorizationCode:
 		if !core.AuthorizationURL.Present || *o.AuthorizationURL == "" {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("authorizationUrl is required for type=authorizationCode"), core, core.AuthorizationURL))
+			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("oAuthFlow field authorizationUrl is required for type=authorizationCode"), core, core.AuthorizationURL))
 		} else {
 			if _, err := url.Parse(*o.AuthorizationURL); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("authorizationUrl is not a valid uri: %s", err), core, core.AuthorizationURL))
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("oAuthFlow field authorizationUrl is not a valid uri: %s", err), core, core.AuthorizationURL))
 			}
 		}
 		if !core.TokenURL.Present || *o.TokenURL == "" {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("tokenUrl is required for type=authorizationCode"), core, core.TokenURL))
+			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("oAuthFlow field tokenUrl is required for type=authorizationCode"), core, core.TokenURL))
 		} else {
 			if _, err := url.Parse(*o.TokenURL); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("tokenUrl is not a valid uri: %s", err), core, core.TokenURL))
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("oAuthFlow field tokenUrl is not a valid uri: %s", err), core, core.TokenURL))
 			}
 		}
 	}
 
 	if core.RefreshURL.Present {
 		if _, err := url.Parse(*o.RefreshURL); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("refreshUrl is not a valid uri: %s", err), core, core.RefreshURL))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("oAuthFlow field refreshUrl is not a valid uri: %s", err), core, core.RefreshURL))
 		}
 	}
 
 	if !core.Scopes.Present {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("scopes is required (empty map is allowed)"), core, core.Scopes))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("oAuthFlow field scopes is required (empty map is allowed)"), core, core.Scopes))
 	}
 
 	o.Valid = len(errs) == 0 && core.GetValid()

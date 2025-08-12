@@ -5,10 +5,8 @@ package arazzo
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"slices"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
@@ -79,24 +77,7 @@ func Unmarshal(ctx context.Context, doc io.Reader, opts ...Option[unmarshalOptio
 	}
 
 	validationErrs = append(validationErrs, arazzo.Validate(ctx)...)
-	slices.SortFunc(validationErrs, func(a, b error) int {
-		var aValidationErr *validation.Error
-		var bValidationErr *validation.Error
-		aIsValidationErr := errors.As(a, &aValidationErr)
-		bIsValidationErr := errors.As(b, &bValidationErr)
-		if aIsValidationErr && bIsValidationErr {
-			if aValidationErr.GetLineNumber() == bValidationErr.GetLineNumber() {
-				return aValidationErr.GetColumnNumber() - bValidationErr.GetColumnNumber()
-			}
-			return aValidationErr.GetLineNumber() - bValidationErr.GetLineNumber()
-		} else if aIsValidationErr {
-			return -1
-		} else if bIsValidationErr {
-			return 1
-		}
-
-		return 0
-	})
+	validation.SortValidationErrors(validationErrs)
 
 	return &arazzo, validationErrs, nil
 }
@@ -123,11 +104,11 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 
 	arazzoMajor, arazzoMinor, arazzoPatch, err := utils.ParseVersion(a.Arazzo)
 	if err != nil {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("invalid Arazzo version in document %s: %s", a.Arazzo, err.Error()), core, core.Arazzo))
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("arazzo field version is invalid %s: %s", a.Arazzo, err.Error()), core, core.Arazzo))
 	}
 
 	if arazzoMajor != VersionMajor || arazzoMinor != VersionMinor || arazzoPatch > VersionPatch {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("only Arazzo version %s and below is supported", Version), core, core.Arazzo))
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("arazzo field version only %s and below is supported", Version), core, core.Arazzo))
 	}
 
 	errs = append(errs, a.Info.Validate(ctx, opts...)...)
@@ -138,7 +119,7 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, sourceDescription.Validate(ctx, opts...)...)
 
 		if _, ok := sourceDescriptionNames[sourceDescription.Name]; ok {
-			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("sourceDescription name %s is not unique", sourceDescription.Name), core, core.SourceDescriptions, i))
+			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("sourceDescription field name %s is not unique", sourceDescription.Name), core, core.SourceDescriptions, i))
 		}
 
 		sourceDescriptionNames[sourceDescription.Name] = true
@@ -150,7 +131,7 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, workflow.Validate(ctx, opts...)...)
 
 		if _, ok := workflowIds[workflow.WorkflowID]; ok {
-			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflowId %s is not unique", workflow.WorkflowID), core, core.Workflows, i))
+			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow field workflowId %s is not unique", workflow.WorkflowID), core, core.Workflows, i))
 		}
 
 		workflowIds[workflow.WorkflowID] = true

@@ -7,7 +7,7 @@ import (
 )
 
 type Tag struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"tag"`
 
 	Name         marshaller.Node[string]                          `key:"name"`
 	Description  marshaller.Node[*string]                         `key:"description"`

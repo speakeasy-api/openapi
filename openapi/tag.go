@@ -66,7 +66,7 @@ func (t *Tag) Validate(ctx context.Context, opts ...validation.Option) []error {
 	errs := []error{}
 
 	if core.Name.Present && t.Name == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("name is required"), core, core.Name))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("tag field name is required"), core, core.Name))
 	}
 
 	if t.ExternalDocs != nil {

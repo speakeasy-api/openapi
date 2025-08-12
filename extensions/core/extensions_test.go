@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/extensions/core"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
@@ -14,12 +15,15 @@ import (
 )
 
 type TestCoreModel struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"testCoreModel"`
+
 	Name  marshaller.Node[string]     `key:"name"`
 	Value marshaller.Node[*yaml.Node] `key:"value" required:"true"`
 }
 
-func (t *TestCoreModel) Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error) {
+var _ interfaces.CoreModel = (*TestCoreModel)(nil)
+
+func (t *TestCoreModel) Unmarshal(ctx context.Context, parentName string, node *yaml.Node) ([]error, error) {
 	return marshaller.UnmarshalModel(ctx, node, t)
 }
 

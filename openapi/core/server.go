@@ -7,7 +7,7 @@ import (
 )
 
 type Server struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"server"`
 
 	URL         marshaller.Node[string]                                     `key:"url"`
 	Description marshaller.Node[*string]                                    `key:"description"`
@@ -16,7 +16,7 @@ type Server struct {
 }
 
 type ServerVariable struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"serverVariable"`
 
 	Default     marshaller.Node[string]                    `key:"default"`
 	Enum        marshaller.Node[[]marshaller.Node[string]] `key:"enum"`

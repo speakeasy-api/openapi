@@ -161,7 +161,7 @@ func (o *OpenAPI) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	openAPIMajor, openAPIMinor, openAPIPatch, err := utils.ParseVersion(o.OpenAPI)
 	if err != nil {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("invalid OpenAPI version in document %s: %s", o.OpenAPI, err.Error()), core, core.OpenAPI))
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi field openapi invalid OpenAPI version %s: %s", o.OpenAPI, err.Error()), core, core.OpenAPI))
 	}
 
 	minorVersionSupported := slices.Contains([]int{0, 1}, openAPIMinor)
@@ -175,7 +175,7 @@ func (o *OpenAPI) Validate(ctx context.Context, opts ...validation.Option) []err
 	}
 
 	if openAPIMajor != VersionMajor || !minorVersionSupported || !patchVersionSupported {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("only OpenAPI version %s and below is supported", Version), core, core.OpenAPI))
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi field openapi only OpenAPI version %s and below is supported", Version), core, core.OpenAPI))
 	}
 
 	errs = append(errs, o.Info.Validate(ctx, opts...)...)
@@ -210,7 +210,7 @@ func (o *OpenAPI) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	if core.JSONSchemaDialect.Present && o.JSONSchemaDialect != nil {
 		if _, err := url.Parse(*o.JSONSchemaDialect); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("jsonSchemaDialect is not a valid uri: %s", err), core, core.JSONSchemaDialect))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi field jsonSchemaDialect is not a valid uri: %s", err), core, core.JSONSchemaDialect))
 		}
 	}
 

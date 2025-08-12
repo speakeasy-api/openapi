@@ -109,7 +109,7 @@ func TestInfo_Validate_Error(t *testing.T) {
 			yml: `
 version: 1.0.0
 `,
-			wantErrs: []string{"[2:1] field title is missing"},
+			wantErrs: []string{"[2:1] info field title is missing"},
 		},
 		{
 			name: "empty title",
@@ -117,14 +117,14 @@ version: 1.0.0
 title: ""
 version: 1.0.0
 `,
-			wantErrs: []string{"[2:8] title is required"},
+			wantErrs: []string{"[2:8] info field title is required"},
 		},
 		{
 			name: "missing version",
 			yml: `
 title: Test API
 `,
-			wantErrs: []string{"[2:1] field version is missing"},
+			wantErrs: []string{"[2:1] info field version is missing"},
 		},
 		{
 			name: "empty version",
@@ -132,7 +132,7 @@ title: Test API
 title: Test API
 version: ""
 `,
-			wantErrs: []string{"[3:10] version is required"},
+			wantErrs: []string{"[3:10] info field version is required"},
 		},
 		{
 			name: "invalid termsOfService URI",
@@ -141,7 +141,7 @@ title: Test API
 version: 1.0.0
 termsOfService: ":invalid"
 `,
-			wantErrs: []string{"[4:17] termsOfService is not a valid uri: parse \":invalid\": missing protocol scheme"},
+			wantErrs: []string{"[4:17] info field termsOfService is not a valid uri: parse \":invalid\": missing protocol scheme"},
 		},
 		{
 			name: "invalid contact URL",
@@ -152,7 +152,7 @@ contact:
   name: Support
   url: ":invalid"
 `,
-			wantErrs: []string{"[6:8] url is not a valid uri: parse \":invalid\": missing protocol scheme"},
+			wantErrs: []string{"[6:8] contact field url is not a valid uri: parse \":invalid\": missing protocol scheme"},
 		},
 		{
 			name: "invalid contact email",
@@ -163,7 +163,7 @@ contact:
   name: Support
   email: "not-an-email"
 `,
-			wantErrs: []string{"[6:10] email is not a valid email address: mail: missing '@' or angle-addr"},
+			wantErrs: []string{"[6:10] contact field email is not a valid email address: mail: missing '@' or angle-addr"},
 		},
 		{
 			name: "invalid license URL",
@@ -174,7 +174,7 @@ license:
   name: MIT
   url: ":invalid"
 `,
-			wantErrs: []string{"[6:8] url is not a valid uri: parse \":invalid\": missing protocol scheme"},
+			wantErrs: []string{"[6:8] license field url is not a valid uri: parse \":invalid\": missing protocol scheme"},
 		},
 		{
 			name: "missing license name",
@@ -184,7 +184,7 @@ version: 1.0.0
 license:
   url: https://opensource.org/licenses/MIT
 `,
-			wantErrs: []string{"[5:3] field name is missing"},
+			wantErrs: []string{"[5:3] license field name is missing"},
 		},
 		{
 			name: "multiple validation errors",
@@ -197,10 +197,10 @@ license:
   name: ""
 `,
 			wantErrs: []string{
-				"[2:8] title is required",
-				"[3:10] version is required",
-				"[5:10] email is not a valid email address: mail: missing '@' or angle-addr",
-				"[7:9] name is required",
+				"[2:8] info field title is required",
+				"[3:10] info field version is required",
+				"[5:10] contact field email is not a valid email address: mail: missing '@' or angle-addr",
+				"[7:9] license field name is required",
 			},
 		},
 	}
@@ -327,7 +327,7 @@ func TestContact_Validate_Error(t *testing.T) {
 name: Support
 url: ":invalid"
 `,
-			wantErrs: []string{"[3:6] url is not a valid uri: parse \":invalid\": missing protocol scheme"},
+			wantErrs: []string{"[3:6] contact field url is not a valid uri: parse \":invalid\": missing protocol scheme"},
 		},
 		{
 			name: "invalid email",
@@ -335,7 +335,7 @@ url: ":invalid"
 name: Support
 email: "not-an-email"
 `,
-			wantErrs: []string{"[3:8] email is not a valid email address: mail: missing '@' or angle-addr"},
+			wantErrs: []string{"[3:8] contact field email is not a valid email address: mail: missing '@' or angle-addr"},
 		},
 		{
 			name: "invalid URL with spaces",
@@ -343,7 +343,7 @@ email: "not-an-email"
 name: Support
 url: ":invalid url"
 `,
-			wantErrs: []string{"[3:6] url is not a valid uri: parse \":invalid url\": missing protocol scheme"},
+			wantErrs: []string{"[3:6] contact field url is not a valid uri: parse \":invalid url\": missing protocol scheme"},
 		},
 		{
 			name: "invalid email missing @",
@@ -351,7 +351,7 @@ url: ":invalid url"
 name: Support
 email: "supportexample.com"
 `,
-			wantErrs: []string{"[3:8] email is not a valid email address: mail: missing '@' or angle-addr"},
+			wantErrs: []string{"[3:8] contact field email is not a valid email address: mail: missing '@' or angle-addr"},
 		},
 		{
 			name: "multiple validation errors",
@@ -361,8 +361,8 @@ url: ":invalid"
 email: "invalid-email"
 `,
 			wantErrs: []string{
-				"[3:6] url is not a valid uri: parse \":invalid\": missing protocol scheme",
-				"[4:8] email is not a valid email address: mail: missing '@' or angle-addr",
+				"[3:6] contact field url is not a valid uri: parse \":invalid\": missing protocol scheme",
+				"[4:8] contact field email is not a valid email address: mail: missing '@' or angle-addr",
 			},
 		},
 	}
@@ -477,7 +477,7 @@ func TestLicense_Validate_Error(t *testing.T) {
 			yml: `
 url: https://opensource.org/licenses/MIT
 `,
-			wantErrs: []string{"[2:1] field name is missing"},
+			wantErrs: []string{"[2:1] license field name is missing"},
 		},
 		{
 			name: "empty name",
@@ -485,7 +485,7 @@ url: https://opensource.org/licenses/MIT
 name: ""
 url: https://opensource.org/licenses/MIT
 `,
-			wantErrs: []string{"[2:7] name is required"},
+			wantErrs: []string{"[2:7] license field name is required"},
 		},
 		{
 			name: "invalid URL",
@@ -493,7 +493,7 @@ url: https://opensource.org/licenses/MIT
 name: MIT
 url: ":invalid"
 `,
-			wantErrs: []string{"[3:6] url is not a valid uri: parse \":invalid\": missing protocol scheme"},
+			wantErrs: []string{"[3:6] license field url is not a valid uri: parse \":invalid\": missing protocol scheme"},
 		},
 		{
 			name: "invalid URL with spaces",
@@ -501,7 +501,7 @@ url: ":invalid"
 name: MIT
 url: ":invalid url"
 `,
-			wantErrs: []string{"[3:6] url is not a valid uri: parse \":invalid url\": missing protocol scheme"},
+			wantErrs: []string{"[3:6] license field url is not a valid uri: parse \":invalid url\": missing protocol scheme"},
 		},
 		{
 			name: "multiple validation errors",
@@ -510,8 +510,8 @@ name: ""
 url: ":invalid"
 `,
 			wantErrs: []string{
-				"[2:7] name is required",
-				"[3:6] url is not a valid uri: parse \":invalid\": missing protocol scheme",
+				"[2:7] license field name is required",
+				"[3:6] license field url is not a valid uri: parse \":invalid\": missing protocol scheme",
 			},
 		},
 	}

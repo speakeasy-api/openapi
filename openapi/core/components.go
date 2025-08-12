@@ -8,7 +8,8 @@ import (
 )
 
 type Components struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"components"`
+
 	Schemas         marshaller.Node[*sequencedmap.Map[string, oascore.JSONSchema]]          `key:"schemas"`
 	Responses       marshaller.Node[*sequencedmap.Map[string, *Reference[*Response]]]       `key:"responses"`
 	Parameters      marshaller.Node[*sequencedmap.Map[string, *Reference[*Parameter]]]      `key:"parameters"`

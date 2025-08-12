@@ -8,6 +8,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/require"
 )
 
@@ -368,9 +369,111 @@ func TestSchema_Validate_Error(t *testing.T) {
 type: string
 title: Missing External Docs URL
 externalDocs:
-  description: "More information"
+  description: More information
 `,
-			wantErrs: []string{"[5:3] field url is missing"},
+			wantErrs: []string{"[5:3] externalDocumentation field url is missing"},
+		},
+		{
+			name: "invalid type property",
+			yml: `
+type: invalid_type
+title: Invalid Type
+`,
+			wantErrs: []string{
+				"schema field type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"schema field type got string, want array",
+			},
+		},
+		{
+			name: "negative minLength",
+			yml: `
+type: string
+minLength: -1
+`,
+			wantErrs: []string{"schema field minLength minimum: got -1, want 0"},
+		},
+		{
+			name: "negative multipleOf",
+			yml: `
+type: number
+multipleOf: -1
+`,
+			wantErrs: []string{"schema field multipleOf exclusiveMinimum: got -1, want 0"},
+		},
+		{
+			name: "zero multipleOf",
+			yml: `
+type: number
+multipleOf: 0
+`,
+			wantErrs: []string{"schema field multipleOf exclusiveMinimum: got 0, want 0"},
+		},
+		{
+			name: "invalid additionalProperties type",
+			yml: `
+type: object
+additionalProperties: "invalid"
+`,
+			wantErrs: []string{
+				"schema field additionalProperties got string, want boolean or object",
+				"schema expected object, got scalar",
+			},
+		},
+		{
+			name: "negative minItems",
+			yml: `
+type: array
+minItems: -1
+`,
+			wantErrs: []string{"schema field minItems minimum: got -1, want 0"},
+		},
+		{
+			name: "negative minProperties",
+			yml: `
+type: object
+minProperties: -1
+`,
+			wantErrs: []string{"schema field minProperties minimum: got -1, want 0"},
+		},
+		{
+			name: "invalid items type",
+			yml: `
+type: array
+items: "invalid"
+`,
+			wantErrs: []string{
+				"schema field items got string, want boolean or object",
+				"schema expected object, got scalar",
+			},
+		},
+		{
+			name: "invalid required not array",
+			yml: `
+type: object
+required: "invalid"
+`,
+			wantErrs: []string{"schema field required got string, want array"},
+		},
+		{
+			name: "invalid allOf not array",
+			yml: `
+allOf: "invalid"
+`,
+			wantErrs: []string{"schema field allOf got string, want array"},
+		},
+		{
+			name: "invalid anyOf not array",
+			yml: `
+anyOf: "invalid"
+`,
+			wantErrs: []string{"schema field anyOf got string, want array"},
+		},
+		{
+			name: "invalid oneOf not array",
+			yml: `
+oneOf: "invalid"
+`,
+			wantErrs: []string{"schema field oneOf got string, want array"},
 		},
 	}
 
@@ -388,6 +491,7 @@ externalDocs:
 
 			validateErrs := schema.Validate(context.Background())
 			allErrors = append(allErrors, validateErrs...)
+			validation.SortValidationErrors(allErrors)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")
 

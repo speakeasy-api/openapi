@@ -56,7 +56,7 @@ func (d *Discriminator) Validate(ctx context.Context, opts ...validation.Option)
 
 	if core.PropertyName.Present {
 		if core.PropertyName.Value == "" {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("propertyName is required"), core, core.PropertyName))
+			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("discriminator field propertyName is required"), core, core.PropertyName))
 		}
 	}
 

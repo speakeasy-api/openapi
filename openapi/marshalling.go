@@ -2,9 +2,7 @@ package openapi
 
 import (
 	"context"
-	"errors"
 	"io"
-	"slices"
 
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
@@ -46,24 +44,7 @@ func Unmarshal(ctx context.Context, doc io.Reader, opts ...Option[UnmarshalOptio
 
 	if !o.skipValidation {
 		validationErrs = append(validationErrs, openapi.Validate(ctx)...)
-		slices.SortFunc(validationErrs, func(a, b error) int {
-			var aValidationErr *validation.Error
-			var bValidationErr *validation.Error
-			aIsValidationErr := errors.As(a, &aValidationErr)
-			bIsValidationErr := errors.As(b, &bValidationErr)
-			if aIsValidationErr && bIsValidationErr {
-				if aValidationErr.GetLineNumber() == bValidationErr.GetLineNumber() {
-					return aValidationErr.GetColumnNumber() - bValidationErr.GetColumnNumber()
-				}
-				return aValidationErr.GetLineNumber() - bValidationErr.GetLineNumber()
-			} else if aIsValidationErr {
-				return -1
-			} else if bIsValidationErr {
-				return 1
-			}
-
-			return 0
-		})
+		validation.SortValidationErrors(validationErrs)
 	}
 
 	return &openapi, validationErrs, nil

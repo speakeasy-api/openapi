@@ -7,7 +7,8 @@ import (
 )
 
 type PayloadReplacement struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"payloadReplacement"`
+
 	Target     marshaller.Node[string]                       `key:"target"`
 	Value      marshaller.Node[expression.ValueOrExpression] `key:"value" required:"true"`
 	Extensions core.Extensions                               `key:"extensions"`

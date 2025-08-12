@@ -13,7 +13,8 @@ import (
 )
 
 type Reference[T marshaller.CoreModeler] struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"reference"`
+
 	Reference   marshaller.Node[*string] `key:"$ref"`
 	Summary     marshaller.Node[*string] `key:"summary"`
 	Description marshaller.Node[*string] `key:"description"`
@@ -23,7 +24,7 @@ type Reference[T marshaller.CoreModeler] struct {
 
 var _ interfaces.CoreModel = (*Reference[*PathItem])(nil)
 
-func (r *Reference[T]) Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error) {
+func (r *Reference[T]) Unmarshal(ctx context.Context, parentName string, node *yaml.Node) ([]error, error) {
 	resolvedNode := yml.ResolveAlias(node)
 	if resolvedNode == nil {
 		return nil, fmt.Errorf("node is nil")
@@ -32,7 +33,7 @@ func (r *Reference[T]) Unmarshal(ctx context.Context, node *yaml.Node) ([]error,
 	if resolvedNode.Kind != yaml.MappingNode {
 		r.SetValid(false, false)
 
-		return []error{validation.NewValidationError(validation.NewTypeMismatchError("expected mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode)}, nil
+		return []error{validation.NewValidationError(validation.NewTypeMismatchError("reference expected mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode)}, nil
 	}
 
 	if _, _, ok := yml.GetMapElementNodes(ctx, resolvedNode, "$ref"); ok {
@@ -41,7 +42,7 @@ func (r *Reference[T]) Unmarshal(ctx context.Context, node *yaml.Node) ([]error,
 
 	var obj T
 
-	validationErrs, err := marshaller.UnmarshalCore(ctx, node, &obj)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, parentName, node, &obj)
 	if err != nil {
 		return nil, err
 	}

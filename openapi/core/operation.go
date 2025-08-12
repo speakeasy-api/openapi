@@ -8,7 +8,7 @@ import (
 )
 
 type Operation struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"operation"`
 
 	OperationID  marshaller.Node[*string]                                          `key:"operationId"`
 	Summary      marshaller.Node[*string]                                          `key:"summary"`

@@ -25,7 +25,7 @@ func TestJSONSchema_Unmarshal_BooleanValue_Success(t *testing.T) {
 
 	// Test the exact JSONSchema type structure
 	var target JSONSchema
-	validationErrs, err := marshaller.UnmarshalCore(ctx, node.Content[0], &target)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, "", node.Content[0], &target)
 
 	// Should succeed without syntax errors
 	require.NoError(t, err, "Should not have syntax errors")
@@ -55,7 +55,7 @@ minLength: 1
 
 	// Test the exact JSONSchema type structure
 	var target JSONSchema
-	validationErrs, err := marshaller.UnmarshalCore(ctx, node.Content[0], &target)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, "", node.Content[0], &target)
 
 	// Should succeed without syntax errors
 	require.NoError(t, err, "Should not have syntax errors")

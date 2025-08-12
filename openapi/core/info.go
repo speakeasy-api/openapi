@@ -6,7 +6,8 @@ import (
 )
 
 type Info struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"info"`
+
 	Title          marshaller.Node[string]   `key:"title"`
 	Version        marshaller.Node[string]   `key:"version"`
 	Summary        marshaller.Node[*string]  `key:"summary"`
@@ -18,7 +19,8 @@ type Info struct {
 }
 
 type Contact struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"contact"`
+
 	Name       marshaller.Node[*string] `key:"name"`
 	URL        marshaller.Node[*string] `key:"url"`
 	Email      marshaller.Node[*string] `key:"email"`
@@ -26,7 +28,8 @@ type Contact struct {
 }
 
 type License struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"license"`
+
 	Name       marshaller.Node[string]  `key:"name"`
 	Identifier marshaller.Node[*string] `key:"identifier"`
 	URL        marshaller.Node[*string] `key:"url"`

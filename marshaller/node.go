@@ -9,7 +9,7 @@ import (
 )
 
 type NodeMutator interface {
-	Unmarshal(ctx context.Context, keyNode, valueNode *yaml.Node) ([]error, error)
+	Unmarshal(ctx context.Context, parentName string, keyNode, valueNode *yaml.Node) ([]error, error)
 	SetPresent(present bool)
 	SyncValue(ctx context.Context, key string, value any) (*yaml.Node, *yaml.Node, error)
 }
@@ -32,7 +32,7 @@ var (
 	_ NodeMutator  = (*Node[any])(nil)
 )
 
-func (n *Node[V]) Unmarshal(ctx context.Context, keyNode, valueNode *yaml.Node) ([]error, error) {
+func (n *Node[V]) Unmarshal(ctx context.Context, parentName string, keyNode, valueNode *yaml.Node) ([]error, error) {
 	resolvedKeyNode := yml.ResolveAlias(keyNode)
 	if resolvedKeyNode != nil {
 		n.Key = resolvedKeyNode.Value
@@ -40,7 +40,7 @@ func (n *Node[V]) Unmarshal(ctx context.Context, keyNode, valueNode *yaml.Node) 
 	}
 	n.ValueNode = valueNode
 
-	validationErrs, err := UnmarshalCore(ctx, n.ValueNode, &n.Value)
+	validationErrs, err := UnmarshalCore(ctx, parentName, n.ValueNode, &n.Value)
 
 	n.SetPresent(err == nil && len(validationErrs) == 0)
 

@@ -8,7 +8,7 @@ import (
 )
 
 type SecurityScheme struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"securityScheme"`
 
 	Type             marshaller.Node[string]      `key:"type"`
 	Description      marshaller.Node[*string]     `key:"description"`
@@ -22,7 +22,7 @@ type SecurityScheme struct {
 }
 
 type SecurityRequirement struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"securityRequirement"`
 	sequencedmap.Map[string, marshaller.Node[[]marshaller.Node[string]]]
 }
 
@@ -41,7 +41,7 @@ func (s *SecurityRequirement) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Nod
 }
 
 type OAuthFlows struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"oAuthFlows"`
 
 	Implicit          marshaller.Node[*OAuthFlow] `key:"implicit"`
 	Password          marshaller.Node[*OAuthFlow] `key:"password"`
@@ -51,7 +51,7 @@ type OAuthFlows struct {
 }
 
 type OAuthFlow struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"oAuthFlow"`
 
 	AuthorizationURL marshaller.Node[*string]                           `key:"authorizationUrl"`
 	TokenURL         marshaller.Node[*string]                           `key:"tokenUrl"`

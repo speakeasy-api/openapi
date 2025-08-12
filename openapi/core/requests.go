@@ -7,7 +7,7 @@ import (
 )
 
 type RequestBody struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"requestBody"`
 
 	Description marshaller.Node[*string]                               `key:"description"`
 	Content     marshaller.Node[*sequencedmap.Map[string, *MediaType]] `key:"content" required:"true"`

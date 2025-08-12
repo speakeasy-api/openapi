@@ -20,7 +20,7 @@ type Model[C any] interface {
 }
 
 type CoreModel interface {
-	Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error)
+	Unmarshal(ctx context.Context, parentName string, node *yaml.Node) ([]error, error)
 }
 
 // sequencedMapInterface defines the interface that sequenced maps must implement

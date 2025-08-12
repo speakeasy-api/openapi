@@ -6,7 +6,8 @@ import (
 )
 
 type ExternalDocumentation struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"externalDocumentation"`
+
 	Description marshaller.Node[*string] `key:"description"`
 	URL         marshaller.Node[string]  `key:"url"`
 	Extensions  core.Extensions          `key:"extensions"`

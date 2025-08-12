@@ -34,11 +34,11 @@ func (i *Info) Validate(ctx context.Context, opts ...validation.Option) []error 
 	errs := []error{}
 
 	if core.Title.Present && i.Title == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("title is required"), core, core.Title))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("info field title is required"), core, core.Title))
 	}
 
 	if core.Version.Present && i.Version == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("version is required"), core, core.Version))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("info field version is required"), core, core.Version))
 	}
 
 	i.Valid = len(errs) == 0 && core.GetValid()

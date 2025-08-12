@@ -6,7 +6,8 @@ import (
 )
 
 type SourceDescription struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"sourceDescription"`
+
 	Name       marshaller.Node[string] `key:"name"`
 	URL        marshaller.Node[string] `key:"url"`
 	Type       marshaller.Node[string] `key:"type"`

@@ -7,7 +7,7 @@ import (
 )
 
 type Encoding struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"encoding"`
 
 	ContentType   marshaller.Node[*string]                                        `key:"contentType"`
 	Headers       marshaller.Node[*sequencedmap.Map[string, *Reference[*Header]]] `key:"headers"`

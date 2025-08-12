@@ -131,7 +131,7 @@ func TestRequestBody_Validate_Error(t *testing.T) {
 description: Request body without content
 required: true
 `,
-			wantErrs: []string{"[2:1] field content is missing"},
+			wantErrs: []string{"[2:1] requestBody field content is missing"},
 		},
 		{
 			name: "empty content",
@@ -139,7 +139,7 @@ required: true
 content: {}
 description: Request body with empty content
 `,
-			wantErrs: []string{"[2:10] content is required"},
+			wantErrs: []string{"[2:10] requestBody field content is required"},
 		},
 		{
 			name: "invalid schema in content",
@@ -150,7 +150,7 @@ content:
       type: invalid-type
 description: Request body with invalid schema
 `,
-			wantErrs: []string{"jsonschema validation error: at '/type': value must be one of"},
+			wantErrs: []string{"[5:13] schema field type value must be one of"},
 		},
 	}
 

@@ -124,9 +124,9 @@ func (x *XML) Validate(ctx context.Context, opts ...validation.Option) []error {
 	if x.Namespace != nil {
 		u, err := url.Parse(*x.Namespace)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("namespace is not a valid uri: %s", err), core, core.Namespace))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("xml field namespace is not a valid uri: %s", err), core, core.Namespace))
 		} else if !u.IsAbs() {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("namespace must be an absolute uri: %s", *x.Namespace), core, core.Namespace))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("xml field namespace must be an absolute uri: %s", *x.Namespace), core, core.Namespace))
 		}
 	}
 

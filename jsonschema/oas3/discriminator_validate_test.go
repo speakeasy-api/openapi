@@ -92,7 +92,7 @@ func TestDiscriminator_Validate_Error(t *testing.T) {
 mapping:
   dog: "#/components/schemas/Dog"
 `,
-			wantErrs: []string{"[2:1] field propertyName is missing"},
+			wantErrs: []string{"[2:1] discriminator field propertyName is missing"},
 		},
 		{
 			name: "empty property name",
@@ -101,7 +101,7 @@ propertyName: ""
 mapping:
   dog: "#/components/schemas/Dog"
 `,
-			wantErrs: []string{"[2:15] propertyName is required"},
+			wantErrs: []string{"[2:15] discriminator field propertyName is required"},
 		},
 	}
 

@@ -13,7 +13,7 @@ import (
 )
 
 type EitherValue[L any, R any] struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"eitherValue"`
 
 	Left   marshaller.Node[L]
 	IsLeft bool
@@ -24,14 +24,14 @@ type EitherValue[L any, R any] struct {
 
 var _ interfaces.CoreModel = (*EitherValue[any, any])(nil)
 
-func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error) {
+func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, parentName string, node *yaml.Node) ([]error, error) {
 	var leftUnmarshalErr error
 	var leftValidationErrs []error
 	var rightUnmarshalErr error
 	var rightValidationErrs []error
 
 	// Try Left type without strict mode
-	leftValidationErrs, leftUnmarshalErr = marshaller.UnmarshalCore(ctx, node, &v.Left)
+	leftValidationErrs, leftUnmarshalErr = marshaller.UnmarshalCore(ctx, parentName, node, &v.Left)
 	if leftUnmarshalErr == nil && !hasTypeMismatchErrors(leftValidationErrs) {
 		// No unmarshalling error and no type mismatch validation errors - this is successful
 		v.IsLeft = true
@@ -40,7 +40,7 @@ func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, node *yaml.Node) ([]e
 	}
 
 	// Try Right type without strict mode
-	rightValidationErrs, rightUnmarshalErr = marshaller.UnmarshalCore(ctx, node, &v.Right)
+	rightValidationErrs, rightUnmarshalErr = marshaller.UnmarshalCore(ctx, parentName, node, &v.Right)
 	if rightUnmarshalErr == nil && !hasTypeMismatchErrors(rightValidationErrs) {
 		// No unmarshalling error and no type mismatch validation errors - this is successful
 		v.IsRight = true

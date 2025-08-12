@@ -127,7 +127,7 @@ float64PtrField: null
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var model core.TestPrimitiveModel
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, tt.yml), &model)
+			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 			require.True(t, model.Valid)
@@ -152,10 +152,10 @@ func TestUnmarshal_PrimitiveTypes_Error(t *testing.T) {
 stringPtrField: "optional field"
 `,
 			wantErrs: []string{
-				"[2:1] field stringField is missing",
-				"[2:1] field boolField is missing",
-				"[2:1] field intField is missing",
-				"[2:1] field float64Field is missing",
+				"[2:1] testPrimitiveModel field stringField is missing",
+				"[2:1] testPrimitiveModel field boolField is missing",
+				"[2:1] testPrimitiveModel field intField is missing",
+				"[2:1] testPrimitiveModel field float64Field is missing",
 			},
 		},
 		{
@@ -166,7 +166,7 @@ boolField: true
 intField: 42
 float64Field: 3.14
 `,
-			wantErrs: []string{"[2:14] expected scalar for string, got sequence"},
+			wantErrs: []string{"[2:14] testPrimitiveModel expected scalar, got sequence"},
 		},
 		{
 			name: "type mismatch - bool field gets string",
@@ -176,7 +176,7 @@ boolField: "not a bool"
 intField: 42
 float64Field: 3.14
 `,
-			wantErrs: []string{"[3:12] yaml: unmarshal errors:"},
+			wantErrs: []string{"[3:12] testPrimitiveModel yaml: unmarshal errors:"},
 		},
 		{
 			name: "type mismatch - int field gets string",
@@ -186,7 +186,7 @@ boolField: true
 intField: "not an int"
 float64Field: 3.14
 `,
-			wantErrs: []string{"[4:11] yaml: unmarshal errors:"},
+			wantErrs: []string{"[4:11] testPrimitiveModel yaml: unmarshal errors:"},
 		},
 		{
 			name: "type mismatch - float field gets string",
@@ -196,7 +196,7 @@ boolField: true
 intField: 42
 float64Field: "not a float"
 `,
-			wantErrs: []string{"[5:15] yaml: unmarshal errors:"},
+			wantErrs: []string{"[5:15] testPrimitiveModel yaml: unmarshal errors:"},
 		},
 		{
 			name: "multiple validation errors",
@@ -205,9 +205,9 @@ boolField: "not a bool"
 intField: "not an int"
 `,
 			wantErrs: []string{
-				"[2:1] field stringField is missing",
-				"[2:1] field float64Field is missing",
-				"[2:12] yaml: unmarshal errors:",
+				"[2:1] testPrimitiveModel field stringField is missing",
+				"[2:1] testPrimitiveModel field float64Field is missing",
+				"[2:12] testPrimitiveModel yaml: unmarshal errors:",
 			},
 		},
 	}
@@ -216,7 +216,7 @@ intField: "not an int"
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var model core.TestPrimitiveModel
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, tt.yml), &model)
+			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 			require.NotEmpty(t, validationErrs)
 
@@ -332,7 +332,7 @@ eitherModelOrPrimitive:
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var model core.TestComplexModel
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, tt.yml), &model)
+			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 			require.True(t, model.Valid)
@@ -364,9 +364,9 @@ nestedModel:
   # missing required stringField, boolField, float64Field
 `,
 			wantErrs: []string{
-				"[8:3] field stringField is missing",
-				"[8:3] field boolField is missing",
-				"[8:3] field float64Field is missing",
+				"[8:3] testPrimitiveModel field stringField is missing",
+				"[8:3] testPrimitiveModel field boolField is missing",
+				"[8:3] testPrimitiveModel field float64Field is missing",
 			},
 		},
 		{
@@ -380,7 +380,7 @@ nestedModelValue:
 nestedModel:
   - "this should be an object"
 `,
-			wantErrs: []string{"[8:3] expected mapping for struct, got sequence"},
+			wantErrs: []string{"[8:3] testComplexModel expected object, got sequence"},
 		},
 		{
 			name: "type mismatch - array field gets object",
@@ -393,7 +393,7 @@ nestedModelValue:
 arrayField:
   key: "this should be an array"
 `,
-			wantErrs: []string{"[8:3] expected sequence for slice, got mapping"},
+			wantErrs: []string{"[8:3] testComplexModel expected sequence, got object"},
 		},
 		{
 			name: "deeply nested validation error",
@@ -413,7 +413,7 @@ structArrayField:
     float64Field: 4.56
     # missing required stringField in second element
 `,
-			wantErrs: []string{"[12:5] field stringField is missing"},
+			wantErrs: []string{"[12:5] testPrimitiveModel field stringField is missing"},
 		},
 	}
 
@@ -421,7 +421,7 @@ structArrayField:
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var model core.TestComplexModel
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, tt.yml), &model)
+			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 			require.NotEmpty(t, validationErrs)
 
@@ -455,7 +455,7 @@ description: "test description"
 `
 
 	var model core.TestNonCoreModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -474,7 +474,7 @@ x-extension: "ext value"
 `
 
 	var model core.TestCustomUnmarshalModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, model.Valid)
@@ -513,7 +513,7 @@ x-alias-ext: *alias
 `
 
 	var model core.TestAliasModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, model.Valid)
@@ -553,7 +553,7 @@ dynamicKey2: "value2"
 `
 
 	var model core.TestEmbeddedMapModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, model.Valid)
@@ -591,7 +591,7 @@ x-extension: "ext value"
 `
 
 	var model core.TestEmbeddedMapWithFieldsModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, model.Valid)
@@ -634,7 +634,7 @@ optionalPtr: "optional pointer value"
 `
 
 	var model core.TestRequiredPointerModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, model.Valid)
@@ -664,7 +664,7 @@ func TestUnmarshal_RequiredPointer_Error(t *testing.T) {
 			yml: `
 optionalPtr: "only optional set"
 `,
-			wantErrs: []string{"[2:1] field requiredPtr is missing"},
+			wantErrs: []string{"[2:1] testRequiredPointerModel field requiredPtr is missing"},
 		},
 		{
 			name: "required pointer field with null value should be valid",
@@ -679,7 +679,7 @@ requiredPtr: null
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var model core.TestRequiredPointerModel
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, tt.yml), &model)
+			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 
 			if len(tt.wantErrs) == 0 {
@@ -728,7 +728,7 @@ requiredRawNode: "raw node value"
 `
 
 	var model core.TestRequiredNilableModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, model.Valid)
@@ -774,12 +774,12 @@ func TestUnmarshal_RequiredNilableTypes_Error(t *testing.T) {
 optionalPtr: "only optional set"
 `,
 			wantErrs: []string{
-				"[2:1] field requiredPtr is missing",
-				"[2:1] field requiredSlice is missing",
-				"[2:1] field requiredMap is missing",
-				"[2:1] field requiredStruct is missing",
-				"[2:1] field requiredEither is missing",
-				"[2:1] field requiredRawNode is missing",
+				"[2:1] testRequiredNilableModel field requiredPtr is missing",
+				"[2:1] testRequiredNilableModel field requiredSlice is missing",
+				"[2:1] testRequiredNilableModel field requiredMap is missing",
+				"[2:1] testRequiredNilableModel field requiredStruct is missing",
+				"[2:1] testRequiredNilableModel field requiredEither is missing",
+				"[2:1] testRequiredNilableModel field requiredRawNode is missing",
 			},
 		},
 		{
@@ -790,10 +790,10 @@ requiredSlice: ["item1"]
 # missing requiredMap, requiredStruct, requiredEither, requiredRawNode
 `,
 			wantErrs: []string{
-				"[2:1] field requiredMap is missing",
-				"[2:1] field requiredStruct is missing",
-				"[2:1] field requiredEither is missing",
-				"[2:1] field requiredRawNode is missing",
+				"[2:1] testRequiredNilableModel field requiredMap is missing",
+				"[2:1] testRequiredNilableModel field requiredStruct is missing",
+				"[2:1] testRequiredNilableModel field requiredEither is missing",
+				"[2:1] testRequiredNilableModel field requiredRawNode is missing",
 			},
 		},
 		{
@@ -810,10 +810,10 @@ requiredEither: "string value"
 requiredRawNode: "raw value"
 `,
 			wantErrs: []string{
-				"[8:3] field stringField is missing",
-				"[8:3] field boolField is missing",
-				"[8:3] field intField is missing",
-				"[8:3] field float64Field is missing",
+				"[8:3] testPrimitiveModel field stringField is missing",
+				"[8:3] testPrimitiveModel field boolField is missing",
+				"[8:3] testPrimitiveModel field intField is missing",
+				"[8:3] testPrimitiveModel field float64Field is missing",
 			},
 		},
 	}
@@ -822,7 +822,7 @@ requiredRawNode: "raw value"
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var model core.TestRequiredNilableModel
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, tt.yml), &model)
+			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 			require.NotEmpty(t, validationErrs)
 
@@ -873,7 +873,7 @@ put:
 `
 
 	var model core.TestTypeConversionCoreModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
 
 	// This should work fine for the core model (string keys)
 	require.NoError(t, err)
@@ -954,7 +954,7 @@ float64Field: 3.14
 	var model *tests.TestPrimitiveHighModel
 
 	// This should not panic and should return a proper error
-	validationErrs, err := marshaller.UnmarshalNode(context.Background(), node, model)
+	validationErrs, err := marshaller.UnmarshalNode(context.Background(), "", node, model)
 
 	// We expect an error, not a panic
 	require.Error(t, err, "should return error when out is nil")

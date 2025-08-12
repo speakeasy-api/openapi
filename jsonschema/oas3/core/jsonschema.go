@@ -10,7 +10,8 @@ import (
 type JSONSchema = *values.EitherValue[Schema, bool]
 
 type Schema struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"schema"`
+
 	Ref                   marshaller.Node[*string]                                                `key:"$ref"`
 	ExclusiveMaximum      marshaller.Node[*values.EitherValue[bool, float64]]                     `key:"exclusiveMaximum"`
 	ExclusiveMinimum      marshaller.Node[*values.EitherValue[bool, float64]]                     `key:"exclusiveMinimum"`

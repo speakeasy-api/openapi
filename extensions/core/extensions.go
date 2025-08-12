@@ -21,7 +21,7 @@ func UnmarshalExtensionModel[L any](ctx context.Context, e Extensions, ext strin
 	node := e.GetOrZero(ext)
 
 	var l L
-	validationErrs, err := marshaller.UnmarshalCore(ctx, node.Value, &l)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, "", node.Value, &l)
 	if err != nil {
 		return nil, nil, err
 	}

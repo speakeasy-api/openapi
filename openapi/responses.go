@@ -183,7 +183,7 @@ func (r *Response) Validate(ctx context.Context, opts ...validation.Option) []er
 	errs := []error{}
 
 	if core.Description.Present && r.Description == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("description is required"), core, core.Description))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("response field description is required"), core, core.Description))
 	}
 
 	for _, header := range r.GetHeaders().All() {

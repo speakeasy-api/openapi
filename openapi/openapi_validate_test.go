@@ -175,7 +175,7 @@ info:
   version: 1.0.0
 paths: {}
 `,
-			wantErrs: []string{"invalid OpenAPI version in document invalid-version"},
+			wantErrs: []string{"openapi field openapi invalid OpenAPI version invalid-version"},
 		},
 		{
 			name: "unsupported_openapi_version",

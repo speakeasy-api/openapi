@@ -4,16 +4,20 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"sync"
 
 	_ "embed"
 
 	jsValidator "github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/santhosh-tekuri/jsonschema/v6/kind"
 	"github.com/speakeasy-api/openapi/json"
 	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"gopkg.in/yaml.v3"
 )
 
@@ -24,6 +28,7 @@ var schema31JSON string
 var schema31BaseJSON string
 
 var oasSchemaValidator *jsValidator.Schema
+var defaultPrinter = message.NewPrinter(language.English)
 
 func Validate[T Referenceable | Concrete](ctx context.Context, schema *JSONSchema[T], opts ...validation.Option) []error {
 	if schema == nil {
@@ -45,14 +50,14 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	if err := json.YAMLToJSON(core.RootNode, 0, buf); err != nil {
 		return []error{
-			validation.NewValidationError(validation.NewValueValidationError(err.Error()), core.RootNode),
+			validation.NewValidationError(validation.NewTypeMismatchError("schema is not valid json: %s", err.Error()), core.RootNode),
 		}
 	}
 
 	jsAny, err := jsValidator.UnmarshalJSON(buf)
 	if err != nil {
 		return []error{
-			validation.NewValidationError(validation.NewValueValidationError(err.Error()), core.RootNode),
+			validation.NewValidationError(validation.NewTypeMismatchError("schema is not valid json: %s", err.Error()), core.RootNode),
 		}
 	}
 
@@ -64,7 +69,7 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 			errs = getRootCauses(validationErr, *core)
 		} else {
 			errs = []error{
-				validation.NewValidationError(validation.NewValueValidationError(err.Error()), core.RootNode),
+				validation.NewValidationError(validation.NewValueValidationError("schema invalid: %s", err.Error()), core.RootNode),
 			}
 		}
 	}
@@ -102,7 +107,14 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 				}
 			}
 
-			errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("jsonschema validation error: %s", cause.Error()), valueNode))
+			switch cause.ErrorKind.(type) {
+			case *kind.Type:
+				errs = append(errs, validation.NewValidationError(validation.NewTypeMismatchError("schema field %s %s", strings.Join(cause.InstanceLocation, "."), cause.ErrorKind.LocalizedString(defaultPrinter)), valueNode))
+			case *kind.Required:
+				errs = append(errs, validation.NewValidationError(validation.NewMissingFieldError("schema field %s %s", strings.Join(cause.InstanceLocation, "."), cause.ErrorKind.LocalizedString(defaultPrinter)), valueNode))
+			default:
+				errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("schema field %s %s", strings.Join(cause.InstanceLocation, "."), cause.ErrorKind.LocalizedString(defaultPrinter)), valueNode))
+			}
 		} else {
 			errs = append(errs, getRootCauses(cause, js)...)
 		}

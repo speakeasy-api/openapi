@@ -9,7 +9,7 @@ import (
 )
 
 type Parameter struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"parameter"`
 
 	Name            marshaller.Node[string]                                          `key:"name"`
 	In              marshaller.Node[string]                                          `key:"in"`
