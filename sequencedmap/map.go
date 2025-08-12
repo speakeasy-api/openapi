@@ -115,7 +115,7 @@ func (m *Map[K, V]) Len() int {
 	return len(m.l)
 }
 
-// Set sets the value for the specified key.
+// Set sets the value for the specified key. If the key does not exist, it is added to the end of the list.
 func (m *Map[K, V]) Set(key K, value V) {
 	element := &Element[K, V]{
 		Key:   key,
@@ -133,7 +133,30 @@ func (m *Map[K, V]) Set(key K, value V) {
 	}
 }
 
-// Set with any type
+// Add adds the specified key-value pair to the map. If the key already exists, it is moved to the end of the list.
+func (m *Map[K, V]) Add(key K, value V) {
+	element := &Element[K, V]{
+		Key:   key,
+		Value: value,
+	}
+
+	// Check if key already exists
+	if existingElement, exists := m.m[key]; exists {
+		// Move existing element to the end of the list
+		index := slices.Index(m.l, existingElement)
+		if index >= 0 {
+			m.l = slices.Delete(m.l, index, index+1)
+		}
+		m.m[key] = element
+		m.l = append(m.l, element)
+	} else {
+		// Add new element
+		m.m[key] = element
+		m.l = append(m.l, element)
+	}
+}
+
+// SetAny Set with any type
 func (m *Map[K, V]) SetAny(key, value any) {
 	k, ok := key.(K)
 	if !ok {
@@ -146,7 +169,20 @@ func (m *Map[K, V]) SetAny(key, value any) {
 	m.Set(k, v)
 }
 
-// Get with any type
+// AddAny Add with any type
+func (m *Map[K, V]) AddAny(key, value any) {
+	k, ok := key.(K)
+	if !ok {
+		return // silently ignore type mismatches
+	}
+	v, ok := value.(V)
+	if !ok {
+		return // silently ignore type mismatches
+	}
+	m.Add(k, v)
+}
+
+// GetAny Get with any type
 func (m *Map[K, V]) GetAny(key any) (any, bool) {
 	k, ok := key.(K)
 	if !ok {
@@ -156,7 +192,7 @@ func (m *Map[K, V]) GetAny(key any) (any, bool) {
 	return v, found
 }
 
-// Delete with any type
+// DeleteAny Delete with any type
 func (m *Map[K, V]) DeleteAny(key any) {
 	k, ok := key.(K)
 	if !ok {
@@ -165,7 +201,7 @@ func (m *Map[K, V]) DeleteAny(key any) {
 	m.Delete(k)
 }
 
-// Keys with any type
+// KeysAny Keys with any type
 func (m *Map[K, V]) KeysAny() iter.Seq[any] {
 	return func(yield func(any) bool) {
 		if m == nil {

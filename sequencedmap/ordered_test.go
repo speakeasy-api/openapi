@@ -309,3 +309,294 @@ func TestAllOrdered_CompareWithAll_Success(t *testing.T) {
 		assert.Equal(t, allVals, orderedVals, "values should also match")
 	})
 }
+
+func TestAdd_Success(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name           string
+		setup          func() *Map[string, int]
+		addKey         string
+		addValue       int
+		expectedKeys   []string
+		expectedValues []int
+	}{
+		{
+			name: "Add new key to empty map",
+			setup: func() *Map[string, int] {
+				return New[string, int]()
+			},
+			addKey:         "first",
+			addValue:       1,
+			expectedKeys:   []string{"first"},
+			expectedValues: []int{1},
+		},
+		{
+			name: "Add new key to existing map",
+			setup: func() *Map[string, int] {
+				m := New[string, int]()
+				m.Set("alpha", 1)
+				m.Set("beta", 2)
+				return m
+			},
+			addKey:         "gamma",
+			addValue:       3,
+			expectedKeys:   []string{"alpha", "beta", "gamma"},
+			expectedValues: []int{1, 2, 3},
+		},
+		{
+			name: "Add existing key moves it to end",
+			setup: func() *Map[string, int] {
+				m := New[string, int]()
+				m.Set("alpha", 1)
+				m.Set("beta", 2)
+				m.Set("gamma", 3)
+				return m
+			},
+			addKey:         "alpha",
+			addValue:       10,
+			expectedKeys:   []string{"beta", "gamma", "alpha"},
+			expectedValues: []int{2, 3, 10},
+		},
+		{
+			name: "Add existing key from middle moves it to end",
+			setup: func() *Map[string, int] {
+				m := New[string, int]()
+				m.Set("first", 1)
+				m.Set("middle", 2)
+				m.Set("last", 3)
+				return m
+			},
+			addKey:         "middle",
+			addValue:       20,
+			expectedKeys:   []string{"first", "last", "middle"},
+			expectedValues: []int{1, 3, 20},
+		},
+		{
+			name: "Add last key keeps it at end",
+			setup: func() *Map[string, int] {
+				m := New[string, int]()
+				m.Set("alpha", 1)
+				m.Set("beta", 2)
+				m.Set("gamma", 3)
+				return m
+			},
+			addKey:         "gamma",
+			addValue:       30,
+			expectedKeys:   []string{"alpha", "beta", "gamma"},
+			expectedValues: []int{1, 2, 30},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := tt.setup()
+
+			m.Add(tt.addKey, tt.addValue)
+
+			var actualKeys []string
+			var actualValues []int
+			for k, v := range m.All() {
+				actualKeys = append(actualKeys, k)
+				actualValues = append(actualValues, v)
+			}
+
+			assert.Equal(t, tt.expectedKeys, actualKeys, "keys should match expected order after Add")
+			assert.Equal(t, tt.expectedValues, actualValues, "values should match expected order after Add")
+			assert.Equal(t, len(tt.expectedKeys), m.Len(), "map length should match expected")
+		})
+	}
+}
+
+func TestAdd_Error(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Add to nil map should panic", func(t *testing.T) {
+		t.Parallel()
+		var m *Map[string, int]
+
+		// Should panic when adding to nil map
+		assert.Panics(t, func() {
+			m.Add("key", 1)
+		}, "Add should panic on nil map")
+	})
+}
+
+func TestAdd_CompareWithSet_Success(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Add vs Set behavior with existing key", func(t *testing.T) {
+		t.Parallel()
+		// Test Set behavior - updates in place
+		setMap := New[string, int]()
+		setMap.Set("alpha", 1)
+		setMap.Set("beta", 2)
+		setMap.Set("gamma", 3)
+		setMap.Set("alpha", 10) // Update existing key
+
+		var setKeys []string
+		for k := range setMap.All() {
+			setKeys = append(setKeys, k)
+		}
+
+		// Test Add behavior - moves to end
+		addMap := New[string, int]()
+		addMap.Set("alpha", 1)
+		addMap.Set("beta", 2)
+		addMap.Set("gamma", 3)
+		addMap.Add("alpha", 10) // Move existing key to end
+
+		var addKeys []string
+		for k := range addMap.All() {
+			addKeys = append(addKeys, k)
+		}
+
+		// Set should maintain original position
+		assert.Equal(t, []string{"alpha", "beta", "gamma"}, setKeys, "Set should maintain key position")
+
+		// Add should move key to end
+		assert.Equal(t, []string{"beta", "gamma", "alpha"}, addKeys, "Add should move key to end")
+
+		// Both should have same value
+		setVal, _ := setMap.Get("alpha")
+		addVal, _ := addMap.Get("alpha")
+		assert.Equal(t, setVal, addVal, "both methods should set same value")
+		assert.Equal(t, 10, setVal, "value should be updated")
+		assert.Equal(t, 10, addVal, "value should be updated")
+	})
+
+	t.Run("Add vs Set behavior with new key", func(t *testing.T) {
+		t.Parallel()
+		// Both Set and Add should behave the same for new keys
+		setMap := New[string, int]()
+		setMap.Set("alpha", 1)
+		setMap.Set("beta", 2)
+		setMap.Set("gamma", 3) // New key
+
+		addMap := New[string, int]()
+		addMap.Set("alpha", 1)
+		addMap.Set("beta", 2)
+		addMap.Add("gamma", 3) // New key
+
+		var setKeys []string
+		var addKeys []string
+
+		for k := range setMap.All() {
+			setKeys = append(setKeys, k)
+		}
+
+		for k := range addMap.All() {
+			addKeys = append(addKeys, k)
+		}
+
+		assert.Equal(t, setKeys, addKeys, "Set and Add should behave identically for new keys")
+		assert.Equal(t, []string{"alpha", "beta", "gamma"}, setKeys, "new key should be added at end")
+	})
+}
+
+func TestAddAny_Success(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name           string
+		setup          func() *Map[string, int]
+		addKey         any
+		addValue       any
+		expectedKeys   []string
+		expectedValues []int
+	}{
+		{
+			name: "AddAny with correct types",
+			setup: func() *Map[string, int] {
+				m := New[string, int]()
+				m.Set("alpha", 1)
+				return m
+			},
+			addKey:         "beta",
+			addValue:       2,
+			expectedKeys:   []string{"alpha", "beta"},
+			expectedValues: []int{1, 2},
+		},
+		{
+			name: "AddAny moves existing key to end",
+			setup: func() *Map[string, int] {
+				m := New[string, int]()
+				m.Set("alpha", 1)
+				m.Set("beta", 2)
+				return m
+			},
+			addKey:         "alpha",
+			addValue:       10,
+			expectedKeys:   []string{"beta", "alpha"},
+			expectedValues: []int{2, 10},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := tt.setup()
+
+			m.AddAny(tt.addKey, tt.addValue)
+
+			var actualKeys []string
+			var actualValues []int
+			for k, v := range m.All() {
+				actualKeys = append(actualKeys, k)
+				actualValues = append(actualValues, v)
+			}
+
+			assert.Equal(t, tt.expectedKeys, actualKeys, "keys should match expected order after AddAny")
+			assert.Equal(t, tt.expectedValues, actualValues, "values should match expected order after AddAny")
+		})
+	}
+}
+
+func TestAddAny_Error(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		setup    func() *Map[string, int]
+		addKey   any
+		addValue any
+	}{
+		{
+			name: "AddAny with wrong key type",
+			setup: func() *Map[string, int] {
+				return New[string, int]()
+			},
+			addKey:   123, // int instead of string
+			addValue: 1,
+		},
+		{
+			name: "AddAny with wrong value type",
+			setup: func() *Map[string, int] {
+				return New[string, int]()
+			},
+			addKey:   "key",
+			addValue: "string", // string instead of int
+		},
+		{
+			name: "AddAny with both wrong types",
+			setup: func() *Map[string, int] {
+				return New[string, int]()
+			},
+			addKey:   123,      // int instead of string
+			addValue: "string", // string instead of int
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := tt.setup()
+			originalLen := m.Len()
+
+			// Should silently ignore type mismatches
+			assert.NotPanics(t, func() {
+				m.AddAny(tt.addKey, tt.addValue)
+			}, "AddAny should not panic on type mismatch")
+
+			assert.Equal(t, originalLen, m.Len(), "map length should not change on type mismatch")
+		})
+	}
+}
