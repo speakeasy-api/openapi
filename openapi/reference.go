@@ -13,7 +13,7 @@ import (
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/references"
 	"github.com/speakeasy-api/openapi/validation"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 type (

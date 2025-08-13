@@ -9,7 +9,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/errors"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 const (

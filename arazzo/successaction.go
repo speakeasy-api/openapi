@@ -14,7 +14,7 @@ import (
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/validation"
 	walkpkg "github.com/speakeasy-api/openapi/walk"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // SuccessActionType represents the type of action to take on success.

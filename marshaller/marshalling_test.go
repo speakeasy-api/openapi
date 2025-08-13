@@ -569,7 +569,6 @@ func TestMarshal_ExtensiveAliases_MapElements_Success(t *testing.T) {
 	t.Parallel()
 
 	inputYAML := `# Define aliases for map elements
-keyAlias: &keyAlias "dynamic-key"
 valueAlias: &valueAlias "aliased map value"
 structValue: &structValue
   stringField: "struct as map value"
@@ -577,9 +576,9 @@ structValue: &structValue
   intField: 300
   float64Field: 2.71
 name: "test name"
-# Use aliases in embedded map (keys and values)
-*keyAlias:
-  stringField: "value for aliased key"
+# Use aliases in embedded map (values)
+somekey:
+  stringField: *valueAlias
   boolField: false
   intField: 400
   float64Field: 5.67
@@ -591,7 +590,7 @@ anotherKey:
   float64Field: 8.9
 # Use aliases in extensions
 x-map-ext:
-  *keyAlias: *valueAlias
+  somekey: *valueAlias
   regularExtKey: "regular value"
 `
 

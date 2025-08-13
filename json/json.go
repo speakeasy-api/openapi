@@ -10,7 +10,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/yml"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // YAMLToJSON will convert the provided YAML node to JSON in a stable way not reordering keys.

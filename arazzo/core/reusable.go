@@ -11,7 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/validation"
 	values "github.com/speakeasy-api/openapi/values/core"
 	"github.com/speakeasy-api/openapi/yml"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 type Reusable[T marshaller.CoreModeler] struct {
