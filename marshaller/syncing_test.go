@@ -65,7 +65,7 @@ float64PtrField: 8.88
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_PrimitiveTypes_NilPointers_Success(t *testing.T) {
@@ -112,7 +112,7 @@ float64Field: 3.14
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_ComplexTypes_Success(t *testing.T) {
@@ -200,7 +200,7 @@ nodeArrayField:
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_RequiredNilableTypes_Success(t *testing.T) {
@@ -265,7 +265,7 @@ requiredStruct:
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_RequiredPointer_Success(t *testing.T) {
@@ -300,7 +300,7 @@ optionalPtr: optional synced ptr
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_EmbeddedMapWithFields_Success(t *testing.T) {
@@ -379,7 +379,7 @@ name: synced name
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_EmbeddedMap_Success(t *testing.T) {
@@ -430,7 +430,7 @@ syncKey3: synced value3
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_Validation_Success(t *testing.T) {
@@ -523,7 +523,7 @@ optionalStruct:
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_PrimitiveTypes_WithExtensions_Success(t *testing.T) {
@@ -594,7 +594,7 @@ x-another: another extension
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_EitherValueModel_Success(t *testing.T) {
@@ -669,7 +669,7 @@ x-either: either extension
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_TypeConversionModel_Success(t *testing.T) {
@@ -790,7 +790,7 @@ x-sync: sync extension
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_ExtensionModification_Success(t *testing.T) {
@@ -861,7 +861,7 @@ x-status: active
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_ExtensionReplacement_Success(t *testing.T) {
@@ -936,7 +936,7 @@ x-modern-flag: enabled
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_EmbeddedMapPointer_Success(t *testing.T) {
@@ -987,7 +987,7 @@ ptrKey3: pointer value3
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_EmbeddedMapWithFieldsPointer_Success(t *testing.T) {
@@ -1066,7 +1066,7 @@ name: synced pointer name
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.YAMLEq(t, expectedYAML, string(actualYAML))
+	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
@@ -1139,7 +1139,7 @@ func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
 		valueYAML, err := yaml.Marshal(valueModel.GetCore().GetRootNode())
 		require.NoError(t, err)
 
-		require.YAMLEq(t, string(ptrYAML), string(valueYAML))
-		require.YAMLEq(t, "shared_key: shared_value\n", string(ptrYAML))
+		require.Equal(t, string(ptrYAML), string(valueYAML))
+		require.Equal(t, "shared_key: shared_value\n", string(ptrYAML))
 	})
 }

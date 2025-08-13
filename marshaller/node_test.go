@@ -239,7 +239,7 @@ func runNodeSyncTest[T any](t *testing.T, testCase *syncTestCase[T]) {
 
 	// Verify sync worked
 	assert.Equal(t, testCase.newValue, node.Value)
-	assert.YAMLEq(t, testCase.expectedYAML, node.ValueNode.Value)
+	assert.Equal(t, testCase.expectedYAML, node.ValueNode.Value)
 }
 
 func TestNode_SyncValue_Success(t *testing.T) {

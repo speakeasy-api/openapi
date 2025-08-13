@@ -54,7 +54,14 @@ func CreateOrUpdateMapNodeElement(ctx context.Context, key string, keyNode, valu
 
 	if resolvedMapNode != nil {
 		for i := 0; i < len(resolvedMapNode.Content); i += 2 {
-			if resolvedMapNode.Content[i].Value == key {
+			keyNode := resolvedMapNode.Content[i]
+			// Check direct match first
+			if keyNode.Value == key {
+				resolvedMapNode.Content[i+1] = valueNode
+				return mapNode
+			}
+			// Check alias resolution match for alias keys like *keyAlias
+			if resolvedKeyNode := ResolveAlias(keyNode); resolvedKeyNode != nil && resolvedKeyNode.Value == key {
 				resolvedMapNode.Content[i+1] = valueNode
 				return mapNode
 			}
@@ -133,8 +140,14 @@ func GetMapElementNodes(ctx context.Context, mapNode *yaml.Node, key string) (*y
 	}
 
 	for i := 0; i < len(resolvedMapNode.Content); i += 2 {
-		if resolvedMapNode.Content[i].Value == key {
-			return resolvedMapNode.Content[i], resolvedMapNode.Content[i+1], true
+		keyNode := resolvedMapNode.Content[i]
+		// Check direct match first
+		if keyNode.Value == key {
+			return keyNode, resolvedMapNode.Content[i+1], true
+		}
+		// Check alias resolution match for alias keys like *keyAlias
+		if resolvedKeyNode := ResolveAlias(keyNode); resolvedKeyNode != nil && resolvedKeyNode.Value == key {
+			return keyNode, resolvedMapNode.Content[i+1], true
 		}
 	}
 

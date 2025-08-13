@@ -141,5 +141,5 @@ func TestMarshal_TestEmbeddedMapModel_RoundTrip_Empty_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.YAMLEq(t, inputYAML, outputYAML)
+	assert.Equal(t, inputYAML, outputYAML)
 }

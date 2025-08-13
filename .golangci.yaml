@@ -65,3 +65,6 @@ linters:
       enable:
         - opaque
         - unexported
+    testifylint:
+      disable:
+        - encoded-compare

@@ -260,15 +260,6 @@ trace:
 	}
 }
 
-func TestPaths_Validate_Error(t *testing.T) {
-	t.Parallel()
-
-	// Note: Currently no validation error cases for Paths object itself
-	// The main validation happens at the PathItem and Operation level
-	// Any validation errors would come from nested objects
-	t.Skip("No current validation error cases for Paths - validation happens at nested levels")
-}
-
 func TestPathItem_Validate_Error(t *testing.T) {
 	t.Parallel()
 
