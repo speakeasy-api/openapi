@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -119,11 +118,11 @@ description: Link without operation reference
 
 			var link openapi.Link
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &link)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &link)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := link.Validate(context.Background(), validation.WithContextObject(openAPIDoc))
+			errs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -216,11 +215,11 @@ description: Invalid request body expression syntax - empty query name
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &link)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &link)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := link.Validate(context.Background(), validation.WithContextObject(openAPIDoc))
+			validateErrs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "Expected validation errors")
@@ -260,7 +259,7 @@ func TestLink_Validate_OperationID_NotFound(t *testing.T) {
 		OperationID: stringPtr("nonExistentOperation"),
 	}
 
-	errs := link.Validate(context.Background(), validation.WithContextObject(openAPIDoc))
+	errs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 	require.NotEmpty(t, errs, "Expected validation error for non-existent operationId")
 	require.Contains(t, errs[0].Error(), "link field operationId value nonExistentOperation does not exist in document")
 }
@@ -285,7 +284,7 @@ func TestLink_Validate_OperationID_Found(t *testing.T) {
 		OperationID: stringPtr("getUserById"),
 	}
 
-	errs := link.Validate(context.Background(), validation.WithContextObject(openAPIDoc))
+	errs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 	require.Empty(t, errs, "Expected no validation errors for existing operationId")
 }
 
@@ -297,7 +296,7 @@ func TestLink_Validate_OperationID_WithoutOpenAPIContext_Panics(t *testing.T) {
 	}
 
 	require.Panics(t, func() {
-		link.Validate(context.Background())
+		link.Validate(t.Context())
 	}, "Expected panic when validating operationId without OpenAPI context")
 }
 
@@ -370,11 +369,11 @@ description: Runtime expressions
 
 			var link openapi.Link
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &link)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &link)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := link.Validate(context.Background(), validation.WithContextObject(openAPIDoc))
+			errs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 			require.Empty(t, errs, "Expected no validation errors for valid expressions")
 		})
 	}
@@ -403,7 +402,7 @@ func TestLink_Validate_NilParameters(t *testing.T) {
 		Server:      nil, // Explicitly nil
 	}
 
-	errs := link.Validate(context.Background(), validation.WithContextObject(openAPIDoc))
+	errs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 	require.Empty(t, errs, "Expected no validation errors for nil parameters")
 }
 
@@ -430,11 +429,11 @@ description: Empty parameters map
 `
 	var link openapi.Link
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &link)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &link)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
-	errs := link.Validate(context.Background(), validation.WithContextObject(openAPIDoc))
+	errs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 	require.Empty(t, errs, "Expected no validation errors for empty parameters")
 }
 

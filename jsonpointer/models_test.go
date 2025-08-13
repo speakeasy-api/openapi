@@ -38,7 +38,7 @@ func TestNavigateModel_BasicFields(t *testing.T) {
 	// Test navigating to float64Field
 	target, err = GetTarget(model, "/float64Field")
 	require.NoError(t, err)
-	assert.Equal(t, 3.14, target)
+	assert.InDelta(t, 3.14, target, 0.001)
 }
 
 func TestNavigateModel_PointerFields(t *testing.T) {

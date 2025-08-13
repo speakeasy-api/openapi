@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -33,7 +34,7 @@ func (c *CriterionTypeUnion) Unmarshal(ctx context.Context, parentName string, n
 	resolvedNode := yml.ResolveAlias(node)
 
 	if resolvedNode == nil {
-		return nil, fmt.Errorf("node is nil")
+		return nil, errors.New("node is nil")
 	}
 
 	c.SetRootNode(node)

@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -36,7 +35,7 @@ x-test: some-value
 
 	var param openapi.Parameter
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &param)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &param)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 

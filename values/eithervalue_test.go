@@ -190,7 +190,7 @@ func TestEitherValue_LeftValue_NilSafety(t *testing.T) {
 	// This should not panic even with nil EitherValue
 	assert.NotPanics(t, func() {
 		result := either.LeftValue()
-		assert.Equal(t, "", result) // Should return zero value for string
+		assert.Empty(t, result) // Should return zero value for string
 	})
 }
 
@@ -485,8 +485,8 @@ func TestEitherValue_DifferentTypes_Success(t *testing.T) {
 		assert.True(t, either.IsLeft())
 		assert.False(t, either.IsRight())
 		assert.True(t, either.LeftValue())
-		assert.Nil(t, either.GetRight())          // GetRight now returns pointer, so nil when not set
-		assert.Equal(t, 0.0, either.RightValue()) // RightValue returns zero value
+		assert.Nil(t, either.GetRight())                   // GetRight now returns pointer, so nil when not set
+		assert.InDelta(t, 0.0, either.RightValue(), 0.001) // RightValue returns zero value
 	})
 
 	t.Run("slice and map", func(t *testing.T) {

@@ -19,9 +19,9 @@ func TestClearAllCaches_Success(t *testing.T) { //nolint:paralleltest
 
 	// Verify caches have data
 	stats := GetAllCacheStats()
-	assert.Greater(t, stats.URLCacheSize, int64(0), "URL cache should have entries")
-	assert.Greater(t, stats.ReferenceCacheSize, int64(0), "Reference cache should have entries")
-	assert.Greater(t, stats.FieldCacheSize, int64(0), "Field cache should have entries")
+	assert.Positive(t, stats.URLCacheSize, "URL cache should have entries")
+	assert.Positive(t, stats.ReferenceCacheSize, "Reference cache should have entries")
+	assert.Positive(t, stats.FieldCacheSize, "Field cache should have entries")
 
 	// Clear all caches
 	ClearAllCaches()
@@ -41,7 +41,7 @@ func TestClearURLCache_Success(t *testing.T) {
 
 	// Verify cache has data
 	stats := GetAllCacheStats()
-	assert.Greater(t, stats.URLCacheSize, int64(0), "URL cache should have entries")
+	assert.Positive(t, stats.URLCacheSize, "URL cache should have entries")
 
 	// Clear only URL cache
 	ClearURLCache()
@@ -59,7 +59,7 @@ func TestClearReferenceCache_Success(t *testing.T) {
 
 	// Verify cache has data
 	stats := GetAllCacheStats()
-	assert.Greater(t, stats.ReferenceCacheSize, int64(0), "Reference cache should have entries")
+	assert.Positive(t, stats.ReferenceCacheSize, "Reference cache should have entries")
 
 	// Clear only reference cache
 	ClearReferenceCache()
@@ -77,7 +77,7 @@ func TestClearFieldCache_Success(t *testing.T) {
 
 	// Verify cache has data
 	stats := GetAllCacheStats()
-	assert.Greater(t, stats.FieldCacheSize, int64(0), "Field cache should have entries")
+	assert.Positive(t, stats.FieldCacheSize, "Field cache should have entries")
 
 	// Clear only field cache
 	ClearFieldCache()
@@ -87,7 +87,7 @@ func TestClearFieldCache_Success(t *testing.T) {
 	assert.Equal(t, int64(0), stats.FieldCacheSize, "Field cache should be empty")
 }
 
-// nolint:paralleltest
+//nolint:paralleltest
 func TestGetAllCacheStats_Success(t *testing.T) {
 	// Don't run in parallel since we're testing global cache state
 
@@ -107,14 +107,16 @@ func TestGetAllCacheStats_Success(t *testing.T) {
 
 	// Verify stats reflect populated caches
 	stats = GetAllCacheStats()
-	assert.Greater(t, stats.URLCacheSize, int64(0), "URL cache should have entries")
-	assert.Greater(t, stats.ReferenceCacheSize, int64(0), "Reference cache should have entries")
-	assert.Greater(t, stats.FieldCacheSize, int64(0), "Field cache should have entries")
+	assert.Positive(t, stats.URLCacheSize, "URL cache should have entries")
+	assert.Positive(t, stats.ReferenceCacheSize, "Reference cache should have entries")
+	assert.Positive(t, stats.FieldCacheSize, "Field cache should have entries")
 }
 
 // Helper functions to populate caches with test data
 
 func populateURLCache(t *testing.T) {
+	t.Helper()
+
 	urls := []string{
 		"https://example1.com/api/v1",
 		"https://example2.com/api/v2",
@@ -128,6 +130,7 @@ func populateURLCache(t *testing.T) {
 }
 
 func populateReferenceCache(t *testing.T) {
+	t.Helper()
 	refs := []struct {
 		ref    references.Reference
 		target string
@@ -144,6 +147,7 @@ func populateReferenceCache(t *testing.T) {
 }
 
 func populateFieldCache(t *testing.T) {
+	t.Helper()
 	// Define test struct types to populate the field cache
 	type TestStruct1 struct {
 		Name     string `key:"name" required:"true"`

@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -21,7 +20,7 @@ type TestEitherValue[L any, R any] struct {
 func TestEitherValue_SyncChanges_Success(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	source := TestEitherValue[string, string]{
 		Left: pointer.From("some-value"),
@@ -39,7 +38,7 @@ func TestEitherValue_Unmarshal_BooleanValue_Success(t *testing.T) {
 
 	// Test case that reproduces the additionalProperties: false issue
 	// This should unmarshal as a boolean (Right type) when Left type (complex object) fails with validation errors
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a simple struct for Left type that would fail validation on a boolean
 	type ComplexType struct {
@@ -64,7 +63,7 @@ func TestEitherValue_Unmarshal_BooleanValue_Success(t *testing.T) {
 	// Should have chosen the Right type (bool)
 	assert.True(t, target.IsRight, "Should have chosen Right type (bool)")
 	assert.False(t, target.IsLeft, "Should not have chosen Left type (ComplexType)")
-	assert.Equal(t, false, target.Right.Value, "Should have unmarshaled boolean value correctly")
+	assert.False(t, target.Right.Value, "Should have unmarshaled boolean value correctly")
 }
 
 // TestEitherValue_BothTypesFailValidation tests the case where both Left and Right types
@@ -73,7 +72,7 @@ func TestEitherValue_Unmarshal_BooleanValue_Success(t *testing.T) {
 func TestEitherValue_BothTypesFailValidation(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test case that reproduces the items array issue from burgershop.openapi-modified.yaml
 	// An array cannot be unmarshalled into either a string (expects scalar) or bool (expects scalar)

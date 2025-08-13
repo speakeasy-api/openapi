@@ -1,6 +1,7 @@
 package values
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -128,7 +129,7 @@ func (e *EitherValue[L, LCore, R, RCore]) GetNavigableNode() (any, error) {
 	if e.Right != nil {
 		return e.Right, nil
 	}
-	return nil, fmt.Errorf("EitherValue has no value set")
+	return nil, errors.New("EitherValue has no value set")
 }
 
 // IsEqual compares two EitherValue instances for equality.

@@ -2,7 +2,6 @@ package openapi
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -60,16 +59,17 @@ externalValue: https://example.com/user.json
 			t.Parallel()
 
 			var ref ReferencedExample
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yaml)), &ref)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yaml), &ref)
 			require.NoError(t, err)
 
 			// Validate the reference
-			errs := ref.Validate(context.Background())
+			errs := ref.Validate(t.Context())
 			assert.Empty(t, errs, "Expected no validation errors for valid reference")
 			assert.True(t, ref.Valid, "Expected reference to be marked as valid")
 
 			// Combine unmarshal and validation errors for comprehensive check
-			allErrors := append(validationErrs, errs...)
+			allErrors := validationErrs
+			allErrors = append(allErrors, errs...)
 			assert.Empty(t, allErrors, "Expected no errors overall")
 		})
 	}
@@ -139,14 +139,15 @@ description: A reference to the user example
 			t.Parallel()
 
 			var ref ReferencedExample
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yaml)), &ref)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yaml), &ref)
 			require.NoError(t, err)
 
 			// Validate the reference
-			errs := ref.Validate(context.Background())
+			errs := ref.Validate(t.Context())
 
 			// Combine unmarshal and validation errors
-			allErrors := append(validationErrs, errs...)
+			allErrors := validationErrs
+			allErrors = append(allErrors, errs...)
 
 			if tt.expectValid {
 				assert.Empty(t, allErrors, "Expected no validation errors for valid reference")
@@ -208,14 +209,15 @@ externalValue: https://example.com/user.json
 			t.Parallel()
 
 			var ref ReferencedExample
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yaml)), &ref)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yaml), &ref)
 			require.NoError(t, err)
 
 			// Validate the reference
-			errs := ref.Validate(context.Background())
+			errs := ref.Validate(t.Context())
 
 			// Combine unmarshal and validation errors
-			allErrors := append(validationErrs, errs...)
+			allErrors := validationErrs
+			allErrors = append(allErrors, errs...)
 
 			// Note: The validation errors come from the Example object validation, not the Reference itself
 			// If there are no validation errors, it means the Example object is valid according to its rules
@@ -256,11 +258,12 @@ func TestReference_Validate_DifferentTypes(t *testing.T) {
 
 		yaml := `$ref: '#/components/parameters/UserIdParam'`
 		var ref ReferencedParameter
-		validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yaml)), &ref)
+		validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yaml), &ref)
 		require.NoError(t, err)
 
-		errs := ref.Validate(context.Background())
-		allErrors := append(validationErrs, errs...)
+		errs := ref.Validate(t.Context())
+		allErrors := validationErrs
+		allErrors = append(allErrors, errs...)
 		assert.Empty(t, allErrors)
 		assert.True(t, ref.Valid)
 	})
@@ -277,11 +280,12 @@ schema:
 description: The user ID parameter
 `
 		var ref ReferencedParameter
-		validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yaml)), &ref)
+		validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yaml), &ref)
 		require.NoError(t, err)
 
-		errs := ref.Validate(context.Background())
-		allErrors := append(validationErrs, errs...)
+		errs := ref.Validate(t.Context())
+		allErrors := validationErrs
+		allErrors = append(allErrors, errs...)
 		assert.Empty(t, allErrors)
 		assert.True(t, ref.Valid)
 	})
@@ -291,11 +295,12 @@ description: The user ID parameter
 
 		yaml := `$ref: '#/components/responses/NotFound'`
 		var ref ReferencedResponse
-		validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yaml)), &ref)
+		validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yaml), &ref)
 		require.NoError(t, err)
 
-		errs := ref.Validate(context.Background())
-		allErrors := append(validationErrs, errs...)
+		errs := ref.Validate(t.Context())
+		allErrors := validationErrs
+		allErrors = append(allErrors, errs...)
 		assert.Empty(t, allErrors)
 		assert.True(t, ref.Valid)
 	})
@@ -314,11 +319,12 @@ content:
           type: string
 `
 		var ref ReferencedResponse
-		validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yaml)), &ref)
+		validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yaml), &ref)
 		require.NoError(t, err)
 
-		errs := ref.Validate(context.Background())
-		allErrors := append(validationErrs, errs...)
+		errs := ref.Validate(t.Context())
+		allErrors := validationErrs
+		allErrors = append(allErrors, errs...)
 		assert.Empty(t, allErrors)
 		assert.True(t, ref.Valid)
 	})
@@ -328,11 +334,12 @@ content:
 
 		yaml := `$ref: '#/components/requestBodies/UserBody'`
 		var ref ReferencedRequestBody
-		validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yaml)), &ref)
+		validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yaml), &ref)
 		require.NoError(t, err)
 
-		errs := ref.Validate(context.Background())
-		allErrors := append(validationErrs, errs...)
+		errs := ref.Validate(t.Context())
+		allErrors := validationErrs
+		allErrors = append(allErrors, errs...)
 		assert.Empty(t, allErrors)
 		assert.True(t, ref.Valid)
 	})
@@ -354,11 +361,12 @@ content:
           type: string
 `
 		var ref ReferencedRequestBody
-		validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yaml)), &ref)
+		validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yaml), &ref)
 		require.NoError(t, err)
 
-		errs := ref.Validate(context.Background())
-		allErrors := append(validationErrs, errs...)
+		errs := ref.Validate(t.Context())
+		allErrors := validationErrs
+		allErrors = append(allErrors, errs...)
 		assert.Empty(t, allErrors)
 		assert.True(t, ref.Valid)
 	})
@@ -378,7 +386,7 @@ value:
   name: Test User
 `
 		var ref ReferencedExample
-		validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yaml)), &ref)
+		validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yaml), &ref)
 		require.NoError(t, err)
 
 		// Test validation with custom options (using a mock context object)
@@ -386,8 +394,9 @@ value:
 		opts := []validation.Option{
 			validation.WithContextObject(mockOpenAPI),
 		}
-		errs := ref.Validate(context.Background(), opts...)
-		allErrors := append(validationErrs, errs...)
+		errs := ref.Validate(t.Context(), opts...)
+		allErrors := validationErrs
+		allErrors = append(allErrors, errs...)
 		assert.Empty(t, allErrors)
 		assert.True(t, ref.Valid)
 	})
@@ -401,7 +410,7 @@ func TestReference_Validate_EdgeCases(t *testing.T) {
 
 		var ref *ReferencedExample
 		// This should not panic
-		errs := ref.Validate(context.Background())
+		errs := ref.Validate(t.Context())
 		// Nil reference should be considered invalid
 		assert.NotEmpty(t, errs)
 	})
@@ -411,7 +420,7 @@ func TestReference_Validate_EdgeCases(t *testing.T) {
 
 		ref := &ReferencedExample{}
 		// This should not panic even with uninitialized core
-		errs := ref.Validate(context.Background())
+		errs := ref.Validate(t.Context())
 		// An uninitialized reference may or may not have errors depending on the core state
 		// The important thing is that it doesn't panic
 		assert.NotNil(t, errs) // Just ensure we get a slice back, even if empty

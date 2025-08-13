@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -102,7 +101,7 @@ x-another: 123
 
 			var securityScheme openapi.SecurityScheme
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &securityScheme)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &securityScheme)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
@@ -153,7 +152,7 @@ oauth2:
 
 			var securityRequirement openapi.SecurityRequirement
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &securityRequirement)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &securityRequirement)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
@@ -192,7 +191,7 @@ x-custom: value
 
 	var oauthFlows openapi.OAuthFlows
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &oauthFlows)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &oauthFlows)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -282,7 +281,7 @@ x-custom: value
 
 			var oauthFlow openapi.OAuthFlow
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &oauthFlow)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &oauthFlow)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 

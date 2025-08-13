@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -43,7 +42,7 @@ x-rate-limit: 100
 
 	var paths openapi.Paths
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &paths)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &paths)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -159,7 +158,7 @@ x-rate-limit: 100
 
 	var pathItem openapi.PathItem
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &pathItem)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &pathItem)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 

@@ -237,7 +237,8 @@ func findNodePathInMapping(mappingNode, targetNode *yaml.Node, currentPath []str
 		}
 
 		// Create new path with this key
-		newPath := append(currentPath, keyStr)
+		newPath := currentPath
+		newPath = append(newPath, keyStr)
 
 		// Check if the key node itself is our target
 		if keyNode == targetNode {
@@ -257,7 +258,8 @@ func findNodePathInMapping(mappingNode, targetNode *yaml.Node, currentPath []str
 func findNodePathInSequence(sequenceNode, targetNode *yaml.Node, currentPath []string) []string {
 	for i, childNode := range sequenceNode.Content {
 		// Create new path with this index
-		newPath := append(currentPath, strconv.Itoa(i))
+		newPath := currentPath
+		newPath = append(newPath, strconv.Itoa(i))
 
 		// Check if this child node is our target or contains our target
 		if result := findNodePath(childNode, targetNode, newPath); result != nil {

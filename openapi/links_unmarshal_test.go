@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -35,13 +34,13 @@ x-retry-count: 3
 
 	var link openapi.Link
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &link)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &link)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	// Verify basic fields
 	require.Equal(t, "getUserById", link.GetOperationID())
-	require.Equal(t, "", link.GetOperationRef()) // Should be empty since we used operationId
+	require.Empty(t, link.GetOperationRef()) // Should be empty since we used operationId
 	require.Equal(t, "Link to get user by ID with parameters and request body", link.GetDescription())
 
 	// Verify parameters
@@ -82,12 +81,12 @@ parameters:
 
 	var link openapi.Link
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &link)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &link)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	// Verify operationRef is used instead of operationId
-	require.Equal(t, "", link.GetOperationID()) // Should be empty since we used operationRef
+	require.Empty(t, link.GetOperationID()) // Should be empty since we used operationRef
 	require.Equal(t, "#/paths/~1users~1{id}/get", link.GetOperationRef())
 	require.Equal(t, "Reference to get user operation", link.GetDescription())
 
@@ -106,14 +105,14 @@ operationId: simpleOperation
 
 	var link openapi.Link
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &link)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &link)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	// Verify minimal link
 	require.Equal(t, "simpleOperation", link.GetOperationID())
-	require.Equal(t, "", link.GetOperationRef())
-	require.Equal(t, "", link.GetDescription())
+	require.Empty(t, link.GetOperationRef())
+	require.Empty(t, link.GetDescription())
 	require.Nil(t, link.Parameters)
 	require.Nil(t, link.RequestBody)
 	require.Nil(t, link.Server)

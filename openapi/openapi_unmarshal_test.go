@@ -1,7 +1,6 @@
 package openapi_test
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -89,7 +88,7 @@ paths: {}`,
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 
 			doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
 			require.NoError(t, err)
@@ -142,7 +141,7 @@ paths: {}`,
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 
 			doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
 

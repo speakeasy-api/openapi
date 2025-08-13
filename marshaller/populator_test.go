@@ -1,7 +1,6 @@
 package marshaller_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -27,7 +26,7 @@ x-custom: "extension value"
 
 	// First unmarshal to core model
 	var coreModel core.TestPrimitiveModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -41,15 +40,15 @@ x-custom: "extension value"
 	require.Equal(t, "test string", highModel.StringField)
 	require.NotNil(t, highModel.StringPtrField)
 	require.Equal(t, "test ptr string", *highModel.StringPtrField)
-	require.Equal(t, true, highModel.BoolField)
+	require.True(t, highModel.BoolField)
 	require.NotNil(t, highModel.BoolPtrField)
-	require.Equal(t, false, *highModel.BoolPtrField)
+	require.False(t, *highModel.BoolPtrField)
 	require.Equal(t, 42, highModel.IntField)
 	require.NotNil(t, highModel.IntPtrField)
 	require.Equal(t, 24, *highModel.IntPtrField)
-	require.Equal(t, 3.14, highModel.Float64Field)
+	require.InDelta(t, 3.14, highModel.Float64Field, 0.001)
 	require.NotNil(t, highModel.Float64PtrField)
-	require.Equal(t, 2.71, *highModel.Float64PtrField)
+	require.InDelta(t, 2.71, *highModel.Float64PtrField, 0.001)
 
 	// Verify extensions were populated
 	require.NotNil(t, highModel.Extensions)
@@ -67,7 +66,7 @@ float64Field: 3.14
 
 	// First unmarshal to core model
 	var coreModel core.TestPrimitiveModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -79,9 +78,9 @@ float64Field: 3.14
 
 	// Verify required fields were populated
 	require.Equal(t, "required only", highModel.StringField)
-	require.Equal(t, true, highModel.BoolField)
+	require.True(t, highModel.BoolField)
 	require.Equal(t, 42, highModel.IntField)
-	require.Equal(t, 3.14, highModel.Float64Field)
+	require.InDelta(t, 3.14, highModel.Float64Field, 0.001)
 
 	// Verify optional fields are nil/zero
 	require.Nil(t, highModel.StringPtrField)
@@ -125,7 +124,7 @@ x-extension: "ext value"
 
 	// First unmarshal to core model
 	var coreModel core.TestComplexModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -138,15 +137,15 @@ x-extension: "ext value"
 	// Verify nested model population
 	require.NotNil(t, highModel.NestedModel)
 	require.Equal(t, "nested value", highModel.NestedModel.StringField)
-	require.Equal(t, true, highModel.NestedModel.BoolField)
+	require.True(t, highModel.NestedModel.BoolField)
 	require.Equal(t, 100, highModel.NestedModel.IntField)
-	require.Equal(t, 1.23, highModel.NestedModel.Float64Field)
+	require.InDelta(t, 1.23, highModel.NestedModel.Float64Field, 0.001)
 
 	// Verify nested model value population
 	require.Equal(t, "value model", highModel.NestedModelValue.StringField)
-	require.Equal(t, false, highModel.NestedModelValue.BoolField)
+	require.False(t, highModel.NestedModelValue.BoolField)
 	require.Equal(t, 200, highModel.NestedModelValue.IntField)
-	require.Equal(t, 4.56, highModel.NestedModelValue.Float64Field)
+	require.InDelta(t, 4.56, highModel.NestedModelValue.Float64Field, 0.001)
 
 	// Verify array field population
 	require.Len(t, highModel.ArrayField, 3)
@@ -201,7 +200,7 @@ requiredRawNode: "raw node value"
 
 	// First unmarshal to core model
 	var coreModel core.TestRequiredNilableModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -229,9 +228,9 @@ requiredRawNode: "raw node value"
 
 	require.NotNil(t, highModel.RequiredStruct)
 	require.Equal(t, "nested required", highModel.RequiredStruct.StringField)
-	require.Equal(t, true, highModel.RequiredStruct.BoolField)
+	require.True(t, highModel.RequiredStruct.BoolField)
 	require.Equal(t, 42, highModel.RequiredStruct.IntField)
-	require.Equal(t, 3.14, highModel.RequiredStruct.Float64Field)
+	require.InDelta(t, 3.14, highModel.RequiredStruct.Float64Field, 0.001)
 
 	// Verify either field was populated
 	require.NotNil(t, highModel.RequiredEither)
@@ -253,7 +252,7 @@ optionalPtr: "optional pointer value"
 
 	// First unmarshal to core model
 	var coreModel core.TestRequiredPointerModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -288,7 +287,7 @@ float64PtrField: null
 
 	// First unmarshal to core model
 	var coreModel core.TestPrimitiveModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -300,9 +299,9 @@ float64PtrField: null
 
 	// Verify required fields are populated
 	require.Equal(t, "test", highModel.StringField)
-	require.Equal(t, true, highModel.BoolField)
+	require.True(t, highModel.BoolField)
 	require.Equal(t, 42, highModel.IntField)
-	require.Equal(t, 3.14, highModel.Float64Field)
+	require.InDelta(t, 3.14, highModel.Float64Field, 0.001)
 
 	// Verify null pointer fields are still nil in high model
 	require.Nil(t, highModel.StringPtrField)
@@ -331,7 +330,7 @@ x-extension: "ext value"
 
 	// First unmarshal to core model
 	var coreModel core.TestEmbeddedMapWithFieldsModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -360,13 +359,13 @@ x-extension: "ext value"
 	require.True(t, ok1)
 	require.NotNil(t, dynamicVal1)
 	require.Equal(t, "dynamic value 1", dynamicVal1.StringField)
-	require.Equal(t, true, dynamicVal1.BoolField)
+	require.True(t, dynamicVal1.BoolField)
 
 	dynamicVal2, ok2 := highModel.Get("dynamicKey2")
 	require.True(t, ok2)
 	require.NotNil(t, dynamicVal2)
 	require.Equal(t, "dynamic value 2", dynamicVal2.StringField)
-	require.Equal(t, false, dynamicVal2.BoolField)
+	require.False(t, dynamicVal2.BoolField)
 
 	// Verify extensions were populated
 	require.NotNil(t, highModel.Extensions)
@@ -383,7 +382,7 @@ dynamicKey3: "value3"
 
 	// First unmarshal to core model
 	var coreModel core.TestEmbeddedMapModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -437,7 +436,7 @@ x-extension: "ext value"
 
 	// First unmarshal to core model
 	var coreModel core.TestValidationModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -464,15 +463,15 @@ x-extension: "ext value"
 	// Verify nested structs
 	require.NotNil(t, highModel.RequiredStruct)
 	require.Equal(t, "nested required", highModel.RequiredStruct.StringField)
-	require.Equal(t, true, highModel.RequiredStruct.BoolField)
+	require.True(t, highModel.RequiredStruct.BoolField)
 	require.Equal(t, 42, highModel.RequiredStruct.IntField)
-	require.Equal(t, 3.14, highModel.RequiredStruct.Float64Field)
+	require.InDelta(t, 3.14, highModel.RequiredStruct.Float64Field, 0.001)
 
 	require.NotNil(t, highModel.OptionalStruct)
 	require.Equal(t, "nested optional", highModel.OptionalStruct.StringField)
-	require.Equal(t, false, highModel.OptionalStruct.BoolField)
+	require.False(t, highModel.OptionalStruct.BoolField)
 	require.Equal(t, 24, highModel.OptionalStruct.IntField)
-	require.Equal(t, 2.71, highModel.OptionalStruct.Float64Field)
+	require.InDelta(t, 2.71, highModel.OptionalStruct.Float64Field, 0.001)
 
 	// Verify extensions
 	require.NotNil(t, highModel.Extensions)
@@ -507,7 +506,7 @@ put:
 
 	// First unmarshal to core model (this should work fine)
 	var coreModel core.TestTypeConversionCoreModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)
@@ -578,7 +577,7 @@ httpMethodField: "post"
 
 	// First unmarshal to core model (string field)
 	var coreModel core.TestTypeConversionCoreModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &coreModel)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, coreModel.Valid)

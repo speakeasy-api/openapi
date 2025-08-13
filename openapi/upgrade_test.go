@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"os"
 	"strings"
@@ -58,12 +57,12 @@ func TestUpgrade_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// Read and unmarshal original document
 			originalFile, err := os.Open(tt.inputFile)
 			require.NoError(t, err, "failed to open input file")
-			defer originalFile.Close() // nolint:errcheck
+			defer originalFile.Close()
 
 			originalDoc, validationErrs, err := openapi.Unmarshal(ctx, originalFile, openapi.WithSkipValidation())
 			require.NoError(t, err, "failed to unmarshal original document")
@@ -83,7 +82,7 @@ func TestUpgrade_Success(t *testing.T) {
 			// Read expected output
 			expectedFile, err := os.Open(tt.expectedFile)
 			require.NoError(t, err, "failed to open expected file")
-			defer expectedFile.Close() // nolint:errcheck
+			defer expectedFile.Close()
 
 			expectedBytes, err := io.ReadAll(expectedFile)
 			require.NoError(t, err, "failed to read expected file")
@@ -153,7 +152,7 @@ func TestUpgrade_NoUpgradeNeeded(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// Create a simple document with the specified version
 			doc := &openapi.OpenAPI{
@@ -179,7 +178,7 @@ func TestUpgrade_NoUpgradeNeeded(t *testing.T) {
 func TestUpgrade_RoundTrip(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test with a comprehensive document that exercises all upgrade paths
 	yamlDoc := `

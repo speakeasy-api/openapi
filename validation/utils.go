@@ -12,17 +12,18 @@ func SortValidationErrors(allErrors []error) {
 		var bValidationErr *Error
 		aIsValidationErr := errors.As(a, &aValidationErr)
 		bIsValidationErr := errors.As(b, &bValidationErr)
-		if aIsValidationErr && bIsValidationErr {
+		switch {
+		case aIsValidationErr && bIsValidationErr:
 			if aValidationErr.GetLineNumber() == bValidationErr.GetLineNumber() {
 				return aValidationErr.GetColumnNumber() - bValidationErr.GetColumnNumber()
 			}
 			return aValidationErr.GetLineNumber() - bValidationErr.GetLineNumber()
-		} else if aIsValidationErr {
+		case aIsValidationErr:
 			return -1
-		} else if bIsValidationErr {
+		case bIsValidationErr:
 			return 1
+		default:
+			return 0
 		}
-
-		return 0
 	})
 }

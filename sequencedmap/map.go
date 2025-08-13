@@ -4,6 +4,7 @@ package sequencedmap
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"reflect"
@@ -51,15 +52,15 @@ var _ interfaces.SequencedMapInterface = (*Map[any, any])(nil)
 
 // New creates a new map with the specified elements.
 func New[K comparable, V any](elements ...*Element[K, V]) *Map[K, V] {
-	return new(-1, elements...)
+	return newMap(-1, elements...)
 }
 
 // NewWithCapacity creates a new map with the specified capacity and elements.
 func NewWithCapacity[K comparable, V any](capacity int, elements ...*Element[K, V]) *Map[K, V] {
-	return new(capacity, elements...)
+	return newMap(capacity, elements...)
 }
 
-func new[K comparable, V any](capacity int, elements ...*Element[K, V]) *Map[K, V] {
+func newMap[K comparable, V any](capacity int, elements ...*Element[K, V]) *Map[K, V] {
 	if len(elements) > capacity && capacity > 0 {
 		capacity = len(elements)
 	}
@@ -447,13 +448,13 @@ func (m *Map[K, V]) GetValueType() reflect.Type {
 // This is an implementation of the jsonpointer.KeyNavigable interface.
 func (m *Map[K, V]) NavigateWithKey(key string) (any, error) {
 	if m == nil {
-		return nil, fmt.Errorf("sequencedmap.Map is nil")
+		return nil, errors.New("sequencedmap.Map is nil")
 	}
 
 	keyType := reflect.TypeOf((*K)(nil)).Elem()
 
 	if reflect.TypeOf((*K)(nil)).Elem().Kind() != reflect.String {
-		return nil, fmt.Errorf("sequencedmap.Map key type must be string")
+		return nil, errors.New("sequencedmap.Map key type must be string")
 	}
 
 	var ka any = key

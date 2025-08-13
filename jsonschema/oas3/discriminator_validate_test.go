@@ -2,7 +2,6 @@ package oas3_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -67,11 +66,11 @@ mapping: {}
 			t.Parallel()
 
 			var discriminator oas3.Discriminator
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &discriminator)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &discriminator)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := discriminator.Validate(context.Background())
+			errs := discriminator.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, discriminator.Valid, "expected discriminator to be valid")
 		})
@@ -113,11 +112,11 @@ mapping:
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &discriminator)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &discriminator)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := discriminator.Validate(context.Background())
+			validateErrs := discriminator.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")

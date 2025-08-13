@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -246,12 +247,12 @@ func (r *Reference[T, V, C]) SetTopLevelParent(topLevelParent *Reference[T, V, C
 // Validate will validate the reusable object against the Arazzo specification.
 func (r *Reference[T, V, C]) Validate(ctx context.Context, opts ...validation.Option) []error {
 	if r == nil {
-		return []error{fmt.Errorf("reference is nil")}
+		return []error{errors.New("reference is nil")}
 	}
 
 	core := r.GetCore()
 	if core == nil {
-		return []error{fmt.Errorf("reference core is nil")}
+		return []error{errors.New("reference core is nil")}
 	}
 
 	errs := []error{}
@@ -307,7 +308,7 @@ func (r *Reference[T, V, C]) GetNavigableNode() (any, error) {
 
 	obj := r.GetObject()
 	if obj == nil {
-		return nil, fmt.Errorf("unresolved reference")
+		return nil, errors.New("unresolved reference")
 	}
 	return obj, nil
 }
@@ -388,7 +389,8 @@ func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.Co
 	for _, chainRef := range referenceChain {
 		if chainRef == absRef {
 			// Build circular reference error message showing the full chain
-			chainWithCurrent := append(referenceChain, absRef)
+			chainWithCurrent := referenceChain
+			chainWithCurrent = append(chainWithCurrent, absRef)
 			ref.ensureMutex()
 			ref.cacheMutex.Lock()
 			ref.circularErrorFound = true
@@ -398,7 +400,8 @@ func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.Co
 	}
 
 	// Add this reference to the chain
-	newChain := append(referenceChain, absRef)
+	newChain := referenceChain
+	newChain = append(newChain, absRef)
 
 	// Resolve the current reference
 	obj, nextRef, validationErrs, err := ref.resolve(ctx, opts)

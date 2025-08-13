@@ -12,6 +12,7 @@ import (
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -147,7 +148,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("step field operationId must be a sourceDescriptions expression, got %s", typ), core, core.OperationID))
 			}
 
-			if a.SourceDescriptions.Find(string(sourceDescriptionName)) == nil {
+			if a.SourceDescriptions.Find(sourceDescriptionName) == nil {
 				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("step field operationId referencing sourceDescription %s not found", sourceDescriptionName), core, core.OperationID))
 			}
 		}
@@ -164,7 +165,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("step field operationPath must be a sourceDescriptions expression, got %s", typ), core, core.OperationPath))
 		}
 
-		if a.SourceDescriptions.Find(string(sourceDescriptionName)) == nil {
+		if a.SourceDescriptions.Find(sourceDescriptionName) == nil {
 			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("step field operationPath referencing sourceDescription %s not found", sourceDescriptionName), core, core.OperationPath))
 		}
 
@@ -188,13 +189,11 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("step field workflowId must be a sourceDescriptions expression, got %s", typ), core, core.WorkflowID))
 			}
 
-			if a.SourceDescriptions.Find(string(sourceDescriptionName)) == nil {
+			if a.SourceDescriptions.Find((sourceDescriptionName)) == nil {
 				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("step field workflowId referencing sourceDescription %s not found", sourceDescriptionName), core, core.WorkflowID))
 			}
-		} else {
-			if a.Workflows.Find(string(*s.WorkflowID)) == nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("step field workflowId referencing workflow %s not found", *s.WorkflowID), core, core.WorkflowID))
-			}
+		} else if a.Workflows.Find(pointer.Value(s.WorkflowID).String()) == nil {
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("step field workflowId referencing workflow %s not found", *s.WorkflowID), core, core.WorkflowID))
 		}
 	}
 

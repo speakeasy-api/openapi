@@ -19,7 +19,7 @@ func Example_reading() {
 	if err != nil {
 		panic(err)
 	}
-	defer r.Close() //nolint:errcheck
+	defer r.Close()
 
 	// Unmarshal the Arazzo document which will also validate it against the Arazzo Specification
 	a, validationErrs, err := arazzo.Unmarshal(ctx, r)

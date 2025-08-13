@@ -8,6 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/jsonschema/oas3/core"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/references"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/values"
 )
 
@@ -184,7 +185,7 @@ func (j *JSONSchema[T]) IsEqual(other *JSONSchema[T]) bool {
 
 // Validate validates the JSONSchema against the JSON Schema specification.
 // This is a wrapper around calling GetLeft().Validate() for schema objects.
-func (j *JSONSchema[T]) Validate(ctx context.Context, opts ...interface{}) []error {
+func (j *JSONSchema[T]) Validate(ctx context.Context, opts ...validation.Option) []error {
 	if j == nil {
 		return []error{}
 	}
@@ -213,5 +214,5 @@ func (j *JSONSchema[T]) Validate(ctx context.Context, opts ...interface{}) []err
 // This allows for efficient conversion without allocation when you need to walk a concrete schema
 // as if it were a referenceable schema.
 func ConcreteToReferenceable(concrete *JSONSchema[Concrete]) *JSONSchema[Referenceable] {
-	return (*JSONSchema[Referenceable])(unsafe.Pointer(concrete))
+	return (*JSONSchema[Referenceable])(unsafe.Pointer(concrete)) //nolint:gosec
 }

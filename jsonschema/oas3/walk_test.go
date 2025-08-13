@@ -1,7 +1,6 @@
 package oas3
 
 import (
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/extensions"
@@ -26,7 +25,7 @@ func TestWalk_Success(t *testing.T) {
 		),
 	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 	var visitedSchemas []*JSONSchema[Referenceable]
 	var visitedLocations []string
 
@@ -57,7 +56,7 @@ func TestWalkExternalDocs_Success(t *testing.T) {
 		Description: pointer.From("Example documentation"),
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	var visitedItems []string
 
 	// Walk the external docs and collect visited items
@@ -82,7 +81,7 @@ func TestWalkExternalDocs_Success(t *testing.T) {
 
 func TestWalk_NilSchema(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	count := 0
 
 	// Walk a nil schema - should not yield any items

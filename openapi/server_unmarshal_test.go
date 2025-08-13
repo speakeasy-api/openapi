@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -31,7 +30,7 @@ x-test: some-value
 
 	var server openapi.Server
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &server)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &server)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -71,7 +70,7 @@ description: Environment name
 
 	var variable openapi.ServerVariable
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &variable)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &variable)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 

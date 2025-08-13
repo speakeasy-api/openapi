@@ -2,7 +2,6 @@ package marshaller_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -57,7 +56,7 @@ func TestMarshal_TestEmbeddedMapModel_Empty_Success(t *testing.T) {
 			model := tt.setup()
 
 			var buf bytes.Buffer
-			err := marshaller.Marshal(context.Background(), model, &buf)
+			err := marshaller.Marshal(t.Context(), model, &buf)
 			require.NoError(t, err)
 
 			actual := buf.String()
@@ -116,7 +115,7 @@ func TestMarshal_TestEmbeddedMapWithFieldsModel_Empty_Success(t *testing.T) {
 			model := tt.setup()
 
 			var buf bytes.Buffer
-			err := marshaller.Marshal(context.Background(), model, &buf)
+			err := marshaller.Marshal(t.Context(), model, &buf)
 			require.NoError(t, err)
 
 			actual := buf.String()
@@ -133,14 +132,14 @@ func TestMarshal_TestEmbeddedMapModel_RoundTrip_Empty_Success(t *testing.T) {
 	// Unmarshal empty object -> Marshal -> Compare
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestEmbeddedMapHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }

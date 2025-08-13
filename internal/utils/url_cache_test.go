@@ -45,7 +45,7 @@ func TestURLCache_Parse_Error(t *testing.T) {
 
 	// Should return error and not cache invalid URLs
 	_, err := cache.Parse(invalidURL)
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	// Verify it's not cached by checking stats
 	stats := URLCacheStats{}
@@ -129,7 +129,7 @@ func TestURLCache_Clear(t *testing.T) {
 	assert.Equal(t, int64(0), sizeAfter)
 }
 
-// nolint:paralleltest
+//nolint:paralleltest
 func TestParseURLCached_Global(t *testing.T) {
 	// Don't run in parallel since we're testing global cache state
 
@@ -173,7 +173,7 @@ func TestClassifyReference_WithCache(t *testing.T) {
 
 	// Verify URL is cached
 	stats := GetURLCacheStats()
-	assert.Greater(t, stats.Size, int64(0), "URL should be cached after classification")
+	assert.Positive(t, stats.Size, "URL should be cached after classification")
 
 	// Second classification - should use cached URL
 	result2, err := ClassifyReference(testURL)

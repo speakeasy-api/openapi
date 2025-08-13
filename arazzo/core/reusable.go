@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -27,7 +28,7 @@ func (r *Reusable[T]) Unmarshal(ctx context.Context, parentName string, node *ya
 	resolvedNode := yml.ResolveAlias(node)
 
 	if resolvedNode == nil {
-		return nil, fmt.Errorf("node is nil")
+		return nil, errors.New("node is nil")
 	}
 
 	if resolvedNode.Kind != yaml.MappingNode {

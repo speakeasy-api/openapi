@@ -62,7 +62,7 @@ func TestNavigateModel_EmbeddedMapComplexPath(t *testing.T) {
 			result, err := GetTarget(paths, tt.pointer)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
 

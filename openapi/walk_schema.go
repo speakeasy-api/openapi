@@ -44,17 +44,17 @@ func convertSchemaMatchFunc(schemaMatchFunc oas3.SchemaMatchFunc) MatchFunc {
 // convertSchemaLocation converts oas3 schema locations to openapi locations
 func convertSchemaLocation(schemaLoc walkpkg.Locations[oas3.SchemaMatchFunc], baseLoc []LocationContext) []LocationContext {
 	// Start with the base location (where the schema is located in the OpenAPI document)
-	result := make([]LocationContext, len(baseLoc))
+	result := make([]LocationContext, len(baseLoc)+len(schemaLoc))
 	copy(result, baseLoc)
 
 	// Convert each oas3 location context to openapi location context
-	for _, schemaLocCtx := range schemaLoc {
-		result = append(result, LocationContext{
+	for i, schemaLocCtx := range schemaLoc {
+		result[len(baseLoc)+i] = LocationContext{
 			Parent:      convertSchemaMatchFunc(schemaLocCtx.Parent),
 			ParentField: schemaLocCtx.ParentField,
 			ParentKey:   schemaLocCtx.ParentKey,
 			ParentIndex: schemaLocCtx.ParentIndex,
-		})
+		}
 	}
 
 	return result

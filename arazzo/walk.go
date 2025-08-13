@@ -621,7 +621,17 @@ func getMatchFunc[T any](target *T) MatchFunc {
 		}
 	}
 
-	handler := h.(matchHandler[T])
+	handler, ok := h.(matchHandler[T])
+	if !ok {
+		// For unknown types, just use the Any matcher
+		return func(m Matcher) error {
+			if m.Any != nil {
+				return m.Any(target)
+			}
+			return nil
+		}
+	}
+
 	return func(m Matcher) error {
 		if m.Any != nil {
 			if err := m.Any(target); err != nil {

@@ -1,6 +1,7 @@
 package references
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -49,7 +50,7 @@ func (r Reference) Validate() error {
 	if r.HasJSONPointer() {
 		jp := r.GetJSONPointer()
 		if jp == "" {
-			return fmt.Errorf("invalid reference JSON pointer: empty")
+			return errors.New("invalid reference JSON pointer: empty")
 		}
 
 		if err := jp.Validate(); err != nil {

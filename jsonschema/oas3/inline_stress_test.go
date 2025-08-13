@@ -2,7 +2,6 @@ package oas3_test
 
 import (
 	"context"
-	"errors"
 	"os"
 	"testing"
 	"time"
@@ -55,10 +54,10 @@ func TestInline_CombinatorialLongLoop_Timeout_Error(t *testing.T) {
 			var ctx context.Context
 			var cancel context.CancelFunc
 			if tt.contextTimeout > 0 {
-				ctx, cancel = context.WithTimeout(context.Background(), tt.contextTimeout)
+				ctx, cancel = context.WithTimeout(t.Context(), tt.contextTimeout)
 				defer cancel()
 			} else {
-				ctx = context.Background()
+				ctx = t.Context()
 			}
 
 			// Load the combinatorial.json file once for all test cases
@@ -67,7 +66,7 @@ func TestInline_CombinatorialLongLoop_Timeout_Error(t *testing.T) {
 			require.NoError(t, err, "failed to read combinatorial.json")
 
 			// Parse the OpenAPI document
-			openAPIDoc, _, err := openapi.Unmarshal(context.Background(), combinatorialFile)
+			openAPIDoc, _, err := openapi.Unmarshal(t.Context(), combinatorialFile)
 			require.NoError(t, err, "failed to parse combinatorial.json as OpenAPI document")
 
 			// Extract the schema from the post operation at /api/rest/shops
@@ -97,7 +96,7 @@ func TestInline_CombinatorialLongLoop_Timeout_Error(t *testing.T) {
 			require.Error(t, err, tt.description)
 
 			// Check that it's the expected timeout error
-			assert.True(t, errors.Is(err, oas3.ErrInlineTimeout), "should be timeout error")
+			require.ErrorIs(t, err, oas3.ErrInlineTimeout, "should be timeout error")
 			assert.Contains(t, err.Error(), tt.expectedErrorMsg, "should contain expected error message")
 		})
 	}

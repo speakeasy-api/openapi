@@ -11,6 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/validation"
 	walkpkg "github.com/speakeasy-api/openapi/walk"
 	"gopkg.in/yaml.v3"
@@ -136,13 +137,11 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, parentName string,
 				errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s field workflowId must be a sourceDescriptions expression, got %s", parentName, typ), params.workflowIDNode))
 			}
 
-			if params.arazzo.SourceDescriptions.Find(string(sourceDescriptionName)) == nil {
+			if params.arazzo.SourceDescriptions.Find(sourceDescriptionName) == nil {
 				errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s field sourceDescription value %s not found", parentName, sourceDescriptionName), params.workflowIDNode))
 			}
-		} else {
-			if params.arazzo.Workflows.Find(string(*params.workflowID)) == nil {
-				errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s field workflowId value %s does not exist", parentName, *params.workflowID), params.workflowIDNode))
-			}
+		} else if params.arazzo.Workflows.Find(pointer.Value(params.workflowID).String()) == nil {
+			errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s field workflowId value %s does not exist", parentName, *params.workflowID), params.workflowIDNode))
 		}
 	}
 	if params.stepID != nil {
@@ -174,7 +173,7 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, parentName string,
 
 											_, _, expressionParts, _ := onSuccess.Reference.GetParts()
 											if len(expressionParts) > 0 && expressionParts[0] == key.name {
-												if workflow.Steps.Find(string(*params.stepID)) != nil {
+												if workflow.Steps.Find(pointer.Value(params.stepID)) != nil {
 													foundStepId = true
 													return walkpkg.ErrTerminate
 												}
@@ -188,7 +187,7 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, parentName string,
 
 											_, _, expressionParts, _ := onFailure.Reference.GetParts()
 											if len(expressionParts) > 0 && expressionParts[0] == key.name {
-												if workflow.Steps.Find(string(*params.stepID)) != nil {
+												if workflow.Steps.Find(pointer.Value(params.stepID)) != nil {
 													foundStepId = true
 													return walkpkg.ErrTerminate
 												}
@@ -207,13 +206,11 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, parentName string,
 				}
 
 				if !foundStepId {
-					errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s field stepId value %s does not exist in any parent workflows", parentName, *params.stepID), params.workflowIDNode))
+					errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s field stepId value %s does not exist in any parent workflows", parentName, pointer.Value(params.stepID)), params.workflowIDNode))
 				}
 			}
-		} else {
-			if w.Steps.Find(string(*params.stepID)) == nil {
-				errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s field stepId value %s does not exist in workflow %s", parentName, *params.stepID, w.WorkflowID), params.workflowIDNode))
-			}
+		} else if w.Steps.Find(pointer.Value(params.stepID)) == nil {
+			errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s field stepId value %s does not exist in workflow %s", parentName, pointer.Value(params.stepID), w.WorkflowID), params.workflowIDNode))
 		}
 	}
 

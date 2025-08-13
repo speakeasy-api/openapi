@@ -1,7 +1,6 @@
 package marshaller
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,12 +14,13 @@ type testCase[T any] struct {
 }
 
 func runNodeTest[T any](t *testing.T, testCase *testCase[T]) {
+	t.Helper()
 	var yamlNode yaml.Node
 	err := yaml.Unmarshal([]byte(testCase.yamlData), &yamlNode)
 	require.NoError(t, err)
 
 	var node Node[T]
-	validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 	require.NoError(t, err)
 	require.Empty(t, validationErrors)
 
@@ -138,6 +138,7 @@ type errorTestCase[T any] struct {
 }
 
 func runNodeErrorTest[T any](t *testing.T, testCase *errorTestCase[T]) {
+	t.Helper()
 	var yamlNode yaml.Node
 	err := yaml.Unmarshal([]byte(testCase.yamlData), &yamlNode)
 	if !testCase.expectValidationError {
@@ -147,7 +148,7 @@ func runNodeErrorTest[T any](t *testing.T, testCase *errorTestCase[T]) {
 	require.NoError(t, err)
 
 	var node Node[T]
-	validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 	if testCase.expectValidationError {
 		require.NoError(t, err)
 		require.NotEmpty(t, validationErrors)
@@ -166,6 +167,7 @@ func TestNode_Unmarshal_Error(t *testing.T) {
 		{
 			name: "string node with array value",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				runNodeErrorTest(t, &errorTestCase[string]{
 					yamlData:              `["not", "a", "string"]`,
 					expectValidationError: true,
@@ -175,6 +177,7 @@ func TestNode_Unmarshal_Error(t *testing.T) {
 		{
 			name: "int node with string value",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				runNodeErrorTest(t, &errorTestCase[int]{
 					yamlData:              `"hello"`,
 					expectValidationError: true,
@@ -184,6 +187,7 @@ func TestNode_Unmarshal_Error(t *testing.T) {
 		{
 			name: "bool node with string value",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				runNodeErrorTest(t, &errorTestCase[bool]{
 					yamlData:              `"true"`,
 					expectValidationError: true,
@@ -193,6 +197,7 @@ func TestNode_Unmarshal_Error(t *testing.T) {
 		{
 			name: "malformed yaml",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				runNodeErrorTest(t, &errorTestCase[string]{
 					yamlData:              `{invalid: yaml: content`,
 					expectValidationError: false,
@@ -217,23 +222,24 @@ type syncTestCase[T any] struct {
 }
 
 func runNodeSyncTest[T any](t *testing.T, testCase *syncTestCase[T]) {
+	t.Helper()
 	var yamlNode yaml.Node
 	err := yaml.Unmarshal([]byte(testCase.initialYAML), &yamlNode)
 	require.NoError(t, err)
 
 	var node Node[T]
-	validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 	require.NoError(t, err)
 	require.Empty(t, validationErrors)
 
 	// Sync new value
 	node.Value = testCase.newValue
-	_, _, err = node.SyncValue(context.Background(), "", testCase.newValue)
+	_, _, err = node.SyncValue(t.Context(), "", testCase.newValue)
 	require.NoError(t, err)
 
 	// Verify sync worked
 	assert.Equal(t, testCase.newValue, node.Value)
-	assert.Equal(t, testCase.expectedYAML, node.ValueNode.Value)
+	assert.YAMLEq(t, testCase.expectedYAML, node.ValueNode.Value)
 }
 
 func TestNode_SyncValue_Success(t *testing.T) {
@@ -246,6 +252,8 @@ func TestNode_SyncValue_Success(t *testing.T) {
 		{
 			name: "sync string value",
 			testFunc: func(t *testing.T) {
+				t.Helper()
+				t.Helper()
 				runNodeSyncTest(t, &syncTestCase[string]{
 					initialYAML:  `"old value"`,
 					newValue:     "new value",
@@ -256,6 +264,7 @@ func TestNode_SyncValue_Success(t *testing.T) {
 		{
 			name: "sync int value",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				runNodeSyncTest(t, &syncTestCase[int]{
 					initialYAML:  `42`,
 					newValue:     100,
@@ -266,6 +275,7 @@ func TestNode_SyncValue_Success(t *testing.T) {
 		{
 			name: "sync bool value true to false",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				runNodeSyncTest(t, &syncTestCase[bool]{
 					initialYAML:  `true`,
 					newValue:     false,
@@ -276,6 +286,7 @@ func TestNode_SyncValue_Success(t *testing.T) {
 		{
 			name: "sync bool value false to true",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				runNodeSyncTest(t, &syncTestCase[bool]{
 					initialYAML:  `false`,
 					newValue:     true,
@@ -304,12 +315,13 @@ func TestNode_GetValue_Success(t *testing.T) {
 		{
 			name: "get string value",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				var yamlNode yaml.Node
 				err := yaml.Unmarshal([]byte(`"hello"`), &yamlNode)
 				require.NoError(t, err)
 
 				var node Node[string]
-				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -319,12 +331,13 @@ func TestNode_GetValue_Success(t *testing.T) {
 		{
 			name: "get string pointer value",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				var yamlNode yaml.Node
 				err := yaml.Unmarshal([]byte(`"hello"`), &yamlNode)
 				require.NoError(t, err)
 
 				var node Node[*string]
-				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -339,12 +352,13 @@ func TestNode_GetValue_Success(t *testing.T) {
 		{
 			name: "get null string pointer value",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				var yamlNode yaml.Node
 				err := yaml.Unmarshal([]byte(`null`), &yamlNode)
 				require.NoError(t, err)
 
 				var node Node[*string]
-				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -354,12 +368,13 @@ func TestNode_GetValue_Success(t *testing.T) {
 		{
 			name: "get int value",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				var yamlNode yaml.Node
 				err := yaml.Unmarshal([]byte(`42`), &yamlNode)
 				require.NoError(t, err)
 
 				var node Node[int]
-				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -369,12 +384,13 @@ func TestNode_GetValue_Success(t *testing.T) {
 		{
 			name: "get bool value",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				var yamlNode yaml.Node
 				err := yaml.Unmarshal([]byte(`true`), &yamlNode)
 				require.NoError(t, err)
 
 				var node Node[bool]
-				validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -401,7 +417,7 @@ func TestNode_NodeAccessor_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	var node Node[string]
-	validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 	require.NoError(t, err)
 	require.Empty(t, validationErrors)
 
@@ -435,7 +451,7 @@ func TestNode_NodeMutator_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	var node Node[string]
-	validationErrors, err := node.Unmarshal(context.Background(), "", nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 	require.NoError(t, err)
 	require.Empty(t, validationErrors)
 
@@ -449,7 +465,7 @@ func TestNode_NodeMutator_Success(t *testing.T) {
 	assert.True(t, node.Present)
 
 	// Test SyncValue
-	_, _, err = mutator.SyncValue(context.Background(), "testKey", "new value")
+	_, _, err = mutator.SyncValue(t.Context(), "testKey", "new value")
 	require.NoError(t, err)
 
 	// Verify the change

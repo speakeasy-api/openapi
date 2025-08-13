@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -34,7 +33,7 @@ x-test: some-value
 
 	var info openapi.Info
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &info)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &info)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -81,7 +80,7 @@ x-test: some-value
 
 	var contact openapi.Contact
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &contact)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &contact)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -106,7 +105,7 @@ x-test: some-value
 
 	var license openapi.License
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &license)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &license)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 

@@ -2,7 +2,6 @@ package arazzo
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/expression"
@@ -37,7 +36,7 @@ func (p *PayloadReplacement) Validate(ctx context.Context, opts ...validation.Op
 	}
 
 	if err := p.Target.Validate(); err != nil {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError(fmt.Sprintf("payloadReplacement field target is invalid: %s", err.Error())), core, core.Target))
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("payloadReplacement field target is invalid: "+err.Error()), core, core.Target))
 	}
 
 	if core.Value.Present && p.Value == nil {
@@ -45,11 +44,11 @@ func (p *PayloadReplacement) Validate(ctx context.Context, opts ...validation.Op
 	} else if p.Value != nil {
 		_, expression, err := expression.GetValueOrExpressionValue(p.Value)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(fmt.Sprintf("payloadReplacement field value is invalid: %s", err.Error())), core, core.Value))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("payloadReplacement field value is invalid: "+err.Error()), core, core.Value))
 		}
 		if expression != nil {
 			if err := expression.Validate(); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError(fmt.Sprintf("payloadReplacement field value is invalid: %s", err.Error())), core, core.Value))
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("payloadReplacement field value is invalid: "+err.Error()), core, core.Value))
 			}
 		}
 	}

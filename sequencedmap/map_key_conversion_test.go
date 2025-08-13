@@ -59,6 +59,6 @@ func TestNavigateWithKey_InvalidKeyType_Error(t *testing.T) {
 	m.Set(42, "value")
 
 	_, err := m.NavigateWithKey("42")
-	assert.Error(t, err, "should fail with non-string key type")
+	require.Error(t, err, "should fail with non-string key type")
 	assert.Contains(t, err.Error(), "key type must be string", "should contain appropriate error message")
 }

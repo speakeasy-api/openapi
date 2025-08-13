@@ -192,7 +192,7 @@ func TestClassifyReference_Error(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := ClassifyReference(tt.reference)
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Nil(t, result)
 		})
 	}
@@ -422,7 +422,7 @@ func TestReferenceClassification_JoinWith_Error(t *testing.T) {
 			require.NotNil(t, classification)
 
 			result, err := classification.JoinWith(tt.relative)
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Empty(t, result)
 		})
 	}
@@ -485,7 +485,7 @@ func TestJoinReference_Error(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := JoinReference(tt.base, tt.relative)
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Empty(t, result)
 		})
 	}

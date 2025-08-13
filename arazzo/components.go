@@ -48,7 +48,8 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 		}
 
 		if input.IsLeft() {
-			jsOpts := append(opts, validation.WithContextObject(&componentKey{name: key}))
+			jsOpts := opts
+			jsOpts = append(jsOpts, validation.WithContextObject(&componentKey{name: key}))
 
 			errs = append(errs, input.Left.Validate(ctx, jsOpts...)...)
 		}
@@ -59,7 +60,8 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field parameters key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Parameters, key))
 		}
 
-		paramOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
+		paramOps := opts
+		paramOps = append(paramOps, validation.WithContextObject(&componentKey{name: key}))
 
 		errs = append(errs, parameter.Validate(ctx, paramOps...)...)
 	}
@@ -69,7 +71,8 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field successActions key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.SuccessActions, key))
 		}
 
-		successActionOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
+		successActionOps := opts
+		successActionOps = append(successActionOps, validation.WithContextObject(&componentKey{name: key}))
 
 		errs = append(errs, successAction.Validate(ctx, successActionOps...)...)
 	}
@@ -79,7 +82,8 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field failureActions key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.FailureActions, key))
 		}
 
-		failureActionOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
+		failureActionOps := opts
+		failureActionOps = append(failureActionOps, validation.WithContextObject(&componentKey{name: key}))
 
 		errs = append(errs, failureAction.Validate(ctx, failureActionOps...)...)
 	}

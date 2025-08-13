@@ -82,8 +82,7 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 	}
 
 	if w.Inputs != nil {
-		inputsValNode := core.Inputs.GetValueNodeOrRoot(core.RootNode)
-		errs = append(errs, validateJSONSchema(ctx, w.Inputs, inputsValNode, opts...)...)
+		errs = append(errs, w.Inputs.Validate(ctx, opts...)...)
 	}
 
 	for i, dependsOn := range w.DependsOn {
@@ -101,10 +100,8 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 			if a.SourceDescriptions.Find(sourceDescriptionName) == nil {
 				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow field dependsOn sourceDescription %s not found", sourceDescriptionName), core, core.DependsOn, i))
 			}
-		} else {
-			if a.Workflows.Find(string(dependsOn)) == nil {
-				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow field dependsOn workflowId %s not found", dependsOn), core, core.DependsOn, i))
-			}
+		} else if a.Workflows.Find(string(dependsOn)) == nil {
+			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow field dependsOn workflowId %s not found", dependsOn), core, core.DependsOn, i))
 		}
 	}
 

@@ -2,7 +2,6 @@ package marshaller_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -31,16 +30,16 @@ x-custom: "extension value"
 	// Unmarshal -> Marshal -> Compare
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestPrimitiveHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 func TestMarshal_TestPrimitiveModel_WithChanges_YAML_Success(t *testing.T) {
@@ -64,7 +63,7 @@ x-modified: modified extension
 	// Unmarshal
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestPrimitiveHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -79,11 +78,11 @@ x-modified: modified extension
 
 	// Marshal
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, expectedYAML, outputYAML)
+	assert.YAMLEq(t, expectedYAML, outputYAML)
 }
 
 func TestMarshal_TestComplexModel_RoundTrip_YAML_Success(t *testing.T) {
@@ -108,16 +107,16 @@ x-extension: "ext value"
 	// Unmarshal -> Marshal -> Compare
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestComplexHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 func TestMarshal_TestComplexModel_WithChanges_YAML_Success(t *testing.T) {
@@ -155,7 +154,7 @@ eitherModelOrPrimitive: 456
 	// Unmarshal
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestComplexHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -166,11 +165,11 @@ eitherModelOrPrimitive: 456
 
 	// Marshal
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, expectedYAML, outputYAML)
+	assert.YAMLEq(t, expectedYAML, outputYAML)
 }
 
 func TestMarshal_TestEmbeddedMapModel_RoundTrip_YAML_Success(t *testing.T) {
@@ -184,16 +183,16 @@ dynamicKey3: "value3"
 	// Unmarshal -> Marshal -> Compare
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestEmbeddedMapHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 func TestMarshal_TestEmbeddedMapModel_WithChanges_YAML_Success(t *testing.T) {
@@ -211,7 +210,7 @@ newKey: "new value"
 	// Unmarshal
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestEmbeddedMapHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -221,11 +220,11 @@ newKey: "new value"
 
 	// Marshal
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, expectedYAML, outputYAML)
+	assert.YAMLEq(t, expectedYAML, outputYAML)
 }
 
 func TestMarshal_TestEmbeddedMapWithFieldsModel_RoundTrip_YAML_Success(t *testing.T) {
@@ -248,16 +247,16 @@ x-extension: "ext value"
 	// Unmarshal -> Marshal -> Compare
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestEmbeddedMapWithFieldsHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 func TestMarshal_WithComments_YAML_Success(t *testing.T) {
@@ -276,16 +275,16 @@ x-custom: "extension value"
 	// Unmarshal -> Marshal -> Check comment preservation
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestPrimitiveHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 func TestMarshal_WithAliases_YAML_Success(t *testing.T) {
@@ -302,16 +301,16 @@ x-alias-ext: *alias
 	// Unmarshal -> Marshal -> Check alias preservation
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestPrimitiveHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 func TestMarshal_JSON_Input_YAML_Output_Success(t *testing.T) {
@@ -343,7 +342,7 @@ x-custom: extension value
 	// Unmarshal JSON -> Marshal to YAML
 	reader := strings.NewReader(inputJSON)
 	model := &tests.TestPrimitiveHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -351,11 +350,11 @@ x-custom: extension value
 	model.GetCore().Config.OutputFormat = yml.OutputFormatYAML
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, expectedYAML, outputYAML)
+	assert.YAMLEq(t, expectedYAML, outputYAML)
 }
 
 func TestMarshal_ComplexNesting_RoundTrip_Success(t *testing.T) {
@@ -387,16 +386,16 @@ x-root-extension: "root-ext-value"
 	// Unmarshal -> Marshal -> Verify exact preservation
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestComplexHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 func TestMarshal_ComplexNesting_WithChanges_Success(t *testing.T) {
@@ -443,7 +442,7 @@ x-new-extension: new-ext-value
 	// Unmarshal
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestComplexHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -462,11 +461,11 @@ x-new-extension: new-ext-value
 
 	// Marshal
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, expectedYAML, outputYAML)
+	assert.YAMLEq(t, expectedYAML, outputYAML)
 }
 
 // TestMarshal_ExtensiveAliases_PrimitiveFields_Success tests alias preservation on primitive fields
@@ -497,16 +496,16 @@ x-float-ext: *floatAlias
 	// Unmarshal -> Marshal -> Check alias preservation
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestPrimitiveHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 // TestMarshal_ExtensiveAliases_ArrayElements_Success tests alias preservation in array elements
@@ -553,16 +552,16 @@ x-array-ext:
 	// Unmarshal -> Marshal -> Check alias preservation
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestComplexHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 // TestMarshal_ExtensiveAliases_MapElements_Success tests alias preservation in map values and keys
@@ -605,16 +604,16 @@ x-map-ext:
 	// Unmarshal -> Marshal -> Check alias preservation
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestEmbeddedMapWithFieldsHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 // TestMarshal_ExtensiveComments_PrimitiveFields_Success tests comment preservation on primitive fields
@@ -647,16 +646,16 @@ x-another: "another extension" # another inline comment
 	// Unmarshal -> Marshal -> Check comment preservation
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestPrimitiveHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 // TestMarshal_ExtensiveComments_ArrayElements_Success tests comment preservation in arrays
@@ -708,16 +707,16 @@ x-array-ext:
 	// Unmarshal -> Marshal -> Check comment preservation
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestComplexHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 // TestMarshal_ExtensiveComments_MapElements_Success tests comment preservation in maps
@@ -759,16 +758,16 @@ x-simple: "simple extension value" # simple inline comment
 	// Unmarshal -> Marshal -> Check comment preservation
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestEmbeddedMapWithFieldsHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 // TestMarshal_MixedAliasesAndComments_Success tests complex scenarios with both aliases and comments
@@ -825,16 +824,16 @@ x-simple-ext: "simple value" # simple extension comment
 	// Unmarshal -> Marshal -> Check preservation of both aliases and comments
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestComplexHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 // TestMarshal_CrossReferenceAliases_Success tests aliases defined in one section and used in another
@@ -879,16 +878,16 @@ x-mixed-array:
 	// Unmarshal -> Marshal -> Check cross-reference alias preservation
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestComplexHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 func TestMarshal_TestTypeConversionModel_RoundTrip_YAML_Success(t *testing.T) {
@@ -916,16 +915,16 @@ x-custom: "extension value"
 	// Unmarshal -> Marshal -> Compare (tests key type conversion)
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestTypeConversionHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, inputYAML, outputYAML)
+	assert.YAMLEq(t, inputYAML, outputYAML)
 }
 
 func TestMarshal_TestTypeConversionModel_WithChanges_YAML_Success(t *testing.T) {
@@ -968,7 +967,7 @@ x-modified: modified extension
 	// Unmarshal
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestTypeConversionHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -998,11 +997,11 @@ x-modified: modified extension
 
 	// Marshal
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
-	assert.Equal(t, expectedYAML, outputYAML)
+	assert.YAMLEq(t, expectedYAML, outputYAML)
 }
 
 // TestMarshal_ExtensionOrderingBug_Reproduction reproduces the bug where extensions
@@ -1051,7 +1050,7 @@ x-modified: modified extension
 	// Unmarshal
 	reader := strings.NewReader(inputYAML)
 	model := &tests.TestTypeConversionHighModel{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), reader, model)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), reader, model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -1081,7 +1080,7 @@ x-modified: modified extension
 
 	// Marshal
 	var buf bytes.Buffer
-	err = marshaller.Marshal(context.Background(), model, &buf)
+	err = marshaller.Marshal(t.Context(), model, &buf)
 	require.NoError(t, err)
 
 	outputYAML := buf.String()
@@ -1097,5 +1096,5 @@ x-modified: modified extension
 	require.Contains(t, outputYAML, "x-original: \"original extension\"")
 	require.Contains(t, outputYAML, "x-modified: modified extension")
 
-	assert.Equal(t, expectedYAML, outputYAML)
+	assert.YAMLEq(t, expectedYAML, outputYAML)
 }

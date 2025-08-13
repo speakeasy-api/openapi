@@ -1,7 +1,7 @@
 package arazzo_test
 
 import (
-	"context"
+	"errors"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/arazzo"
@@ -14,7 +14,7 @@ import (
 
 func TestWalk_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a simple arazzo document for testing
 	arazzoDoc := &arazzo.Arazzo{
@@ -102,7 +102,7 @@ func TestWalk_Success(t *testing.T) {
 
 func TestWalk_WithJSONSchema_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create an arazzo document without schema for now since the schema walking
 	// integration is complex and the main functionality is already tested
@@ -146,7 +146,7 @@ func TestWalk_WithJSONSchema_Success(t *testing.T) {
 
 func TestWalk_LocationTracking_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	arazzoDoc := &arazzo.Arazzo{
 		Arazzo: arazzo.Version,
@@ -183,7 +183,7 @@ func TestWalk_LocationTracking_Success(t *testing.T) {
 
 	// Verify location tracking
 	require.NotNil(t, stepLocation, "step should have location information")
-	assert.Greater(t, len(stepLocation), 0, "step location should have context")
+	assert.NotEmpty(t, stepLocation, "step location should have context")
 
 	// The step should have location context showing its path through the document
 	// Root -> workflows -> workflow[0] -> steps -> step[0]
@@ -203,7 +203,7 @@ func TestWalk_LocationTracking_Success(t *testing.T) {
 
 func TestWalk_EarlyTermination_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	arazzoDoc := &arazzo.Arazzo{
 		Arazzo: arazzo.Version,
@@ -242,7 +242,7 @@ func TestWalk_EarlyTermination_Success(t *testing.T) {
 				return nil
 			},
 		})
-		if err != nil && err == walk.ErrTerminate {
+		if err != nil && errors.Is(err, walk.ErrTerminate) {
 			break
 		}
 		require.NoError(t, err)
@@ -254,7 +254,7 @@ func TestWalk_EarlyTermination_Success(t *testing.T) {
 
 func TestWalk_NilArazzo_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Walk with nil arazzo should not panic and should not yield any items
 	itemCount := 0
@@ -267,7 +267,7 @@ func TestWalk_NilArazzo_Success(t *testing.T) {
 
 func TestWalk_EmptyArazzo_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create minimal arazzo document
 	arazzoDoc := &arazzo.Arazzo{

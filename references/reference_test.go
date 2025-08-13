@@ -65,7 +65,7 @@ func TestReference_Validate_Success(t *testing.T) {
 			t.Parallel()
 
 			err := tt.ref.Validate()
-			assert.NoError(t, err, "Expected reference to be valid: %s", tt.ref)
+			require.NoError(t, err, "Expected reference to be valid: %s", tt.ref)
 		})
 	}
 }
@@ -139,7 +139,7 @@ func TestReference_Validate_EdgeCases(t *testing.T) {
 		ref := Reference("https://example.com/api.yaml#/User#invalid")
 		err := ref.Validate()
 		// This should be valid as we only split on the first #
-		assert.NoError(t, err, "Reference with multiple # should be valid (only first # is used)")
+		require.NoError(t, err, "Reference with multiple # should be valid (only first # is used)")
 	})
 
 	t.Run("reference with empty URI and valid pointer", func(t *testing.T) {
@@ -147,7 +147,7 @@ func TestReference_Validate_EdgeCases(t *testing.T) {
 
 		ref := Reference("#/components/schemas/User")
 		err := ref.Validate()
-		assert.NoError(t, err, "Reference with empty URI and valid pointer should be valid")
+		require.NoError(t, err, "Reference with empty URI and valid pointer should be valid")
 	})
 }
 

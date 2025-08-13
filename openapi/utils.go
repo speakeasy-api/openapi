@@ -34,7 +34,7 @@ func (o *OpenAPI) ResolveAllReferences(ctx context.Context, opts ResolveAllOptio
 		HTTPClient:          opts.HTTPClient,
 	}
 
-	resolve := func(r resolvable) error {
+	resolve := func(r resolvable) error { //nolint:unparam
 		vErrs, err := resolveAny(ctx, r, rOpts)
 		validationErrs = append(validationErrs, vErrs...)
 		if err != nil {

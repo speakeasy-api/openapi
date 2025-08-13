@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -102,7 +101,7 @@ x-custom: custom-data
 			t.Parallel()
 
 			var response openapi.Response
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &response)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &response)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
@@ -125,7 +124,7 @@ x-custom: custom-data
 				opts = append(opts, validation.WithContextObject(openAPIDoc))
 			}
 
-			errs := response.Validate(context.Background(), opts...)
+			errs := response.Validate(t.Context(), opts...)
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, response.Valid, "expected response to be valid")
 		})
@@ -182,11 +181,11 @@ content:
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &response)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &response)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := response.Validate(context.Background())
+			validateErrs := response.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")
@@ -263,11 +262,11 @@ x-test: some-value
 			t.Parallel()
 
 			var responses openapi.Responses
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &responses)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &responses)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := responses.Validate(context.Background())
+			errs := responses.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, responses.Valid, "expected responses to be valid")
 		})
@@ -311,11 +310,11 @@ x-test: some-value
 			t.Parallel()
 
 			var responses openapi.Responses
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &responses)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &responses)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := responses.Validate(context.Background())
+			errs := responses.Validate(t.Context())
 			require.NotEmpty(t, errs, "expected validation errors")
 			require.False(t, responses.Valid, "expected responses to be invalid")
 

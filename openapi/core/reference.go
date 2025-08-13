@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -27,7 +28,7 @@ var _ interfaces.CoreModel = (*Reference[*PathItem])(nil)
 func (r *Reference[T]) Unmarshal(ctx context.Context, parentName string, node *yaml.Node) ([]error, error) {
 	resolvedNode := yml.ResolveAlias(node)
 	if resolvedNode == nil {
-		return nil, fmt.Errorf("node is nil")
+		return nil, errors.New("node is nil")
 	}
 
 	if resolvedNode.Kind != yaml.MappingNode {

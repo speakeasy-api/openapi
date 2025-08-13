@@ -2,6 +2,7 @@ package references
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -105,7 +106,7 @@ func (m *MockFile) Close() error {
 }
 
 func (m *MockFile) Stat() (fs.FileInfo, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, errors.New("not implemented")
 }
 
 // MockHTTPClient implements system.Client for testing
@@ -160,7 +161,7 @@ func testPrimitiveUnmarshaler(ctx context.Context, node *yaml.Node, skipValidati
 }
 
 func testErrorUnmarshaler(ctx context.Context, node *yaml.Node, skipValidation bool) (*tests.TestComplexHighModel, []error, error) {
-	return nil, nil, fmt.Errorf("unmarshaling failed")
+	return nil, nil, errors.New("unmarshaling failed")
 }
 
 func testNilUnmarshaler(ctx context.Context, node *yaml.Node, skipValidation bool) (*tests.TestComplexHighModel, []error, error) {
@@ -212,7 +213,7 @@ func TestResolve_RootDocument(t *testing.T) {
 			TargetDocument: root,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference(""), func(ctx context.Context, node *yaml.Node, skipValidation bool) (*TestResolutionTarget, []error, error) {
+		result, validationErrs, err := Resolve(t.Context(), Reference(""), func(ctx context.Context, node *yaml.Node, skipValidation bool) (*TestResolutionTarget, []error, error) {
 			return root, nil, nil
 		}, opts)
 
@@ -220,7 +221,7 @@ func TestResolve_RootDocument(t *testing.T) {
 		assert.Nil(t, validationErrs)
 		require.NotNil(t, result)
 		require.NotNil(t, result.Object)
-		assert.Equal(t, 3, len(result.Object.ArrayField))
+		assert.Len(t, result.Object.ArrayField, 3)
 	})
 
 	t.Run("resolve JSON pointer against root document", func(t *testing.T) {
@@ -235,7 +236,7 @@ func TestResolve_RootDocument(t *testing.T) {
 			TargetDocument: root,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("#/nestedModel"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("#/nestedModel"), testPrimitiveUnmarshaler, opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -262,7 +263,7 @@ func TestResolve_FilePath(t *testing.T) {
 			VirtualFS:      fs,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("schemas/test.yaml"), testComplexUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("schemas/test.yaml"), testComplexUnmarshaler, opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -281,7 +282,7 @@ func TestResolve_FilePath(t *testing.T) {
 			VirtualFS:      fs,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("missing.yaml"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("missing.yaml"), testPrimitiveUnmarshaler, opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -307,7 +308,7 @@ func TestResolve_URL(t *testing.T) {
 			HTTPClient:     client,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("schemas/test.yaml"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("schemas/test.yaml"), testPrimitiveUnmarshaler, opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -328,7 +329,7 @@ func TestResolve_URL(t *testing.T) {
 			HTTPClient:     client,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("missing.yaml"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("missing.yaml"), testPrimitiveUnmarshaler, opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -359,7 +360,7 @@ func TestResolve_Caching(t *testing.T) {
 			VirtualFS:      fs,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("schemas/cached.yaml"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("schemas/cached.yaml"), testPrimitiveUnmarshaler, opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -382,7 +383,7 @@ func TestResolve_Errors(t *testing.T) {
 			RootDocument: NewMockResolutionTarget(),
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("#/test"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("#/test"), testPrimitiveUnmarshaler, opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -397,7 +398,7 @@ func TestResolve_Errors(t *testing.T) {
 			TargetLocation: "/test/root.yaml",
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("#/test"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("#/test"), testPrimitiveUnmarshaler, opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -415,7 +416,7 @@ func TestResolve_Errors(t *testing.T) {
 			RootDocument:   root,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("#/test"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("#/test"), testPrimitiveUnmarshaler, opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -437,7 +438,7 @@ func TestResolve_Errors(t *testing.T) {
 			VirtualFS:      fs,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("test.yaml"), testErrorUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("test.yaml"), testErrorUnmarshaler, opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -459,7 +460,7 @@ func TestResolve_Errors(t *testing.T) {
 			VirtualFS:      fs,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("test.yaml"), testNilUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("test.yaml"), testNilUnmarshaler, opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -482,7 +483,7 @@ func TestResolve_Errors(t *testing.T) {
 			DisableExternalRefs: true,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("external.yaml"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("external.yaml"), testPrimitiveUnmarshaler, opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -502,13 +503,13 @@ func TestResolve_HTTPIntegration(t *testing.T) {
 			switch r.URL.Path {
 			case "/test.yaml":
 				w.Header().Set("Content-Type", "application/yaml")
-				w.WriteHeader(200)
+				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write([]byte("type: object\nproperties:\n  test: {type: string}"))
 			case "/error":
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write([]byte("Not Found"))
 			default:
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
 		defer server.Close()
@@ -520,7 +521,7 @@ func TestResolve_HTTPIntegration(t *testing.T) {
 			TargetDocument: root,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("test.yaml"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("test.yaml"), testPrimitiveUnmarshaler, opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -534,13 +535,13 @@ func TestResolve_HTTPIntegration(t *testing.T) {
 			switch r.URL.Path {
 			case "/test.yaml":
 				w.Header().Set("Content-Type", "application/yaml")
-				w.WriteHeader(200)
+				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write([]byte("type: object\nproperties:\n  test: {type: string}"))
 			case "/error":
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write([]byte("Not Found"))
 			default:
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
 		defer server.Close()
@@ -552,7 +553,7 @@ func TestResolve_HTTPIntegration(t *testing.T) {
 			TargetDocument: root,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("error"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("error"), testPrimitiveUnmarshaler, opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -580,7 +581,7 @@ func TestResolve_FileSystemIntegration(t *testing.T) {
 			TargetDocument: root,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("test.yaml"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("test.yaml"), testPrimitiveUnmarshaler, opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -597,7 +598,7 @@ func TestResolve_FileSystemIntegration(t *testing.T) {
 			TargetDocument: root,
 		}
 
-		result, validationErrs, err := Resolve(context.Background(), Reference("nonexistent.yaml"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("nonexistent.yaml"), testPrimitiveUnmarshaler, opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -626,7 +627,7 @@ func TestResolve_DefaultOptions(t *testing.T) {
 			// VirtualFS not set - should default to system.FileSystem
 		}
 
-		_, _, err := Resolve(context.Background(), Reference("nonexistent.yaml"), testComplexUnmarshaler, opts)
+		_, _, err := Resolve(t.Context(), Reference("nonexistent.yaml"), testComplexUnmarshaler, opts)
 
 		require.Error(t, err)
 		// Error should be from the actual file system, not a nil pointer panic
@@ -644,7 +645,7 @@ func TestResolve_DefaultOptions(t *testing.T) {
 			// HTTPClient not set - should default to http.DefaultClient
 		}
 
-		_, _, err := Resolve(context.Background(), Reference("https://nonexistent.example.com/test.yaml"), testComplexUnmarshaler, opts)
+		_, _, err := Resolve(t.Context(), Reference("https://nonexistent.example.com/test.yaml"), testComplexUnmarshaler, opts)
 
 		require.Error(t, err)
 		// Error should be from the HTTP client, not a nil pointer panic
@@ -770,7 +771,7 @@ func TestResolve_AbsoluteVsRelativeReferenceHandling(t *testing.T) {
 			}
 
 			// Test resolution using the Resolve function
-			result, validationErrs, err := Resolve(context.Background(), Reference(tt.referenceURI), func(ctx context.Context, node *yaml.Node, skipValidation bool) (*TestResolutionTarget, []error, error) {
+			result, validationErrs, err := Resolve(t.Context(), Reference(tt.referenceURI), func(ctx context.Context, node *yaml.Node, skipValidation bool) (*TestResolutionTarget, []error, error) {
 				target := NewTestResolutionTarget()
 				target.InitCache()
 				return target, nil, nil
@@ -827,7 +828,7 @@ func TestResolve_RootDocumentDifferentFromTargetDocument(t *testing.T) {
 		}
 
 		// Resolve a reference to an external file
-		result, validationErrs, err := Resolve(context.Background(), Reference("schemas/user.yaml"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("schemas/user.yaml"), testPrimitiveUnmarshaler, opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -867,7 +868,7 @@ func TestResolve_RootDocumentDifferentFromTargetDocument(t *testing.T) {
 		}
 
 		// Resolve a reference to an external URL
-		result, validationErrs, err := Resolve(context.Background(), Reference("https://external.com/schemas/common.yaml"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("https://external.com/schemas/common.yaml"), testPrimitiveUnmarshaler, opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -909,7 +910,7 @@ func TestResolve_RootDocumentDifferentFromTargetDocument(t *testing.T) {
 		}
 
 		// Resolve - should use cache from root document, not file system
-		result, validationErrs, err := Resolve(context.Background(), Reference("schemas/cached.yaml"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("schemas/cached.yaml"), testPrimitiveUnmarshaler, opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -941,7 +942,7 @@ func TestResolve_RootDocumentDifferentFromTargetDocument(t *testing.T) {
 		}
 
 		// Resolve a JSON pointer against the target document
-		result, validationErrs, err := Resolve(context.Background(), Reference("#/nestedModel"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference("#/nestedModel"), testPrimitiveUnmarshaler, opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -975,7 +976,7 @@ func TestResolve_RootDocumentDifferentFromTargetDocument(t *testing.T) {
 			VirtualFS:      fs,
 		}
 
-		result1, validationErrs1, err1 := Resolve(context.Background(), Reference("external1.yaml"), testComplexUnmarshaler, opts1)
+		result1, validationErrs1, err1 := Resolve(t.Context(), Reference("external1.yaml"), testComplexUnmarshaler, opts1)
 		require.NoError(t, err1)
 		assert.Nil(t, validationErrs1)
 		require.NotNil(t, result1)
@@ -994,7 +995,7 @@ func TestResolve_RootDocumentDifferentFromTargetDocument(t *testing.T) {
 			VirtualFS:      fs,
 		}
 
-		result2, validationErrs2, err2 := Resolve(context.Background(), Reference("external2.yaml"), testComplexUnmarshaler, opts2)
+		result2, validationErrs2, err2 := Resolve(t.Context(), Reference("external2.yaml"), testComplexUnmarshaler, opts2)
 		require.NoError(t, err2)
 		assert.Nil(t, validationErrs2)
 		require.NotNil(t, result2)
@@ -1029,14 +1030,14 @@ func TestResolve_ObjectCaching_Success(t *testing.T) {
 		}
 
 		// First resolution - should cache the object
-		result1, validationErrs1, err1 := Resolve(context.Background(), Reference("schema.yaml"), testComplexUnmarshaler, opts)
+		result1, validationErrs1, err1 := Resolve(t.Context(), Reference("schema.yaml"), testComplexUnmarshaler, opts)
 		require.NoError(t, err1)
 		assert.Nil(t, validationErrs1)
 		require.NotNil(t, result1)
 		require.NotNil(t, result1.Object)
 
 		// Second resolution - should return cached object
-		result2, validationErrs2, err2 := Resolve(context.Background(), Reference("schema.yaml"), testComplexUnmarshaler, opts)
+		result2, validationErrs2, err2 := Resolve(t.Context(), Reference("schema.yaml"), testComplexUnmarshaler, opts)
 		require.NoError(t, err2)
 		assert.Nil(t, validationErrs2)
 		require.NotNil(t, result2)
@@ -1067,13 +1068,13 @@ func TestResolve_ObjectCaching_Success(t *testing.T) {
 		}
 
 		// Resolve first schema
-		result1, validationErrs1, err1 := Resolve(context.Background(), Reference("schema1.yaml"), testComplexUnmarshaler, opts)
+		result1, validationErrs1, err1 := Resolve(t.Context(), Reference("schema1.yaml"), testComplexUnmarshaler, opts)
 		require.NoError(t, err1)
 		assert.Nil(t, validationErrs1)
 		require.NotNil(t, result1)
 
 		// Resolve second schema
-		result2, validationErrs2, err2 := Resolve(context.Background(), Reference("schema2.yaml"), testComplexUnmarshaler, opts)
+		result2, validationErrs2, err2 := Resolve(t.Context(), Reference("schema2.yaml"), testComplexUnmarshaler, opts)
 		require.NoError(t, err2)
 		assert.Nil(t, validationErrs2)
 		require.NotNil(t, result2)
@@ -1104,13 +1105,13 @@ func TestResolve_ObjectCaching_Success(t *testing.T) {
 		}
 
 		// First resolution with JSON pointer
-		result1, validationErrs1, err1 := Resolve(context.Background(), Reference("#/nestedModel"), testPrimitiveUnmarshaler, opts)
+		result1, validationErrs1, err1 := Resolve(t.Context(), Reference("#/nestedModel"), testPrimitiveUnmarshaler, opts)
 		require.NoError(t, err1)
 		assert.Nil(t, validationErrs1)
 		require.NotNil(t, result1)
 
 		// Second resolution with same JSON pointer
-		result2, validationErrs2, err2 := Resolve(context.Background(), Reference("#/nestedModel"), testPrimitiveUnmarshaler, opts)
+		result2, validationErrs2, err2 := Resolve(t.Context(), Reference("#/nestedModel"), testPrimitiveUnmarshaler, opts)
 		require.NoError(t, err2)
 		assert.Nil(t, validationErrs2)
 		require.NotNil(t, result2)
@@ -1147,7 +1148,7 @@ func TestResolve_ObjectCaching_Success(t *testing.T) {
 		}
 
 		// First resolution
-		result1, validationErrs1, err1 := Resolve(context.Background(), Reference("schema.yaml"), customUnmarshaler, opts)
+		result1, validationErrs1, err1 := Resolve(t.Context(), Reference("schema.yaml"), customUnmarshaler, opts)
 		require.NoError(t, err1)
 		assert.Nil(t, validationErrs1)
 		require.NotNil(t, result1)
@@ -1157,7 +1158,7 @@ func TestResolve_ObjectCaching_Success(t *testing.T) {
 		result1.Object.ArrayField = append(result1.Object.ArrayField, "modified")
 
 		// Second resolution should return the same modified object
-		result2, validationErrs2, err2 := Resolve(context.Background(), Reference("schema.yaml"), customUnmarshaler, opts)
+		result2, validationErrs2, err2 := Resolve(t.Context(), Reference("schema.yaml"), customUnmarshaler, opts)
 		require.NoError(t, err2)
 		assert.Nil(t, validationErrs2)
 		require.NotNil(t, result2)
@@ -1197,14 +1198,14 @@ func TestResolve_ObjectCaching_Success(t *testing.T) {
 		}
 
 		// First resolution - should call unmarshaler
-		result1, validationErrs1, err1 := Resolve(context.Background(), Reference("schema.yaml"), countingUnmarshaler, opts)
+		result1, validationErrs1, err1 := Resolve(t.Context(), Reference("schema.yaml"), countingUnmarshaler, opts)
 		require.NoError(t, err1)
 		assert.Nil(t, validationErrs1)
 		require.NotNil(t, result1)
 		assert.Equal(t, 1, callCount, "unmarshaler should be called once")
 
 		// Second resolution - should use cache, not call unmarshaler
-		result2, validationErrs2, err2 := Resolve(context.Background(), Reference("schema.yaml"), countingUnmarshaler, opts)
+		result2, validationErrs2, err2 := Resolve(t.Context(), Reference("schema.yaml"), countingUnmarshaler, opts)
 		require.NoError(t, err2)
 		assert.Nil(t, validationErrs2)
 		require.NotNil(t, result2)
@@ -1252,7 +1253,7 @@ func TestResolve_ObjectCaching_Integration_Success(t *testing.T) {
 
 		// First round of resolutions
 		for _, ref := range references {
-			result, validationErrs, err := Resolve(context.Background(), Reference(ref), testComplexUnmarshaler, opts)
+			result, validationErrs, err := Resolve(t.Context(), Reference(ref), testComplexUnmarshaler, opts)
 			require.NoError(t, err, "Failed to resolve %s", ref)
 			assert.Nil(t, validationErrs)
 			require.NotNil(t, result)
@@ -1261,7 +1262,7 @@ func TestResolve_ObjectCaching_Integration_Success(t *testing.T) {
 
 		// Second round of resolutions (should use cache)
 		for _, ref := range references {
-			result, validationErrs, err := Resolve(context.Background(), Reference(ref), testComplexUnmarshaler, opts)
+			result, validationErrs, err := Resolve(t.Context(), Reference(ref), testComplexUnmarshaler, opts)
 			require.NoError(t, err, "Failed to resolve %s on second attempt", ref)
 			assert.Nil(t, validationErrs)
 			require.NotNil(t, result)

@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -85,11 +84,11 @@ termsOfService: https://example.com/terms-of-service
 			t.Parallel()
 
 			var info openapi.Info
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &info)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &info)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := info.Validate(context.Background())
+			errs := info.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, info.Valid, "expected info to be valid")
 		})
@@ -210,14 +209,14 @@ license:
 			t.Parallel()
 
 			var info openapi.Info
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &info)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &info)
 			require.NoError(t, err)
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := info.Validate(context.Background())
+			validateErrs := info.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")
@@ -302,11 +301,11 @@ url: https://api.example.com/v1/support/contact
 			t.Parallel()
 
 			var contact openapi.Contact
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &contact)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &contact)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := contact.Validate(context.Background())
+			errs := contact.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, contact.Valid, "expected contact to be valid")
 		})
@@ -372,14 +371,14 @@ email: "invalid-email"
 			t.Parallel()
 
 			var contact openapi.Contact
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &contact)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &contact)
 			require.NoError(t, err)
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := contact.Validate(context.Background())
+			validateErrs := contact.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")
@@ -453,11 +452,11 @@ identifier: BSD-3-Clause
 			t.Parallel()
 
 			var license openapi.License
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &license)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &license)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := license.Validate(context.Background())
+			errs := license.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, license.Valid, "expected license to be valid")
 		})
@@ -521,14 +520,14 @@ url: ":invalid"
 			t.Parallel()
 
 			var license openapi.License
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &license)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &license)
 			require.NoError(t, err)
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := license.Validate(context.Background())
+			validateErrs := license.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")

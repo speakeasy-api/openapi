@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -74,13 +75,14 @@ func (s *Server) Validate(ctx context.Context, opts ...validation.Option) []erro
 	errs := []error{}
 
 	if core.URL.Present {
-		if s.URL == "" {
+		switch {
+		case s.URL == "":
 			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("server field url is required"), core, core.URL))
-		} else if !strings.Contains(s.URL, "{") {
+		case !strings.Contains(s.URL, "{"):
 			if _, err := url.Parse(s.URL); err != nil {
 				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("server field url is not a valid uri: %s", err), core, core.URL))
 			}
-		} else {
+		default:
 			if resolvedURL, err := resolveServerVariables(s.URL, s.Variables); err != nil {
 				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("server field url is not a valid uri: %s", err), core, core.URL))
 			} else if _, err := url.Parse(resolvedURL); err != nil {
@@ -161,7 +163,7 @@ func (v *ServerVariable) Validate(ctx context.Context, opts ...validation.Option
 
 func resolveServerVariables(serverURL string, variables *sequencedmap.Map[string, *ServerVariable]) (string, error) {
 	if variables.Len() == 0 {
-		return "", fmt.Errorf("serverURL contains variables but no variables are defined")
+		return "", errors.New("serverURL contains variables but no variables are defined")
 	}
 
 	resolvedURL := serverURL

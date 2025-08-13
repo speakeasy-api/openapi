@@ -2,7 +2,6 @@ package oas3_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -60,11 +59,11 @@ url: https://api.example.com/v1/docs?section=reference
 			t.Parallel()
 
 			var extDoc oas3.ExternalDocumentation
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &extDoc)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &extDoc)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := extDoc.Validate(context.Background())
+			errs := extDoc.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, extDoc.Valid, "expected external doc to be valid")
 		})
@@ -120,11 +119,11 @@ url: ":invalid url"
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &extDoc)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &extDoc)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := extDoc.Validate(context.Background())
+			validateErrs := extDoc.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")

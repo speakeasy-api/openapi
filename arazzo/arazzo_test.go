@@ -2,8 +2,9 @@ package arazzo_test
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -240,12 +241,12 @@ func getTestArazzoInstance() *arazzo.Arazzo {
 
 func TestArazzo_Unmarshal_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	data, err := os.ReadFile("testdata/test.arazzo.yaml")
 	require.NoError(t, err)
 
-	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewBuffer([]byte(fmt.Sprintf(string(data), ""))))
+	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewBuffer(data))
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -261,14 +262,14 @@ func TestArazzo_Unmarshal_Success(t *testing.T) {
 
 func TestArazzo_RoundTrip_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	data, err := os.ReadFile("testdata/test.arazzo.yaml")
 	require.NoError(t, err)
 
 	doc := fmt.Sprintf(string(data), "")
 
-	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewBuffer([]byte(doc)))
+	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewBufferString(doc))
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -292,7 +293,7 @@ sourceDescriptions:
     x-test: some-value
 `)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewBuffer(data))
 	require.NoError(t, err)
@@ -312,7 +313,8 @@ sourceDescriptions:
 	require.Len(t, validationErrs, len(expectedErrors), "number of validation errors should match")
 
 	for i, expectedErr := range expectedErrors {
-		validationErr, ok := validationErrs[i].(*validation.Error)
+		var validationErr *validation.Error
+		ok := errors.As(validationErrs[i], &validationErr)
 		require.True(t, ok, "error at index %d should be a validation.Error", i)
 
 		assert.Equal(t, expectedErr.line, validationErr.GetLineNumber(), "line number should match for error %d", i)
@@ -361,7 +363,7 @@ sourceDescriptions:
 
 func TestArazzo_Mutate_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	data, err := os.ReadFile("testdata/test.arazzo.yaml")
 	require.NoError(t, err)
@@ -460,7 +462,7 @@ func TestArazzo_Create_Success(t *testing.T) {
 	t.Parallel()
 	outBuf := bytes.NewBuffer([]byte{})
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	testInstance := getTestArazzoInstance()
 	err := arazzo.Marshal(ctx, testInstance, outBuf)
@@ -492,7 +494,7 @@ sourceDescriptions:
 workflows: []
 `)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewReader(data))
 	require.NoError(t, err)
@@ -715,7 +717,7 @@ func TestArazzo_StressTests_Validate(t *testing.T) {
 	for _, tt := range stressTests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
+			ctx := t.Context()
 
 			var r io.ReadCloser
 			if strings.HasPrefix(tt.args.location, "testdata/") {
@@ -727,7 +729,7 @@ func TestArazzo_StressTests_Validate(t *testing.T) {
 				r, err = downloadFile(tt.args.location)
 				require.NoError(t, err)
 			}
-			defer r.Close() //nolint:errcheck
+			defer r.Close()
 
 			arazzo, validationErrs, err := arazzo.Unmarshal(ctx, r)
 			require.NoError(t, err)
@@ -748,7 +750,7 @@ func TestArazzo_StressTests_RoundTrip(t *testing.T) {
 				t.SkipNow()
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 
 			var r io.ReadCloser
 			if strings.HasPrefix(tt.args.location, "testdata/") {
@@ -760,7 +762,7 @@ func TestArazzo_StressTests_RoundTrip(t *testing.T) {
 				r, err = downloadFile(tt.args.location)
 				require.NoError(t, err)
 			}
-			defer r.Close() //nolint:errcheck
+			defer r.Close()
 
 			inBuf := bytes.NewBuffer([]byte{})
 			tee := io.TeeReader(r, inBuf)
@@ -794,7 +796,7 @@ func downloadFile(url string) (io.ReadCloser, error) {
 
 	// hash url to create a unique filename
 	hash := sha256.Sum256([]byte(url))
-	filename := fmt.Sprintf("%x", hash)
+	filename := hex.EncodeToString(hash[:])
 
 	filepath := filepath.Join(tempDir, filename)
 
@@ -808,7 +810,7 @@ func downloadFile(url string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close() //nolint:errcheck
+	defer resp.Body.Close()
 
 	// Read all data from response body
 	data, err := io.ReadAll(resp.Body)
@@ -821,7 +823,7 @@ func downloadFile(url string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close() //nolint:errcheck
+	defer f.Close()
 
 	_, err = f.Write(data)
 	if err != nil {

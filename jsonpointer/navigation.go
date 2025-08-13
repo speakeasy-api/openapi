@@ -1,6 +1,7 @@
 package jsonpointer
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -37,7 +38,7 @@ var (
 
 func (j JSONPointer) getNavigationStack() ([]navigationPart, error) {
 	if len(j) == 0 {
-		return nil, fmt.Errorf("jsonpointer must not be empty")
+		return nil, errors.New("jsonpointer must not be empty")
 	}
 
 	if len(j) == 1 && j[0] == '/' {

@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -41,7 +40,7 @@ x-max-file-size: 10485760
 
 	var encoding openapi.Encoding
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &encoding)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &encoding)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -87,12 +86,12 @@ func TestEncoding_Unmarshal_Minimal(t *testing.T) {
 
 	var encoding openapi.Encoding
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &encoding)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &encoding)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
 	// Verify defaults
-	require.Equal(t, "", encoding.GetContentTypeValue())
+	require.Empty(t, encoding.GetContentTypeValue())
 	require.Equal(t, openapi.SerializationStyleForm, encoding.GetStyle()) // Default style
 	require.True(t, encoding.GetExplode())                                // Default explode for form style
 	require.False(t, encoding.GetAllowReserved())                         // Default allowReserved
@@ -151,7 +150,7 @@ style: deepObject
 
 			var encoding openapi.Encoding
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &encoding)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &encoding)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
@@ -198,7 +197,7 @@ contentType: application/json,application/xml,text/plain
 
 			var encoding openapi.Encoding
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &encoding)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &encoding)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 

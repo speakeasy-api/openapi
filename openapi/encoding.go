@@ -54,6 +54,8 @@ func (e *Encoding) GetContentType(schema *oas3.JSONSchema[oas3.Concrete]) string
 				if schema.GetLeft().Items.IsResolved() {
 					return e.GetContentType(schema.Left.Items.GetResolvedSchema())
 				}
+			default:
+				break
 			}
 		}
 

@@ -73,7 +73,7 @@ func walk(ctx context.Context, openAPI *OpenAPI, yield func(WalkItem) bool) {
 	yield(WalkItem{Match: geMatchFunc(openAPI.Extensions), Location: append(loc, LocationContext{Parent: openAPIMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
-func walkInfo(ctx context.Context, info *Info, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
+func walkInfo(_ context.Context, info *Info, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
 	if info == nil {
 		return true
 	}
@@ -88,7 +88,8 @@ func walkInfo(ctx context.Context, info *Info, loc []LocationContext, openAPI *O
 	if info.Contact != nil {
 		contactMatchFunc := geMatchFunc(info.Contact)
 
-		contactLoc := append(loc, LocationContext{Parent: infoMatchFunc, ParentField: "contact"})
+		contactLoc := loc
+		contactLoc = append(contactLoc, LocationContext{Parent: infoMatchFunc, ParentField: "contact"})
 
 		if !yield(WalkItem{Match: contactMatchFunc, Location: contactLoc, OpenAPI: openAPI}) {
 			return false
@@ -103,7 +104,8 @@ func walkInfo(ctx context.Context, info *Info, loc []LocationContext, openAPI *O
 	if info.License != nil {
 		licenseMatchFunc := geMatchFunc(info.License)
 
-		licenseLoc := append(loc, LocationContext{Parent: infoMatchFunc, ParentField: "license"})
+		licenseLoc := loc
+		licenseLoc = append(licenseLoc, LocationContext{Parent: infoMatchFunc, ParentField: "license"})
 
 		if !yield(WalkItem{Match: licenseMatchFunc, Location: licenseLoc, OpenAPI: openAPI}) {
 			return false
@@ -357,7 +359,7 @@ func walkResponses(ctx context.Context, responses *Responses, loc []LocationCont
 
 	// Walk through status code responses
 	for statusCode, response := range responses.All() {
-		if !walkReferencedResponse(ctx, response, append(loc, LocationContext{Parent: responsesMatchFunc, ParentKey: pointer.From(string(statusCode))}), openAPI, yield) {
+		if !walkReferencedResponse(ctx, response, append(loc, LocationContext{Parent: responsesMatchFunc, ParentKey: pointer.From(statusCode)}), openAPI, yield) {
 			return false
 		}
 	}
@@ -609,7 +611,7 @@ func walkReferencedExample(ctx context.Context, example *ReferencedExample, loc 
 }
 
 // walkExample walks through an example
-func walkExample(ctx context.Context, example *Example, parent MatchFunc, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
+func walkExample(_ context.Context, example *Example, parent MatchFunc, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
 	if example == nil {
 		return true
 	}

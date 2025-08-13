@@ -73,7 +73,7 @@ x-speakeasy-custom-security-scheme:
 `
 
 	// Unmarshal the YAML into a model with extensions
-	m := getTestModelWithExtensions(context.Background(), t, yamlContent)
+	m := getTestModelWithExtensions(t.Context(), t, yamlContent)
 
 	// Verify the extension was parsed
 	require.Equal(t, 1, m.Extensions.Len(), "should have one extension")
@@ -83,14 +83,14 @@ x-speakeasy-custom-security-scheme:
 	// This should succeed even when some fields are missing from the YAML
 	var css CustomSecurityConfig
 	vErrs, err := extensions.UnmarshalExtensionModel[CustomSecurityConfig, CoreCustomSecurityConfig](
-		context.Background(),
+		t.Context(),
 		m.Extensions,
 		"x-speakeasy-custom-security-scheme",
 		&css,
 	)
 
 	// Should not error
-	assert.NoError(t, err, "should successfully unmarshal extension model")
+	require.NoError(t, err, "should successfully unmarshal extension model")
 	assert.Empty(t, vErrs, "should have no validation errors")
 
 	// Should populate the schema field that was present in YAML

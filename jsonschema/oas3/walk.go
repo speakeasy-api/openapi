@@ -92,7 +92,8 @@ func walkSchema(ctx context.Context, schema *JSONSchema[Referenceable], loc walk
 		if js.Discriminator != nil {
 			discriminatorMatchFunc := getSchemaMatchFunc(js.Discriminator)
 
-			discriminatorLoc := append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "discriminator"})
+			discriminatorLoc := loc
+			discriminatorLoc = append(discriminatorLoc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "discriminator"})
 
 			if !yield(SchemaWalkItem{Match: discriminatorMatchFunc, Location: discriminatorLoc, Schema: rootSchema}) {
 				return false
@@ -197,7 +198,8 @@ func walkSchema(ctx context.Context, schema *JSONSchema[Referenceable], loc walk
 		if js.XML != nil {
 			xmlMatchFunc := getSchemaMatchFunc(js.XML)
 
-			xmlLoc := append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "xml"})
+			xmlLoc := loc
+			xmlLoc = append(xmlLoc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "xml"})
 
 			if !yield(SchemaWalkItem{Match: xmlMatchFunc, Location: xmlLoc, Schema: rootSchema}) {
 				return false
@@ -218,7 +220,7 @@ func walkSchema(ctx context.Context, schema *JSONSchema[Referenceable], loc walk
 	return true
 }
 
-func walkExternalDocs(ctx context.Context, externalDocs *ExternalDocumentation, loc walk.Locations[SchemaMatchFunc], rootSchema *JSONSchema[Referenceable], yield func(SchemaWalkItem) bool) bool {
+func walkExternalDocs(_ context.Context, externalDocs *ExternalDocumentation, loc walk.Locations[SchemaMatchFunc], rootSchema *JSONSchema[Referenceable], yield func(SchemaWalkItem) bool) bool {
 	if externalDocs == nil {
 		return true
 	}

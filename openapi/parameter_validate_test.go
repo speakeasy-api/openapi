@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -122,11 +121,11 @@ description: This parameter is deprecated
 			t.Parallel()
 
 			var param openapi.Parameter
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &param)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &param)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := param.Validate(context.Background())
+			errs := param.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, param.Valid, "expected parameter to be valid")
 		})
@@ -209,14 +208,14 @@ required: false
 			t.Parallel()
 
 			var param openapi.Parameter
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &param)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &param)
 			require.NoError(t, err)
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := param.Validate(context.Background())
+			validateErrs := param.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")

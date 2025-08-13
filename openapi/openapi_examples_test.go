@@ -3,6 +3,7 @@ package openapi_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ func Example_reading() {
 	if err != nil {
 		panic(err)
 	}
-	defer r.Close() //nolint:errcheck
+	defer r.Close()
 
 	// Unmarshal the OpenAPI document which will also validate it against the OpenAPI Specification
 	doc, validationErrs, err := openapi.Unmarshal(ctx, r /*, openapi.WithSkipValidation()*/) // Optionally skip validation
@@ -189,7 +190,7 @@ func Example_validating() {
 	if err != nil {
 		panic(err)
 	}
-	defer f.Close() //nolint:errcheck
+	defer f.Close()
 
 	// Unmarshal with validation (default behavior)
 	doc, validationErrs, err := openapi.Unmarshal(ctx, f)
@@ -228,7 +229,7 @@ func Example_mutating() {
 	if err != nil {
 		panic(err)
 	}
-	defer r.Close() //nolint:errcheck
+	defer r.Close()
 
 	// Unmarshal the OpenAPI document
 	doc, validationErrs, err := openapi.Unmarshal(ctx, r)
@@ -290,7 +291,7 @@ func Example_walking() {
 	if err != nil {
 		panic(err)
 	}
-	defer f.Close() //nolint:errcheck
+	defer f.Close()
 
 	doc, _, err := openapi.Unmarshal(ctx, f)
 	if err != nil {
@@ -333,7 +334,7 @@ func Example_walking() {
 			},
 		})
 		if err != nil {
-			if err == walk.ErrTerminate {
+			if errors.Is(err, walk.ErrTerminate) {
 				fmt.Println("Walk terminated early")
 				break
 			}
@@ -364,7 +365,7 @@ func Example_resolvingAllReferences() {
 	if err != nil {
 		panic(err)
 	}
-	defer f.Close() //nolint:errcheck
+	defer f.Close()
 
 	// Unmarshal the document
 	doc, validationErrs, err := openapi.Unmarshal(ctx, f)
@@ -421,7 +422,7 @@ func Example_resolvingReferencesAsYouGo() {
 	if err != nil {
 		panic(err)
 	}
-	defer f.Close() //nolint:errcheck
+	defer f.Close()
 
 	// Unmarshal the document
 	doc, _, err := openapi.Unmarshal(ctx, f)

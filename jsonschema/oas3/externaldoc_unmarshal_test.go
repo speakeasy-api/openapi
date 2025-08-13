@@ -2,7 +2,6 @@ package oas3_test
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
@@ -22,7 +21,7 @@ x-custom: custom-value
 
 	var extDocs oas3.ExternalDocumentation
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &extDocs)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &extDocs)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 

@@ -78,6 +78,12 @@ var (
 // Expression represents a runtime expression as defined by the OpenAPI & Arazzo specifications.
 type Expression string
 
+var _ fmt.Stringer = (*Expression)(nil)
+
+func (e Expression) String() string {
+	return string(e)
+}
+
 // Validate will validate the expression is valid as per the OpenAPI & Arazzo specifications.
 func (e Expression) Validate() error {
 	// First check basic format using ExtractExpressions

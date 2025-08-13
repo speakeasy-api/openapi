@@ -45,7 +45,7 @@ type TestCoreModel struct {
 
 func TestUnmarshalExtensionModel_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	m := getTestModelWithExtensions(ctx, t, `
 test: hello world
@@ -64,7 +64,7 @@ x-speakeasy-test:
 
 func TestGetExtensionValue_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	m := getTestModelWithExtensions(ctx, t, `
 test: hello world
@@ -91,7 +91,7 @@ x-simple-model:
 	boolVal, err := extensions.GetExtensionValue[bool](m.Extensions, "x-bool")
 	require.NoError(t, err)
 	require.NotNil(t, boolVal)
-	assert.Equal(t, true, *boolVal)
+	assert.True(t, *boolVal)
 
 	simpleMapVal, err := extensions.GetExtensionValue[map[string]string](m.Extensions, "x-simple-map")
 	require.NoError(t, err)

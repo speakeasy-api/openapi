@@ -1,9 +1,9 @@
 package testutils
 
 import (
-	"fmt"
 	"iter"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ func CreateStringYamlNode(value string, line, column int) *yaml.Node {
 
 func CreateIntYamlNode(value int, line, column int) *yaml.Node {
 	return &yaml.Node{
-		Value:  fmt.Sprintf("%d", value),
+		Value:  strconv.Itoa(value),
 		Kind:   yaml.ScalarNode,
 		Tag:    "!!int",
 		Line:   line,
@@ -33,7 +33,7 @@ func CreateIntYamlNode(value int, line, column int) *yaml.Node {
 
 func CreateBoolYamlNode(value bool, line, column int) *yaml.Node {
 	return &yaml.Node{
-		Value:  fmt.Sprintf("%t", value),
+		Value:  strconv.FormatBool(value),
 		Kind:   yaml.ScalarNode,
 		Tag:    "!!bool",
 		Line:   line,
@@ -72,6 +72,7 @@ func isInterfaceNil(i interface{}) bool {
 }
 
 func AssertEqualSequencedMap(t *testing.T, expected, actual SequencedMap) {
+	t.Helper()
 	// Check if both are truly nil (interface with nil type and value)
 	if expected == nil && actual == nil {
 		return

@@ -2,6 +2,7 @@ package marshaller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"reflect"
@@ -23,7 +24,7 @@ type MapGetter interface {
 func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.Node, target interfaces.SequencedMapInterface) ([]error, error) {
 	resolvedNode := yml.ResolveAlias(node)
 	if resolvedNode == nil {
-		return nil, fmt.Errorf("node is nil")
+		return nil, errors.New("node is nil")
 	}
 
 	// Check if the node is actually a mapping node
@@ -47,7 +48,6 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 	valuesToSet := make([]keyPair, numJobs)
 
 	for i := 0; i < len(resolvedNode.Content); i += 2 {
-		i := i
 		g.Go(func() error {
 			keyNode := resolvedNode.Content[i]
 			valueNode := resolvedNode.Content[i+1]
@@ -55,7 +55,7 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 			// Resolve alias for key node to handle alias keys like *keyAlias :
 			resolvedKeyNode := yml.ResolveAlias(keyNode)
 			if resolvedKeyNode == nil {
-				return fmt.Errorf("failed to resolve key node alias")
+				return errors.New("failed to resolve key node alias")
 			}
 			key := resolvedKeyNode.Value
 
@@ -123,13 +123,14 @@ func populateSequencedMap(source any, target interfaces.SequencedMapInterface) e
 	var ok bool
 
 	// Handle both pointer and non-pointer cases
-	if sourceValue.Kind() == reflect.Ptr {
+	switch {
+	case sourceValue.Kind() == reflect.Ptr:
 		// Source is already a pointer
 		sm, ok = source.(interfaces.SequencedMapInterface)
-	} else if sourceValue.CanAddr() {
+	case sourceValue.CanAddr():
 		// Source is addressable, get a pointer to it
 		sm, ok = sourceValue.Addr().Interface().(interfaces.SequencedMapInterface)
-	} else {
+	default:
 		// Source is neither a pointer nor addressable
 		return fmt.Errorf("expected source to be addressable or a pointer to SequencedMap, got %s", sourceValue.Type())
 	}

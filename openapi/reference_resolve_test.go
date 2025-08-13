@@ -1,7 +1,6 @@
 package openapi
 
 import (
-	"context"
 	"io"
 	"io/fs"
 	"os"
@@ -31,6 +30,7 @@ func TestResolveObject_Success(t *testing.T) {
 			componentType: "parameters",
 			componentName: "testParamRef",
 			testFunc: func(t *testing.T, resolved interface{}, validationErrs []error, err error) {
+				t.Helper()
 				require.NoError(t, err)
 				assert.Empty(t, validationErrs)
 				param, ok := resolved.(*Parameter)
@@ -47,6 +47,7 @@ func TestResolveObject_Success(t *testing.T) {
 			componentType: "parameters",
 			componentName: "testExternalParamRef",
 			testFunc: func(t *testing.T, resolved interface{}, validationErrs []error, err error) {
+				t.Helper()
 				require.NoError(t, err)
 				assert.Empty(t, validationErrs)
 				param, ok := resolved.(*Parameter)
@@ -62,6 +63,7 @@ func TestResolveObject_Success(t *testing.T) {
 			componentType: "responses",
 			componentName: "testResponseRef",
 			testFunc: func(t *testing.T, resolved interface{}, validationErrs []error, err error) {
+				t.Helper()
 				require.NoError(t, err)
 				assert.Empty(t, validationErrs)
 				response, ok := resolved.(*Response)
@@ -77,6 +79,7 @@ func TestResolveObject_Success(t *testing.T) {
 			componentType: "examples",
 			componentName: "testExampleRef",
 			testFunc: func(t *testing.T, resolved interface{}, validationErrs []error, err error) {
+				t.Helper()
 				require.NoError(t, err)
 				assert.Empty(t, validationErrs)
 				example, ok := resolved.(*Example)
@@ -92,6 +95,7 @@ func TestResolveObject_Success(t *testing.T) {
 			componentType: "requestBodies",
 			componentName: "testRequestBodyRef",
 			testFunc: func(t *testing.T, resolved interface{}, validationErrs []error, err error) {
+				t.Helper()
 				require.NoError(t, err)
 				assert.Empty(t, validationErrs)
 				requestBody, ok := resolved.(*RequestBody)
@@ -107,6 +111,7 @@ func TestResolveObject_Success(t *testing.T) {
 			componentType: "headers",
 			componentName: "testHeaderRef",
 			testFunc: func(t *testing.T, resolved interface{}, validationErrs []error, err error) {
+				t.Helper()
 				require.NoError(t, err)
 				assert.Empty(t, validationErrs)
 				header, ok := resolved.(*Header)
@@ -122,6 +127,7 @@ func TestResolveObject_Success(t *testing.T) {
 			componentType: "securitySchemes",
 			componentName: "testSecurityRef",
 			testFunc: func(t *testing.T, resolved interface{}, validationErrs []error, err error) {
+				t.Helper()
 				require.NoError(t, err)
 				assert.Empty(t, validationErrs)
 				security, ok := resolved.(*SecurityScheme)
@@ -138,6 +144,7 @@ func TestResolveObject_Success(t *testing.T) {
 			componentType: "links",
 			componentName: "testLinkRef",
 			testFunc: func(t *testing.T, resolved interface{}, validationErrs []error, err error) {
+				t.Helper()
 				require.NoError(t, err)
 				assert.Empty(t, validationErrs)
 				link, ok := resolved.(*Link)
@@ -153,6 +160,7 @@ func TestResolveObject_Success(t *testing.T) {
 			componentType: "callbacks",
 			componentName: "testCallbackRef",
 			testFunc: func(t *testing.T, resolved interface{}, validationErrs []error, err error) {
+				t.Helper()
 				require.NoError(t, err)
 				assert.Empty(t, validationErrs)
 				callback, ok := resolved.(*Callback)
@@ -160,7 +168,7 @@ func TestResolveObject_Success(t *testing.T) {
 				require.NotNil(t, callback)
 				// Test that callback has expressions (via embedded map)
 				assert.NotNil(t, callback.Map)
-				assert.True(t, callback.Len() > 0, "Callback should have expressions")
+				assert.Positive(t, callback.Len(), "Callback should have expressions")
 			},
 		},
 	}
@@ -169,13 +177,13 @@ func TestResolveObject_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// Load the OpenAPI document
 			testDataPath := filepath.Join("testdata", "resolve_test", tt.filename)
 			file, err := os.Open(testDataPath)
 			require.NoError(t, err)
-			defer file.Close() //nolint:errcheck
+			defer file.Close()
 
 			doc, validationErrs, err := Unmarshal(ctx, file)
 			require.NoError(t, err)
@@ -339,13 +347,13 @@ func TestResolveObject_Error(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// Load the OpenAPI document
 			testDataPath := filepath.Join("testdata", "resolve_test", tt.filename)
 			file, err := os.Open(testDataPath)
 			require.NoError(t, err)
-			defer file.Close() //nolint:errcheck
+			defer file.Close()
 
 			doc, validationErrs, err := Unmarshal(ctx, file)
 			require.NoError(t, err)
@@ -383,7 +391,7 @@ func TestResolveObject_Error(t *testing.T) {
 func TestResolveObjectWithTracking_CircularReference(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a test reference that would cause circular reference
 	ref := ReferencedParameter{
@@ -500,7 +508,7 @@ func TestResolveObject_Caching_SameReference(t *testing.T) {
 	t.Parallel()
 	// Note: Cannot use t.Parallel() due to shared cache state causing race conditions
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create mock filesystem and read existing test files
 	mockFS := NewMockVirtualFS()
@@ -519,7 +527,7 @@ func TestResolveObject_Caching_SameReference(t *testing.T) {
 	mainPath := filepath.Join("testdata", "resolve_test", "main.yaml")
 	file, err := os.Open(mainPath)
 	require.NoError(t, err)
-	defer file.Close() //nolint:errcheck
+	defer file.Close()
 
 	mainDoc, validationErrs, err := Unmarshal(ctx, file)
 	require.NoError(t, err)
@@ -577,7 +585,7 @@ func TestResolveObject_Caching_MultipleReferencesToSameFile(t *testing.T) {
 	t.Parallel()
 	// Note: Cannot use t.Parallel() due to shared cache state causing race conditions
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create mock filesystem and read existing test files
 	mockFS := NewMockVirtualFS()
@@ -596,7 +604,7 @@ func TestResolveObject_Caching_MultipleReferencesToSameFile(t *testing.T) {
 	mainPath := filepath.Join("testdata", "resolve_test", "main.yaml")
 	file, err := os.Open(mainPath)
 	require.NoError(t, err)
-	defer file.Close() //nolint:errcheck
+	defer file.Close()
 
 	mainDoc, validationErrs, err := Unmarshal(ctx, file)
 	require.NoError(t, err)
@@ -676,7 +684,7 @@ func TestResolveObject_Caching_DifferentFiles(t *testing.T) {
 	t.Parallel()
 	// Note: Cannot use t.Parallel() due to shared cache state causing race conditions
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create mock filesystem and read existing test files
 	mockFS := NewMockVirtualFS()
@@ -705,7 +713,7 @@ func TestResolveObject_Caching_DifferentFiles(t *testing.T) {
 	mainPath := filepath.Join("testdata", "resolve_test", "main.yaml")
 	file, err := os.Open(mainPath)
 	require.NoError(t, err)
-	defer file.Close() //nolint:errcheck
+	defer file.Close()
 
 	mainDoc, validationErrs, err := Unmarshal(ctx, file)
 	require.NoError(t, err)
@@ -765,13 +773,13 @@ func TestResolveObject_TrickyJSONPointers(t *testing.T) {
 	t.Parallel()
 	// Note: Cannot use t.Parallel() due to shared cache state causing race conditions
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Load test document with tricky JSON pointer references
 	mainPath := filepath.Join("testdata", "resolve_test", "main.yaml")
 	file, err := os.Open(mainPath)
 	require.NoError(t, err)
-	defer file.Close() //nolint:errcheck
+	t.Cleanup(func() { _ = file.Close() })
 
 	mainDoc, validationErrs, err := Unmarshal(ctx, file)
 	require.NoError(t, err)
@@ -797,6 +805,7 @@ func TestResolveObject_TrickyJSONPointers(t *testing.T) {
 			componentType: "parameters",
 			componentName: "trickyOperationParamRef",
 			testFunc: func(t *testing.T, resolved interface{}, validationErrs []error, err error) {
+				t.Helper()
 				// Log the error to understand what's happening with the JSON pointer
 				if err != nil {
 					t.Logf("JSON pointer resolution failed (this may be expected): %v", err)
@@ -817,6 +826,7 @@ func TestResolveObject_TrickyJSONPointers(t *testing.T) {
 			componentType: "parameters",
 			componentName: "trickyPostParamRef",
 			testFunc: func(t *testing.T, resolved interface{}, validationErrs []error, err error) {
+				t.Helper()
 				if err != nil {
 					t.Logf("JSON pointer resolution failed (this may be expected): %v", err)
 					assert.Contains(t, err.Error(), "not found")
@@ -834,6 +844,7 @@ func TestResolveObject_TrickyJSONPointers(t *testing.T) {
 			componentType: "responses",
 			componentName: "trickyOperationResponseRef",
 			testFunc: func(t *testing.T, resolved interface{}, validationErrs []error, err error) {
+				t.Helper()
 				if err != nil {
 					t.Logf("JSON pointer resolution failed (this may be expected): %v", err)
 					assert.Contains(t, err.Error(), "not found")
@@ -893,7 +904,7 @@ func TestResolveObject_ChainedReference_Success(t *testing.T) {
 	t.Parallel()
 	// Note: Cannot use t.Parallel() due to shared cache state causing race conditions
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create mock filesystem with the test files
 	mockFS := NewMockVirtualFS()
@@ -923,7 +934,7 @@ func TestResolveObject_ChainedReference_Success(t *testing.T) {
 	mainPath := filepath.Join("testdata", "resolve_test", "main.yaml")
 	file, err := os.Open(mainPath)
 	require.NoError(t, err)
-	defer file.Close() //nolint:errcheck
+	defer file.Close()
 
 	mainDoc, validationErrs, err := Unmarshal(ctx, file)
 	require.NoError(t, err)

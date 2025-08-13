@@ -1,7 +1,6 @@
 package oas3
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,7 +57,7 @@ func TestJSONSchema_Resolve_ExternalWithInternalRefs(t *testing.T) {
 		}
 
 		// First resolution - get the Person schema
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 		require.NoError(t, err, "first resolution should succeed")
 		assert.Nil(t, validationErrs)
 
@@ -85,7 +84,7 @@ func TestJSONSchema_Resolve_ExternalWithInternalRefs(t *testing.T) {
 
 			// Try to resolve the address reference
 			// This reference (#/$defs/Address) should resolve within the external document
-			addressValidationErrs, addressErr := addressProp.Resolve(context.Background(), opts)
+			addressValidationErrs, addressErr := addressProp.Resolve(t.Context(), opts)
 
 			// Log any error for debugging
 			if addressErr != nil {
@@ -160,7 +159,7 @@ func TestJSONSchema_Resolve_ExternalWithInternalRefs(t *testing.T) {
 		}
 
 		// First resolution - get the TreeNode schema
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 		require.NoError(t, err, "first resolution should succeed")
 		assert.Nil(t, validationErrs)
 
@@ -205,7 +204,7 @@ func TestJSONSchema_Resolve_ExternalWithInternalRefs(t *testing.T) {
 			// The items reference should resolve against the external document
 			// Since this was loaded from external_circular.json, that should be the context
 
-			itemsValidationErrs, itemsErr := items.Resolve(context.Background(), itemsOpts)
+			itemsValidationErrs, itemsErr := items.Resolve(t.Context(), itemsOpts)
 
 			// For circular references, we expect this to either:
 			// 1. Succeed if the resolution handles circularity

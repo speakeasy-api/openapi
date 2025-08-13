@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -105,11 +104,11 @@ x-another: 123
 
 			var securityScheme openapi.SecurityScheme
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &securityScheme)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &securityScheme)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := securityScheme.Validate(context.Background())
+			errs := securityScheme.Validate(t.Context())
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -193,11 +192,11 @@ type: openIdConnect
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &securityScheme)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &securityScheme)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := securityScheme.Validate(context.Background())
+			validateErrs := securityScheme.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "Expected validation errors")
@@ -258,7 +257,7 @@ oauth2:
 
 			var securityRequirement openapi.SecurityRequirement
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &securityRequirement)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &securityRequirement)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
@@ -276,7 +275,7 @@ oauth2:
 				},
 			}
 
-			errs := securityRequirement.Validate(context.Background(), validation.WithContextObject(openAPIDoc))
+			errs := securityRequirement.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -305,7 +304,7 @@ undefined_scheme: []
 
 			var securityRequirement openapi.SecurityRequirement
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &securityRequirement)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &securityRequirement)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
@@ -316,7 +315,7 @@ undefined_scheme: []
 				},
 			}
 
-			errs := securityRequirement.Validate(context.Background(), validation.WithContextObject(openAPIDoc))
+			errs := securityRequirement.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 			require.NotEmpty(t, errs, "Expected validation errors")
 			require.Contains(t, errs[0].Error(), tt.expectedErr)
 		})
@@ -403,11 +402,11 @@ x-custom: value
 
 			var oauthFlows openapi.OAuthFlows
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &oauthFlows)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &oauthFlows)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := oauthFlows.Validate(context.Background())
+			errs := oauthFlows.Validate(t.Context())
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -487,11 +486,11 @@ x-custom: value
 
 			var oauthFlow openapi.OAuthFlow
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &oauthFlow)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &oauthFlow)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := oauthFlow.Validate(context.Background(), validation.WithContextObject(&tt.flowType))
+			errs := oauthFlow.Validate(t.Context(), validation.WithContextObject(&tt.flowType))
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -567,11 +566,11 @@ tokenUrl: https://example.com/oauth/token
 
 			var oauthFlow openapi.OAuthFlow
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &oauthFlow)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &oauthFlow)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := oauthFlow.Validate(context.Background(), validation.WithContextObject(&tt.flowType))
+			errs := oauthFlow.Validate(t.Context(), validation.WithContextObject(&tt.flowType))
 			require.NotEmpty(t, errs, "Expected validation errors")
 			require.Contains(t, errs[0].Error(), tt.expectedErr)
 		})

@@ -2,7 +2,6 @@ package oas3_test
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
@@ -162,7 +161,7 @@ x-metadata:
 
 	var schema oas3.Schema
 
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yml)), &schema)
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &schema)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -181,9 +180,9 @@ x-metadata:
 
 	// Test numeric constraints
 	require.NotNil(t, schema.MultipleOf)
-	require.Equal(t, 1.0, *schema.MultipleOf)
-	require.Equal(t, 0.0, *schema.GetMinimum())
-	require.Equal(t, 1000.0, *schema.GetMaximum())
+	require.InDelta(t, 1.0, *schema.MultipleOf, 0.001)
+	require.InDelta(t, 0.0, *schema.GetMinimum(), 0.001)
+	require.InDelta(t, 1000.0, *schema.GetMaximum(), 0.001)
 	require.NotNil(t, schema.ExclusiveMinimum)
 	require.NotNil(t, schema.ExclusiveMaximum)
 

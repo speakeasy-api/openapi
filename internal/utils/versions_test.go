@@ -132,7 +132,7 @@ func Test_ParseVersion_Error(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			major, minor, patch, err := ParseVersion(tt.args.version)
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Equal(t, 0, major)
 			assert.Equal(t, 0, minor)
 			assert.Equal(t, 0, patch)

@@ -2,7 +2,6 @@ package oas3_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
@@ -19,7 +18,7 @@ func TestInline_ContextTimeout_Error(t *testing.T) {
 	})
 
 	// Create a context that is already cancelled to ensure deterministic behavior
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // Cancel immediately to ensure context is cancelled before Inline is called
 
 	opts := oas3.InlineOptions{
@@ -34,13 +33,13 @@ func TestInline_ContextTimeout_Error(t *testing.T) {
 	require.Error(t, err, "should fail with timeout error")
 
 	// Check that it's the expected timeout error
-	assert.True(t, errors.Is(err, oas3.ErrInlineTimeout), "should be timeout error")
+	require.ErrorIs(t, err, oas3.ErrInlineTimeout, "should be timeout error")
 	assert.Contains(t, err.Error(), "inline operation timed out", "should contain timeout message")
 }
 
 func TestInline_MaxCycles_Error(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a schema with a simple reference
 	schema := oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{
@@ -60,13 +59,13 @@ func TestInline_MaxCycles_Error(t *testing.T) {
 	require.Error(t, err, "should fail with max cycles error")
 
 	// Check that it's the expected timeout error (cycles are reported as timeout)
-	assert.True(t, errors.Is(err, oas3.ErrInlineTimeout), "should be timeout error")
+	require.ErrorIs(t, err, oas3.ErrInlineTimeout, "should be timeout error")
 	assert.Contains(t, err.Error(), "exceeded limit", "should contain exceeded limit message")
 }
 
 func TestInline_DefaultMaxCycles_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a simple schema without references
 	schema := oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{
@@ -89,7 +88,7 @@ func TestInline_DefaultMaxCycles_Success(t *testing.T) {
 
 func TestInline_CustomMaxCycles_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a simple schema without references
 	schema := oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{
@@ -112,7 +111,7 @@ func TestInline_CustomMaxCycles_Success(t *testing.T) {
 
 func TestInline_NilSchema_Success(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	opts := oas3.InlineOptions{
 		MaxCycles: 100,

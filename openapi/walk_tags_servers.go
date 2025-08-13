@@ -88,7 +88,7 @@ func walkVariables(ctx context.Context, variables *sequencedmap.Map[string, *Ser
 	return true
 }
 
-func walkVariable(ctx context.Context, variable *ServerVariable, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
+func walkVariable(_ context.Context, variable *ServerVariable, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
 	variableMatchFunc := geMatchFunc(variable)
 
 	if !yield(WalkItem{Match: variableMatchFunc, Location: loc, OpenAPI: openAPI}) {

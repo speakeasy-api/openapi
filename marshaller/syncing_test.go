@@ -1,7 +1,6 @@
 package marshaller_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/extensions"
@@ -32,7 +31,7 @@ func TestSync_PrimitiveTypes_Success(t *testing.T) {
 	}
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -43,15 +42,15 @@ func TestSync_PrimitiveTypes_Success(t *testing.T) {
 	require.Equal(t, "synced string", coreModel.StringField.Value)
 	require.NotNil(t, coreModel.StringPtrField.Value)
 	require.Equal(t, "synced ptr string", *coreModel.StringPtrField.Value)
-	require.Equal(t, true, coreModel.BoolField.Value)
+	require.True(t, coreModel.BoolField.Value)
 	require.NotNil(t, coreModel.BoolPtrField.Value)
-	require.Equal(t, false, *coreModel.BoolPtrField.Value)
+	require.False(t, *coreModel.BoolPtrField.Value)
 	require.Equal(t, 99, coreModel.IntField.Value)
 	require.NotNil(t, coreModel.IntPtrField.Value)
 	require.Equal(t, 88, *coreModel.IntPtrField.Value)
-	require.Equal(t, 9.99, coreModel.Float64Field.Value)
+	require.InDelta(t, 9.99, coreModel.Float64Field.Value, 0.001)
 	require.NotNil(t, coreModel.Float64PtrField.Value)
-	require.Equal(t, 8.88, *coreModel.Float64PtrField.Value)
+	require.InDelta(t, 8.88, *coreModel.Float64PtrField.Value, 0.001)
 
 	// Verify the core model's RootNode contains the correct YAML
 	expectedYAML := `stringField: synced string
@@ -66,7 +65,7 @@ float64PtrField: 8.88
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_PrimitiveTypes_NilPointers_Success(t *testing.T) {
@@ -85,7 +84,7 @@ func TestSync_PrimitiveTypes_NilPointers_Success(t *testing.T) {
 	}
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -94,9 +93,9 @@ func TestSync_PrimitiveTypes_NilPointers_Success(t *testing.T) {
 
 	// Verify required fields were synced
 	require.Equal(t, "required string", coreModel.StringField.Value)
-	require.Equal(t, true, coreModel.BoolField.Value)
+	require.True(t, coreModel.BoolField.Value)
 	require.Equal(t, 42, coreModel.IntField.Value)
-	require.Equal(t, 3.14, coreModel.Float64Field.Value)
+	require.InDelta(t, 3.14, coreModel.Float64Field.Value, 0.001)
 
 	// Verify nil pointer fields are nil in core model
 	require.Nil(t, coreModel.StringPtrField.Value)
@@ -113,7 +112,7 @@ float64Field: 3.14
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_ComplexTypes_Success(t *testing.T) {
@@ -144,7 +143,7 @@ func TestSync_ComplexTypes_Success(t *testing.T) {
 	}
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -155,16 +154,16 @@ func TestSync_ComplexTypes_Success(t *testing.T) {
 	require.NotNil(t, coreModel.NestedModel.Value)
 	nestedCore := coreModel.NestedModel.Value
 	require.Equal(t, "nested synced", nestedCore.StringField.Value)
-	require.Equal(t, true, nestedCore.BoolField.Value)
+	require.True(t, nestedCore.BoolField.Value)
 	require.Equal(t, 200, nestedCore.IntField.Value)
-	require.Equal(t, 2.22, nestedCore.Float64Field.Value)
+	require.InDelta(t, 2.22, nestedCore.Float64Field.Value, 0.001)
 
 	// Verify nested model value was synced
 	nestedValueCore := coreModel.NestedModelValue.Value
 	require.Equal(t, "value synced", nestedValueCore.StringField.Value)
-	require.Equal(t, false, nestedValueCore.BoolField.Value)
+	require.False(t, nestedValueCore.BoolField.Value)
 	require.Equal(t, 300, nestedValueCore.IntField.Value)
-	require.Equal(t, 3.33, nestedValueCore.Float64Field.Value)
+	require.InDelta(t, 3.33, nestedValueCore.Float64Field.Value, 0.001)
 
 	// Verify array field was synced
 	arrayValue := coreModel.ArrayField.Value
@@ -201,7 +200,7 @@ nodeArrayField:
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_RequiredNilableTypes_Success(t *testing.T) {
@@ -223,7 +222,7 @@ func TestSync_RequiredNilableTypes_Success(t *testing.T) {
 	}
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -242,9 +241,9 @@ func TestSync_RequiredNilableTypes_Success(t *testing.T) {
 	require.NotNil(t, coreModel.RequiredStruct.Value)
 	structCore := coreModel.RequiredStruct.Value
 	require.Equal(t, "nested required synced", structCore.StringField.Value)
-	require.Equal(t, true, structCore.BoolField.Value)
+	require.True(t, structCore.BoolField.Value)
 	require.Equal(t, 500, structCore.IntField.Value)
-	require.Equal(t, 5.55, structCore.Float64Field.Value)
+	require.InDelta(t, 5.55, structCore.Float64Field.Value, 0.001)
 
 	// Verify optional fields are nil
 	require.Nil(t, coreModel.OptionalPtr.Value)
@@ -266,7 +265,7 @@ requiredStruct:
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_RequiredPointer_Success(t *testing.T) {
@@ -279,7 +278,7 @@ func TestSync_RequiredPointer_Success(t *testing.T) {
 	}
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -301,7 +300,7 @@ optionalPtr: optional synced ptr
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_EmbeddedMapWithFields_Success(t *testing.T) {
@@ -333,7 +332,7 @@ func TestSync_EmbeddedMapWithFields_Success(t *testing.T) {
 	highModel.Set("syncKey2", dynamicVal2)
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -355,14 +354,14 @@ func TestSync_EmbeddedMapWithFields_Success(t *testing.T) {
 	require.NotNil(t, syncedVal1)
 	syncedCore1 := syncedVal1.Value
 	require.Equal(t, "synced dynamic 1", syncedCore1.StringField.Value)
-	require.Equal(t, true, syncedCore1.BoolField.Value)
+	require.True(t, syncedCore1.BoolField.Value)
 
 	syncedVal2, ok2 := coreModel.Get("syncKey2")
 	require.True(t, ok2)
 	require.NotNil(t, syncedVal2)
 	syncedCore2 := syncedVal2.Value
 	require.Equal(t, "synced dynamic 2", syncedCore2.StringField.Value)
-	require.Equal(t, false, syncedCore2.BoolField.Value)
+	require.False(t, syncedCore2.BoolField.Value)
 
 	// Verify the core model's RootNode contains the correct YAML
 	expectedYAML := `syncKey1:
@@ -380,7 +379,7 @@ name: synced name
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_EmbeddedMap_Success(t *testing.T) {
@@ -396,7 +395,7 @@ func TestSync_EmbeddedMap_Success(t *testing.T) {
 	highModel.Set("syncKey3", "synced value3")
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -431,7 +430,7 @@ syncKey3: synced value3
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_Validation_Success(t *testing.T) {
@@ -463,7 +462,7 @@ func TestSync_Validation_Success(t *testing.T) {
 	}
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -490,16 +489,16 @@ func TestSync_Validation_Success(t *testing.T) {
 	require.NotNil(t, coreModel.RequiredStruct.Value)
 	requiredStructCore := coreModel.RequiredStruct.Value
 	require.Equal(t, "synced required nested", requiredStructCore.StringField.Value)
-	require.Equal(t, true, requiredStructCore.BoolField.Value)
+	require.True(t, requiredStructCore.BoolField.Value)
 	require.Equal(t, 600, requiredStructCore.IntField.Value)
-	require.Equal(t, 6.66, requiredStructCore.Float64Field.Value)
+	require.InDelta(t, 6.66, requiredStructCore.Float64Field.Value, 0.001)
 
 	require.NotNil(t, coreModel.OptionalStruct.Value)
 	optionalStructCore := coreModel.OptionalStruct.Value
 	require.Equal(t, "synced optional nested", optionalStructCore.StringField.Value)
-	require.Equal(t, false, optionalStructCore.BoolField.Value)
+	require.False(t, optionalStructCore.BoolField.Value)
 	require.Equal(t, 700, optionalStructCore.IntField.Value)
-	require.Equal(t, 7.77, optionalStructCore.Float64Field.Value)
+	require.InDelta(t, 7.77, optionalStructCore.Float64Field.Value, 0.001)
 
 	// Verify the core model's RootNode contains the correct YAML
 	expectedYAML := `requiredField: synced required
@@ -524,7 +523,7 @@ optionalStruct:
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_PrimitiveTypes_WithExtensions_Success(t *testing.T) {
@@ -549,7 +548,7 @@ func TestSync_PrimitiveTypes_WithExtensions_Success(t *testing.T) {
 	highModel.Extensions.Set("x-another", testutils.CreateStringYamlNode("another extension", 1, 1))
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -560,15 +559,15 @@ func TestSync_PrimitiveTypes_WithExtensions_Success(t *testing.T) {
 	require.Equal(t, "synced string", coreModel.StringField.Value)
 	require.NotNil(t, coreModel.StringPtrField.Value)
 	require.Equal(t, "synced ptr string", *coreModel.StringPtrField.Value)
-	require.Equal(t, true, coreModel.BoolField.Value)
+	require.True(t, coreModel.BoolField.Value)
 	require.NotNil(t, coreModel.BoolPtrField.Value)
-	require.Equal(t, false, *coreModel.BoolPtrField.Value)
+	require.False(t, *coreModel.BoolPtrField.Value)
 	require.Equal(t, 99, coreModel.IntField.Value)
 	require.NotNil(t, coreModel.IntPtrField.Value)
 	require.Equal(t, 88, *coreModel.IntPtrField.Value)
-	require.Equal(t, 9.99, coreModel.Float64Field.Value)
+	require.InDelta(t, 9.99, coreModel.Float64Field.Value, 0.001)
 	require.NotNil(t, coreModel.Float64PtrField.Value)
-	require.Equal(t, 8.88, *coreModel.Float64PtrField.Value)
+	require.InDelta(t, 8.88, *coreModel.Float64PtrField.Value, 0.001)
 
 	// Verify extensions were synced
 	require.NotNil(t, coreModel.Extensions)
@@ -595,7 +594,7 @@ x-another: another extension
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_EitherValueModel_Success(t *testing.T) {
@@ -632,7 +631,7 @@ func TestSync_EitherValueModel_Success(t *testing.T) {
 	highModel.Extensions.Set("x-either", testutils.CreateStringYamlNode("either extension", 1, 1))
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -670,7 +669,7 @@ x-either: either extension
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_TypeConversionModel_Success(t *testing.T) {
@@ -716,7 +715,7 @@ func TestSync_TypeConversionModel_Success(t *testing.T) {
 	highModel.Extensions.Set("x-sync", testutils.CreateStringYamlNode("sync extension", 1, 1))
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -741,27 +740,27 @@ func TestSync_TypeConversionModel_Success(t *testing.T) {
 	require.NotNil(t, syncedPostOp)
 	syncedPostCore := syncedPostOp.Value
 	require.Equal(t, "Synced POST operation", syncedPostCore.StringField.Value)
-	require.Equal(t, true, syncedPostCore.BoolField.Value)
+	require.True(t, syncedPostCore.BoolField.Value)
 	require.Equal(t, 42, syncedPostCore.IntField.Value)
-	require.Equal(t, 3.14, syncedPostCore.Float64Field.Value)
+	require.InDelta(t, 3.14, syncedPostCore.Float64Field.Value, 0.001)
 
 	syncedGetOp, ok2 := coreModel.Get("get")
 	require.True(t, ok2)
 	require.NotNil(t, syncedGetOp)
 	syncedGetCore := syncedGetOp.Value
 	require.Equal(t, "Synced GET operation", syncedGetCore.StringField.Value)
-	require.Equal(t, false, syncedGetCore.BoolField.Value)
+	require.False(t, syncedGetCore.BoolField.Value)
 	require.Equal(t, 100, syncedGetCore.IntField.Value)
-	require.Equal(t, 1.23, syncedGetCore.Float64Field.Value)
+	require.InDelta(t, 1.23, syncedGetCore.Float64Field.Value, 0.001)
 
 	syncedPutOp, ok3 := coreModel.Get("put")
 	require.True(t, ok3)
 	require.NotNil(t, syncedPutOp)
 	syncedPutCore := syncedPutOp.Value
 	require.Equal(t, "Synced PUT operation", syncedPutCore.StringField.Value)
-	require.Equal(t, true, syncedPutCore.BoolField.Value)
+	require.True(t, syncedPutCore.BoolField.Value)
 	require.Equal(t, 200, syncedPutCore.IntField.Value)
-	require.Equal(t, 2.34, syncedPutCore.Float64Field.Value)
+	require.InDelta(t, 2.34, syncedPutCore.Float64Field.Value, 0.001)
 
 	// Verify extensions were synced
 	require.NotNil(t, coreModel.Extensions)
@@ -791,7 +790,7 @@ x-sync: sync extension
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_ExtensionModification_Success(t *testing.T) {
@@ -812,7 +811,7 @@ func TestSync_ExtensionModification_Success(t *testing.T) {
 	highModel.Extensions.Set("x-author", testutils.CreateStringYamlNode("developer", 1, 1))
 
 	// Perform initial sync
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -834,7 +833,7 @@ func TestSync_ExtensionModification_Success(t *testing.T) {
 	highModel.Extensions.Delete("x-author")                                              // Remove
 
 	// Sync the changes
-	resultNode, err = marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err = marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -862,7 +861,7 @@ x-status: active
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_ExtensionReplacement_Success(t *testing.T) {
@@ -884,7 +883,7 @@ func TestSync_ExtensionReplacement_Success(t *testing.T) {
 	highModel.Extensions.Set("x-deprecated", testutils.CreateStringYamlNode("soon", 1, 1))
 
 	// Perform initial sync
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -903,7 +902,7 @@ func TestSync_ExtensionReplacement_Success(t *testing.T) {
 	highModel.Extensions = newExtensions
 
 	// Sync the replacement
-	resultNode, err = marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err = marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -937,7 +936,7 @@ x-modern-flag: enabled
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_EmbeddedMapPointer_Success(t *testing.T) {
@@ -953,7 +952,7 @@ func TestSync_EmbeddedMapPointer_Success(t *testing.T) {
 	highModel.Set("ptrKey3", "pointer value3")
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -988,7 +987,7 @@ ptrKey3: pointer value3
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_EmbeddedMapWithFieldsPointer_Success(t *testing.T) {
@@ -1020,7 +1019,7 @@ func TestSync_EmbeddedMapWithFieldsPointer_Success(t *testing.T) {
 	highModel.Set("ptrSyncKey2", dynamicVal2)
 
 	// Sync the high model to the core model
-	resultNode, err := marshaller.SyncValue(context.Background(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
 	require.NoError(t, err)
 	require.NotNil(t, resultNode)
 
@@ -1042,14 +1041,14 @@ func TestSync_EmbeddedMapWithFieldsPointer_Success(t *testing.T) {
 	require.NotNil(t, syncedVal1)
 	syncedCore1 := syncedVal1.Value
 	require.Equal(t, "synced pointer dynamic 1", syncedCore1.StringField.Value)
-	require.Equal(t, true, syncedCore1.BoolField.Value)
+	require.True(t, syncedCore1.BoolField.Value)
 
 	syncedVal2, ok2 := coreModel.Get("ptrSyncKey2")
 	require.True(t, ok2)
 	require.NotNil(t, syncedVal2)
 	syncedCore2 := syncedVal2.Value
 	require.Equal(t, "synced pointer dynamic 2", syncedCore2.StringField.Value)
-	require.Equal(t, false, syncedCore2.BoolField.Value)
+	require.False(t, syncedCore2.BoolField.Value)
 
 	// Verify the core model's RootNode contains the correct YAML
 	expectedYAML := `ptrSyncKey1:
@@ -1067,7 +1066,7 @@ name: synced pointer name
 
 	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
 	require.NoError(t, err)
-	require.Equal(t, expectedYAML, string(actualYAML))
+	require.YAMLEq(t, expectedYAML, string(actualYAML))
 }
 
 func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
@@ -1081,7 +1080,7 @@ func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
 		ptrModel.Set("key1", "ptr_value1")
 		ptrModel.Set("key2", "ptr_value2")
 
-		ptrResultNode, err := marshaller.SyncValue(context.Background(), &ptrModel, ptrModel.GetCore(), ptrModel.GetRootNode(), false)
+		ptrResultNode, err := marshaller.SyncValue(t.Context(), &ptrModel, ptrModel.GetCore(), ptrModel.GetRootNode(), false)
 		require.NoError(t, err)
 		require.NotNil(t, ptrResultNode)
 
@@ -1102,7 +1101,7 @@ func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
 		valueModel.Set("key1", "val_value1")
 		valueModel.Set("key2", "val_value2")
 
-		valueResultNode, err := marshaller.SyncValue(context.Background(), &valueModel, valueModel.GetCore(), valueModel.GetRootNode(), false)
+		valueResultNode, err := marshaller.SyncValue(t.Context(), &valueModel, valueModel.GetCore(), valueModel.GetRootNode(), false)
 		require.NoError(t, err)
 		require.NotNil(t, valueResultNode)
 
@@ -1127,10 +1126,10 @@ func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
 		valueModel.Set("shared_key", "shared_value")
 
 		// Sync both models
-		_, err := marshaller.SyncValue(context.Background(), &ptrModel, ptrModel.GetCore(), ptrModel.GetRootNode(), false)
+		_, err := marshaller.SyncValue(t.Context(), &ptrModel, ptrModel.GetCore(), ptrModel.GetRootNode(), false)
 		require.NoError(t, err)
 
-		_, err = marshaller.SyncValue(context.Background(), &valueModel, valueModel.GetCore(), valueModel.GetRootNode(), false)
+		_, err = marshaller.SyncValue(t.Context(), &valueModel, valueModel.GetCore(), valueModel.GetRootNode(), false)
 		require.NoError(t, err)
 
 		// Both should produce the same YAML output
@@ -1140,7 +1139,7 @@ func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
 		valueYAML, err := yaml.Marshal(valueModel.GetCore().GetRootNode())
 		require.NoError(t, err)
 
-		require.Equal(t, string(ptrYAML), string(valueYAML))
-		require.Equal(t, "shared_key: shared_value\n", string(ptrYAML))
+		require.YAMLEq(t, string(ptrYAML), string(valueYAML))
+		require.YAMLEq(t, "shared_key: shared_value\n", string(ptrYAML))
 	})
 }

@@ -74,7 +74,7 @@ func TestEitherValue_JSONPointer_LeftValue_KeyNavigation(t *testing.T) {
 
 	// Test key not found
 	result, err = jsonpointer.GetTarget(eitherValue, jsonpointer.JSONPointer("/nonexistent"))
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 }
 
@@ -108,7 +108,7 @@ func TestEitherValue_JSONPointer_UnsupportedType(t *testing.T) {
 
 	// Try to navigate with key (should fail because string doesn't support navigation)
 	result, err := jsonpointer.GetTarget(eitherValue, jsonpointer.JSONPointer("/somekey"))
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 }
 
@@ -131,7 +131,7 @@ func TestEitherValue_JSONPointer_LeftValue_IndexNavigation(t *testing.T) {
 
 	// Test index out of range
 	result, err = jsonpointer.GetTarget(eitherValue, jsonpointer.JSONPointer("/10"))
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 }
 
@@ -161,7 +161,7 @@ func TestEitherValue_GetNavigableNode_NoValueSet(t *testing.T) {
 
 	// Test GetNavigableNode directly
 	result, err := eitherValue.GetNavigableNode()
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "has no value set")
 	assert.Nil(t, result)
 }

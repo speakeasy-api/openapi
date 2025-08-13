@@ -39,8 +39,8 @@ func TestWindowsStylePathJoining_Success(t *testing.T) {
 		{
 			name:     "windows path with absolute relative path",
 			base:     "C:\\path\\to\\schemas\\user.json",
-			relative: "D:\\other\\path\\schema.json",
-			expected: "D:\\other\\path\\schema.json",
+			relative: "D:\\other\\path\\schema.json", //nolint:misspell
+			expected: "D:\\other\\path\\schema.json", //nolint:misspell
 		},
 		{
 			name:     "windows path with fragment",

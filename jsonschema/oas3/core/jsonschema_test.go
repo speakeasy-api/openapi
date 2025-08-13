@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -15,7 +14,7 @@ func TestJSONSchema_Unmarshal_BooleanValue_Success(t *testing.T) {
 
 	// Test case that reproduces the additionalProperties: false issue
 	// This should unmarshal as a boolean (Right type) when Left type (Schema) fails with validation errors
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// YAML with just a boolean value (like additionalProperties: false)
 	testYaml := `false`
@@ -35,14 +34,14 @@ func TestJSONSchema_Unmarshal_BooleanValue_Success(t *testing.T) {
 	require.NotNil(t, target, "JSONSchema should not be nil")
 	assert.True(t, target.IsRight, "JSONSchema should be Right type (bool)")
 	assert.False(t, target.IsLeft, "JSONSchema should not be Left type (Schema)")
-	assert.Equal(t, false, target.Right.Value, "JSONSchema should have unmarshaled boolean value correctly")
+	assert.False(t, target.Right.Value, "JSONSchema should have unmarshaled boolean value correctly")
 }
 
 func TestJSONSchema_Unmarshal_SchemaObject_Success(t *testing.T) {
 	t.Parallel()
 
 	// Test case that ensures schema objects still work correctly
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// YAML with a schema object
 	testYaml := `

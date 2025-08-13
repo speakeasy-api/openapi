@@ -1,7 +1,6 @@
 package arazzo_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/arazzo"
@@ -16,7 +15,7 @@ func TestRequestBody_Validate_JSONPathInPayload_Success(t *testing.T) {
 	t.Parallel()
 	// This test reproduces the bug where JSONPath-like expressions in payload
 	// are incorrectly validated as Arazzo runtime expressions
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a payload that contains JSONPath-like expressions ($.Id, $.time, etc.)
 	// but these should NOT be validated as Arazzo expressions since they're just payload data
@@ -65,7 +64,7 @@ func TestRequestBody_Validate_AnyPayloadData_Success(t *testing.T) {
 	t.Parallel()
 	// This test ensures that ANY data in payloads is allowed, including invalid expressions
 	// since payloads are arbitrary user data and should not be validated as Arazzo expressions
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a payload with various expression-like data that should all be ignored
 	payloadNode := &yaml.Node{
@@ -110,7 +109,7 @@ func TestRequestBody_Validate_TopLevelExpression_ValidatesCorrectly(t *testing.T
 		Valid: true,
 	}
 
-	validationErrors := validRequestBody.Validate(context.Background())
+	validationErrors := validRequestBody.Validate(t.Context())
 	assert.Empty(t, validationErrors, "Valid top-level expression should not produce validation errors")
 
 	// Test invalid top-level expression (valid type but invalid format)
@@ -125,7 +124,7 @@ func TestRequestBody_Validate_TopLevelExpression_ValidatesCorrectly(t *testing.T
 		Valid: true,
 	}
 
-	validationErrors = invalidRequestBody.Validate(context.Background())
+	validationErrors = invalidRequestBody.Validate(t.Context())
 	assert.NotEmpty(t, validationErrors, "Invalid top-level expression should produce validation errors")
 	assert.Contains(t, validationErrors[0].Error(), "payload expression is not valid")
 }

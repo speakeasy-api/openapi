@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -67,7 +68,7 @@ func (m *MockFile) Close() error {
 }
 
 func (m *MockFile) Stat() (fs.FileInfo, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, errors.New("not implemented")
 }
 
 func TestInline_Success(t *testing.T) {
@@ -294,10 +295,10 @@ func TestInline_Success(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// Parse input JSON into schema
-			schema, err := parseJSONToSchema(tt.input)
+			schema, err := parseJSONToSchema(t.Context(), tt.input)
 			require.NoError(t, err, "failed to parse input JSON")
 
 			// Create resolve options with the schema as the root document
@@ -346,9 +347,9 @@ func TestInline_Error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
+			ctx := t.Context()
 
-			schema, err := parseJSONToSchema(tt.input)
+			schema, err := parseJSONToSchema(t.Context(), tt.input)
 			require.NoError(t, err, "failed to parse input JSON")
 
 			opts := oas3.InlineOptions{
@@ -367,20 +368,20 @@ func TestInline_Error(t *testing.T) {
 
 func TestInline_NilSchema(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	opts := oas3.InlineOptions{}
 
 	_, err := oas3.Inline(ctx, nil, opts)
-	assert.NoError(t, err, "inlining nil schema should not error")
+	require.NoError(t, err, "inlining nil schema should not error")
 }
 
 // Helper functions for JSON parsing and conversion
 
-func parseJSONToSchema(jsonStr string) (*oas3.JSONSchema[oas3.Referenceable], error) {
+func parseJSONToSchema(ctx context.Context, jsonStr string) (*oas3.JSONSchema[oas3.Referenceable], error) {
 	reader := strings.NewReader(jsonStr)
 	schema := &oas3.JSONSchema[oas3.Referenceable]{}
 
-	_, err := marshaller.Unmarshal(context.Background(), reader, schema)
+	_, err := marshaller.Unmarshal(ctx, reader, schema)
 	if err != nil {
 		return nil, err
 	}
@@ -837,10 +838,10 @@ func TestInline_CircularReferences_Success(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// Parse input JSON into schema
-			schema, err := parseJSONToSchema(tt.input)
+			schema, err := parseJSONToSchema(t.Context(), tt.input)
 			require.NoError(t, err, "failed to parse input JSON")
 
 			// Create resolve options
@@ -978,9 +979,9 @@ func TestInline_CircularReferences_Error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
+			ctx := t.Context()
 
-			schema, err := parseJSONToSchema(tt.input)
+			schema, err := parseJSONToSchema(t.Context(), tt.input)
 			require.NoError(t, err, "failed to parse input JSON")
 
 			opts := oas3.InlineOptions{
@@ -1236,10 +1237,10 @@ func TestInline_OpenAPIComponentReferences_Success(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// Parse OpenAPI document
-			openAPIDoc, err := parseJSONToOpenAPI(tt.openAPIDoc)
+			openAPIDoc, err := parseJSONToOpenAPI(t.Context(), tt.openAPIDoc)
 			require.NoError(t, err, "failed to parse OpenAPI document")
 
 			// Extract schema using JSON pointer
@@ -1322,10 +1323,10 @@ func TestInline_OpenAPIComponentReferences_Error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
+			ctx := t.Context()
 
 			// Parse OpenAPI document
-			openAPIDoc, err := parseJSONToOpenAPI(tt.openAPIDoc)
+			openAPIDoc, err := parseJSONToOpenAPI(t.Context(), tt.openAPIDoc)
 			require.NoError(t, err, "failed to parse OpenAPI document")
 
 			// Extract schema using JSON pointer
@@ -1348,10 +1349,10 @@ func TestInline_OpenAPIComponentReferences_Error(t *testing.T) {
 
 // Helper functions for OpenAPI parsing and schema extraction
 
-func parseJSONToOpenAPI(jsonStr string) (*openapi.OpenAPI, error) {
+func parseJSONToOpenAPI(ctx context.Context, jsonStr string) (*openapi.OpenAPI, error) {
 	reader := strings.NewReader(jsonStr)
 
-	doc, _, err := openapi.Unmarshal(context.Background(), reader)
+	doc, _, err := openapi.Unmarshal(ctx, reader)
 	if err != nil {
 		return nil, err
 	}

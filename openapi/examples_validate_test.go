@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -97,11 +96,11 @@ value: true
 			t.Parallel()
 
 			var example openapi.Example
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &example)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &example)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := example.Validate(context.Background())
+			errs := example.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, example.Valid, "expected example to be valid")
 		})
@@ -158,11 +157,11 @@ externalValue: ":invalid"
 			t.Parallel()
 
 			var example openapi.Example
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &example)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &example)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := example.Validate(context.Background())
+			errs := example.Validate(t.Context())
 			require.NotEmpty(t, errs, "expected validation errors")
 			require.False(t, example.Valid, "expected example to be invalid")
 

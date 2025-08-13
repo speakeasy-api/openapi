@@ -300,7 +300,7 @@ for item := range openapi.Walk(ctx, doc) {
 		},
 	})
 	if err != nil {
-		if err == walk.ErrTerminate {
+		if errors.Is(err, walk.ErrTerminate) {
 			fmt.Println("Walk terminated early")
 			break
 		}

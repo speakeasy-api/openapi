@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -123,11 +122,11 @@ x-custom: value
 
 			var encoding openapi.Encoding
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &encoding)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &encoding)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := encoding.Validate(context.Background())
+			errs := encoding.Validate(t.Context())
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -156,11 +155,11 @@ style: invalidStyle
 
 			var encoding openapi.Encoding
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &encoding)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &encoding)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := encoding.Validate(context.Background())
+			errs := encoding.Validate(t.Context())
 			require.NotEmpty(t, errs, "Expected validation errors")
 			require.Contains(t, errs[0].Error(), tt.expectedErr)
 		})

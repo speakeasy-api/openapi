@@ -2,7 +2,6 @@ package values
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -31,7 +30,7 @@ type TestEitherValue struct {
 
 func TestEitherValue_SyncAfterInPlaceModification(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First, load from JSON to establish a valid core
 	jsonInput := `{"$ref": "#/$defs/Test"}`
@@ -63,7 +62,7 @@ func TestEitherValue_SyncAfterInPlaceModification(t *testing.T) {
 	// Verify the modification worked at the Go level
 	require.True(t, original.IsRight())
 	require.NotNil(t, original.GetRight())
-	assert.Equal(t, true, *original.GetRight())
+	assert.True(t, *original.GetRight())
 
 	// Marshal the same instance after modification
 	var buf2 bytes.Buffer
@@ -77,7 +76,7 @@ func TestEitherValue_SyncAfterInPlaceModification(t *testing.T) {
 
 func TestEitherValue_BooleanLoad(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Load a boolean value from JSON
 	jsonInput := `true`
@@ -90,7 +89,7 @@ func TestEitherValue_BooleanLoad(t *testing.T) {
 	// Verify it loaded correctly
 	require.True(t, boolValue.IsRight())
 	require.NotNil(t, boolValue.GetRight())
-	assert.Equal(t, true, *boolValue.GetRight())
+	assert.True(t, *boolValue.GetRight())
 
 	// Marshal back to JSON
 	var buf bytes.Buffer

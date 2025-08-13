@@ -16,14 +16,14 @@ import (
 )
 
 // loadOpenAPIDocument loads a fresh OpenAPI document for each test to ensure thread safety
-func loadOpenAPIDocument() (*openapi.OpenAPI, error) {
+func loadOpenAPIDocument(ctx context.Context) (*openapi.OpenAPI, error) {
 	f, err := os.Open("testdata/walk.openapi.yaml")
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close() //nolint:errcheck
+	defer f.Close()
 
-	o, validationErrs, err := openapi.Unmarshal(context.Background(), f)
+	o, validationErrs, err := openapi.Unmarshal(ctx, f)
 	if err != nil {
 		return nil, err
 	}
@@ -37,20 +37,20 @@ func loadOpenAPIDocument() (*openapi.OpenAPI, error) {
 func TestWalkOpenAPI_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			OpenAPI: func(o *openapi.OpenAPI) error {
 				openAPILoc := string(item.Location.ToJSONPointer())
 				matchedLocations = append(matchedLocations, openAPILoc)
 
 				if openAPILoc == expectedLoc {
-					assert.Equal(t, o.OpenAPI, "3.1.0")
+					assert.Equal(t, "3.1.0", o.OpenAPI)
 					assert.Equal(t, o.JSONSchemaDialect, pointer.From("https://json-schema.org/draft/2020-12/schema"))
 
 					return walk.ErrTerminate // Found our target now terminate
@@ -72,20 +72,20 @@ func TestWalkOpenAPI_Success(t *testing.T) {
 func TestWalkOpenAPI_Extensions_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Extensions: func(e *extensions.Extensions) error {
 				extensionsLoc := string(item.Location.ToJSONPointer())
 				matchedLocations = append(matchedLocations, extensionsLoc)
 
 				if extensionsLoc == expectedLoc {
-					assert.Equal(t, e.GetOrZero("x-custom").Value, "root-extension")
+					assert.Equal(t, "root-extension", e.GetOrZero("x-custom").Value)
 
 					return walk.ErrTerminate // Found our target now terminate
 				}
@@ -106,22 +106,22 @@ func TestWalkOpenAPI_Extensions_Success(t *testing.T) {
 func TestWalkInfo_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/info"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Info: func(i *openapi.Info) error {
 				infoLoc := string(item.Location.ToJSONPointer())
 				matchedLocations = append(matchedLocations, infoLoc)
 
 				if infoLoc == expectedLoc {
-					assert.Equal(t, i.GetTitle(), "Comprehensive API")
-					assert.Equal(t, i.GetVersion(), "1.0.0")
-					assert.Equal(t, i.GetDescription(), "A comprehensive API for testing walk functionality")
+					assert.Equal(t, "Comprehensive API", i.GetTitle())
+					assert.Equal(t, "1.0.0", i.GetVersion())
+					assert.Equal(t, "A comprehensive API for testing walk functionality", i.GetDescription())
 
 					return walk.ErrTerminate
 				}
@@ -142,22 +142,22 @@ func TestWalkInfo_Success(t *testing.T) {
 func TestWalkContact_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/info/contact"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Contact: func(c *openapi.Contact) error {
 				contactLoc := string(item.Location.ToJSONPointer())
 				matchedLocations = append(matchedLocations, contactLoc)
 
 				if contactLoc == expectedLoc {
-					assert.Equal(t, c.GetName(), "API Team")
-					assert.Equal(t, c.GetEmail(), "api@example.com")
-					assert.Equal(t, c.GetURL(), "https://example.com/contact")
+					assert.Equal(t, "API Team", c.GetName())
+					assert.Equal(t, "api@example.com", c.GetEmail())
+					assert.Equal(t, "https://example.com/contact", c.GetURL())
 
 					return walk.ErrTerminate
 				}
@@ -178,21 +178,21 @@ func TestWalkContact_Success(t *testing.T) {
 func TestWalkLicense_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/info/license"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			License: func(l *openapi.License) error {
 				licenseLoc := string(item.Location.ToJSONPointer())
 				matchedLocations = append(matchedLocations, licenseLoc)
 
 				if licenseLoc == expectedLoc {
-					assert.Equal(t, l.GetName(), "MIT")
-					assert.Equal(t, l.GetURL(), "https://opensource.org/licenses/MIT")
+					assert.Equal(t, "MIT", l.GetName())
+					assert.Equal(t, "https://opensource.org/licenses/MIT", l.GetURL())
 
 					return walk.ErrTerminate
 				}
@@ -213,21 +213,21 @@ func TestWalkLicense_Success(t *testing.T) {
 func TestWalkExternalDocs_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedAssertions := map[string]func(*oas3.ExternalDocumentation){
 		"/externalDocs": func(e *oas3.ExternalDocumentation) {
-			assert.Equal(t, e.GetURL(), "https://example.com/docs")
-			assert.Equal(t, e.GetDescription(), "Additional documentation")
+			assert.Equal(t, "https://example.com/docs", e.GetURL())
+			assert.Equal(t, "Additional documentation", e.GetDescription())
 		},
 		"/tags/0/externalDocs": func(e *oas3.ExternalDocumentation) {
-			assert.Equal(t, e.GetURL(), "https://example.com/users")
+			assert.Equal(t, "https://example.com/users", e.GetURL())
 		},
 	}
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			ExternalDocs: func(e *oas3.ExternalDocumentation) error {
 				externalDocsLoc := string(item.Location.ToJSONPointer())
@@ -251,22 +251,22 @@ func TestWalkExternalDocs_Success(t *testing.T) {
 func TestWalkTag_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedAssertions := map[string]func(*openapi.Tag){
 		"/tags/0": func(tag *openapi.Tag) {
-			assert.Equal(t, tag.GetName(), "users")
-			assert.Equal(t, tag.GetDescription(), "User operations")
+			assert.Equal(t, "users", tag.GetName())
+			assert.Equal(t, "User operations", tag.GetDescription())
 		},
 		"/tags/1": func(tag *openapi.Tag) {
-			assert.Equal(t, tag.GetName(), "pets")
-			assert.Equal(t, tag.GetDescription(), "Pet operations")
+			assert.Equal(t, "pets", tag.GetName())
+			assert.Equal(t, "Pet operations", tag.GetDescription())
 		},
 	}
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Tag: func(tag *openapi.Tag) error {
 				tagLoc := string(item.Location.ToJSONPointer())
@@ -290,22 +290,22 @@ func TestWalkTag_Success(t *testing.T) {
 func TestWalkServer_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedAssertions := map[string]func(*openapi.Server){
 		"/servers/0": func(s *openapi.Server) {
-			assert.Equal(t, s.GetURL(), "https://api.example.com/{version}")
-			assert.Equal(t, s.GetDescription(), "Production server")
+			assert.Equal(t, "https://api.example.com/{version}", s.GetURL())
+			assert.Equal(t, "Production server", s.GetDescription())
 		},
 		"/servers/1": func(s *openapi.Server) {
-			assert.Equal(t, s.GetURL(), "https://staging.example.com")
-			assert.Equal(t, s.GetDescription(), "Staging server")
+			assert.Equal(t, "https://staging.example.com", s.GetURL())
+			assert.Equal(t, "Staging server", s.GetDescription())
 		},
 	}
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Server: func(s *openapi.Server) error {
 				serverLoc := string(item.Location.ToJSONPointer())
@@ -329,21 +329,21 @@ func TestWalkServer_Success(t *testing.T) {
 func TestWalkServerVariable_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/servers/0/variables/version"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			ServerVariable: func(sv *openapi.ServerVariable) error {
 				serverVarLoc := string(item.Location.ToJSONPointer())
 				matchedLocations = append(matchedLocations, serverVarLoc)
 
 				if serverVarLoc == expectedLoc {
-					assert.Equal(t, sv.GetDefault(), "v1")
-					assert.Equal(t, sv.GetDescription(), "API version")
+					assert.Equal(t, "v1", sv.GetDefault())
+					assert.Equal(t, "API version", sv.GetDescription())
 					assert.Contains(t, sv.GetEnum(), "v1")
 					assert.Contains(t, sv.GetEnum(), "v2")
 
@@ -366,13 +366,13 @@ func TestWalkServerVariable_Success(t *testing.T) {
 func TestWalkSecurity_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/security/0"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Security: func(sr *openapi.SecurityRequirement) error {
 				securityLoc := string(item.Location.ToJSONPointer())
@@ -404,13 +404,13 @@ func TestWalkSecurity_Success(t *testing.T) {
 func TestWalkPaths_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/paths"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Paths: func(p *openapi.Paths) error {
 				pathsLoc := string(item.Location.ToJSONPointer())
@@ -442,7 +442,7 @@ func TestWalkPaths_Success(t *testing.T) {
 func TestWalkReferencedPathItem_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
@@ -450,16 +450,16 @@ func TestWalkReferencedPathItem_Success(t *testing.T) {
 		"/paths/~1users~1{id}": func(rpi *openapi.ReferencedPathItem) {
 			assert.False(t, rpi.IsReference())
 			assert.NotNil(t, rpi.Object)
-			assert.Equal(t, rpi.Object.GetSummary(), "User operations")
+			assert.Equal(t, "User operations", rpi.Object.GetSummary())
 		},
 		"/webhooks/newUser": func(rpi *openapi.ReferencedPathItem) {
 			assert.False(t, rpi.IsReference())
 			assert.NotNil(t, rpi.Object)
-			assert.Equal(t, rpi.Object.GetSummary(), "New user webhook")
+			assert.Equal(t, "New user webhook", rpi.Object.GetSummary())
 		},
 	}
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			ReferencedPathItem: func(rpi *openapi.ReferencedPathItem) error {
 				pathItemLoc := string(item.Location.ToJSONPointer())
@@ -483,22 +483,22 @@ func TestWalkReferencedPathItem_Success(t *testing.T) {
 func TestWalkOperation_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/paths/~1users~1{id}/get"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Operation: func(op *openapi.Operation) error {
 				operationLoc := string(item.Location.ToJSONPointer())
 				matchedLocations = append(matchedLocations, operationLoc)
 
 				if operationLoc == expectedLoc {
-					assert.Equal(t, op.GetOperationID(), "getUser")
-					assert.Equal(t, op.GetSummary(), "Get user by ID")
-					assert.Equal(t, op.GetDescription(), "Retrieve a user by their ID")
+					assert.Equal(t, "getUser", op.GetOperationID())
+					assert.Equal(t, "Get user by ID", op.GetSummary())
+					assert.Equal(t, "Retrieve a user by their ID", op.GetDescription())
 					assert.Contains(t, op.GetTags(), "users")
 
 					return walk.ErrTerminate
@@ -520,7 +520,7 @@ func TestWalkOperation_Success(t *testing.T) {
 func TestWalkReferencedParameter_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
@@ -528,8 +528,8 @@ func TestWalkReferencedParameter_Success(t *testing.T) {
 		"/paths/~1users~1{id}/parameters/0": func(rp *openapi.ReferencedParameter) {
 			assert.False(t, rp.IsReference())
 			assert.NotNil(t, rp.Object)
-			assert.Equal(t, rp.Object.GetName(), "id")
-			assert.Equal(t, rp.Object.GetIn(), openapi.ParameterInPath)
+			assert.Equal(t, "id", rp.Object.GetName())
+			assert.Equal(t, openapi.ParameterInPath, rp.Object.GetIn())
 		},
 		"/paths/~1users~1{id}/get/parameters/0": func(rp *openapi.ReferencedParameter) {
 			// Basic validation for the operation parameter
@@ -537,7 +537,7 @@ func TestWalkReferencedParameter_Success(t *testing.T) {
 		},
 	}
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			ReferencedParameter: func(rp *openapi.ReferencedParameter) error {
 				paramLoc := string(item.Location.ToJSONPointer())
@@ -561,7 +561,7 @@ func TestWalkReferencedParameter_Success(t *testing.T) {
 func TestWalkSchema_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
@@ -571,19 +571,19 @@ func TestWalkSchema_Success(t *testing.T) {
 			s := schema.Left
 			schemaType := s.GetType()
 			assert.Len(t, schemaType, 1, "User schema should have exactly one type")
-			assert.Equal(t, schemaType[0], oas3.SchemaTypeObject)
-			assert.Equal(t, s.GetDescription(), "User object")
+			assert.Equal(t, oas3.SchemaTypeObject, schemaType[0])
+			assert.Equal(t, "User object", s.GetDescription())
 		},
 		"/paths/~1users~1{id}/parameters/0/schema": func(schema *oas3.JSONSchema[oas3.Referenceable]) {
 			assert.True(t, schema.IsLeft())
 			s := schema.Left
 			schemaType := s.GetType()
 			assert.Len(t, schemaType, 1, "Parameter schema should have exactly one type")
-			assert.Equal(t, schemaType[0], oas3.SchemaTypeInteger)
+			assert.Equal(t, oas3.SchemaTypeInteger, schemaType[0])
 		},
 	}
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
 				schemaLoc := string(item.Location.ToJSONPointer())
@@ -607,13 +607,13 @@ func TestWalkSchema_Success(t *testing.T) {
 func TestWalkMediaType_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/paths/~1users~1{id}/get/requestBody/content/application~1json"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			MediaType: func(mt *openapi.MediaType) error {
 				mediaTypeLoc := string(item.Location.ToJSONPointer())
@@ -644,13 +644,13 @@ func TestWalkMediaType_Success(t *testing.T) {
 func TestWalkComponents_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/components"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Components: func(c *openapi.Components) error {
 				componentsLoc := string(item.Location.ToJSONPointer())
@@ -683,7 +683,7 @@ func TestWalkComponents_Success(t *testing.T) {
 func TestWalkReferencedExample_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
@@ -691,16 +691,16 @@ func TestWalkReferencedExample_Success(t *testing.T) {
 		"/components/examples/UserExample": func(re *openapi.ReferencedExample) {
 			assert.False(t, re.IsReference())
 			assert.NotNil(t, re.Object)
-			assert.Equal(t, re.Object.GetSummary(), "User example")
+			assert.Equal(t, "User example", re.Object.GetSummary())
 		},
 		"/paths/~1users~1{id}/parameters/0/examples/user-id-example": func(re *openapi.ReferencedExample) {
 			assert.False(t, re.IsReference())
 			assert.NotNil(t, re.Object)
-			assert.Equal(t, re.Object.GetSummary(), "User ID example")
+			assert.Equal(t, "User ID example", re.Object.GetSummary())
 		},
 	}
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			ReferencedExample: func(re *openapi.ReferencedExample) error {
 				exampleLoc := string(item.Location.ToJSONPointer())
@@ -724,13 +724,13 @@ func TestWalkReferencedExample_Success(t *testing.T) {
 func TestWalkResponses_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/paths/~1users~1{id}/get/responses"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Responses: func(r *openapi.Responses) error {
 				responsesLoc := string(item.Location.ToJSONPointer())
@@ -764,7 +764,7 @@ func TestWalkResponses_Success(t *testing.T) {
 func TestWalkReferencedResponse_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
@@ -772,21 +772,21 @@ func TestWalkReferencedResponse_Success(t *testing.T) {
 		"/paths/~1users~1{id}/get/responses/200": func(rr *openapi.ReferencedResponse) {
 			assert.False(t, rr.IsReference())
 			assert.NotNil(t, rr.Object)
-			assert.Equal(t, rr.Object.GetDescription(), "Successful response")
+			assert.Equal(t, "Successful response", rr.Object.GetDescription())
 		},
 		"/paths/~1users~1{id}/get/responses/default": func(rr *openapi.ReferencedResponse) {
 			assert.False(t, rr.IsReference())
 			assert.NotNil(t, rr.Object)
-			assert.Equal(t, rr.Object.GetDescription(), "Error response")
+			assert.Equal(t, "Error response", rr.Object.GetDescription())
 		},
 		"/components/responses/ErrorResponse": func(rr *openapi.ReferencedResponse) {
 			assert.False(t, rr.IsReference())
 			assert.NotNil(t, rr.Object)
-			assert.Equal(t, rr.Object.GetDescription(), "Error response")
+			assert.Equal(t, "Error response", rr.Object.GetDescription())
 		},
 	}
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			ReferencedResponse: func(rr *openapi.ReferencedResponse) error {
 				responseLoc := string(item.Location.ToJSONPointer())
@@ -810,13 +810,13 @@ func TestWalkReferencedResponse_Success(t *testing.T) {
 func TestWalkOAuthFlows_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/components/securitySchemes/oauth2/flows"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			OAuthFlows: func(flows *openapi.OAuthFlows) error {
 				flowsLoc := string(item.Location.ToJSONPointer())
@@ -848,35 +848,35 @@ func TestWalkOAuthFlows_Success(t *testing.T) {
 func TestWalkOAuthFlow_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedAssertions := map[string]func(*openapi.OAuthFlow){
 		"/components/securitySchemes/oauth2/flows/implicit": func(flow *openapi.OAuthFlow) {
-			assert.Equal(t, flow.GetAuthorizationURL(), "https://example.com/oauth/authorize")
+			assert.Equal(t, "https://example.com/oauth/authorize", flow.GetAuthorizationURL())
 			scopes := flow.GetScopes()
 			assert.NotNil(t, scopes)
 			assert.True(t, scopes.Has("read"))
 			assert.True(t, scopes.Has("write"))
 		},
 		"/components/securitySchemes/oauth2/flows/password": func(flow *openapi.OAuthFlow) {
-			assert.Equal(t, flow.GetTokenURL(), "https://example.com/oauth/token")
+			assert.Equal(t, "https://example.com/oauth/token", flow.GetTokenURL())
 			scopes := flow.GetScopes()
 			assert.NotNil(t, scopes)
 			assert.True(t, scopes.Has("read"))
 			assert.True(t, scopes.Has("write"))
 		},
 		"/components/securitySchemes/oauth2/flows/clientCredentials": func(flow *openapi.OAuthFlow) {
-			assert.Equal(t, flow.GetTokenURL(), "https://example.com/oauth/token")
+			assert.Equal(t, "https://example.com/oauth/token", flow.GetTokenURL())
 			scopes := flow.GetScopes()
 			assert.NotNil(t, scopes)
 			assert.True(t, scopes.Has("read"))
 			assert.True(t, scopes.Has("write"))
 		},
 		"/components/securitySchemes/oauth2/flows/authorizationCode": func(flow *openapi.OAuthFlow) {
-			assert.Equal(t, flow.GetAuthorizationURL(), "https://example.com/oauth/authorize")
-			assert.Equal(t, flow.GetTokenURL(), "https://example.com/oauth/token")
+			assert.Equal(t, "https://example.com/oauth/authorize", flow.GetAuthorizationURL())
+			assert.Equal(t, "https://example.com/oauth/token", flow.GetTokenURL())
 			scopes := flow.GetScopes()
 			assert.NotNil(t, scopes)
 			assert.True(t, scopes.Has("read"))
@@ -884,7 +884,7 @@ func TestWalkOAuthFlow_Success(t *testing.T) {
 		},
 	}
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			OAuthFlow: func(flow *openapi.OAuthFlow) error {
 				flowLoc := string(item.Location.ToJSONPointer())
@@ -908,27 +908,27 @@ func TestWalkOAuthFlow_Success(t *testing.T) {
 func TestWalkDiscriminator_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/components/schemas/User/discriminator"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Discriminator: func(d *oas3.Discriminator) error {
 				discriminatorLoc := string(item.Location.ToJSONPointer())
 				matchedLocations = append(matchedLocations, discriminatorLoc)
 
 				if discriminatorLoc == expectedLoc {
-					assert.Equal(t, d.GetPropertyName(), "type")
+					assert.Equal(t, "type", d.GetPropertyName())
 					mapping := d.GetMapping()
 					adminMapping, adminExists := mapping.Get("admin")
 					userMapping, userExists := mapping.Get("user")
 					assert.True(t, adminExists)
 					assert.True(t, userExists)
-					assert.Equal(t, adminMapping, "#/components/schemas/AdminUser")
-					assert.Equal(t, userMapping, "#/components/schemas/RegularUser")
+					assert.Equal(t, "#/components/schemas/AdminUser", adminMapping)
+					assert.Equal(t, "#/components/schemas/RegularUser", userMapping)
 
 					return walk.ErrTerminate
 				}
@@ -949,22 +949,22 @@ func TestWalkDiscriminator_Success(t *testing.T) {
 func TestWalkXML_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
 	expectedLoc := "/components/schemas/User/xml"
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			XML: func(x *oas3.XML) error {
 				xmlLoc := string(item.Location.ToJSONPointer())
 				matchedLocations = append(matchedLocations, xmlLoc)
 
 				if xmlLoc == expectedLoc {
-					assert.Equal(t, x.GetName(), "user")
-					assert.Equal(t, x.GetNamespace(), "https://example.com/user")
-					assert.Equal(t, x.GetPrefix(), "usr")
+					assert.Equal(t, "user", x.GetName())
+					assert.Equal(t, "https://example.com/user", x.GetNamespace())
+					assert.Equal(t, "usr", x.GetPrefix())
 					assert.False(t, x.GetAttribute())
 					assert.False(t, x.GetWrapped())
 
@@ -987,7 +987,7 @@ func TestWalkXML_Success(t *testing.T) {
 func TestWalkComplexSchema_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	matchedLocations := []string{}
@@ -1011,7 +1011,7 @@ func TestWalkComplexSchema_Success(t *testing.T) {
 		"/components/schemas/ComplexSchema/dependentSchemas/name",
 	}
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
 				schemaLoc := string(item.Location.ToJSONPointer())
@@ -1031,12 +1031,12 @@ func TestWalkComplexSchema_Success(t *testing.T) {
 func TestWalkAny_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	visitCounts := make(map[string]int)
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			Any: func(model any) error {
 				location := string(item.Location.ToJSONPointer())
@@ -1048,10 +1048,10 @@ func TestWalkAny_Success(t *testing.T) {
 	}
 
 	// Verify we visited key locations
-	assert.Greater(t, visitCounts["/"], 0, "Should visit root")
-	assert.Greater(t, visitCounts["/info"], 0, "Should visit info")
-	assert.Greater(t, visitCounts["/components"], 0, "Should visit components")
-	assert.Greater(t, visitCounts["/paths"], 0, "Should visit paths")
+	assert.Positive(t, visitCounts["/"], "Should visit root")
+	assert.Positive(t, visitCounts["/info"], "Should visit info")
+	assert.Positive(t, visitCounts["/components"], "Should visit components")
+	assert.Positive(t, visitCounts["/paths"], "Should visit paths")
 
 	// Should have visited many locations
 	assert.Greater(t, len(visitCounts), 50, "Should visit many locations in comprehensive document")
@@ -1060,17 +1060,17 @@ func TestWalkAny_Success(t *testing.T) {
 func TestWalk_Terminate_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument()
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
 	require.NoError(t, err)
 
 	visits := 0
 
-	for item := range openapi.Walk(context.Background(), openAPIDoc) {
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
 		err := item.Match(openapi.Matcher{
 			OpenAPI: func(o *openapi.OpenAPI) error {
 				return walk.ErrTerminate
 			},
-			Any: func(any any) error {
+			Any: func(a any) error {
 				visits++
 				return nil
 			},

@@ -162,7 +162,7 @@ func syncExtensions(ctx context.Context, source any, target reflect.Value, mapNo
 	cf, ok := sUnderlying.Type().FieldByName("core")
 	if ok {
 		sf := sUnderlying.FieldByIndex(cf.Index)
-		reflect.NewAt(sf.Type(), unsafe.Pointer(sf.UnsafeAddr())).Elem().Set(target)
+		reflect.NewAt(sf.Type(), unsafe.Pointer(sf.UnsafeAddr())).Elem().Set(target) //nolint:gosec
 	}
 
 	return mapNode, nil

@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/internal/testutils"
@@ -214,7 +213,7 @@ type:
 
 			c := Criterion{}
 
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", doc.Content[0], &c)
+			validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", doc.Content[0], &c)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs, "Expected no validation errors")
 

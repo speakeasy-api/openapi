@@ -1,7 +1,7 @@
 package criterion
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/expression"
@@ -47,7 +47,7 @@ func newCondition(rawCondition string) (*Condition, error) {
 	parts := strings.Split(rawCondition, " ")
 
 	if len(parts) < 3 {
-		return nil, fmt.Errorf("condition must at least be in the format [expression] [operator] [value]")
+		return nil, errors.New("condition must at least be in the format [expression] [operator] [value]")
 	}
 
 	if strings.ContainsAny(rawCondition, "&|") {

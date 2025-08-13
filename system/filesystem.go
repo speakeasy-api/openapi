@@ -14,5 +14,5 @@ type FileSystem struct{}
 var _ VirtualFS = (*FileSystem)(nil)
 
 func (fs *FileSystem) Open(name string) (fs.File, error) {
-	return os.Open(name)
+	return os.Open(name) //nolint:gosec
 }

@@ -2,7 +2,6 @@ package oas3_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -344,11 +343,11 @@ required: ["user"]
 			t.Parallel()
 
 			var schema oas3.Schema
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &schema)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &schema)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := schema.Validate(context.Background())
+			errs := schema.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, schema.Valid, "expected schema to be valid")
 		})
@@ -485,11 +484,11 @@ oneOf: "invalid"
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &schema)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &schema)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := schema.Validate(context.Background())
+			validateErrs := schema.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 			validation.SortValidationErrors(allErrors)
 

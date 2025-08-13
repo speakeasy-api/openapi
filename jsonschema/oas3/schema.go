@@ -540,28 +540,31 @@ func (s *Schema) IsEqual(other *Schema) bool {
 	}
 
 	// Compare ExclusiveMaximum and ExclusiveMinimum (EitherValue types)
-	if s.ExclusiveMaximum == nil && other.ExclusiveMaximum == nil {
+	switch {
+	case s.ExclusiveMaximum == nil && other.ExclusiveMaximum == nil:
 		// Both nil, continue
-	} else if s.ExclusiveMaximum == nil || other.ExclusiveMaximum == nil {
+	case s.ExclusiveMaximum == nil || other.ExclusiveMaximum == nil:
 		return false
-	} else if !s.ExclusiveMaximum.IsEqual(other.ExclusiveMaximum) {
+	case !s.ExclusiveMaximum.IsEqual(other.ExclusiveMaximum):
 		return false
 	}
 
-	if s.ExclusiveMinimum == nil && other.ExclusiveMinimum == nil {
+	switch {
+	case s.ExclusiveMinimum == nil && other.ExclusiveMinimum == nil:
 		// Both nil, continue
-	} else if s.ExclusiveMinimum == nil || other.ExclusiveMinimum == nil {
+	case s.ExclusiveMinimum == nil || other.ExclusiveMinimum == nil:
 		return false
-	} else if !s.ExclusiveMinimum.IsEqual(other.ExclusiveMinimum) {
+	case !s.ExclusiveMinimum.IsEqual(other.ExclusiveMinimum):
 		return false
 	}
 
 	// Compare Type (EitherValue type)
-	if s.Type == nil && other.Type == nil {
+	switch {
+	case s.Type == nil && other.Type == nil:
 		// Both nil, continue
-	} else if s.Type == nil || other.Type == nil {
+	case s.Type == nil || other.Type == nil:
 		return false
-	} else if !s.Type.IsEqual(other.Type) {
+	case !s.Type.IsEqual(other.Type):
 		return false
 	}
 
@@ -718,38 +721,42 @@ func (s *Schema) IsEqual(other *Schema) bool {
 	}
 
 	// Compare complex struct pointers using their IsEqual methods
-	if s.Discriminator == nil && other.Discriminator == nil {
+	switch {
+	case s.Discriminator == nil && other.Discriminator == nil:
 		// Both nil, continue
-	} else if s.Discriminator == nil || other.Discriminator == nil {
+	case s.Discriminator == nil || other.Discriminator == nil:
 		return false
-	} else if !s.Discriminator.IsEqual(other.Discriminator) {
+	case !s.Discriminator.IsEqual(other.Discriminator):
 		return false
 	}
 
-	if s.ExternalDocs == nil && other.ExternalDocs == nil {
+	switch {
+	case s.ExternalDocs == nil && other.ExternalDocs == nil:
 		// Both nil, continue
-	} else if s.ExternalDocs == nil || other.ExternalDocs == nil {
+	case s.ExternalDocs == nil || other.ExternalDocs == nil:
 		return false
-	} else if !s.ExternalDocs.IsEqual(other.ExternalDocs) {
+	case !s.ExternalDocs.IsEqual(other.ExternalDocs):
 		return false
 	}
 
-	if s.XML == nil && other.XML == nil {
+	switch {
+	case s.XML == nil && other.XML == nil:
 		// Both nil, continue
-	} else if s.XML == nil || other.XML == nil {
+	case s.XML == nil || other.XML == nil:
 		return false
-	} else if !s.XML.IsEqual(other.XML) {
+	case !s.XML.IsEqual(other.XML):
 		return false
 	}
 
 	// Compare Extensions using the Extensions.IsEqual method which handles nil/empty equality
-	if s.Extensions == nil && other.Extensions == nil {
+	switch {
+	case s.Extensions == nil && other.Extensions == nil:
 		// Both nil, continue
-	} else if (s.Extensions == nil && other.Extensions != nil && other.Extensions.Len() > 0) ||
-		(other.Extensions == nil && s.Extensions != nil && s.Extensions.Len() > 0) {
+	case (s.Extensions == nil && other.Extensions != nil && other.Extensions.Len() > 0) ||
+		(other.Extensions == nil && s.Extensions != nil && s.Extensions.Len() > 0):
 		// One is nil and the other is non-empty
 		return false
-	} else if s.Extensions != nil && other.Extensions != nil {
+	case s.Extensions != nil && other.Extensions != nil:
 		// Both non-nil, use IsEqual method
 		if !s.Extensions.IsEqual(other.Extensions) {
 			return false
@@ -814,9 +821,7 @@ func equalSequencedMaps(a, b *sequencedmap.Map[string, *JSONSchema[Referenceable
 	}
 
 	// Use IsEqualFunc with custom comparison for JSONSchema values
-	return a.IsEqualFunc(b, func(valueA, valueB *JSONSchema[Referenceable]) bool {
-		return equalJSONSchemas(valueA, valueB)
-	})
+	return a.IsEqualFunc(b, equalJSONSchemas)
 }
 
 func equalStringSlices(a, b []string) bool {

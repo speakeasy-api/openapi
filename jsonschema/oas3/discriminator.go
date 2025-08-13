@@ -80,11 +80,12 @@ func (d *Discriminator) IsEqual(other *Discriminator) bool {
 	}
 
 	// Compare Mapping using sequencedmap's IsEqual method
-	if d.Mapping == nil && other.Mapping == nil {
+	switch {
+	case d.Mapping == nil && other.Mapping == nil:
 		// Both nil, continue
-	} else if d.Mapping == nil || other.Mapping == nil {
+	case d.Mapping == nil || other.Mapping == nil:
 		return false
-	} else if !d.Mapping.IsEqual(other.Mapping) {
+	case !d.Mapping.IsEqual(other.Mapping):
 		return false
 	}
 

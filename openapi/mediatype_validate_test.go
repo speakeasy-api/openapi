@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -109,11 +108,11 @@ x-custom: custom-data
 			t.Parallel()
 
 			var mediaType openapi.MediaType
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &mediaType)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &mediaType)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := mediaType.Validate(context.Background())
+			errs := mediaType.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, mediaType.Valid, "expected media type to be valid")
 		})
@@ -153,11 +152,11 @@ encoding:
 			t.Parallel()
 
 			var mediaType openapi.MediaType
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &mediaType)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &mediaType)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := mediaType.Validate(context.Background())
+			errs := mediaType.Validate(t.Context())
 			require.NotEmpty(t, errs, "expected validation errors")
 			require.False(t, mediaType.Valid, "expected media type to be invalid")
 

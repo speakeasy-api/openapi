@@ -1,7 +1,6 @@
 package values
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -74,7 +73,7 @@ false`,
 			// Use the complete marshaller.Unmarshal flow (UnmarshalCore + Populate)
 			highLevelEither := &EitherValue[TestModel, TestCoreModel, bool, bool]{}
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(),
+			validationErrs, err := marshaller.Unmarshal(t.Context(),
 				strings.NewReader(tt.yaml), highLevelEither)
 
 			require.NoError(t, err, "Unmarshal should not return an error")

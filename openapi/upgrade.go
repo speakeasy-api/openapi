@@ -36,11 +36,12 @@ func Upgrade(ctx context.Context, doc *OpenAPI, opts ...Option[UpgradeOptions]) 
 	// Only upgrade if:
 	// 1. Document is 3.0.x (always upgrade these)
 	// 2. Document is 3.1.x and upgradeSamePatchVersion is true (upgrade to 3.1.1)
-	if strings.HasPrefix(doc.OpenAPI, "3.0") {
+	switch {
+	case strings.HasPrefix(doc.OpenAPI, "3.0"):
 		// Always upgrade 3.0.x versions
-	} else if strings.HasPrefix(doc.OpenAPI, "3.1") && o.upgradeSamePatchVersion && doc.OpenAPI != Version {
+	case strings.HasPrefix(doc.OpenAPI, "3.1") && o.upgradeSamePatchVersion && doc.OpenAPI != Version:
 		// Upgrade 3.1.x versions to 3.1.1 if option is set and not already 3.1.1
-	} else {
+	default:
 		// Don't upgrade other versions
 		return false, nil
 	}

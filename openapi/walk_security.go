@@ -27,7 +27,7 @@ func walkSecurity(ctx context.Context, security []*SecurityRequirement, loc []Lo
 }
 
 // walkSecurityRequirement walks through a single security requirement
-func walkSecurityRequirement(ctx context.Context, securityRequirement *SecurityRequirement, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
+func walkSecurityRequirement(_ context.Context, securityRequirement *SecurityRequirement, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
 	if securityRequirement == nil {
 		return true
 	}
@@ -106,7 +106,7 @@ func walkOAuthFlows(ctx context.Context, flows *OAuthFlows, loc []LocationContex
 }
 
 // walkOAuthFlow walks through an OAuth flow
-func walkOAuthFlow(ctx context.Context, flow *OAuthFlow, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
+func walkOAuthFlow(_ context.Context, flow *OAuthFlow, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
 	if flow == nil {
 		return true
 	}

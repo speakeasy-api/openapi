@@ -106,7 +106,7 @@ func TestJSONPointer_Validate_Error(t *testing.T) {
 			t.Parallel()
 
 			err := tt.args.j.Validate()
-			assert.EqualError(t, err, tt.wantErr.Error())
+			require.EqualError(t, err, tt.wantErr.Error())
 		})
 	}
 }
@@ -405,7 +405,7 @@ func TestGetTarget_Error(t *testing.T) {
 			t.Parallel()
 
 			target, err := GetTarget(tt.args.source, tt.args.pointer, tt.args.opts...)
-			assert.EqualError(t, err, tt.wantErr.Error())
+			require.EqualError(t, err, tt.wantErr.Error())
 			assert.Nil(t, target)
 		})
 	}
@@ -572,7 +572,7 @@ func TestGetTarget_WithInterfaces_Error(t *testing.T) {
 			t.Parallel()
 
 			target, err := GetTarget(tt.args.source, tt.args.pointer, tt.args.opts...)
-			assert.EqualError(t, err, tt.wantErr.Error())
+			require.EqualError(t, err, tt.wantErr.Error())
 			assert.Nil(t, target)
 		})
 	}

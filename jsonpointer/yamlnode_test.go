@@ -27,6 +27,7 @@ func TestGetTarget_YamlNode_Success(t *testing.T) {
 				pointer:     JSONPointer("/"),
 			},
 			validate: func(t *testing.T, result any) {
+				t.Helper()
 				node, ok := result.(*yaml.Node)
 				require.True(t, ok, "result should be *yaml.Node")
 				// Root node should return the document's content (MappingNode)
@@ -43,6 +44,7 @@ active: true`,
 				pointer: JSONPointer("/name"),
 			},
 			validate: func(t *testing.T, result any) {
+				t.Helper()
 				node, ok := result.(*yaml.Node)
 				require.True(t, ok, "result should be *yaml.Node")
 				assert.Equal(t, yaml.ScalarNode, node.Kind)
@@ -61,6 +63,7 @@ user:
 				pointer: JSONPointer("/user/profile/settings/theme"),
 			},
 			validate: func(t *testing.T, result any) {
+				t.Helper()
 				node, ok := result.(*yaml.Node)
 				require.True(t, ok, "result should be *yaml.Node")
 				assert.Equal(t, yaml.ScalarNode, node.Kind)
@@ -78,6 +81,7 @@ items:
 				pointer: JSONPointer("/items/1"),
 			},
 			validate: func(t *testing.T, result any) {
+				t.Helper()
 				node, ok := result.(*yaml.Node)
 				require.True(t, ok, "result should be *yaml.Node")
 				assert.Equal(t, yaml.ScalarNode, node.Kind)
@@ -100,6 +104,7 @@ api:
 				pointer: JSONPointer("/api/endpoints/0/methods/1"),
 			},
 			validate: func(t *testing.T, result any) {
+				t.Helper()
 				node, ok := result.(*yaml.Node)
 				require.True(t, ok, "result should be *yaml.Node")
 				assert.Equal(t, yaml.ScalarNode, node.Kind)
@@ -117,6 +122,7 @@ api:
 				pointer: JSONPointer("/paths/~1users~1{id}/get/summary"),
 			},
 			validate: func(t *testing.T, result any) {
+				t.Helper()
 				node, ok := result.(*yaml.Node)
 				require.True(t, ok, "result should be *yaml.Node")
 				assert.Equal(t, yaml.ScalarNode, node.Kind)

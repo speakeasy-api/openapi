@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -148,11 +147,11 @@ x-custom: value
 
 			var doc openapi.OpenAPI
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &doc)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &doc)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := doc.Validate(context.Background())
+			errs := doc.Validate(t.Context())
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -257,11 +256,11 @@ paths: {}
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &doc)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &doc)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := doc.Validate(context.Background())
+			validateErrs := doc.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "Expected validation errors")

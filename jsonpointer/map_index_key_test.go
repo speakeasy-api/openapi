@@ -332,9 +332,9 @@ func TestMapIntegerKeys_Error(t *testing.T) {
 
 			_, err := GetTarget(tt.data, JSONPointer(tt.jsonPointer))
 			if tt.expectError {
-				assert.Error(t, err, "should return an error for invalid path")
+				require.Error(t, err, "should return an error for invalid path")
 			} else {
-				assert.NoError(t, err, "should not return an error")
+				require.NoError(t, err, "should not return an error")
 			}
 		})
 	}

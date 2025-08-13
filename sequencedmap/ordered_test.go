@@ -117,7 +117,7 @@ func TestAllOrdered_Success(t *testing.T) {
 
 			assert.Equal(t, tt.expected, actualKeys, "keys should match expected order")
 			assert.Equal(t, tt.expectVals, actualVals, "values should match expected order")
-			assert.Equal(t, len(tt.expected), len(actualKeys), "length should match")
+			assert.Len(t, actualKeys, len(tt.expected), "length should match")
 		})
 	}
 }
@@ -278,7 +278,7 @@ func TestAllOrdered_EarlyExit_Success(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.expectedKeys, actualKeys, "keys should match expected with early exit")
-			assert.Equal(t, tt.stopAfter, len(actualKeys), "should stop after specified count")
+			assert.Len(t, actualKeys, tt.stopAfter, "should stop after specified count")
 		})
 	}
 }
@@ -291,6 +291,7 @@ func TestAllOrdered_CompareWithAll_Success(t *testing.T) {
 	m.Set("beta", 2)
 
 	t.Run("OrderAdded should match All() behavior", func(t *testing.T) {
+		t.Parallel()
 		var allKeys []string
 		var allVals []int
 		for k, v := range m.All() {

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"path/filepath"
@@ -32,7 +33,7 @@ type ReferenceClassification struct {
 func ClassifyReference(ref string) (*ReferenceClassification, error) {
 	// Handle empty strings
 	if ref == "" {
-		return nil, fmt.Errorf("empty reference")
+		return nil, errors.New("empty reference")
 	}
 
 	result := &ReferenceClassification{

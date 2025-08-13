@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -86,11 +85,11 @@ variables:
 			t.Parallel()
 
 			var server openapi.Server
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &server)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &server)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := server.Validate(context.Background())
+			errs := server.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, server.Valid, "expected server to be valid")
 		})
@@ -179,11 +178,11 @@ variables:
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &server)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &server)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := server.Validate(context.Background())
+			validateErrs := server.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")
@@ -257,11 +256,11 @@ description: Fixed version
 			t.Parallel()
 
 			var variable openapi.ServerVariable
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &variable)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &variable)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := variable.Validate(context.Background())
+			errs := variable.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, variable.Valid, "expected server variable to be valid")
 		})
@@ -312,11 +311,11 @@ description: Variable with invalid default
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &variable)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &variable)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := variable.Validate(context.Background())
+			validateErrs := variable.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")

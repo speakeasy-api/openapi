@@ -1,7 +1,6 @@
 package oas3
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -18,7 +17,7 @@ func TestSchema_Defs_Success(t *testing.T) {
 		t.Parallel()
 
 		// Load test schema with $defs
-		root, err := LoadTestSchemaFromFile("testdata/defs_schema.json")
+		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/defs_schema.json")
 		require.NoError(t, err)
 
 		opts := ResolveOptions{
@@ -38,7 +37,7 @@ func TestSchema_Defs_Success(t *testing.T) {
 		require.True(t, userProperty.IsReference())
 
 		// Resolve the reference
-		validationErrs, err := userProperty.Resolve(context.Background(), opts)
+		validationErrs, err := userProperty.Resolve(t.Context(), opts)
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
 
@@ -69,7 +68,7 @@ func TestSchema_Defs_Success(t *testing.T) {
 	t.Run("resolve chained references through $defs", func(t *testing.T) {
 		t.Parallel()
 
-		root, err := LoadTestSchemaFromFile("testdata/defs_schema.json")
+		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/defs_schema.json")
 		require.NoError(t, err)
 
 		opts := ResolveOptions{
@@ -89,7 +88,7 @@ func TestSchema_Defs_Success(t *testing.T) {
 		require.True(t, userProperty.IsReference())
 
 		// Resolve the User reference
-		validationErrs, err := userProperty.Resolve(context.Background(), opts)
+		validationErrs, err := userProperty.Resolve(t.Context(), opts)
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
 
@@ -114,7 +113,7 @@ func TestSchema_Defs_Success(t *testing.T) {
 	t.Run("resolve chained reference (ref to ref)", func(t *testing.T) {
 		t.Parallel()
 
-		root, err := LoadTestSchemaFromFile("testdata/defs_schema.json")
+		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/defs_schema.json")
 		require.NoError(t, err)
 
 		opts := ResolveOptions{
@@ -134,7 +133,7 @@ func TestSchema_Defs_Success(t *testing.T) {
 		require.True(t, chainedProperty.IsReference())
 
 		// Resolve the chained reference
-		validationErrs, err := chainedProperty.Resolve(context.Background(), opts)
+		validationErrs, err := chainedProperty.Resolve(t.Context(), opts)
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
 
@@ -165,7 +164,7 @@ func TestSchema_Defs_Success(t *testing.T) {
 	t.Run("resolve reference from within nested schema with local $defs", func(t *testing.T) {
 		t.Parallel()
 
-		root, err := LoadTestSchemaFromFile("testdata/defs_schema.json")
+		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/defs_schema.json")
 		require.NoError(t, err)
 
 		opts := ResolveOptions{
@@ -193,7 +192,7 @@ func TestSchema_Defs_Success(t *testing.T) {
 		assert.Equal(t, "#/$defs/LocalDef", string(localRef.GetRef()))
 
 		// Now resolve the localRef - this should find LocalDef in the nested schema's $defs
-		validationErrs, err := localRef.Resolve(context.Background(), opts)
+		validationErrs, err := localRef.Resolve(t.Context(), opts)
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
 
@@ -219,7 +218,7 @@ func TestSchema_Defs_Success(t *testing.T) {
 	t.Run("$defs getter method works correctly", func(t *testing.T) {
 		t.Parallel()
 
-		root, err := LoadTestSchemaFromFile("testdata/defs_schema.json")
+		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/defs_schema.json")
 		require.NoError(t, err)
 
 		// Get the $defs from the root schema
@@ -252,7 +251,7 @@ func TestSchema_Defs_Error(t *testing.T) {
 	t.Run("reference to non-existent $defs entry", func(t *testing.T) {
 		t.Parallel()
 
-		root, err := LoadTestSchemaFromFile("testdata/defs_schema.json")
+		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/defs_schema.json")
 		require.NoError(t, err)
 
 		opts := ResolveOptions{
@@ -272,7 +271,7 @@ func TestSchema_Defs_Error(t *testing.T) {
 		require.True(t, nonExistentProperty.IsReference())
 
 		// Try to resolve the non-existent reference
-		validationErrs, err := nonExistentProperty.Resolve(context.Background(), opts)
+		validationErrs, err := nonExistentProperty.Resolve(t.Context(), opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -348,7 +347,7 @@ func TestSchema_ExternalDefs_Success(t *testing.T) {
 
 		// Parse the test schema
 		testSchema := &JSONSchema[Referenceable]{}
-		validationErrs, err := marshaller.Unmarshal(context.Background(), strings.NewReader(testSchemaContent), testSchema)
+		validationErrs, err := marshaller.Unmarshal(t.Context(), strings.NewReader(testSchemaContent), testSchema)
 		require.NoError(t, err, "should parse test schema")
 		require.Empty(t, validationErrs, "should have no validation errors")
 
@@ -369,7 +368,7 @@ func TestSchema_ExternalDefs_Success(t *testing.T) {
 		require.True(t, externalUserProperty.IsReference())
 
 		// Resolve the external reference
-		validationErrs, err = externalUserProperty.Resolve(context.Background(), opts)
+		validationErrs, err = externalUserProperty.Resolve(t.Context(), opts)
 		require.NoError(t, err, "should resolve external $defs reference")
 		assert.Nil(t, validationErrs, "should have no validation errors")
 
@@ -412,7 +411,7 @@ func TestSchema_ExternalDefs_Success(t *testing.T) {
 
 		// Parse the test schema
 		testSchema := &JSONSchema[Referenceable]{}
-		validationErrs, err := marshaller.Unmarshal(context.Background(), strings.NewReader(testSchemaContent), testSchema)
+		validationErrs, err := marshaller.Unmarshal(t.Context(), strings.NewReader(testSchemaContent), testSchema)
 		require.NoError(t, err, "should parse test schema")
 		require.Empty(t, validationErrs, "should have no validation errors")
 
@@ -433,7 +432,7 @@ func TestSchema_ExternalDefs_Success(t *testing.T) {
 		require.True(t, nonExistentProperty.IsReference())
 
 		// Try to resolve the non-existent external reference
-		validationErrs, err = nonExistentProperty.Resolve(context.Background(), opts)
+		validationErrs, err = nonExistentProperty.Resolve(t.Context(), opts)
 		require.Error(t, err, "should return error for non-existent external reference")
 		assert.Nil(t, validationErrs, "validation errors should be nil on resolution error")
 	})

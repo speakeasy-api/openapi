@@ -100,7 +100,7 @@ func DeleteMapNodeElement(ctx context.Context, key string, mapNode *yaml.Node) *
 
 	for i := 0; i < len(resolvedMapNode.Content); i += 2 {
 		if resolvedMapNode.Content[i].Value == key {
-			mapNode.Content = append(resolvedMapNode.Content[:i], resolvedMapNode.Content[i+2:]...)
+			mapNode.Content = append(resolvedMapNode.Content[:i], resolvedMapNode.Content[i+2:]...) //nolint:gocritic
 			return mapNode
 		}
 	}

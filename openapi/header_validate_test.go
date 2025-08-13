@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -102,11 +101,11 @@ x-custom: custom-data
 			t.Parallel()
 
 			var header openapi.Header
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &header)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &header)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := header.Validate(context.Background())
+			errs := header.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, header.Valid, "expected header to be valid")
 		})
@@ -137,11 +136,11 @@ description: Header with invalid schema
 			t.Parallel()
 
 			var header openapi.Header
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &header)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &header)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := header.Validate(context.Background())
+			errs := header.Validate(t.Context())
 			require.NotEmpty(t, errs, "expected validation errors")
 			require.False(t, header.Valid, "expected header to be invalid")
 

@@ -52,7 +52,8 @@ func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, parentName string, no
 	if leftUnmarshalErr == nil && rightUnmarshalErr == nil {
 		// Both failed with validation errors only (no real unmarshalling errors)
 		// Combine the validation errors and return them instead of an error
-		allValidationErrs := append(leftValidationErrs, rightValidationErrs...)
+		allValidationErrs := leftValidationErrs
+		allValidationErrs = append(allValidationErrs, rightValidationErrs...)
 		return allValidationErrs, nil
 	}
 
@@ -162,7 +163,7 @@ func (v *EitherValue[L, R]) SyncChanges(ctx context.Context, model any, valueNod
 	}
 
 	// Both are nil - this shouldn't happen in a valid EitherValue, but handle gracefully
-	return nil, fmt.Errorf("EitherValue has neither Left nor Right set")
+	return nil, errors.New("EitherValue has neither Left nor Right set")
 }
 
 func (v *EitherValue[L, R]) GetNavigableNode() (any, error) {

@@ -2,7 +2,6 @@ package openapi
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -24,9 +23,10 @@ func TestReference_Unmarshal_Success(t *testing.T) {
 			name: "reference with $ref only",
 			yaml: `$ref: '#/components/examples/UserExample'`,
 			testFunc: func(t *testing.T, ref *ReferencedExample) {
+				t.Helper()
 				assert.Equal(t, "#/components/examples/UserExample", string(ref.GetReference()))
-				assert.Equal(t, "", ref.GetSummary())
-				assert.Equal(t, "", ref.GetDescription())
+				assert.Empty(t, ref.GetSummary())
+				assert.Empty(t, ref.GetDescription())
 				assert.True(t, ref.IsReference())
 				assert.Nil(t, ref.Object)
 			},
@@ -39,6 +39,7 @@ summary: User example reference
 description: A reference to the user example with additional context
 `,
 			testFunc: func(t *testing.T, ref *ReferencedExample) {
+				t.Helper()
 				assert.Equal(t, "#/components/examples/UserExample", string(ref.GetReference()))
 				assert.Equal(t, "User example reference", ref.GetSummary())
 				assert.Equal(t, "A reference to the user example with additional context", ref.GetDescription())
@@ -57,9 +58,10 @@ value:
   email: john@example.com
 `,
 			testFunc: func(t *testing.T, ref *ReferencedExample) {
-				assert.Equal(t, "", string(ref.GetReference()))
-				assert.Equal(t, "", ref.GetSummary()) // Summary/Description are on the object, not the reference
-				assert.Equal(t, "", ref.GetDescription())
+				t.Helper()
+				assert.Empty(t, string(ref.GetReference()))
+				assert.Empty(t, ref.GetSummary()) // Summary/Description are on the object, not the reference
+				assert.Empty(t, ref.GetDescription())
 				assert.False(t, ref.IsReference())
 				assert.NotNil(t, ref.Object)
 				assert.Equal(t, "Inline user example", ref.Object.GetSummary())
@@ -70,9 +72,10 @@ value:
 			name: "empty reference",
 			yaml: `{}`,
 			testFunc: func(t *testing.T, ref *ReferencedExample) {
-				assert.Equal(t, "", string(ref.GetReference()))
-				assert.Equal(t, "", ref.GetSummary())
-				assert.Equal(t, "", ref.GetDescription())
+				t.Helper()
+				assert.Empty(t, string(ref.GetReference()))
+				assert.Empty(t, ref.GetSummary())
+				assert.Empty(t, ref.GetDescription())
 				assert.False(t, ref.IsReference())
 				// Empty reference creates an empty object, not nil
 				assert.NotNil(t, ref.Object)
@@ -85,7 +88,7 @@ value:
 			t.Parallel()
 
 			var ref ReferencedExample
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yaml)), &ref)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yaml), &ref)
 			require.NoError(t, err)
 			assert.Empty(t, validationErrs)
 
@@ -126,15 +129,15 @@ func TestReference_Unmarshal_Error(t *testing.T) {
 			t.Parallel()
 
 			var ref ReferencedExample
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yaml)), &ref)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yaml), &ref)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errorMsg != "" {
 					assert.Contains(t, err.Error(), tt.errorMsg)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				// For non-mapping nodes, we should get validation errors
 				if tt.yaml != `{}` {
 					assert.NotEmpty(t, validationErrs)
@@ -156,9 +159,10 @@ func TestReference_GetterMethods_NilSafety(t *testing.T) {
 			name: "nil reference",
 			ref:  nil,
 			testFunc: func(t *testing.T, ref *ReferencedExample) {
-				assert.Equal(t, "", string(ref.GetReference()))
-				assert.Equal(t, "", ref.GetSummary())
-				assert.Equal(t, "", ref.GetDescription())
+				t.Helper()
+				assert.Empty(t, string(ref.GetReference()))
+				assert.Empty(t, ref.GetSummary())
+				assert.Empty(t, ref.GetDescription())
 				assert.False(t, ref.IsReference())
 			},
 		},
@@ -166,9 +170,10 @@ func TestReference_GetterMethods_NilSafety(t *testing.T) {
 			name: "reference with nil fields",
 			ref:  &ReferencedExample{},
 			testFunc: func(t *testing.T, ref *ReferencedExample) {
-				assert.Equal(t, "", string(ref.GetReference()))
-				assert.Equal(t, "", ref.GetSummary())
-				assert.Equal(t, "", ref.GetDescription())
+				t.Helper()
+				assert.Empty(t, string(ref.GetReference()))
+				assert.Empty(t, ref.GetSummary())
+				assert.Empty(t, ref.GetDescription())
 				assert.False(t, ref.IsReference())
 			},
 		},
@@ -180,6 +185,7 @@ func TestReference_GetterMethods_NilSafety(t *testing.T) {
 				Description: pointer.From("Test description"),
 			},
 			testFunc: func(t *testing.T, ref *ReferencedExample) {
+				t.Helper()
 				assert.Equal(t, "#/components/examples/UserExample", string(ref.GetReference()))
 				assert.Equal(t, "Test summary", ref.GetSummary())
 				assert.Equal(t, "Test description", ref.GetDescription())
@@ -209,7 +215,7 @@ summary: User ID parameter reference
 description: Reference to the user ID parameter
 `
 		var ref ReferencedParameter
-		validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yaml)), &ref)
+		validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yaml), &ref)
 		require.NoError(t, err)
 		assert.Empty(t, validationErrs)
 
@@ -228,7 +234,7 @@ summary: Not found response reference
 description: Reference to the standard not found response
 `
 		var ref ReferencedResponse
-		validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yaml)), &ref)
+		validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yaml), &ref)
 		require.NoError(t, err)
 		assert.Empty(t, validationErrs)
 
@@ -247,7 +253,7 @@ summary: User request body reference
 description: Reference to the user request body schema
 `
 		var ref ReferencedRequestBody
-		validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(yaml)), &ref)
+		validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yaml), &ref)
 		require.NoError(t, err)
 		assert.Empty(t, validationErrs)
 

@@ -215,10 +215,7 @@ func Inline(ctx context.Context, schema *JSONSchema[Referenceable], opts InlineO
 
 	// Remove unused $defs if requested
 	if opts.RemoveUnusedDefs {
-		err := removeUnusedDefs(ctx, workingSchema, refTracker)
-		if err != nil {
-			return nil, fmt.Errorf("failed to remove unused defs: %w", err)
-		}
+		removeUnusedDefs(ctx, workingSchema, refTracker)
 	}
 
 	return workingSchema, nil
@@ -238,7 +235,7 @@ func analyzeReferences(ctx context.Context, schema *JSONSchema[Referenceable], o
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("%w: %v", ErrInlineTimeout, ctx.Err())
+		return fmt.Errorf("%w: %w", ErrInlineTimeout, ctx.Err())
 	default:
 		// Increment cycle counter and check limits
 		if err := counter.increment(); err != nil {
@@ -426,7 +423,7 @@ func inlineRecursive(ctx context.Context, schema *JSONSchema[Referenceable], opt
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("%w: %v", ErrInlineTimeout, ctx.Err())
+		return fmt.Errorf("%w: %w", ErrInlineTimeout, ctx.Err())
 	default:
 		// Increment cycle counter and check limits
 		if err := counter.increment(); err != nil {
@@ -605,15 +602,13 @@ func inlineRecursive(ctx context.Context, schema *JSONSchema[Referenceable], opt
 		// If we reach here, this reference should be inlined (preserve=false)
 		if !info.preserve {
 			inlineSchemaInPlace(ctx, schema)
-		} else {
+		} else if info.rewrittenRef != "" {
 			// This is a preserved reference - rewrite it to point to the new $defs location
-			if info.rewrittenRef != "" {
-				schema.GetLeft().Ref = pointer.From(references.Reference(info.rewrittenRef))
-				rewrittenAbsRef := references.Reference(opts.ResolveOptions.TargetLocation + info.rewrittenRef)
-				// Add reverse lookup for the rewritten reference
-				if !refTracker.Has(rewrittenAbsRef.String()) {
-					refTracker.Set(rewrittenAbsRef.String(), info)
-				}
+			schema.GetLeft().Ref = pointer.From(references.Reference(info.rewrittenRef))
+			rewrittenAbsRef := references.Reference(opts.ResolveOptions.TargetLocation + info.rewrittenRef)
+			// Add reverse lookup for the rewritten reference
+			if !refTracker.Has(rewrittenAbsRef.String()) {
+				refTracker.Set(rewrittenAbsRef.String(), info)
 			}
 		}
 	}
@@ -623,7 +618,7 @@ func inlineRecursive(ctx context.Context, schema *JSONSchema[Referenceable], opt
 
 // inlineSchemaInPlace replaces a reference schema with its resolved content in place.
 // It includes circular reference detection to prevent infinite recursion.
-func inlineSchemaInPlace(ctx context.Context, schema *JSONSchema[Referenceable]) {
+func inlineSchemaInPlace(_ context.Context, schema *JSONSchema[Referenceable]) {
 	if !schema.IsReference() {
 		// Not a reference, nothing to inline
 		return
@@ -649,14 +644,14 @@ func inlineSchemaInPlace(ctx context.Context, schema *JSONSchema[Referenceable])
 }
 
 // removeUnusedDefs removes $defs that are no longer referenced after inlining
-func removeUnusedDefs(ctx context.Context, schema *JSONSchema[Referenceable], refTracker *sequencedmap.Map[string, *refInfo]) error {
+func removeUnusedDefs(_ context.Context, schema *JSONSchema[Referenceable], refTracker *sequencedmap.Map[string, *refInfo]) {
 	if schema == nil || !schema.IsLeft() {
-		return nil
+		return
 	}
 
 	schemaObj := schema.GetLeft()
 	if schemaObj == nil || schemaObj.Defs == nil || schemaObj.Defs.Len() == 0 {
-		return nil
+		return
 	}
 
 	// Remove unused definitions
@@ -685,8 +680,6 @@ func removeUnusedDefs(ctx context.Context, schema *JSONSchema[Referenceable], re
 	if schemaObj.Defs.Len() == 0 {
 		schemaObj.Defs = nil
 	}
-
-	return nil
 }
 
 // generateUniqueDefName generates a unique name for a definition to avoid conflicts
@@ -724,7 +717,8 @@ func rewriteExternalReference(schema *JSONSchema[Referenceable], refTracker *seq
 	// This is an external reference that needs to be rewritten
 	var newDefName string
 
-	if ref.GetURI() != "" {
+	switch {
+	case ref.GetURI() != "":
 		// External document reference - use URI + JSON pointer as name
 		uri := ref.GetURI()
 		// Clean up URI to make it a valid definition name
@@ -745,7 +739,7 @@ func rewriteExternalReference(schema *JSONSchema[Referenceable], refTracker *seq
 		if newDefName == "" {
 			newDefName = "ExternalRef"
 		}
-	} else if ref.HasJSONPointer() {
+	case ref.HasJSONPointer():
 		// Internal JSON pointer reference (not $defs)
 		jsonPointer := string(ref.GetJSONPointer())
 
@@ -764,7 +758,7 @@ func rewriteExternalReference(schema *JSONSchema[Referenceable], refTracker *seq
 		if newDefName == "" {
 			newDefName = "InternalRef"
 		}
-	} else {
+	default:
 		// Edge case - reference with no URI and no JSON pointer
 		newDefName = "UnknownRef"
 	}
@@ -792,12 +786,12 @@ func consolidateDefinitions(schema *JSONSchema[Referenceable], refTracker *seque
 
 	// Ensure we have a schema object (not a boolean schema)
 	if schema.IsRight() {
-		return fmt.Errorf("cannot add definitions to a boolean schema")
+		return errors.New("cannot add definitions to a boolean schema")
 	}
 
 	js := schema.GetLeft()
 	if js == nil {
-		return fmt.Errorf("schema object is nil")
+		return errors.New("schema object is nil")
 	}
 
 	// Count how many definitions we actually need to add

@@ -3,6 +3,7 @@ package references
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -71,13 +72,13 @@ type ResolveOptions struct {
 
 func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T], opts ResolveOptions) (*ResolveResult[T], []error, error) {
 	if opts.RootDocument == nil {
-		return nil, nil, fmt.Errorf("root document is required")
+		return nil, nil, errors.New("root document is required")
 	}
 	if opts.TargetLocation == "" {
-		return nil, nil, fmt.Errorf("target location is required")
+		return nil, nil, errors.New("target location is required")
 	}
 	if opts.TargetDocument == nil {
-		return nil, nil, fmt.Errorf("target document is required")
+		return nil, nil, errors.New("target document is required")
 	}
 	if opts.VirtualFS == nil {
 		opts.VirtualFS = &system.FileSystem{}
@@ -131,7 +132,7 @@ func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T]
 			ResolvedDocument:  opts.TargetDocument,
 		}, validationErrs, nil
 	} else if opts.DisableExternalRefs {
-		return nil, nil, fmt.Errorf("external reference not allowed")
+		return nil, nil, errors.New("external reference not allowed")
 	}
 
 	cd, cdOK := opts.RootDocument.GetCachedReferenceDocument(absRef)
@@ -203,7 +204,7 @@ func resolveAgainstURL[T any](ctx context.Context, absRef string, jp jsonpointer
 	if err != nil || resp == nil {
 		return nil, nil, nil, err
 	}
-	defer resp.Body.Close() //nolint:errcheck
+	defer resp.Body.Close()
 
 	// Check if the response was successful
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -218,7 +219,7 @@ func resolveAgainstFilePath[T any](ctx context.Context, absRef string, jp jsonpo
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	defer f.Close() //nolint:errcheck
+	defer f.Close()
 
 	return resolveAgainstData(ctx, absRef, f, jp, unmarshaler, opts)
 }
@@ -268,12 +269,12 @@ func resolveAgainstData[T any](ctx context.Context, absRef string, reader io.Rea
 	}
 
 	if target == nil {
-		return nil, nil, nil, fmt.Errorf("target not found")
+		return nil, nil, nil, errors.New("target not found")
 	}
 
 	targetNode, ok := target.(*yaml.Node)
 	if !ok {
-		return nil, nil, nil, fmt.Errorf("target is not a *yaml.Node")
+		return nil, nil, nil, errors.New("target is not a *yaml.Node")
 	}
 
 	resolved, validationErrs, err := unmarshaler(ctx, targetNode, opts.SkipValidation)

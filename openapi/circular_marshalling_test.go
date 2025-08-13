@@ -1,7 +1,6 @@
 package openapi_test
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -15,7 +14,7 @@ import (
 // without infinite recursion. This isolates the issue from any inlining code.
 func TestCircularReferenceMarshalling(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// OpenAPI document with circular references
 	openAPIDoc := `{
@@ -86,7 +85,7 @@ func TestCircularReferenceMarshalling(t *testing.T) {
 	t.Logf("✓ Marshalled successfully, result length: %d characters", len(actualJSON))
 
 	// Basic sanity check that we got some JSON back
-	require.Greater(t, len(actualJSON), 0, "marshalled JSON should not be empty")
+	require.NotEmpty(t, actualJSON, "marshalled JSON should not be empty")
 	require.Contains(t, actualJSON, "User", "marshalled JSON should contain schema content")
 }
 
@@ -94,7 +93,7 @@ func TestCircularReferenceMarshalling(t *testing.T) {
 // after resolving references to see if the issue is specific to individual schemas
 func TestCircularReferenceFullDocumentMarshalling(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// OpenAPI document with circular references
 	openAPIDoc := `{
@@ -165,7 +164,7 @@ func TestCircularReferenceFullDocumentMarshalling(t *testing.T) {
 	t.Logf("✓ Marshalled successfully, result length: %d characters", len(actualJSON))
 
 	// Basic sanity check that we got some JSON back
-	require.Greater(t, len(actualJSON), 0, "marshalled JSON should not be empty")
+	require.NotEmpty(t, actualJSON, "marshalled JSON should not be empty")
 	require.Contains(t, actualJSON, "User", "marshalled JSON should contain schema content")
 	require.Contains(t, actualJSON, "Manager", "marshalled JSON should contain schema content")
 }

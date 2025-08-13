@@ -2,7 +2,6 @@ package oas3_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -76,11 +75,11 @@ name: ""
 			t.Parallel()
 
 			var xml oas3.XML
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &xml)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &xml)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := xml.Validate(context.Background())
+			errs := xml.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, xml.Valid, "expected XML to be valid")
 		})
@@ -134,11 +133,11 @@ namespace: ":invalid namespace"
 			t.Parallel()
 
 			var xml oas3.XML
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &xml)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &xml)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := xml.Validate(context.Background())
+			errs := xml.Validate(t.Context())
 			require.NotEmpty(t, errs, "expected validation errors")
 			require.False(t, xml.Valid, "expected XML to be invalid")
 

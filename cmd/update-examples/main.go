@@ -75,7 +75,7 @@ func processPackage(packageName string) error {
 	}
 
 	// Generate README content
-	content := generateReadmeContent(packageName, examples)
+	content := generateReadmeContent(examples)
 
 	// Update README file
 	if err := updateReadmeFile(readmeFile, content); err != nil {
@@ -231,7 +231,7 @@ func extractOutputComment(code string) string {
 	return strings.Join(outputLines, "\n")
 }
 
-func generateReadmeContent(packageName string, examples []ExampleInfo) string {
+func generateReadmeContent(examples []ExampleInfo) string {
 	var content strings.Builder
 
 	// Generate content in the order examples appear in the file
@@ -254,7 +254,7 @@ func generateReadmeContent(packageName string, examples []ExampleInfo) string {
 
 func updateReadmeFile(filename, newContent string) error {
 	// Read the current README
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(filename) //nolint:gosec
 	if err != nil {
 		return err
 	}
@@ -279,5 +279,5 @@ func updateReadmeFile(filename, newContent string) error {
 	newFileContent := before + "\n\n" + newContent + after
 
 	// Write the updated content
-	return os.WriteFile(filename, []byte(newFileContent), 0644)
+	return os.WriteFile(filename, []byte(newFileContent), 0600)
 }

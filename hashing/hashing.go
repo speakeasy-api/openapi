@@ -13,7 +13,7 @@ import (
 
 func Hash(v any) string {
 	hasher := fnv.New64a()
-	hasher.Write([]byte(toHashableString(v)))
+	_, _ = hasher.Write([]byte(toHashableString(v)))
 	return fmt.Sprintf("%016x", hasher.Sum64())
 }
 

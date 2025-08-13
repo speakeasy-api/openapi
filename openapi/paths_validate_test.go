@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -82,11 +81,11 @@ x-another: 123
 
 			var paths openapi.Paths
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &paths)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &paths)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := paths.Validate(context.Background())
+			errs := paths.Validate(t.Context())
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -251,11 +250,11 @@ trace:
 
 			var pathItem openapi.PathItem
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &pathItem)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &pathItem)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := pathItem.Validate(context.Background())
+			errs := pathItem.Validate(t.Context())
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -316,11 +315,11 @@ get:
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &pathItem)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &pathItem)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := pathItem.Validate(context.Background())
+			validateErrs := pathItem.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "Expected validation errors")

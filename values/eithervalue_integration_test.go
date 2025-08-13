@@ -81,7 +81,7 @@ func TestEitherValue_JSONPointer_Integration(t *testing.T) {
 			result, err := jsonpointer.GetTarget(eitherValue, jsonpointer.JSONPointer(tt.pointer))
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
 
@@ -126,7 +126,7 @@ func TestEitherValue_JSONPointer_UnsupportedNavigation(t *testing.T) {
 
 	// Try to navigate with key (should fail because string doesn't support navigation)
 	result, err := jsonpointer.GetTarget(eitherValue, jsonpointer.JSONPointer("/somekey"))
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "expected map, slice, struct, or yaml.Node, got string")
 }

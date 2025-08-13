@@ -1,7 +1,6 @@
 package marshaller_test
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -38,17 +37,17 @@ x-custom: "extension value"
 				require.True(t, model.StringField.Present)
 				require.Equal(t, "test ptr string", *model.StringPtrField.Value)
 				require.True(t, model.StringPtrField.Present)
-				require.Equal(t, true, model.BoolField.Value)
+				require.True(t, model.BoolField.Value)
 				require.True(t, model.BoolField.Present)
-				require.Equal(t, false, *model.BoolPtrField.Value)
+				require.False(t, *model.BoolPtrField.Value)
 				require.True(t, model.BoolPtrField.Present)
 				require.Equal(t, 42, model.IntField.Value)
 				require.True(t, model.IntField.Present)
 				require.Equal(t, 24, *model.IntPtrField.Value)
 				require.True(t, model.IntPtrField.Present)
-				require.Equal(t, 3.14, model.Float64Field.Value)
+				require.InDelta(t, 3.14, model.Float64Field.Value, 0.001)
 				require.True(t, model.Float64Field.Present)
-				require.Equal(t, 2.71, *model.Float64PtrField.Value)
+				require.InDelta(t, 2.71, *model.Float64PtrField.Value, 0.001)
 				require.True(t, model.Float64PtrField.Present)
 
 				// Check extensions
@@ -74,11 +73,11 @@ float64Field: 3.14
 			expected: func(model *core.TestPrimitiveModel) {
 				require.Equal(t, "required only", model.StringField.Value)
 				require.True(t, model.StringField.Present)
-				require.Equal(t, true, model.BoolField.Value)
+				require.True(t, model.BoolField.Value)
 				require.True(t, model.BoolField.Present)
 				require.Equal(t, 42, model.IntField.Value)
 				require.True(t, model.IntField.Present)
-				require.Equal(t, 3.14, model.Float64Field.Value)
+				require.InDelta(t, 3.14, model.Float64Field.Value, 0.001)
 				require.True(t, model.Float64Field.Present)
 
 				// Optional fields should not be present
@@ -103,11 +102,11 @@ float64PtrField: null
 			expected: func(model *core.TestPrimitiveModel) {
 				require.Equal(t, "test", model.StringField.Value)
 				require.True(t, model.StringField.Present)
-				require.Equal(t, true, model.BoolField.Value)
+				require.True(t, model.BoolField.Value)
 				require.True(t, model.BoolField.Present)
 				require.Equal(t, 42, model.IntField.Value)
 				require.True(t, model.IntField.Present)
-				require.Equal(t, 3.14, model.Float64Field.Value)
+				require.InDelta(t, 3.14, model.Float64Field.Value, 0.001)
 				require.True(t, model.Float64Field.Present)
 
 				// Null pointer fields should be present but with nil values
@@ -127,7 +126,7 @@ float64PtrField: null
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var model core.TestPrimitiveModel
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, tt.yml), &model)
+			validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 			require.True(t, model.Valid)
@@ -216,7 +215,7 @@ intField: "not an int"
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var model core.TestPrimitiveModel
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, tt.yml), &model)
+			validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 			require.NotEmpty(t, validationErrs)
 
@@ -297,7 +296,7 @@ eitherModelOrPrimitive: 456
 			expected: func(model *core.TestComplexModel) {
 				require.True(t, model.NestedModelValue.Present)
 				require.Equal(t, "value model", model.NestedModelValue.Value.StringField.Value)
-				require.Equal(t, true, model.NestedModelValue.Value.BoolField.Value)
+				require.True(t, model.NestedModelValue.Value.BoolField.Value)
 			},
 		},
 		{
@@ -332,7 +331,7 @@ eitherModelOrPrimitive:
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var model core.TestComplexModel
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, tt.yml), &model)
+			validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 			require.True(t, model.Valid)
@@ -421,7 +420,7 @@ structArrayField:
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var model core.TestComplexModel
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, tt.yml), &model)
+			validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 			require.NotEmpty(t, validationErrs)
 
@@ -455,7 +454,7 @@ description: "test description"
 `
 
 	var model core.TestNonCoreModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
@@ -474,7 +473,7 @@ x-extension: "ext value"
 `
 
 	var model core.TestCustomUnmarshalModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, model.Valid)
@@ -513,7 +512,7 @@ x-alias-ext: *alias
 `
 
 	var model core.TestAliasModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, model.Valid)
@@ -553,7 +552,7 @@ dynamicKey2: "value2"
 `
 
 	var model core.TestEmbeddedMapModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, model.Valid)
@@ -591,7 +590,7 @@ x-extension: "ext value"
 `
 
 	var model core.TestEmbeddedMapWithFieldsModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, model.Valid)
@@ -634,7 +633,7 @@ optionalPtr: "optional pointer value"
 `
 
 	var model core.TestRequiredPointerModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, model.Valid)
@@ -679,7 +678,7 @@ requiredPtr: null
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var model core.TestRequiredPointerModel
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, tt.yml), &model)
+			validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 
 			if len(tt.wantErrs) == 0 {
@@ -728,7 +727,7 @@ requiredRawNode: "raw node value"
 `
 
 	var model core.TestRequiredNilableModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &model)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 	require.True(t, model.Valid)
@@ -822,7 +821,7 @@ requiredRawNode: "raw value"
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var model core.TestRequiredNilableModel
-			validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, tt.yml), &model)
+			validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 			require.NotEmpty(t, validationErrs)
 
@@ -873,7 +872,7 @@ put:
 `
 
 	var model core.TestTypeConversionCoreModel
-	validationErrs, err := marshaller.UnmarshalCore(context.Background(), "", parseYAML(t, yml), &model)
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &model)
 
 	// This should work fine for the core model (string keys)
 	require.NoError(t, err)
@@ -928,7 +927,7 @@ float64Field: 3.14
 			var model *tests.TestPrimitiveHighModel
 
 			// This should not panic and should return a proper error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), strings.NewReader(tt.yml), model)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), strings.NewReader(tt.yml), model)
 
 			// We expect an error, not a panic
 			require.Error(t, err, "should return error when out is nil")
@@ -954,7 +953,7 @@ float64Field: 3.14
 	var model *tests.TestPrimitiveHighModel
 
 	// This should not panic and should return a proper error
-	validationErrs, err := marshaller.UnmarshalNode(context.Background(), "", node, model)
+	validationErrs, err := marshaller.UnmarshalNode(t.Context(), "", node, model)
 
 	// We expect an error, not a panic
 	require.Error(t, err, "should return error when out is nil")
@@ -964,6 +963,7 @@ float64Field: 3.14
 
 // Helper functions
 func parseYAML(t *testing.T, yml string) *yaml.Node {
+	t.Helper()
 	var node yaml.Node
 	err := yaml.Unmarshal([]byte(yml), &node)
 	require.NoError(t, err)

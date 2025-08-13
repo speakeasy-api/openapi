@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -89,11 +88,11 @@ x-timeout: 30
 
 			var callback openapi.Callback
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &callback)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &callback)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := callback.Validate(context.Background())
+			errs := callback.Validate(t.Context())
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -261,14 +260,14 @@ func TestCallback_Validate_Error(t *testing.T) {
 
 			var callback openapi.Callback
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &callback)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &callback)
 			require.NoError(t, err)
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := callback.Validate(context.Background())
+			validateErrs := callback.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")
@@ -408,11 +407,11 @@ func TestCallback_Validate_ComplexExpressions(t *testing.T) {
 
 			var callback openapi.Callback
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &callback)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &callback)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := callback.Validate(context.Background())
+			errs := callback.Validate(t.Context())
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -505,11 +504,11 @@ x-rate-limit: 100
 
 			var callback openapi.Callback
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &callback)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &callback)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := callback.Validate(context.Background())
+			errs := callback.Validate(t.Context())
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}

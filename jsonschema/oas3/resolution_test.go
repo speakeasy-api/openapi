@@ -3,6 +3,7 @@ package oas3
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -107,7 +108,7 @@ func (m *MockFile) Close() error {
 }
 
 func (m *MockFile) Stat() (fs.FileInfo, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, errors.New("not implemented")
 }
 
 // MockHTTPClient implements system.Client for testing
@@ -152,7 +153,7 @@ type TestResolutionTarget struct {
 	cache map[string][]byte
 }
 
-func LoadTestSchemaFromFile(filename string) (*JSONSchema[Referenceable], error) {
+func LoadTestSchemaFromFile(ctx context.Context, filename string) (*JSONSchema[Referenceable], error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
@@ -160,7 +161,7 @@ func LoadTestSchemaFromFile(filename string) (*JSONSchema[Referenceable], error)
 
 	// Unmarshal into a JSONSchema[Referenceable] since the test data contains a JSON schema document
 	jsonSchema := &JSONSchema[Referenceable]{}
-	validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewReader(data), jsonSchema)
+	validationErrs, err := marshaller.Unmarshal(ctx, bytes.NewReader(data), jsonSchema)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +246,7 @@ func TestJSONSchema_Resolve_RootDocument(t *testing.T) {
 
 	t.Run("resolve empty reference against root document", func(t *testing.T) {
 		t.Parallel()
-		root, err := LoadTestSchemaFromFile("testdata/simple_schema.yaml")
+		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/simple_schema.yaml")
 		require.NoError(t, err)
 		schema := createSchemaWithRef("")
 
@@ -254,7 +255,7 @@ func TestJSONSchema_Resolve_RootDocument(t *testing.T) {
 			RootDocument:   root,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -270,7 +271,7 @@ func TestJSONSchema_Resolve_RootDocument(t *testing.T) {
 
 	t.Run("resolve JSON pointer against root document", func(t *testing.T) {
 		t.Parallel()
-		root, err := LoadTestSchemaFromFile("testdata/simple_schema.yaml")
+		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/simple_schema.yaml")
 		require.NoError(t, err)
 		ref := "#/properties/name"
 		schema := createSchemaWithRef(ref)
@@ -280,7 +281,7 @@ func TestJSONSchema_Resolve_RootDocument(t *testing.T) {
 			RootDocument:   root,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -301,7 +302,7 @@ func TestJSONSchema_Resolve_RootDocument(t *testing.T) {
 		t.Parallel()
 		schema := createSimpleSchema()
 
-		root, err := LoadTestSchemaFromFile("testdata/simple_schema.yaml")
+		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/simple_schema.yaml")
 		require.NoError(t, err)
 
 		opts := ResolveOptions{
@@ -309,7 +310,7 @@ func TestJSONSchema_Resolve_RootDocument(t *testing.T) {
 			RootDocument:   root,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -351,7 +352,7 @@ properties:
 			VirtualFS:      fs,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -384,7 +385,7 @@ properties:
 			VirtualFS:      fs,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -407,7 +408,7 @@ properties:
 			VirtualFS:      fs,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -440,7 +441,7 @@ func TestJSONSchema_Resolve_URL(t *testing.T) {
 			HTTPClient:     client,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -465,7 +466,7 @@ func TestJSONSchema_Resolve_URL(t *testing.T) {
 			HTTPClient:     client,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -489,7 +490,7 @@ func TestJSONSchema_Resolve_Caching(t *testing.T) {
 			ResolvedDocument:  resolved,
 		}
 
-		root, err := LoadTestSchemaFromFile("testdata/simple_schema.yaml")
+		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/simple_schema.yaml")
 		require.NoError(t, err)
 
 		opts := ResolveOptions{
@@ -497,7 +498,7 @@ func TestJSONSchema_Resolve_Caching(t *testing.T) {
 			RootDocument:   root,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -532,7 +533,7 @@ properties:
 			VirtualFS:      fs,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -556,7 +557,7 @@ func TestJSONSchema_Resolve(t *testing.T) {
 		t.Parallel()
 		schema := createSimpleSchema()
 
-		root, err := LoadTestSchemaFromFile("testdata/simple_schema.yaml")
+		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/simple_schema.yaml")
 		require.NoError(t, err)
 
 		opts := ResolveOptions{
@@ -564,7 +565,7 @@ func TestJSONSchema_Resolve(t *testing.T) {
 			RootDocument:   root,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -597,7 +598,7 @@ type: string
 			VirtualFS:      fs,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -634,7 +635,7 @@ $ref: "circular1.yaml"
 			VirtualFS:      fs,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -644,7 +645,7 @@ $ref: "circular1.yaml"
 
 	t.Run("self-referencing schema", func(t *testing.T) {
 		t.Parallel()
-		root, err := LoadTestSchemaFromFile("testdata/simple_schema.yaml")
+		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/simple_schema.yaml")
 		require.NoError(t, err)
 		ref := "#"
 		schema := createSchemaWithRef(ref)
@@ -654,7 +655,7 @@ $ref: "circular1.yaml"
 			RootDocument:   root,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -679,7 +680,7 @@ func TestJSONSchema_Resolve_Errors(t *testing.T) {
 			// TargetLocation deliberately omitted to trigger the error
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -699,7 +700,7 @@ func TestJSONSchema_Resolve_Errors(t *testing.T) {
 			TargetLocation: "testdata/simple_schema.yaml",
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -723,7 +724,7 @@ func TestJSONSchema_Resolve_Errors(t *testing.T) {
 			VirtualFS:      fs,
 		}
 
-		_, err := schema.Resolve(context.Background(), opts)
+		_, err := schema.Resolve(t.Context(), opts)
 
 		require.Error(t, err)
 		result := schema.GetResolvedSchema()
@@ -742,15 +743,15 @@ func TestJSONSchema_Resolve_HTTPIntegration(t *testing.T) {
 			switch r.URL.Path {
 			case "/user.yaml":
 				w.Header().Set("Content-Type", "application/yaml")
-				w.WriteHeader(200)
+				w.WriteHeader(http.StatusOK)
 				// Use actual test data
 				data, _ := os.ReadFile("testdata/simple_schema.yaml")
 				_, _ = w.Write(data)
 			case "/error":
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write([]byte("Not Found"))
 			default:
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
 		defer server.Close()
@@ -764,7 +765,7 @@ func TestJSONSchema_Resolve_HTTPIntegration(t *testing.T) {
 			RootDocument:   root,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -779,15 +780,15 @@ func TestJSONSchema_Resolve_HTTPIntegration(t *testing.T) {
 			switch r.URL.Path {
 			case "/user.yaml":
 				w.Header().Set("Content-Type", "application/yaml")
-				w.WriteHeader(200)
+				w.WriteHeader(http.StatusOK)
 				// Use actual test data
 				data, _ := os.ReadFile("testdata/simple_schema.yaml")
 				_, _ = w.Write(data)
 			case "/error":
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusNotFound)
 				_, _ = w.Write([]byte("Not Found"))
 			default:
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusNotFound)
 			}
 		}))
 		defer server.Close()
@@ -801,7 +802,7 @@ func TestJSONSchema_Resolve_HTTPIntegration(t *testing.T) {
 			RootDocument:   root,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -835,7 +836,7 @@ func TestJSONSchema_Resolve_FileSystemIntegration(t *testing.T) {
 			RootDocument:   root,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
@@ -854,7 +855,7 @@ func TestJSONSchema_Resolve_FileSystemIntegration(t *testing.T) {
 			RootDocument:   root,
 		}
 
-		validationErrs, err := schema.Resolve(context.Background(), opts)
+		validationErrs, err := schema.Resolve(t.Context(), opts)
 
 		require.Error(t, err)
 		assert.Nil(t, validationErrs)
@@ -886,7 +887,7 @@ func TestJSONSchema_Resolve_DefaultOptions(t *testing.T) {
 			// VirtualFS not set - should default to system.FileSystem
 		}
 
-		_, err := schema.Resolve(context.Background(), opts)
+		_, err := schema.Resolve(t.Context(), opts)
 
 		require.Error(t, err)
 		// Error should be from the actual file system, not a nil pointer panic
@@ -905,7 +906,7 @@ func TestJSONSchema_Resolve_DefaultOptions(t *testing.T) {
 			// HTTPClient not set - should default to http.DefaultClient
 		}
 
-		_, err := schema.Resolve(context.Background(), opts)
+		_, err := schema.Resolve(t.Context(), opts)
 
 		require.Error(t, err)
 		// Error should be from the HTTP client, not a nil pointer panic
@@ -916,7 +917,7 @@ func TestJSONSchema_Resolve_DefaultOptions(t *testing.T) {
 func TestResolveSchema_ChainedReference_Success(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create mock filesystem with the test files using existing MockVirtualFS
 	mockFS := NewMockVirtualFS()

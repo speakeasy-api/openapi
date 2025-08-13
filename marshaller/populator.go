@@ -174,11 +174,7 @@ func populateValue(source any, target reflect.Value) error {
 	// Handle nil source early - when source is nil, reflect.ValueOf returns a zero Value
 	if !value.IsValid() {
 		// Set target to zero value and return
-		if target.Kind() == reflect.Ptr {
-			target.Set(reflect.Zero(target.Type()))
-		} else {
-			target.Set(reflect.Zero(target.Type()))
-		}
+		target.Set(reflect.Zero(target.Type()))
 		return nil
 	}
 
@@ -193,11 +189,7 @@ func populateValue(source any, target reflect.Value) error {
 		// Check again after extracting from NodeAccessor
 		if !value.IsValid() {
 			// Set target to zero value and return
-			if target.Kind() == reflect.Ptr {
-				target.Set(reflect.Zero(target.Type()))
-			} else {
-				target.Set(reflect.Zero(target.Type()))
-			}
+			target.Set(reflect.Zero(target.Type()))
 			return nil
 		}
 
@@ -265,16 +257,16 @@ func populateValue(source any, target reflect.Value) error {
 			}
 		}
 	default:
-		if !valueDerefed.IsValid() {
+		switch {
+		case !valueDerefed.IsValid():
 			// Handle zero/invalid values
 			target.Set(reflect.Zero(target.Type()))
 			return nil
-		}
-		if valueDerefed.Type().AssignableTo(target.Type()) {
+		case valueDerefed.Type().AssignableTo(target.Type()):
 			target.Set(valueDerefed)
-		} else if valueDerefed.CanConvert(target.Type()) {
+		case valueDerefed.CanConvert(target.Type()):
 			target.Set(valueDerefed.Convert(target.Type()))
-		} else {
+		default:
 			return fmt.Errorf("cannot convert %v to %v", valueDerefed.Type(), target.Type())
 		}
 	}
@@ -333,11 +325,12 @@ func getSequencedMapInterface(tField reflect.Value) interfaces.SequencedMapInter
 // getSourceForPopulation prepares the source field for population
 // Handles addressability issues for value embeds
 func getSourceForPopulation(originalFieldVal reflect.Value, fieldInt any) any {
-	if originalFieldVal.CanAddr() {
+	switch {
+	case originalFieldVal.CanAddr():
 		return originalFieldVal.Addr().Interface()
-	} else if originalFieldVal.Kind() == reflect.Ptr {
+	case originalFieldVal.Kind() == reflect.Ptr:
 		return originalFieldVal.Interface()
-	} else {
+	default:
 		// Create an addressable copy for value embeds so we can use the interface
 		ptrType := reflect.PointerTo(originalFieldVal.Type())
 		if ptrType.Implements(sequencedMapType) {

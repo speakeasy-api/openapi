@@ -85,15 +85,16 @@ func resolveAbsoluteReferenceUncached(ref Reference, targetLocation string) (*Ab
 	var absRef string
 	var finalClassification *utils.ReferenceClassification
 	uriClassification, uriErr := utils.ClassifyReference(uri)
-	if uriErr == nil && uriClassification.Type == utils.ReferenceTypeURL {
+	switch {
+	case uriErr == nil && uriClassification.Type == utils.ReferenceTypeURL:
 		// URI is an absolute URL - use it directly
 		absRef = uri
 		finalClassification = uriClassification
-	} else if uriErr == nil && uriClassification.Type == utils.ReferenceTypeFilePath && filepath.IsAbs(uri) {
+	case uriErr == nil && uriClassification.Type == utils.ReferenceTypeFilePath && filepath.IsAbs(uri):
 		// URI is an absolute file path - use it directly
 		absRef = uri
 		finalClassification = uriClassification
-	} else {
+	default:
 		// URI is relative - join with root location
 		absRef, err = classification.JoinWith(uri)
 		if err != nil {

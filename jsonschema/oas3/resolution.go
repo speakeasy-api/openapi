@@ -2,6 +2,7 @@ package oas3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"unsafe"
@@ -58,7 +59,7 @@ func (j *JSONSchema[Referenceable]) GetAbsRef() references.Reference {
 // Validation errors can be skipped by setting the skipValidation flag to true. This will skip the missing field errors that occur during unmarshaling.
 // Resolution doesn't run the Validate function on the resolved object. So if you want to fully validate the object after resolution, you need to call the Validate function manually.
 func (s *JSONSchema[Referenceable]) Resolve(ctx context.Context, opts ResolveOptions) ([]error, error) {
-	return resolveJSONSchemaWithTracking(ctx, (*JSONSchemaReferenceable)(unsafe.Pointer(s)), references.ResolveOptions{
+	return resolveJSONSchemaWithTracking(ctx, (*JSONSchemaReferenceable)(unsafe.Pointer(s)), references.ResolveOptions{ //nolint:gosec
 		TargetLocation:      opts.TargetLocation,
 		RootDocument:        opts.RootDocument,
 		TargetDocument:      opts.RootDocument,
@@ -81,7 +82,7 @@ func (s *JSONSchema[Referenceable]) GetResolvedSchema() *JSONSchema[Concrete] {
 	var result *JSONSchema[Concrete]
 
 	if !s.IsReference() {
-		result = (*JSONSchema[Concrete])(unsafe.Pointer(s))
+		result = (*JSONSchema[Concrete])(unsafe.Pointer(s)) //nolint:gosec
 	} else {
 		if s.referenceResolutionCache == nil || s.referenceResolutionCache.Object == nil {
 			return nil
@@ -98,7 +99,7 @@ func (s *JSONSchema[Referenceable]) GetResolvedSchema() *JSONSchema[Concrete] {
 				return nil
 			}
 		} else {
-			result = (*JSONSchema[Concrete])(unsafe.Pointer(resolvedSchema))
+			result = (*JSONSchema[Concrete])(unsafe.Pointer(resolvedSchema)) //nolint:gosec
 		}
 	}
 
@@ -154,21 +155,23 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 	// This catches cases like "#" which reference the root document itself
 	if ref.GetURI() == "" && ref.GetJSONPointer() == "" {
 		s.circularErrorFound = true
-		return nil, nil, fmt.Errorf("circular reference detected: self-referencing schema")
+		return nil, nil, errors.New("circular reference detected: self-referencing schema")
 	}
 
 	// Check for circular reference by looking for the current reference in the chain
 	for _, chainRef := range referenceChain {
 		if chainRef == absRef {
 			// Build circular reference error message showing the full chain
-			chainWithCurrent := append(referenceChain, absRef)
+			chainWithCurrent := referenceChain
+			chainWithCurrent = append(chainWithCurrent, absRef)
 			s.circularErrorFound = true
 			return nil, nil, fmt.Errorf("circular reference detected: %s", joinReferenceChain(chainWithCurrent))
 		}
 	}
 
 	// Add this reference to the chain
-	newChain := append(referenceChain, absRef)
+	newChain := referenceChain
+	newChain = append(newChain, absRef)
 
 	var result *references.ResolveResult[JSONSchemaReferenceable]
 	var validationErrs []error

@@ -1,7 +1,6 @@
 package openapi_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -20,7 +19,7 @@ func TestResolveAllReferences_Success(t *testing.T) {
 	f, err := os.Open(absPath)
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	o, vErrs, err := openapi.Unmarshal(ctx, f)
 	require.NoError(t, err)
@@ -30,7 +29,7 @@ func TestResolveAllReferences_Success(t *testing.T) {
 	validationErrs, errs := o.ResolveAllReferences(ctx, openapi.ResolveAllOptions{
 		OpenAPILocation: absPath,
 	})
-	require.Empty(t, errs)
+	require.NoError(t, errs)
 	require.Empty(t, validationErrs)
 
 	// Assert that we can get the objects which should be already resolved references
@@ -71,7 +70,7 @@ func TestResolveAllReferences_Error(t *testing.T) {
 	f, err := os.Open(absPath)
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	o, vErrs, err := openapi.Unmarshal(ctx, f)
 	require.NoError(t, err)

@@ -199,7 +199,7 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 
 			result, err := resolveServerVariables(tt.args.serverURL, tt.args.variables)
 			require.Error(t, err)
-			assert.Equal(t, "", result)
+			assert.Empty(t, result)
 			assert.Contains(t, err.Error(), tt.expectedErr)
 		})
 	}

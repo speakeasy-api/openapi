@@ -332,7 +332,7 @@ func TestExpression_Validate_Failure(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := tt.args.e.Validate()
-			assert.EqualError(t, err, tt.wantErr.Error())
+			require.EqualError(t, err, tt.wantErr.Error())
 		})
 	}
 }

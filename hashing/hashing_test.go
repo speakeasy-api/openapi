@@ -1,7 +1,6 @@
 package hashing
 
 import (
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/extensions"
@@ -358,6 +357,7 @@ func TestHash_EmbeddedMapComparison_PointerVsValue(t *testing.T) {
 		{
 			name: "pointer_embedded_map",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				// Create a model with pointer embedded map
 				model := &struct {
 					*sequencedmap.Map[string, string]
@@ -377,6 +377,7 @@ func TestHash_EmbeddedMapComparison_PointerVsValue(t *testing.T) {
 		{
 			name: "value_embedded_map",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				// Create a model with value embedded map
 				model := &struct {
 					sequencedmap.Map[string, string]
@@ -396,6 +397,7 @@ func TestHash_EmbeddedMapComparison_PointerVsValue(t *testing.T) {
 		{
 			name: "both_produce_same_hash",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				// Create models with same data but different embed types
 				ptrModel := &struct {
 					*sequencedmap.Map[string, string]
@@ -518,7 +520,7 @@ func TestHash_JSONSchemaReferenceVsResolved(t *testing.T) {
 			}
 
 			resolvedRef := oas3.NewReferencedScheme(
-				context.Background(),
+				t.Context(),
 				tt.reference,
 				resolvedContent,
 			)

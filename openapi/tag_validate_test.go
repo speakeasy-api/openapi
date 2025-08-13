@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -67,11 +66,11 @@ externalDocs:
 			t.Parallel()
 
 			var tag openapi.Tag
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &tag)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &tag)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := tag.Validate(context.Background())
+			errs := tag.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, tag.Valid, "expected tag to be valid")
 		})
@@ -141,11 +140,11 @@ externalDocs:
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &tag)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &tag)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := tag.Validate(context.Background())
+			validateErrs := tag.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")

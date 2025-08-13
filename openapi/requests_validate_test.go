@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -106,11 +105,11 @@ content:
 			t.Parallel()
 
 			var requestBody openapi.RequestBody
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &requestBody)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &requestBody)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := requestBody.Validate(context.Background())
+			errs := requestBody.Validate(t.Context())
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, requestBody.Valid, "expected request body to be valid")
 		})
@@ -162,11 +161,11 @@ description: Request body with invalid schema
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &requestBody)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &requestBody)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := requestBody.Validate(context.Background())
+			validateErrs := requestBody.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")

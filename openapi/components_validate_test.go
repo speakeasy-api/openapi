@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -217,7 +216,7 @@ securitySchemes:
 
 			var components openapi.Components
 
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &components)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &components)
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
@@ -240,7 +239,7 @@ securitySchemes:
 				opts = append(opts, validation.WithContextObject(openAPIDoc))
 			}
 
-			errs := components.Validate(context.Background(), opts...)
+			errs := components.Validate(t.Context(), opts...)
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -273,11 +272,11 @@ securitySchemes:
 
 			// Collect all errors from both unmarshalling and validation
 			var allErrors []error
-			validationErrs, err := marshaller.Unmarshal(context.Background(), bytes.NewBuffer([]byte(tt.yml)), &components)
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &components)
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := components.Validate(context.Background())
+			validateErrs := components.Validate(t.Context())
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "Expected validation errors")

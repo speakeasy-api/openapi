@@ -40,7 +40,7 @@ func TestUnmarshalExtensionModel_Success(t *testing.T) {
 		}),
 	)
 
-	tcm, validationErrs, err := core.UnmarshalExtensionModel[TestCoreModel](context.Background(), e, "x-speakeasy-test")
+	tcm, validationErrs, err := core.UnmarshalExtensionModel[TestCoreModel](t.Context(), e, "x-speakeasy-test")
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 

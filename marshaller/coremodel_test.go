@@ -119,11 +119,11 @@ api:
 
 			// Validate that the returned pointer is a valid JSON pointer
 			err = jsonpointer.JSONPointer(pointer).Validate()
-			assert.NoError(t, err, "returned pointer should be a valid JSON pointer")
+			require.NoError(t, err, "returned pointer should be a valid JSON pointer")
 
 			// Verify reversibility: use the returned pointer to retrieve the same node
 			retrievedNode, err := jsonpointer.GetTarget(&rootNode, jsonpointer.JSONPointer(pointer))
-			assert.NoError(t, err, "should be able to retrieve node using returned pointer (reversible operation)")
+			require.NoError(t, err, "should be able to retrieve node using returned pointer (reversible operation)")
 			assert.Equal(t, yamlTargetNode, retrievedNode, "retrieved node should match original target node (reversible operation)")
 		})
 	}
@@ -230,7 +230,7 @@ development:
 
 	// Validate that the returned pointer is a valid JSON pointer
 	err = jsonpointer.JSONPointer(pointer).Validate()
-	assert.NoError(t, err, "returned pointer should be a valid JSON pointer")
+	require.NoError(t, err, "returned pointer should be a valid JSON pointer")
 }
 
 func TestCoreModel_GetJSONPointer_KeyAndValueNodes_Success(t *testing.T) {
@@ -393,18 +393,18 @@ active: true`,
 
 			// Validate that the returned pointer is a valid JSON pointer
 			err = jsonpointer.JSONPointer(pointer).Validate()
-			assert.NoError(t, err, "returned pointer should be a valid JSON pointer")
+			require.NoError(t, err, "returned pointer should be a valid JSON pointer")
 
 			// For both key and value nodes, the pointer should resolve to the value
 			// This demonstrates the expected behavior: key nodes produce pointers that resolve to their values
 			if pointer != "" && pointer != "/" {
 				retrievedNode, err := jsonpointer.GetTarget(&rootNode, jsonpointer.JSONPointer(pointer))
-				assert.NoError(t, err, "should be able to retrieve node using returned pointer")
+				require.NoError(t, err, "should be able to retrieve node using returned pointer")
 
 				if tt.nodeType == "key" {
 					// For key nodes, we need to get the actual value node to compare against
 					expectedValueNode, err := jsonpointer.GetTarget(&rootNode, jsonpointer.JSONPointer(tt.targetPath))
-					assert.NoError(t, err, "should be able to get expected value node")
+					require.NoError(t, err, "should be able to get expected value node")
 
 					// The pointer should resolve to the value node associated with the key
 					assert.Equal(t, expectedValueNode, retrievedNode, "key node pointer should resolve to its associated value node")
@@ -438,7 +438,8 @@ func findKeyNodeAtPath(rootNode *yaml.Node, jsonPointerPath string) *yaml.Node {
 		unescapedPart := strings.ReplaceAll(part, "~1", "/")
 		unescapedPart = strings.ReplaceAll(unescapedPart, "~0", "~")
 
-		if currentNode.Kind == yaml.MappingNode {
+		switch currentNode.Kind {
+		case yaml.MappingNode:
 			// Look for the key in the mapping
 			for j := 0; j < len(currentNode.Content); j += 2 {
 				if j+1 >= len(currentNode.Content) {
@@ -458,14 +459,14 @@ func findKeyNodeAtPath(rootNode *yaml.Node, jsonPointerPath string) *yaml.Node {
 					break
 				}
 			}
-		} else if currentNode.Kind == yaml.SequenceNode {
+		case yaml.SequenceNode:
 			// Handle array index
 			index, err := strconv.Atoi(unescapedPart)
 			if err != nil || index < 0 || index >= len(currentNode.Content) {
 				return nil
 			}
 			currentNode = currentNode.Content[index]
-		} else {
+		default:
 			return nil
 		}
 	}
