@@ -5,7 +5,7 @@ import (
 	"reflect"
 
 	"github.com/speakeasy-api/openapi/yml"
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 type NodeMutator interface {

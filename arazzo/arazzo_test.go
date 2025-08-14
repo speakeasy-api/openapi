@@ -28,7 +28,7 @@ import (
 	"github.com/speakeasy-api/openapi/yml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 // TODO make it possible to choose json or yaml output

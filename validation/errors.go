@@ -3,7 +3,7 @@ package validation
 import (
 	"fmt"
 
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 // Error represents a validation error and the line and column where it occurred

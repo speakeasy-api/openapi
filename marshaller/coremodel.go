@@ -11,7 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/json"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 type CoreModeler interface {
@@ -107,6 +107,29 @@ func (c *CoreModel) GetJSONPointer(topLevelRootNode *yaml.Node) string {
 
 	// Convert path to JSON pointer format
 	return buildJSONPointer(path)
+}
+
+// GetJSONPath returns the JSONPath expression from the topLevelRootNode to this CoreModel's RootNode.
+// Returns an empty string if the node is not found or if either node is nil.
+// The returned path follows JSONPath format (e.g., "$.paths['/some/path'].get").
+func (c *CoreModel) GetJSONPath(topLevelRootNode *yaml.Node) string {
+	if c == nil || c.RootNode == nil || topLevelRootNode == nil {
+		return ""
+	}
+
+	// If the nodes are the same, return root path
+	if c.RootNode == topLevelRootNode {
+		return "$"
+	}
+
+	// Find the path from topLevelRootNode to c.RootNode
+	path := findNodePath(topLevelRootNode, c.RootNode, []string{})
+	if path == nil {
+		return ""
+	}
+
+	// Convert path to JSONPath format
+	return buildJSONPath(path)
 }
 
 // Marshal will marshal the core model to the provided io.Writer.
@@ -321,4 +344,59 @@ func escapeJSONPointerToken(s string) string {
 	s = strings.ReplaceAll(s, "~", "~0")
 	s = strings.ReplaceAll(s, "/", "~1")
 	return s
+}
+
+// buildJSONPath converts a path slice to a JSONPath expression
+func buildJSONPath(path []string) string {
+	if len(path) == 0 {
+		return "$"
+	}
+
+	var sb strings.Builder
+	sb.WriteByte('$')
+
+	for _, part := range path {
+		// Check if the part is a numeric index (for arrays)
+		if _, err := strconv.Atoi(part); err == nil {
+			// Array index - use bracket notation
+			sb.WriteByte('[')
+			sb.WriteString(part)
+			sb.WriteByte(']')
+		} else {
+			// Object property - check if it needs bracket notation
+			if needsBracketNotation(part) {
+				sb.WriteByte('[')
+				sb.WriteByte('\'')
+				sb.WriteString(escapeJSONPathProperty(part))
+				sb.WriteByte('\'')
+				sb.WriteByte(']')
+			} else {
+				// Use dot notation for simple properties
+				sb.WriteByte('.')
+				sb.WriteString(part)
+			}
+		}
+	}
+
+	return sb.String()
+}
+
+// needsBracketNotation determines if a property name needs bracket notation
+func needsBracketNotation(s string) bool {
+	// Use bracket notation for properties that:
+	// - Start with a slash (like "/users/{id}")
+	// - Contain special characters like {, }, /, spaces, etc.
+	// - Are not simple identifiers
+	for _, r := range s {
+		if r == '/' || r == '{' || r == '}' || r == ' ' || r == '-' || r == '.' {
+			return true
+		}
+	}
+	return false
+}
+
+// escapeJSONPathProperty escapes a property name for use in JSONPath bracket notation.
+func escapeJSONPathProperty(s string) string {
+	// Escape single quotes by doubling them
+	return strings.ReplaceAll(s, "'", "''")
 }

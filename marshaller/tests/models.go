@@ -7,7 +7,7 @@ import (
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/values"
 	valuescore "github.com/speakeasy-api/openapi/values/core"
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 // High-level model counterparts for population testing using marshaller.Model

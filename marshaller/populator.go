@@ -5,7 +5,7 @@ import (
 	"reflect"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 // Pre-computed reflection types for performance

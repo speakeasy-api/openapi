@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 type contextKey string

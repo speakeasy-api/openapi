@@ -42,6 +42,24 @@ func NewElem[K comparable, V any](key K, value V) *Element[K, V] {
 	}
 }
 
+// GetKey returns the key of the element. If the element is nil, the zero value of the key type is returned.
+func (e *Element[K, V]) GetKey() K {
+	if e == nil {
+		var zero K
+		return zero
+	}
+	return e.Key
+}
+
+// GetValue returns the value of the element. If the element is nil, the zero value of the value type is returned.
+func (e *Element[K, V]) GetValue() V {
+	if e == nil {
+		var zero V
+		return zero
+	}
+	return e.Value
+}
+
 // Map is a map implementation that maintains the order of keys as they are added.
 type Map[K comparable, V any] struct {
 	m map[K]*Element[K, V]
@@ -315,6 +333,36 @@ func (m *Map[K, V]) Delete(key K) {
 	if i >= 0 {
 		m.l = slices.Delete(m.l, i, i+1)
 	}
+}
+
+// First returns the first element in the map.
+func (m *Map[K, V]) First() *Element[K, V] {
+	if m == nil || len(m.l) == 0 {
+		return nil
+	}
+
+	return m.l[0]
+}
+
+// Last returns the last element in the map.
+func (m *Map[K, V]) Last() *Element[K, V] {
+	if m == nil || len(m.l) == 0 {
+		return nil
+	}
+
+	return m.l[len(m.l)-1]
+}
+
+// At returns the element at the specified index.
+func (m *Map[K, V]) At(index int) *Element[K, V] {
+	if m == nil || len(m.l) == 0 {
+		return nil
+	}
+	if index < 0 || index >= len(m.l) {
+		return nil
+	}
+
+	return m.l[index]
 }
 
 // All returns an iterator that iterates over all elements in the map, in the order they were added.

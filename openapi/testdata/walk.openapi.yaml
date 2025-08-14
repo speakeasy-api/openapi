@@ -233,7 +233,181 @@ paths:
         description: Get user documentation
         x-custom: operation-external-docs-extension
       x-custom: operation-extension
+    put:
+      operationId: updateUser
+      summary: Update user
+      description: Update an existing user
+      tags:
+        - users
+      requestBody:
+        description: Updated user data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+      responses:
+        "200":
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: User not found
+      x-custom: put-operation-extension
+    delete:
+      operationId: deleteUser
+      summary: Delete user
+      description: Delete a user by ID
+      tags:
+        - users
+      responses:
+        "204":
+          description: User deleted successfully
+        "404":
+          description: User not found
+      x-custom: delete-operation-extension
     x-custom: path-item-extension
+  /users:
+    get:
+      operationId: listUsers
+      summary: List users
+      description: Get a list of all users
+      tags:
+        - users
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of users to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          description: Number of users to skip
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+      x-custom: list-users-operation-extension
+    post:
+      operationId: createUser
+      summary: Create user
+      description: Create a new user
+      tags:
+        - users
+      requestBody:
+        description: User data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+      responses:
+        "201":
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Invalid user data
+      x-custom: create-user-operation-extension
+    x-custom: users-path-item-extension
+
+  /pets/{petId}:
+    parameters:
+      - name: petId
+        in: path
+        description: Pet ID
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: getPet
+      summary: Get pet by ID
+      description: Retrieve a pet by its ID
+      tags:
+        - pets
+      responses:
+        "200":
+          description: Pet details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string
+                  species:
+                    type: string
+        "404":
+          description: Pet not found
+      x-custom: get-pet-operation-extension
+    patch:
+      operationId: updatePetPartial
+      summary: Partially update pet
+      description: Update specific fields of a pet
+      tags:
+        - pets
+      requestBody:
+        description: Pet update data
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                species:
+                  type: string
+      responses:
+        "200":
+          description: Pet updated successfully
+        "404":
+          description: Pet not found
+      x-custom: patch-pet-operation-extension
+    x-custom: pet-path-item-extension
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check
+      description: Check the health status of the API
+      tags:
+        - system
+      responses:
+        "200":
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+      x-custom: health-check-operation-extension
+    x-custom: health-path-item-extension
   x-custom: paths-extension
 
 webhooks:

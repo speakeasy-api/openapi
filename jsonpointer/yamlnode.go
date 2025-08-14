@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 func getYamlNodeTarget(node *yaml.Node, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {

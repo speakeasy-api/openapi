@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"sync"
 
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 // CoreAccessor provides type-safe access to the core field in models

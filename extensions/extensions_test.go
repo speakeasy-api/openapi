@@ -12,7 +12,7 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 type ModelWithExtensions struct {

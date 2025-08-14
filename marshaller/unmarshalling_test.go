@@ -8,7 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller/tests"
 	"github.com/speakeasy-api/openapi/marshaller/tests/core"
 	"github.com/stretchr/testify/require"
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 func TestUnmarshal_PrimitiveTypes_Success(t *testing.T) {

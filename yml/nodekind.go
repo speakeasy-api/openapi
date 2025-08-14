@@ -1,6 +1,6 @@
 package yml
 
-import "go.yaml.in/yaml/v4"
+import "gopkg.in/yaml.v3"
 
 // NodeKindToString returns a human-readable string representation of a yaml.Kind.
 // This helper function is useful for creating more user-friendly error messages

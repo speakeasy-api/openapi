@@ -6,7 +6,7 @@ import (
 	"reflect"
 
 	"github.com/speakeasy-api/openapi/validation"
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 type Validator[T any] interface {

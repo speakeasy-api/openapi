@@ -8,7 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	valuescore "github.com/speakeasy-api/openapi/values/core"
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 // TestPrimitiveModel covers all primitive marshaller.Node field types

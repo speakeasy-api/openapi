@@ -1,6 +1,6 @@
 package values
 
-import "go.yaml.in/yaml/v4"
+import "gopkg.in/yaml.v3"
 
 // Value represents a raw value in an OpenAPI or Arazzo document.
 type Value = *yaml.Node

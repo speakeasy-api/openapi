@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/speakeasy-api/openapi/sequencedmap"
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 // TypeFactory represents a function that creates a new instance of a specific type

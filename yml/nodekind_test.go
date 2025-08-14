@@ -5,7 +5,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/yml"
 	"github.com/stretchr/testify/assert"
-	"go.yaml.in/yaml/v4"
+	"gopkg.in/yaml.v3"
 )
 
 func TestNodeKindToString(t *testing.T) {
