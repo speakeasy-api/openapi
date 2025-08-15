@@ -1,0 +1,8 @@
+overlay: 1.0.0
+info:
+  title: Drinks Overlay
+  version: 1.2.3
+  x-info-extension: 42
+actions:
+  - target: $.paths.*[?(@.x-my-ignore)] # this is non-compliant behaviour
+    remove: true

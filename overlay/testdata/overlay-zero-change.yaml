@@ -1,0 +1,10 @@
+overlay: 1.0.0
+x-speakeasy-jsonpath: rfc9535
+info:
+  title: Drinks Overlay
+  version: 0.0.0
+actions:
+  - target: $.paths["/drink/{name}"].get.summary
+    update: "Read a drink."
+  - target: $.paths["/drink/{name}"].get.summary
+    update: "Get a drink."
