@@ -30,6 +30,7 @@ linters:
     - misspell
     - musttag
     - nilerr
+    - nilnesserr
     - nolintlint
     - paralleltest
     - perfsprint

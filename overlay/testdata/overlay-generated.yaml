@@ -1,0 +1,54 @@
+overlay: 1.0.0
+x-speakeasy-jsonpath: rfc9535
+info:
+  title: Drinks Overlay
+  version: 0.0.0
+actions:
+  - target: $["tags"][*]
+    remove: true
+  - target: $["tags"]
+    update:
+      - name: drinks
+        description: The drinks endpoints.
+      - name: ingredients
+        description: The ingredients endpoints.
+      - name: orders
+        description: The orders endpoints.
+      - name: authentication
+        x-something: else
+      - name: config
+      - name: Testing
+        description: just a description
+  - target: $["paths"]["/anything/selectGlobalServer"]["x-my-ignore"]
+    update:
+      servers:
+        - url: http://localhost:35123
+          description: The default server.
+  - target: $["paths"]["/drinks"]
+    update:
+      x-speakeasy-note:
+        "$ref": "./removeNote.yaml"
+  - target: $["paths"]["/drinks"]["get"]
+    remove: true
+  - target: $["paths"]["/drink/{name}"]["get"]["description"]
+    update: |
+      A long description
+      to validate that we handle indentation properly
+
+      With a second paragraph
+  - target: $["paths"]["/drink/{name}"]["get"]["parameters"]
+    update:
+      - x-parameter-extension: foo
+        name: test
+        description: Test parameter
+        in: query
+        schema:
+          type: string
+  - target: $["paths"]["/drink/{name}"]["get"]["responses"]["200"]["description"]
+    update: Test response
+  - target: $["paths"]["/drink/{name}"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    update:
+      type: string
+  - target: $["paths"]["/drink/{name}"]["get"]["responses"]["200"]
+    update:
+      x-response-extension: foo

@@ -11,7 +11,7 @@ jobs:
     name: Lint and Format Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - name: Install mise
         uses: jdx/mise-action@v2
@@ -45,7 +45,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - name: Install mise
         uses: jdx/mise-action@v2
