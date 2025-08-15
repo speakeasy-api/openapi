@@ -3,6 +3,7 @@ package sequencedmap
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"sort"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/yml"
+	"gopkg.in/yaml.v3"
 )
 
 // OrderType represents the different ways to order iteration through the map
@@ -221,15 +224,23 @@ func (m *Map[K, V]) DeleteAny(key any) {
 }
 
 // KeysAny Keys with any type
+// The iterator is safe for concurrent mutations - it creates a snapshot at the start of iteration.
 func (m *Map[K, V]) KeysAny() iter.Seq[any] {
 	return func(yield func(any) bool) {
 		if m == nil {
 			return
 		}
 
-		for _, element := range m.l {
-			if !yield(element.Key) {
-				return
+		// Create a snapshot of the current elements to avoid issues with concurrent modifications
+		snapshot := make([]*Element[K, V], len(m.l))
+		copy(snapshot, m.l)
+
+		for _, element := range snapshot {
+			// Check if element still exists in the map (it might have been deleted during iteration)
+			if _, exists := m.m[element.Key]; exists {
+				if !yield(element.Key) {
+					return
+				}
 			}
 		}
 	}
@@ -366,68 +377,96 @@ func (m *Map[K, V]) At(index int) *Element[K, V] {
 }
 
 // All returns an iterator that iterates over all elements in the map, in the order they were added.
+// The iterator is safe for concurrent mutations - it creates a snapshot at the start of iteration,
+// so elements added or removed during iteration will not affect the current iteration.
 func (m *Map[K, V]) All() iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		if m == nil {
 			return
 		}
 
-		for _, element := range m.l {
-			if !yield(element.Key, element.Value) {
-				return
+		// Create a snapshot of the current elements to avoid issues with concurrent modifications
+		// This is memory efficient as we're only copying pointers, not the actual elements
+		snapshot := make([]*Element[K, V], len(m.l))
+		copy(snapshot, m.l)
+
+		for _, element := range snapshot {
+			// Check if element still exists in the map (it might have been deleted during iteration)
+			if _, exists := m.m[element.Key]; exists {
+				if !yield(element.Key, element.Value) {
+					return
+				}
 			}
 		}
 	}
 }
 
 // AllOrdered returns an iterator that iterates over all elements in the map in the specified order.
+// The iterator is safe for concurrent mutations - it creates a snapshot at the start of iteration,
+// so elements added or removed during iteration will not affect the current iteration.
 func (m *Map[K, V]) AllOrdered(order OrderType) iter.Seq2[K, V] {
 	return func(yield func(K, V) bool) {
 		if m == nil {
 			return
 		}
 
+		// Create a snapshot of the current elements to avoid issues with concurrent modifications
+		snapshot := make([]*Element[K, V], len(m.l))
+		copy(snapshot, m.l)
+
 		switch order {
 		case OrderAdded:
 			// Same as All() - iterate in insertion order
-			for _, element := range m.l {
-				if !yield(element.Key, element.Value) {
-					return
+			for _, element := range snapshot {
+				// Check if element still exists in the map (it might have been deleted during iteration)
+				if _, exists := m.m[element.Key]; exists {
+					if !yield(element.Key, element.Value) {
+						return
+					}
 				}
 			}
 
 		case OrderAddedReverse:
 			// Iterate in reverse insertion order
-			for i := len(m.l) - 1; i >= 0; i-- {
-				element := m.l[i]
-				if !yield(element.Key, element.Value) {
-					return
+			for i := len(snapshot) - 1; i >= 0; i-- {
+				element := snapshot[i]
+				// Check if element still exists in the map (it might have been deleted during iteration)
+				if _, exists := m.m[element.Key]; exists {
+					if !yield(element.Key, element.Value) {
+						return
+					}
 				}
 			}
 
 		case OrderKeyAsc:
 			// Sort by key in ascending order
-			sortedElements := make([]*Element[K, V], len(m.l))
-			copy(sortedElements, m.l)
+			sortedElements := make([]*Element[K, V], len(snapshot))
+			copy(sortedElements, snapshot)
 			sort.Slice(sortedElements, func(i, j int) bool {
 				return compareKeys(sortedElements[i].Key, sortedElements[j].Key) < 0
 			})
 			for _, element := range sortedElements {
-				if !yield(element.Key, element.Value) {
-					return
+				// Check if element still exists in the map (it might have been deleted during iteration)
+				if _, exists := m.m[element.Key]; exists {
+					if !yield(element.Key, element.Value) {
+						return
+					}
 				}
 			}
 
 		case OrderKeyDesc:
 			// Sort by key in descending order
-			sortedElements := make([]*Element[K, V], len(m.l))
-			copy(sortedElements, m.l)
+			sortedElements := make([]*Element[K, V], len(snapshot))
+			copy(sortedElements, snapshot)
 			sort.Slice(sortedElements, func(i, j int) bool {
 				return compareKeys(sortedElements[i].Key, sortedElements[j].Key) > 0
 			})
 			for _, element := range sortedElements {
-				if !yield(element.Key, element.Value) {
-					return
+				// Check if element still exists in the map (it might have been deleted during iteration)
+				if _, exists := m.m[element.Key]; exists {
+					if !yield(element.Key, element.Value) {
+						return
+					}
 				}
 			}
 		}
@@ -436,45 +475,69 @@ func (m *Map[K, V]) AllOrdered(order OrderType) iter.Seq2[K, V] {
 
 // AllUntyped returns an iterator that iterates over all elements in the map with untyped key and value.
 // This allows for using the map in generic code.
+// The iterator is safe for concurrent mutations - it creates a snapshot at the start of iteration.
 func (m *Map[K, V]) AllUntyped() iter.Seq2[any, any] {
 	return func(yield func(any, any) bool) {
 		if m == nil {
 			return
 		}
 
-		for _, element := range m.l {
-			if !yield(element.Key, element.Value) {
-				return
+		// Create a snapshot of the current elements to avoid issues with concurrent modifications
+		snapshot := make([]*Element[K, V], len(m.l))
+		copy(snapshot, m.l)
+
+		for _, element := range snapshot {
+			// Check if element still exists in the map (it might have been deleted during iteration)
+			if _, exists := m.m[element.Key]; exists {
+				if !yield(element.Key, element.Value) {
+					return
+				}
 			}
 		}
 	}
 }
 
 // Keys returns an iterator that iterates over all keys in the map, in the order they were added.
+// The iterator is safe for concurrent mutations - it creates a snapshot at the start of iteration.
 func (m *Map[K, V]) Keys() iter.Seq[K] {
 	return func(yield func(K) bool) {
 		if m == nil {
 			return
 		}
 
-		for _, element := range m.l {
-			if !yield(element.Key) {
-				return
+		// Create a snapshot of the current elements to avoid issues with concurrent modifications
+		snapshot := make([]*Element[K, V], len(m.l))
+		copy(snapshot, m.l)
+
+		for _, element := range snapshot {
+			// Check if element still exists in the map (it might have been deleted during iteration)
+			if _, exists := m.m[element.Key]; exists {
+				if !yield(element.Key) {
+					return
+				}
 			}
 		}
 	}
 }
 
 // Values returns an iterator that iterates over all values in the map, in the order they were added.
+// The iterator is safe for concurrent mutations - it creates a snapshot at the start of iteration.
 func (m *Map[K, V]) Values() iter.Seq[V] {
 	return func(yield func(V) bool) {
 		if m == nil {
 			return
 		}
 
-		for _, element := range m.l {
-			if !yield(element.Value) {
-				return
+		// Create a snapshot of the current elements to avoid issues with concurrent modifications
+		snapshot := make([]*Element[K, V], len(m.l))
+		copy(snapshot, m.l)
+
+		for _, element := range snapshot {
+			// Check if element still exists in the map (it might have been deleted during iteration)
+			if _, exists := m.m[element.Key]; exists {
+				if !yield(element.Value) {
+					return
+				}
 			}
 		}
 	}
@@ -558,6 +621,74 @@ func (m *Map[K, V]) MarshalJSON() ([]byte, error) {
 	buf.WriteString("}")
 
 	return buf.Bytes(), nil
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface for the Map type.
+// It unmarshals YAML data into the sequenced map, preserving the order of keys.
+func (m *Map[K, V]) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.MappingNode {
+		return fmt.Errorf("cannot unmarshal %s into sequencedmap.Map", value.ShortTag())
+	}
+
+	// Initialize the map if it's not already initialized
+	if !m.IsInitialized() {
+		m.Init()
+	}
+
+	// Clear existing data
+	m.m = make(map[K]*Element[K, V])
+	m.l = make([]*Element[K, V], 0)
+
+	// Process key-value pairs from the YAML mapping node
+	for i := 0; i < len(value.Content); i += 2 {
+		keyNode := value.Content[i]
+		valueNode := value.Content[i+1]
+
+		// Unmarshal the key
+		var key K
+		if err := keyNode.Decode(&key); err != nil {
+			return fmt.Errorf("failed to decode key: %w", err)
+		}
+
+		// Unmarshal the value
+		var val V
+		if err := valueNode.Decode(&val); err != nil {
+			return fmt.Errorf("failed to decode value for key %v: %w", key, err)
+		}
+
+		// Add the key-value pair to the map
+		element := &Element[K, V]{
+			Key:   key,
+			Value: val,
+		}
+		m.m[key] = element
+		m.l = append(m.l, element)
+	}
+
+	return nil
+}
+
+// MarshalYAML implements the yaml.Marshaler interface for the Map type.
+// It marshals the sequenced map to YAML, preserving the order of keys.
+func (m *Map[K, V]) MarshalYAML() (interface{}, error) {
+	if m == nil {
+		return nil, nil
+	}
+
+	content := make([]*yaml.Node, 0, len(m.l)*2)
+	for _, element := range m.l {
+		var keyNode yaml.Node
+		if err := keyNode.Encode(element.Key); err != nil {
+			return nil, err
+		}
+		var valueNode yaml.Node
+		if err := valueNode.Encode(element.Value); err != nil {
+			return nil, err
+		}
+		content = append(content, &keyNode, &valueNode)
+	}
+
+	return yml.CreateMapNode(context.Background(), content), nil
 }
 
 // compareKeys provides a generic comparison function for keys

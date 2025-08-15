@@ -682,6 +682,7 @@ if err != nil {
 
 fmt.Println("After inlining:")
 buf := bytes.NewBuffer([]byte{})
+ctx = yml.ContextWithConfig(ctx, schema.GetCore().Config)
 if err := marshaller.Marshal(ctx, inlinedSchema, buf); err != nil {
 	panic(err)
 }

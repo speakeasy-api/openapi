@@ -15,9 +15,10 @@ import (
 	"github.com/speakeasy-api/openapi/references"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/walk"
+	"github.com/speakeasy-api/openapi/yml"
 )
 
-// The below examples should be copied into the README.md file if ever changed TODO: automate this
+// The below examples should be copied into the README.md file if ever changed
 
 // Example_reading demonstrates how to read and parse an OpenAPI document from a file.
 // This includes validation by default and shows how to access document properties.
@@ -802,6 +803,7 @@ func Example_inliningSchema() {
 
 	fmt.Println("After inlining:")
 	buf := bytes.NewBuffer([]byte{})
+	ctx = yml.ContextWithConfig(ctx, schema.GetCore().Config) // Use the same config as the original schema
 	if err := marshaller.Marshal(ctx, inlinedSchema, buf); err != nil {
 		panic(err)
 	}
