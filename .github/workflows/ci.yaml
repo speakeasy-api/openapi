@@ -16,24 +16,11 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v2
 
-      - name: Get Go cache paths
-        id: go-cache-paths
-        shell: bash
-        run: |
-          echo "go-build=$(go env GOCACHE)" >> $GITHUB_OUTPUT
-          echo "go-mod=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
-
-      - name: Cache Go Build Cache
-        uses: actions/cache@v4
+      - name: Setup Go with caching
+        uses: actions/setup-go@v5
         with:
-          path: ${{ steps.go-cache-paths.outputs.go-build }}
-          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
-
-      - name: Cache Go Mod Cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.go-cache-paths.outputs.go-mod }}
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+          go-version-file: "go.mod"
+          cache: true
 
       - name: Check code formatting
         run: mise run fmt-check
@@ -49,7 +36,6 @@ jobs:
 
   test:
     name: Test
-    needs: lint
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -64,24 +50,11 @@ jobs:
       - name: Install mise
         uses: jdx/mise-action@v2
 
-      - name: Get Go cache paths
-        id: go-cache-paths
-        shell: bash
-        run: |
-          echo "go-build=$(go env GOCACHE)" >> $GITHUB_OUTPUT
-          echo "go-mod=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
-
-      - name: Cache Go Build Cache
-        uses: actions/cache@v4
+      - name: Setup Go with caching
+        uses: actions/setup-go@v5
         with:
-          path: ${{ steps.go-cache-paths.outputs.go-build }}
-          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
-
-      - name: Cache Go Mod Cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.go-cache-paths.outputs.go-mod }}
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+          go-version-file: "go.mod"
+          cache: true
 
       - name: Cache downloaded test files
         uses: actions/cache@v4
@@ -89,7 +62,7 @@ jobs:
           path: |
             ~/tmp/speakeasy-api_arazzo
             ${{ runner.temp }}/speakeasy-api_arazzo
-          key: arazzo-test-files-${{ hashFiles('arazzo/arazzo_test.go') }}
+          key: arazzo-test-files-${{ hashFiles('arazzo/**/*.go') }}
           restore-keys: |
             arazzo-test-files-
 
@@ -99,7 +72,10 @@ jobs:
 
       - name: Run tests (Windows)
         if: matrix.os == 'windows-latest'
-        run: gotestsum --format testname -- -race ./...
+        run: mise run test
+        env:
+          GOOS: windows
+          GOARCH: amd64
 
       - name: Calculate coverage
         if: matrix.os == 'ubuntu-latest'
@@ -116,15 +92,15 @@ jobs:
           # Store current working directory
           CURRENT_DIR=$(pwd)
 
-          # Fetch main branch
-          git fetch origin main:main
+          # Fetch main branch with shallow clone for speed
+          git fetch --depth=1 origin main:main
 
           # Checkout main branch in a temporary directory
           git worktree add /tmp/main-branch main
 
-          # Run tests on main branch to get coverage
+          # Run tests on main branch to get coverage (with timeout)
           cd /tmp/main-branch
-          go test -coverprofile=main-coverage.out -covermode=atomic ./... > /dev/null 2>&1 || echo "Main branch tests failed"
+          timeout 300 go test -coverprofile=main-coverage.out -covermode=atomic ./... > /dev/null 2>&1 || echo "Main branch tests failed or timed out"
 
           if [ -f main-coverage.out ]; then
             MAIN_COVERAGE=$(go tool cover -func=main-coverage.out | grep total | awk '{print $3}' || echo "0.0%")
@@ -243,7 +219,7 @@ jobs:
 
       - name: Build (Windows)
         if: matrix.os == 'windows-latest'
-        run: go build -v ./...
+        run: mise run build
 
   # Summary job that depends on all matrix jobs
   # This provides a single status check for branch protection
@@ -255,16 +231,8 @@ jobs:
     steps:
       - name: Check test results
         run: |
-          if [ "${{ needs.test.result }}" != "success" ]; then
-            echo "Tests failed or were cancelled"
+          if [ "${{ needs.lint.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ]; then
+            echo "Lint or tests failed or were cancelled"
             exit 1
           fi
-          echo "All tests passed successfully"
-
-  # Add this temporary job to satisfy the phantom check TODO: remove when test-and-build check is no longer required
-  test-and-build:
-    name: Legacy Status Check (Temporary)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Satisfy phantom check
-        run: echo "This job exists only to satisfy the phantom test-and-build status check. It will be removed once GitHub stops expecting it."
+          echo "All checks passed successfully"
