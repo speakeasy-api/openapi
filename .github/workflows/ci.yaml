@@ -72,7 +72,7 @@ jobs:
 
       - name: Run tests (Windows)
         if: matrix.os == 'windows-latest'
-        run: mise run test
+        run: gotestsum --format testname -- -race ./...
 
       - name: Calculate coverage
         if: matrix.os == 'ubuntu-latest'
@@ -216,7 +216,7 @@ jobs:
 
       - name: Build (Windows)
         if: matrix.os == 'windows-latest'
-        run: mise run build
+        run: go build -v ./...
 
   # Summary job that depends on all matrix jobs
   # This provides a single status check for branch protection
