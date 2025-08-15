@@ -216,3 +216,38 @@ func (j *JSONSchema[T]) Validate(ctx context.Context, opts ...validation.Option)
 func ConcreteToReferenceable(concrete *JSONSchema[Concrete]) *JSONSchema[Referenceable] {
 	return (*JSONSchema[Referenceable])(unsafe.Pointer(concrete)) //nolint:gosec
 }
+
+// ReferenceableToConcrete converts a JSONSchema[Referenceable] to JSONSchema[Concrete] using unsafe pointer casting.
+// This is safe because the underlying structure is identical, only the type parameter differs.
+// This allows for efficient conversion without allocation when you need to walk a referenceable schema
+// as if it were a concrete schema.
+func ReferenceableToConcrete(referenceable *JSONSchema[Referenceable]) *JSONSchema[Concrete] {
+	return (*JSONSchema[Concrete])(unsafe.Pointer(referenceable)) //nolint:gosec
+}
+
+// ShallowCopy creates a shallow copy of the JSONSchema.
+func (j *JSONSchema[T]) ShallowCopy() *JSONSchema[T] {
+	if j == nil {
+		return nil
+	}
+
+	result := &JSONSchema[T]{
+		referenceResolutionCache: j.referenceResolutionCache,
+		validationErrsCache:      j.validationErrsCache,
+		circularErrorFound:       j.circularErrorFound,
+		resolvedSchemaCache:      j.resolvedSchemaCache,
+		parent:                   j.parent,
+		topLevelParent:           j.topLevelParent,
+	}
+
+	// Shallow copy the EitherValue contents
+	if j.IsLeft() && j.GetLeft() != nil {
+		result.Left = j.GetLeft().ShallowCopy()
+	}
+	if j.IsRight() && j.GetRight() != nil {
+		rightVal := *j.GetRight()
+		result.Right = &rightVal
+	}
+
+	return result
+}

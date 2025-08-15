@@ -153,26 +153,19 @@ type InlineOptions struct {
 //
 // Parameters:
 //   - ctx: Context for the operation
-//   - schema: The schema to inline (modified in place)
+//   - schema: The schema to inline
 //   - opts: Configuration options for inlining
 //
 // Returns:
-//   - *JSONSchema[Referenceable]: The inlined schema (same as input, modified in place)
+//   - *JSONSchema[Referenceable]: The inlined schema (input schema left unmodified)
 //   - error: Any error that occurred, including invalid circular reference errors
 func Inline(ctx context.Context, schema *JSONSchema[Referenceable], opts InlineOptions) (*JSONSchema[Referenceable], error) {
 	if schema == nil {
 		return nil, nil
 	}
 
-	// First, resolve all references to ensure we have access to all definitions
-	_, err := schema.Resolve(ctx, opts.ResolveOptions)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve references: %w", err)
-	}
-
-	// If the input schema is not a reference, try to convert it to a referenced schema
+	// If the working schema is not a reference, try to convert it to a referenced schema
 	// This ensures consistent tracking during circular reference detection
-	workingSchema := schema
 	if !schema.IsReference() {
 		// Try to get the JSON pointer for this schema within the root document
 		if rootDoc, ok := opts.ResolveOptions.RootDocument.(GetRootNoder); ok {
@@ -182,7 +175,7 @@ func Inline(ctx context.Context, schema *JSONSchema[Referenceable], opts InlineO
 				if jsonPtr != "" {
 					// Create a referenced schema using the JSON pointer
 					ref := references.Reference("#" + jsonPtr)
-					workingSchema = NewReferencedScheme(ctx, ref, (*JSONSchema[Concrete])(schema))
+					schema = NewReferencedScheme(ctx, ref, (*JSONSchema[Concrete])(schema))
 				}
 			}
 		}
@@ -199,12 +192,13 @@ func Inline(ctx context.Context, schema *JSONSchema[Referenceable], opts InlineO
 	}
 
 	// First pass: analyze all references and make preservation decisions
-	if err := analyzeReferences(ctx, workingSchema, opts, refTracker, []*loopFrame{}, counter); err != nil {
+	if err := analyzeReferences(ctx, schema, opts, refTracker, []*loopFrame{}, counter); err != nil {
 		return nil, fmt.Errorf("failed to analyze references: %w", err)
 	}
 
 	// Second pass: perform actual inlining based on decisions
-	if err := inlineRecursive(ctx, workingSchema, opts, refTracker, []string{}, counter); err != nil {
+	workingSchema, err := inlineRecursive(ctx, schema, opts, refTracker, []string{}, counter)
+	if err != nil {
 		return nil, fmt.Errorf("failed to inline schema: %w", err)
 	}
 
@@ -248,32 +242,20 @@ func analyzeReferences(ctx context.Context, schema *JSONSchema[Referenceable], o
 	if err != nil {
 		return fmt.Errorf("failed to resolve schema %s: %w", schema.GetAbsRef(), err)
 	}
-
 	resolved := schema.GetResolvedSchema()
-	if resolved.IsRight() {
-		return nil // Boolean schemas don't have references to analyze
-	}
 
 	if schema.IsReference() {
-		absRef := schema.GetAbsRef()
-		if absRef.GetURI() == "" {
-			absRef = references.Reference(opts.ResolveOptions.TargetLocation + absRef.String())
-		}
-
-		// Use GetAbsRef() for consistent tracking across external and internal references
-		absRefStr := absRef.String()
+		absRef := getAbsRef(schema, opts)
 
 		// Track reference usage using the absolute reference
-		info, exists := refTracker.Get(absRefStr)
+		info, exists := refTracker.Get(absRef)
 		if !exists {
-			info = &refInfo{
-				schema: resolved,
-			}
-			refTracker.Set(absRefStr, info)
+			info = &refInfo{}
+			refTracker.Set(absRef, info)
 		}
 
 		previousIdx := slices.IndexFunc(visited, func(frame *loopFrame) bool {
-			return frame.ref == absRefStr
+			return frame.ref == absRef
 		})
 
 		if previousIdx != -1 {
@@ -296,19 +278,23 @@ func analyzeReferences(ctx context.Context, schema *JSONSchema[Referenceable], o
 				}
 			} else {
 				// Invalid circular reference
-				return fmt.Errorf("invalid circular reference %s: %w", absRefStr, err)
+				return fmt.Errorf("invalid circular reference %s: %w", absRef, err)
 			}
 			// Don't continue analyzing circular references
 			return nil
 		}
 
 		visited = append(visited, &loopFrame{
-			ref: absRefStr,
+			ref: absRef,
 		})
 
 		// Continue analyzing the resolved schema
 		// Important: Use ConcreteToReferenceable to maintain resolution context
 		return analyzeReferences(ctx, ConcreteToReferenceable(resolved), opts, refTracker, visited, counter)
+	}
+
+	if resolved.IsRight() {
+		return nil // Boolean schemas don't have references to analyze
 	}
 
 	currentFrame := &loopFrame{}
@@ -415,54 +401,44 @@ func analyzeReferences(ctx context.Context, schema *JSONSchema[Referenceable], o
 	return nil
 }
 
-func inlineRecursive(ctx context.Context, schema *JSONSchema[Referenceable], opts InlineOptions, refTracker *sequencedmap.Map[string, *refInfo], visited []string, counter *cycleCounter) error {
+func inlineRecursive(ctx context.Context, schema *JSONSchema[Referenceable], opts InlineOptions, refTracker *sequencedmap.Map[string, *refInfo], visited []string, counter *cycleCounter) (*JSONSchema[Referenceable], error) {
 	if schema == nil {
-		return nil
+		return nil, nil
 	}
 
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("%w: %w", ErrInlineTimeout, ctx.Err())
+		return nil, fmt.Errorf("%w: %w", ErrInlineTimeout, ctx.Err())
 	default:
 		// Increment cycle counter and check limits
 		if err := counter.increment(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	// Ensure the schema is resolved before proceeding
-	_, err := schema.Resolve(ctx, opts.ResolveOptions)
-	if err != nil {
-		return fmt.Errorf("failed to resolve schema %s: %w", schema.GetAbsRef(), err)
-	}
-
-	resolved := schema.GetResolvedSchema()
-	if resolved.IsRight() {
-		inlineSchemaInPlace(ctx, schema)
-		return nil
-	}
+	schema = schema.ShallowCopy()
+	resolved := ReferenceableToConcrete(schema)
 
 	// Handle references based on pre-computed decisions
 	if schema.IsReference() {
-		absRef := schema.GetAbsRef()
-		if absRef.GetURI() == "" {
-			absRef = references.Reference(opts.ResolveOptions.TargetLocation + absRef.String())
-		}
+		resolved = resolved.MustGetResolvedSchema().ShallowCopy()
 
-		// Use GetAbsRef() for consistent tracking across external and internal references
-		absRefStr := absRef.String()
+		absRef := getAbsRef(schema, opts)
 
 		// Get the pre-computed decision for this reference using the absolute reference
-		info, exists := refTracker.Get(absRefStr)
+		info, exists := refTracker.Get(absRef)
 		if !exists {
-			return fmt.Errorf("reference %s not found in analysis phase", absRefStr)
+			return nil, fmt.Errorf("reference %s not found in analysis phase", absRef)
+		}
+		if info.schema == nil {
+			info.schema = resolved
 		}
 
 		// If this reference should be preserved, we still need to process its contents once
 		// to inline any non-circular references within it
 		if info.preserve {
-			previousIdx := slices.Index(visited, absRefStr)
+			previousIdx := slices.Index(visited, absRef)
 
 			// Check if this is a circular reference
 			if previousIdx != -1 {
@@ -476,132 +452,165 @@ func inlineRecursive(ctx context.Context, schema *JSONSchema[Referenceable], opt
 						refTracker.Set(rewrittenAbsRef.String(), info)
 					}
 				}
-				return nil
+				return schema, nil
 			}
 			// This is the first occurrence - process its contents but don't inline the reference itself
-			visited = append(visited, absRefStr)
+			visited = append(visited, absRef)
 		}
 		// If not preserve, this reference should be inlined - we'll process its content below
+	}
+	if resolved.IsRight() {
+		inlineSchemaInPlace(schema, resolved)
+		return schema, nil
 	}
 
 	js := resolved.GetLeft()
 
 	// Walk through allOf schemas
-	for _, schema := range js.AllOf {
-		if err := inlineRecursive(ctx, schema, opts, refTracker, visited, counter); err != nil {
-			return err
+	for i, s := range js.AllOf {
+		s, err := inlineRecursive(ctx, s, opts, refTracker, visited, counter)
+		if err != nil {
+			return nil, err
 		}
+		js.AllOf[i] = s
 	}
 
 	// Walk through oneOf schemas
-	for _, schema := range js.OneOf {
-		if err := inlineRecursive(ctx, schema, opts, refTracker, visited, counter); err != nil {
-			return err
+	for i, s := range js.OneOf {
+		s, err := inlineRecursive(ctx, s, opts, refTracker, visited, counter)
+		if err != nil {
+			return nil, err
 		}
+		js.OneOf[i] = s
 	}
 
 	// Walk through anyOf schemas
-	for _, schema := range js.AnyOf {
-		if err := inlineRecursive(ctx, schema, opts, refTracker, visited, counter); err != nil {
-			return err
+	for i, s := range js.AnyOf {
+		s, err := inlineRecursive(ctx, s, opts, refTracker, visited, counter)
+		if err != nil {
+			return nil, err
 		}
+		js.AnyOf[i] = s
 	}
 
 	// Walk through prefixItems schemas
-	for _, schema := range js.PrefixItems {
-		if err := inlineRecursive(ctx, schema, opts, refTracker, visited, counter); err != nil {
-			return err
+	for i, s := range js.PrefixItems {
+		s, err := inlineRecursive(ctx, s, opts, refTracker, visited, counter)
+		if err != nil {
+			return nil, err
 		}
+		js.PrefixItems[i] = s
 	}
 
 	// Visit contains schema
-	if err := inlineRecursive(ctx, js.Contains, opts, refTracker, visited, counter); err != nil {
-		return err
+	s, err := inlineRecursive(ctx, js.Contains, opts, refTracker, visited, counter)
+	if err != nil {
+		return nil, err
 	}
+	js.Contains = s
 
 	// Visit if schema
-	if err := inlineRecursive(ctx, js.If, opts, refTracker, visited, counter); err != nil {
-		return err
+	s, err = inlineRecursive(ctx, js.If, opts, refTracker, visited, counter)
+	if err != nil {
+		return nil, err
 	}
+	js.If = s
 
 	// Visit then schema
-	if err := inlineRecursive(ctx, js.Then, opts, refTracker, visited, counter); err != nil {
-		return err
+	s, err = inlineRecursive(ctx, js.Then, opts, refTracker, visited, counter)
+	if err != nil {
+		return nil, err
 	}
+	js.Then = s
 
 	// Visit else schema
-	if err := inlineRecursive(ctx, js.Else, opts, refTracker, visited, counter); err != nil {
-		return err
+	s, err = inlineRecursive(ctx, js.Else, opts, refTracker, visited, counter)
+	if err != nil {
+		return nil, err
 	}
+	js.Else = s
 
 	// Walk through dependentSchemas schemas
-	for _, schema := range js.DependentSchemas.All() {
-		if err := inlineRecursive(ctx, schema, opts, refTracker, visited, counter); err != nil {
-			return err
+	for key, schema := range js.DependentSchemas.All() {
+		s, err := inlineRecursive(ctx, schema, opts, refTracker, visited, counter)
+		if err != nil {
+			return nil, err
 		}
+		js.DependentSchemas.Set(key, s)
 	}
 
 	// Walk through patternProperties schemas
-	for _, schema := range js.PatternProperties.All() {
-		if err := inlineRecursive(ctx, schema, opts, refTracker, visited, counter); err != nil {
-			return err
+	for key, schema := range js.PatternProperties.All() {
+		s, err := inlineRecursive(ctx, schema, opts, refTracker, visited, counter)
+		if err != nil {
+			return nil, err
 		}
+		js.PatternProperties.Set(key, s)
 	}
 
 	// Visit propertyNames schema
-	if err := inlineRecursive(ctx, js.PropertyNames, opts, refTracker, visited, counter); err != nil {
-		return err
+	s, err = inlineRecursive(ctx, js.PropertyNames, opts, refTracker, visited, counter)
+	if err != nil {
+		return nil, err
 	}
+	js.PropertyNames = s
 
 	// Visit unevaluatedItems schema
-	if err := inlineRecursive(ctx, js.UnevaluatedItems, opts, refTracker, visited, counter); err != nil {
-		return err
+	s, err = inlineRecursive(ctx, js.UnevaluatedItems, opts, refTracker, visited, counter)
+	if err != nil {
+		return nil, err
 	}
+	js.UnevaluatedItems = s
 
 	// Visit unevaluatedProperties schema
-	if err := inlineRecursive(ctx, js.UnevaluatedProperties, opts, refTracker, visited, counter); err != nil {
-		return err
+	s, err = inlineRecursive(ctx, js.UnevaluatedProperties, opts, refTracker, visited, counter)
+	if err != nil {
+		return nil, err
 	}
+	js.UnevaluatedProperties = s
 
 	// Visit items schema
-	if err := inlineRecursive(ctx, js.Items, opts, refTracker, visited, counter); err != nil {
-		return err
+	s, err = inlineRecursive(ctx, js.Items, opts, refTracker, visited, counter)
+	if err != nil {
+		return nil, err
 	}
+	js.Items = s
 
 	// Visit not schema
-	if err := inlineRecursive(ctx, js.Not, opts, refTracker, visited, counter); err != nil {
-		return err
+	s, err = inlineRecursive(ctx, js.Not, opts, refTracker, visited, counter)
+	if err != nil {
+		return nil, err
 	}
+	js.Not = s
 
 	// Walk through properties schemas
-	for _, schema := range js.Properties.All() {
-		if err := inlineRecursive(ctx, schema, opts, refTracker, visited, counter); err != nil {
-			return err
+	for key, s := range js.Properties.All() {
+		s, err := inlineRecursive(ctx, s, opts, refTracker, visited, counter)
+		if err != nil {
+			return nil, err
 		}
+		js.Properties.Set(key, s)
 	}
 
 	// Visit additionalProperties schema
-	if err := inlineRecursive(ctx, js.AdditionalProperties, opts, refTracker, visited, counter); err != nil {
-		return err
+	s, err = inlineRecursive(ctx, js.AdditionalProperties, opts, refTracker, visited, counter)
+	if err != nil {
+		return nil, err
 	}
+	js.AdditionalProperties = s
 
 	// Handle reference inlining at the end
 	if schema.IsReference() {
-		// Use GetAbsRef() for consistent tracking
-		absRef := schema.GetAbsRef()
-		if absRef.GetURI() == "" {
-			absRef = references.Reference(opts.ResolveOptions.TargetLocation + absRef.String())
-		}
-		absRefStr := absRef.String()
+		absRef := getAbsRef(schema, opts)
 
-		info, exists := refTracker.Get(absRefStr)
+		info, exists := refTracker.Get(absRef)
 		if !exists {
-			return fmt.Errorf("reference %s not found in analysis phase", absRefStr)
+			return nil, fmt.Errorf("reference %s not found in analysis phase", absRef)
 		}
 
 		// If we reach here, this reference should be inlined (preserve=false)
 		if !info.preserve {
-			inlineSchemaInPlace(ctx, schema)
+			inlineSchemaInPlace(schema, resolved)
 		} else if info.rewrittenRef != "" {
 			// This is a preserved reference - rewrite it to point to the new $defs location
 			schema.GetLeft().Ref = pointer.From(references.Reference(info.rewrittenRef))
@@ -613,12 +622,23 @@ func inlineRecursive(ctx context.Context, schema *JSONSchema[Referenceable], opt
 		}
 	}
 
-	return nil
+	return schema, nil
+}
+
+func getAbsRef(schema *JSONSchema[Referenceable], opts InlineOptions) string {
+	absRef := schema.GetAbsRef()
+	if absRef.GetURI() == "" {
+		absRef = references.Reference(opts.ResolveOptions.TargetLocation + absRef.String())
+	}
+
+	// Use absRefStr for consistent tracking across external and internal references
+	absRefStr := absRef.String()
+	return absRefStr
 }
 
 // inlineSchemaInPlace replaces a reference schema with its resolved content in place.
 // It includes circular reference detection to prevent infinite recursion.
-func inlineSchemaInPlace(_ context.Context, schema *JSONSchema[Referenceable]) {
+func inlineSchemaInPlace(schema *JSONSchema[Referenceable], resolved *JSONSchema[Concrete]) {
 	if !schema.IsReference() {
 		// Not a reference, nothing to inline
 		return
@@ -629,11 +649,8 @@ func inlineSchemaInPlace(_ context.Context, schema *JSONSchema[Referenceable]) {
 		return
 	}
 
-	// Get the resolved schema
-	resolvedSchema := schema.MustGetResolvedSchema()
-
 	// Replace the current schema's EitherValue with the resolved schema's content
-	schema.EitherValue = resolvedSchema.EitherValue
+	schema.EitherValue = resolved.EitherValue
 
 	// Clear the reference resolution cache and related fields since we've inlined the content
 	schema.referenceResolutionCache = nil

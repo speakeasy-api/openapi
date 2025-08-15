@@ -74,6 +74,108 @@ type Schema struct {
 	Extensions            *extensions.Extensions
 }
 
+// ShallowCopy creates a shallow copy of the Schema.
+// This copies all struct fields and creates new slices/maps but does not deep copy the referenced objects.
+// The elements within slices and maps are copied by reference, not deep copied.
+func (s *Schema) ShallowCopy() *Schema {
+	if s == nil {
+		return nil
+	}
+
+	result := &Schema{
+		Model:                 s.Model,
+		Ref:                   s.Ref,
+		ExclusiveMaximum:      s.ExclusiveMaximum,
+		ExclusiveMinimum:      s.ExclusiveMinimum,
+		Type:                  s.Type,
+		Discriminator:         s.Discriminator,
+		Contains:              s.Contains,
+		MinContains:           s.MinContains,
+		MaxContains:           s.MaxContains,
+		If:                    s.If,
+		Else:                  s.Else,
+		Then:                  s.Then,
+		PropertyNames:         s.PropertyNames,
+		UnevaluatedItems:      s.UnevaluatedItems,
+		UnevaluatedProperties: s.UnevaluatedProperties,
+		Items:                 s.Items,
+		Anchor:                s.Anchor,
+		Not:                   s.Not,
+		Title:                 s.Title,
+		MultipleOf:            s.MultipleOf,
+		Maximum:               s.Maximum,
+		Minimum:               s.Minimum,
+		MaxLength:             s.MaxLength,
+		MinLength:             s.MinLength,
+		Pattern:               s.Pattern,
+		Format:                s.Format,
+		MaxItems:              s.MaxItems,
+		MinItems:              s.MinItems,
+		UniqueItems:           s.UniqueItems,
+		MaxProperties:         s.MaxProperties,
+		MinProperties:         s.MinProperties,
+		AdditionalProperties:  s.AdditionalProperties,
+		Description:           s.Description,
+		Default:               s.Default,
+		Const:                 s.Const,
+		Nullable:              s.Nullable,
+		ReadOnly:              s.ReadOnly,
+		WriteOnly:             s.WriteOnly,
+		ExternalDocs:          s.ExternalDocs,
+		Example:               s.Example,
+		Deprecated:            s.Deprecated,
+		Schema:                s.Schema,
+		XML:                   s.XML,
+		Extensions:            s.Extensions,
+	}
+
+	// Shallow copy slices - create new slice but reference same elements
+	if s.AllOf != nil {
+		result.AllOf = make([]*JSONSchema[Referenceable], len(s.AllOf))
+		copy(result.AllOf, s.AllOf)
+	}
+	if s.OneOf != nil {
+		result.OneOf = make([]*JSONSchema[Referenceable], len(s.OneOf))
+		copy(result.OneOf, s.OneOf)
+	}
+	if s.AnyOf != nil {
+		result.AnyOf = make([]*JSONSchema[Referenceable], len(s.AnyOf))
+		copy(result.AnyOf, s.AnyOf)
+	}
+	if s.Examples != nil {
+		result.Examples = make([]values.Value, len(s.Examples))
+		copy(result.Examples, s.Examples)
+	}
+	if s.PrefixItems != nil {
+		result.PrefixItems = make([]*JSONSchema[Referenceable], len(s.PrefixItems))
+		copy(result.PrefixItems, s.PrefixItems)
+	}
+	if s.Required != nil {
+		result.Required = make([]string, len(s.Required))
+		copy(result.Required, s.Required)
+	}
+	if s.Enum != nil {
+		result.Enum = make([]values.Value, len(s.Enum))
+		copy(result.Enum, s.Enum)
+	}
+
+	// Shallow copy maps - create new map but reference same elements
+	if s.DependentSchemas != nil {
+		result.DependentSchemas = sequencedmap.From(s.DependentSchemas.All())
+	}
+	if s.PatternProperties != nil {
+		result.PatternProperties = sequencedmap.From(s.PatternProperties.All())
+	}
+	if s.Properties != nil {
+		result.Properties = sequencedmap.From(s.Properties.All())
+	}
+	if s.Defs != nil {
+		result.Defs = sequencedmap.From(s.Defs.All())
+	}
+
+	return result
+}
+
 // GetRef returns the value of the Ref field. Returns empty string if not set.
 func (s *Schema) GetRef() references.Reference {
 	if s == nil || s.Ref == nil {

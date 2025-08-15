@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -1374,4 +1375,86 @@ func extractSchemaFromOpenAPI(openAPIDoc *openapi.OpenAPI, pointer string) (*oas
 	}
 
 	return schema, nil
+}
+
+func TestInline_EmailParser_PagerDuty_Success(t *testing.T) {
+	t.Parallel()
+
+	// This test reproduces the bug with EmailParser schema from pagerduty.json
+	// The EmailParser schema contains a reference to MatchPredicate, which has a circular reference
+	// through its "children" property that references back to itself
+	ctx := t.Context()
+
+	// Read the pagerduty.json file content
+	pagerDutyContent, err := os.ReadFile("testdata/pagerduty.json")
+	require.NoError(t, err, "failed to read pagerduty.json")
+
+	// Parse as OpenAPI document
+	pagerDutyDoc, err := parseJSONToOpenAPI(ctx, string(pagerDutyContent))
+	require.NoError(t, err, "failed to parse pagerduty.json as OpenAPI")
+
+	// Extract multiple schemas that all use the Integration schema to trigger the bug
+	// when the same MatchPredicate gets processed multiple times in the same session
+
+	// PUT /services/{id}/integrations/{integration_id} requestBody
+	putRequestBodySchema, err := extractSchemaFromOpenAPI(pagerDutyDoc, "/paths/~1services~1{id}~1integrations~1{integration_id}/put/requestBody/content/application~1json/schema")
+	require.NoError(t, err, "failed to extract PUT requestBody schema")
+
+	// POST /services/{id}/integrations requestBody (same Integration schema)
+	postRequestBodySchema, err := extractSchemaFromOpenAPI(pagerDutyDoc, "/paths/~1services~1{id}~1integrations/post/requestBody/content/application~1json/schema")
+	require.NoError(t, err, "failed to extract POST requestBody schema")
+
+	// POST /services/{id}/integrations 201 response (also uses Integration schema)
+	postResponseSchema, err := extractSchemaFromOpenAPI(pagerDutyDoc, "/paths/~1services~1{id}~1integrations/post/responses/201/content/application~1json/schema")
+	require.NoError(t, err, "failed to extract POST 201 response schema")
+
+	// Create resolve options using the pagerduty document as the root document
+	opts := oas3.InlineOptions{
+		ResolveOptions: oas3.ResolveOptions{
+			TargetLocation: "testdata/pagerduty.json",
+			RootDocument:   pagerDutyDoc,
+		},
+		RemoveUnusedDefs: true,
+	}
+
+	// First, inline the PUT requestBody schema
+	inlined1, err := oas3.Inline(ctx, putRequestBodySchema, opts)
+	require.NoError(t, err, "first inlining should succeed for PUT requestBody schema")
+	require.NotNil(t, inlined1, "first inlined schema should not be nil")
+
+	// Then, inline the POST requestBody schema in the same session
+	// This should trigger the bug because MatchPredicate gets processed again
+	inlined2, err := oas3.Inline(ctx, postRequestBodySchema, opts)
+	require.NoError(t, err, "second inlining should succeed for POST requestBody schema")
+	require.NotNil(t, inlined2, "second inlined schema should not be nil")
+
+	// Finally, inline the POST response schema in the same session
+	// This is the third time the same Integration->EmailParser->MatchPredicate chain gets processed
+	inlined3, err := oas3.Inline(ctx, postResponseSchema, opts)
+	require.NoError(t, err, "third inlining should succeed for POST response schema")
+	require.NotNil(t, inlined3, "third inlined schema should not be nil")
+
+	// Verify all results are valid
+	actualJSON1, err := schemaToJSON(ctx, inlined1)
+	require.NoError(t, err, "failed to convert first inlined result to JSON")
+	require.NotEmpty(t, actualJSON1, "first inlined JSON should not be empty")
+
+	actualJSON2, err := schemaToJSON(ctx, inlined2)
+	require.NoError(t, err, "failed to convert second inlined result to JSON")
+	require.NotEmpty(t, actualJSON2, "second inlined JSON should not be empty")
+
+	actualJSON3, err := schemaToJSON(ctx, inlined3)
+	require.NoError(t, err, "failed to convert third inlined result to JSON")
+	require.NotEmpty(t, actualJSON3, "third inlined JSON should not be empty")
+
+	// All schemas should contain the Integration structure with EmailParser inlined
+	for i, actualJSON := range []string{actualJSON1, actualJSON2, actualJSON3} {
+		assert.Contains(t, actualJSON, `"integration"`, "schema %d should contain integration property", i+1)
+		assert.Contains(t, actualJSON, `"action"`, "schema %d should contain action property from inlined EmailParser", i+1)
+		assert.Contains(t, actualJSON, `"match_predicate"`, "schema %d should contain match_predicate property", i+1)
+	}
+
+	t.Logf("Successfully inlined 3 schemas with shared Integration->EmailParser->MatchPredicate references")
+	t.Logf("PUT request: %d chars, POST request: %d chars, POST response: %d chars",
+		len(actualJSON1), len(actualJSON2), len(actualJSON3))
 }

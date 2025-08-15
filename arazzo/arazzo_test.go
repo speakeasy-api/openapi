@@ -788,7 +788,12 @@ func TestArazzo_StressTests_RoundTrip(t *testing.T) {
 }
 
 func downloadFile(url string) (io.ReadCloser, error) {
-	tempDir := filepath.Join(os.TempDir(), "speakeasy-api_arazzo")
+	// Use environment variable for cache directory, fallback to system temp dir
+	cacheDir := os.Getenv("ARAZZO_CACHE_DIR")
+	if cacheDir == "" {
+		cacheDir = os.TempDir()
+	}
+	tempDir := filepath.Join(cacheDir, "speakeasy-api_arazzo")
 
 	if err := os.MkdirAll(tempDir, os.ModePerm); err != nil {
 		return nil, err
