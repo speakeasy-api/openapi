@@ -73,9 +73,6 @@ jobs:
       - name: Run tests (Windows)
         if: matrix.os == 'windows-latest'
         run: mise run test
-        env:
-          GOOS: windows
-          GOARCH: amd64
 
       - name: Calculate coverage
         if: matrix.os == 'ubuntu-latest'
