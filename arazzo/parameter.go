@@ -55,7 +55,7 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	s := validation.GetContextObject[Step](o)
 
 	if core.Name.Present && p.Name == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("name is required"), core, core.Name))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("parameter fieldname is required"), core, core.Name))
 	}
 
 	in := In("")
@@ -71,17 +71,17 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	default:
 		if p.In == nil || in == "" {
 			if w == nil && s != nil && s.WorkflowID == nil {
-				errs = append(errs, validation.NewValueError(validation.NewMissingValueError("in is required within a step when workflowId is not set"), core, core.In))
+				errs = append(errs, validation.NewValueError(validation.NewMissingValueError("parameter field in is required within a step when workflowId is not set"), core, core.In))
 			}
 		}
 
 		if in != "" {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("in must be one of [%s] but was %s", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", "), in), core, core.In))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter field in must be one of [%s] but was %s", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", "), in), core, core.In))
 		}
 	}
 
 	if core.Value.Present && p.Value == nil {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("value is required"), core, core.Value))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("parameter field value is required"), core, core.Value))
 	} else if p.Value != nil {
 		_, expression, err := expression.GetValueOrExpressionValue(p.Value)
 		if err != nil {

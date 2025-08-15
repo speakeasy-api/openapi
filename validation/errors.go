@@ -10,18 +10,31 @@ import (
 // TODO allow getting the JSON path for line/column for validation errors
 type Error struct {
 	UnderlyingError error
-	Line            int
-	Column          int
+	Node            *yaml.Node
 }
 
 var _ error = (*Error)(nil)
 
 func (e Error) Error() string {
-	return fmt.Sprintf("[%d:%d] %s", e.Line, e.Column, e.UnderlyingError.Error())
+	return fmt.Sprintf("[%d:%d] %s", e.GetLineNumber(), e.GetColumnNumber(), e.UnderlyingError.Error())
 }
 
 func (e Error) Unwrap() error {
 	return e.UnderlyingError
+}
+
+func (e Error) GetLineNumber() int {
+	if e.Node == nil {
+		return -1
+	}
+	return e.Node.Line
+}
+
+func (e Error) GetColumnNumber() int {
+	if e.Node == nil {
+		return -1
+	}
+	return e.Node.Column
 }
 
 type valueNodeGetter interface {
@@ -40,11 +53,10 @@ type mapValueNodeGetter interface {
 	GetMapValueNodeOrRoot(key string, root *yaml.Node) *yaml.Node
 }
 
-func NewNodeError(err error, node *yaml.Node) error {
+func NewValidationError(err error, node *yaml.Node) error {
 	return &Error{
 		UnderlyingError: err,
-		Line:            node.Line,
-		Column:          node.Column,
+		Node:            node,
 	}
 }
 
@@ -66,8 +78,7 @@ func NewValueError(err error, core CoreModeler, node valueNodeGetter) error {
 
 	return &Error{
 		UnderlyingError: err,
-		Line:            valueNode.Line,
-		Column:          valueNode.Column,
+		Node:            valueNode,
 	}
 }
 
@@ -85,8 +96,7 @@ func NewSliceError(err error, core CoreModeler, node sliceNodeGetter, index int)
 
 	return &Error{
 		UnderlyingError: err,
-		Line:            valueNode.Line,
-		Column:          valueNode.Column,
+		Node:            valueNode,
 	}
 }
 
@@ -104,8 +114,7 @@ func NewMapKeyError(err error, core CoreModeler, node mapKeyNodeGetter, key stri
 
 	return &Error{
 		UnderlyingError: err,
-		Line:            valueNode.Line,
-		Column:          valueNode.Column,
+		Node:            valueNode,
 	}
 }
 
@@ -123,8 +132,7 @@ func NewMapValueError(err error, core CoreModeler, node mapValueNodeGetter, key 
 
 	return &Error{
 		UnderlyingError: err,
-		Line:            valueNode.Line,
-		Column:          valueNode.Column,
+		Node:            valueNode,
 	}
 }
 

@@ -36,8 +36,12 @@ func UnmarshalExtension(keyNode *yaml.Node, valueNode *yaml.Node, extensionsFiel
 	resolvedKeyNode := yml.ResolveAlias(keyNode)
 	resolvedValueNode := yml.ResolveAlias(valueNode)
 
+	if resolvedKeyNode == nil {
+		return nil
+	}
+
 	if !extensionsField.CanSet() {
-		return fmt.Errorf("Extensions field is not settable (field type: %v) at line %d, column %d",
+		return fmt.Errorf("the Extensions field is not settable (field type: %v) at line %d, column %d",
 			extensionsField.Type(), resolvedKeyNode.Line, resolvedKeyNode.Column)
 	}
 
@@ -158,7 +162,7 @@ func syncExtensions(ctx context.Context, source any, target reflect.Value, mapNo
 	cf, ok := sUnderlying.Type().FieldByName("core")
 	if ok {
 		sf := sUnderlying.FieldByIndex(cf.Index)
-		reflect.NewAt(sf.Type(), unsafe.Pointer(sf.UnsafeAddr())).Elem().Set(target)
+		reflect.NewAt(sf.Type(), unsafe.Pointer(sf.UnsafeAddr())).Elem().Set(target) //nolint:gosec
 	}
 
 	return mapNode, nil

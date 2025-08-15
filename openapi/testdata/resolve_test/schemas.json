@@ -1,0 +1,86 @@
+{
+  "definitions": {
+    "PersonSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "age": {
+          "type": "integer"
+        },
+        "contact": {
+          "$ref": "#/definitions/ContactInfo"
+        }
+      }
+    },
+    "ContactInfo": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "schemas": {
+    "Product": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "price": {
+          "type": "number"
+        },
+        "category": {
+          "$ref": "#/schemas/Category"
+        }
+      }
+    },
+    "Category": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "nested": {
+    "data": {
+      "models": {
+        "User": {
+          "type": "object",
+          "properties": {
+            "username": {
+              "type": "string"
+            },
+            "profile": {
+              "$ref": "#/nested/data/models/Profile"
+            }
+          }
+        },
+        "Profile": {
+          "type": "object",
+          "properties": {
+            "bio": {
+              "type": "string"
+            },
+            "avatar_url": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        }
+      }
+    }
+  }
+}

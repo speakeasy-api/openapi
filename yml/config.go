@@ -3,7 +3,6 @@ package yml
 import (
 	"bytes"
 	"context"
-	"fmt"
 
 	"gopkg.in/yaml.v3"
 )
@@ -153,7 +152,7 @@ func getGlobalStringStyle(doc *yaml.Node, cfg *Config) {
 		case yaml.AliasNode:
 			navigate(node.Alias)
 		default:
-			panic(fmt.Sprintf("unknown node kind: %s", NodeKindToString(node.Kind)))
+			panic("unknown node kind: " + NodeKindToString(node.Kind))
 		}
 	}
 

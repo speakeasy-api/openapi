@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/extensions/core"
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
@@ -14,16 +15,20 @@ import (
 )
 
 type TestCoreModel struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"testCoreModel"`
+
 	Name  marshaller.Node[string]     `key:"name"`
 	Value marshaller.Node[*yaml.Node] `key:"value" required:"true"`
 }
 
-func (t *TestCoreModel) Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error) {
+var _ interfaces.CoreModel = (*TestCoreModel)(nil)
+
+func (t *TestCoreModel) Unmarshal(ctx context.Context, parentName string, node *yaml.Node) ([]error, error) {
 	return marshaller.UnmarshalModel(ctx, node, t)
 }
 
 func TestUnmarshalExtensionModel_Success(t *testing.T) {
+	t.Parallel()
 	e := sequencedmap.New(
 		sequencedmap.NewElem("x-speakeasy-test", marshaller.Node[*yaml.Node]{
 			Value: testutils.CreateMapYamlNode([]*yaml.Node{
@@ -35,7 +40,7 @@ func TestUnmarshalExtensionModel_Success(t *testing.T) {
 		}),
 	)
 
-	tcm, validationErrs, err := core.UnmarshalExtensionModel[TestCoreModel](context.Background(), e, "x-speakeasy-test")
+	tcm, validationErrs, err := core.UnmarshalExtensionModel[TestCoreModel](t.Context(), e, "x-speakeasy-test")
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 

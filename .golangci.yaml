@@ -1,0 +1,71 @@
+version: "2"
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - containedctx
+    - copyloopvar
+    - durationcheck
+    - errcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - exptostd
+    - gocheckcompilerdirectives
+    - gochecksumtype
+    - gocritic
+    - gosec
+    - govet
+    - iface
+    - importas
+    - ineffassign
+    - makezero
+    - mirror
+    - misspell
+    - musttag
+    - nilerr
+    - nolintlint
+    - paralleltest
+    - perfsprint
+    - predeclared
+    - reassign
+    - staticcheck
+    - testifylint
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+  exclusions:
+    rules:
+      - path: (.+)_test.go
+        linters:
+          - gosec
+  settings:
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+        - (*os.File).Close
+        - os.Remove
+        - (io/fs.File).Close
+        - (*github.com/fsnotify/fsnotify.Watcher).Close
+    exhaustive:
+      ignore-enum-types: "yaml.+|reflect.+"
+      default-signifies-exhaustive: true
+    iface:
+      enable:
+        - opaque
+        - unexported
+    testifylint:
+      disable:
+        - encoded-compare

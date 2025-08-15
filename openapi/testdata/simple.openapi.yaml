@@ -1,0 +1,16 @@
+openapi: 3.1.1
+info:
+  title: Simple API
+  description: A simple API for examples
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/v1
+    description: Main server
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      summary: Get all users
+      responses:
+        "200":
+          description: List of users

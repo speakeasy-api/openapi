@@ -1,0 +1,84 @@
+{
+  "openapi": "3.1.1",
+  "info":
+    {
+      "title": "JSON Test API for Upgrade",
+      "version": "1.0.0",
+      "description": "JSON API to test upgrading from 3.0.2 to 3.1.1",
+    },
+  "paths":
+    {
+      "/items":
+        {
+          "get":
+            {
+              "operationId": "getItems",
+              "responses":
+                {
+                  "200":
+                    {
+                      "description": "Success",
+                      "content":
+                        {
+                          "application/json":
+                            {
+                              "schema":
+                                { "$ref": "#/components/schemas/ItemList" },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+  "components":
+    {
+      "schemas":
+        {
+          "Item":
+            {
+              "type": ["object", "null"],
+              "properties":
+                {
+                  "id": { "type": "integer", "examples": [789] },
+                  "title": { "type": "string", "examples": ["Sample Item"] },
+                  "value":
+                    {
+                      "type": "number",
+                      "minimum": 0,
+                      "exclusiveMaximum": 1000,
+                    },
+                  "rating":
+                    {
+                      "type": "number",
+                      "exclusiveMinimum": 0,
+                      "exclusiveMaximum": 5,
+                    },
+                },
+            },
+          "ItemList":
+            {
+              "type": "object",
+              "properties":
+                {
+                  "items":
+                    {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Item" },
+                    },
+                  "total": { "type": "integer", "examples": [100] },
+                },
+            },
+          "NullableString": { "type": ["string", "null"] },
+          "NullableWithAnyOf":
+            {
+              "anyOf":
+                [
+                  { "type": "string" },
+                  { "type": "integer" },
+                  { "type": ["null"] },
+                ],
+            },
+        },
+    },
+}

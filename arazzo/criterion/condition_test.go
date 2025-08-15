@@ -1,11 +1,12 @@
 package criterion
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCondition(t *testing.T) {
@@ -23,12 +24,12 @@ func TestNewCondition(t *testing.T) {
 		"expression only": {
 			raw:           "$statusCode",
 			expected:      nil,
-			expectedError: fmt.Errorf("condition must at least be in the format [expression] [operator] [value]"),
+			expectedError: errors.New("condition must at least be in the format [expression] [operator] [value]"),
 		},
 		"expression and operator only": {
 			raw:           "$statusCode ==",
 			expected:      nil,
-			expectedError: fmt.Errorf("condition must at least be in the format [expression] [operator] [value]"),
+			expectedError: errors.New("condition must at least be in the format [expression] [operator] [value]"),
 		},
 		"$statusCode == 200": {
 			raw: "$statusCode == 200",
@@ -79,9 +80,9 @@ func TestNewCondition(t *testing.T) {
 			actual, actualError := newCondition(tt.raw)
 
 			if tt.expectedError != nil {
-				assert.EqualError(t, actualError, tt.expectedError.Error())
+				require.EqualError(t, actualError, tt.expectedError.Error())
 			} else {
-				assert.NoError(t, actualError)
+				require.NoError(t, actualError)
 			}
 
 			assert.EqualExportedValues(t, tt.expected, actual)

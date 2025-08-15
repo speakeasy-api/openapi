@@ -1,0 +1,41 @@
+openapi: 3.1.1
+info:
+  title: Test API for 3.1.0 Upgrade
+  version: 1.0.0
+  description: Test document to verify WithUpgradeSamePatchVersion option
+paths:
+  /test:
+    get:
+      summary: Test endpoint
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestResponse"
+components:
+  schemas:
+    TestResponse:
+      type:
+        - object
+        - "null"
+      properties:
+        id:
+          type: integer
+          examples:
+            - 123
+        name:
+          type:
+            - string
+            - "null"
+        score:
+          type: number
+          exclusiveMinimum: 0
+          maximum: 100
+        metadata:
+          anyOf:
+            - type: string
+            - type: object
+            - type:
+                - "null"

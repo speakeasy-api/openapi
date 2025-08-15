@@ -1,0 +1,15 @@
+openapi: 3.1.0
+info:
+  title: Chained Schema
+  version: 1.0.0
+components:
+  schemas:
+    ChainedSchema:
+      $ref: "#/components/schemas/LocalChainedSchema"
+    LocalChainedSchema:
+      type: object
+      description: "Local chained schema"
+      properties:
+        nestedValue:
+          type: string
+          description: "A nested value in the chained schema"

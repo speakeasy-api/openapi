@@ -8,6 +8,7 @@ import (
 )
 
 func Test_ParseVersion_Success(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		version string
 	}
@@ -50,6 +51,7 @@ func Test_ParseVersion_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			major, minor, patch, err := ParseVersion(tt.args.version)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedMajor, major)
@@ -60,6 +62,7 @@ func Test_ParseVersion_Success(t *testing.T) {
 }
 
 func Test_ParseVersion_Error(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		version string
 	}
@@ -127,8 +130,9 @@ func Test_ParseVersion_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			major, minor, patch, err := ParseVersion(tt.args.version)
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Equal(t, 0, major)
 			assert.Equal(t, 0, minor)
 			assert.Equal(t, 0, patch)

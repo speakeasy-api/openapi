@@ -22,6 +22,7 @@
 
 </p>
   <p align="center">
+    <a href="https://www.speakeasy.com/openapi"><img src="https://custom-icon-badges.demolab.com/badge/-OpenAPI%20Hub-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
     <a href="https://speakeasy.com/"><img src="https://custom-icon-badges.demolab.com/badge/-Built%20By%20Speakeasy-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
     <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/speakeasy-api/openapi.svg?style=for-the-badge"></a>
     <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi?tab=doc"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
@@ -37,6 +38,10 @@
 ### [arazzo](./arazzo)
 
 The `arazzo` package provides an API for working with Arazzo documents including reading, creating, mutating, walking and validating them.
+
+### [openapi](./openapi)
+
+The `openapi` package provides an API for working with OpenAPI documents including reading, creating, mutating, walking, validating and upgrading them. Supports both OpenAPI 3.0.x and 3.1.x specifications.
 
 ## Sub Packages
 

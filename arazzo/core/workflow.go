@@ -2,12 +2,13 @@ package core
 
 import (
 	coreExtensions "github.com/speakeasy-api/openapi/extensions/core"
-	"github.com/speakeasy-api/openapi/jsonschema/oas31/core"
+	"github.com/speakeasy-api/openapi/jsonschema/oas3/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 )
 
 type Workflow struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"workflow"`
+
 	WorkflowID     marshaller.Node[string]                      `key:"workflowId"`
 	Summary        marshaller.Node[*string]                     `key:"summary"`
 	Description    marshaller.Node[*string]                     `key:"description"`

@@ -25,6 +25,8 @@ func GetValueOrExpressionValue(value ValueOrExpression) (*yaml.Node, *Expression
 			if asExpression.IsExpression() {
 				return nil, &asExpression, nil
 			}
+		default:
+			break
 		}
 	}
 

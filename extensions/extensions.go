@@ -9,6 +9,7 @@ import (
 	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
+	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
 
@@ -96,7 +97,7 @@ func UnmarshalExtensionModel[H any, L any](ctx context.Context, e *Extensions, e
 	}
 
 	c, validationErrs, err := core.UnmarshalExtensionModel[L](ctx, e.core, ext)
-	if err != nil {
+	if err != nil || c == nil {
 		return nil, err
 	}
 
@@ -129,4 +130,43 @@ func GetExtensionValue[T any](e *Extensions, ext string) (*T, error) {
 	}
 
 	return &t, nil
+}
+
+// IsEqual compares two Extensions instances for equality.
+// Treats both empty and nil extensions as equal.
+func (e *Extensions) IsEqual(other *Extensions) bool {
+	if e == nil && other == nil {
+		return true
+	}
+
+	// Treat nil and empty extensions as equal
+	eLen := 0
+	if e != nil {
+		eLen = e.Len()
+	}
+	otherLen := 0
+	if other != nil {
+		otherLen = other.Len()
+	}
+
+	if eLen == 0 && otherLen == 0 {
+		return true
+	}
+
+	if eLen != otherLen {
+		return false
+	}
+
+	// Compare all extension key-value pairs
+	for key, valueA := range e.All() {
+		valueB, exists := other.Get(key)
+		if !exists {
+			return false
+		}
+		// Use the yml package's EqualNodes function for yaml.Node comparison
+		if !yml.EqualNodes(valueA, valueB) {
+			return false
+		}
+	}
+	return true
 }

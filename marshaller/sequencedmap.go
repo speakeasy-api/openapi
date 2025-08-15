@@ -2,30 +2,18 @@ package marshaller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"reflect"
 	"slices"
 
+	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 )
-
-// sequencedMapInterface defines the interface that sequenced maps must implement
-type sequencedMapInterface interface {
-	Init()
-	SetUntyped(key, value any) error
-	AllUntyped() iter.Seq2[any, any]
-	GetKeyType() reflect.Type
-	GetValueType() reflect.Type
-	Len() int
-	GetAny(key any) (any, bool)
-	SetAny(key, value any)
-	DeleteAny(key any)
-	KeysAny() iter.Seq[any]
-}
 
 // MapGetter interface for syncing operations
 type MapGetter interface {
@@ -33,15 +21,15 @@ type MapGetter interface {
 }
 
 // unmarshalSequencedMap unmarshals a YAML node into a sequenced map
-func unmarshalSequencedMap(ctx context.Context, node *yaml.Node, target sequencedMapInterface) ([]error, error) {
+func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.Node, target interfaces.SequencedMapInterface) ([]error, error) {
 	resolvedNode := yml.ResolveAlias(node)
 	if resolvedNode == nil {
-		return nil, fmt.Errorf("node is nil")
+		return nil, errors.New("node is nil")
 	}
 
 	// Check if the node is actually a mapping node
 	if resolvedNode.Kind != yaml.MappingNode {
-		validationErr := validation.NewTypeMismatchError("expected mapping node for sequenced map, got %v", resolvedNode.Kind)
+		validationErr := validation.NewTypeMismatchError("%sexpected mapping node for sequenced map, got %v", getOptionalParentName(parentName), resolvedNode.Kind)
 		return []error{validationErr}, nil
 	}
 
@@ -60,7 +48,6 @@ func unmarshalSequencedMap(ctx context.Context, node *yaml.Node, target sequence
 	valuesToSet := make([]keyPair, numJobs)
 
 	for i := 0; i < len(resolvedNode.Content); i += 2 {
-		i := i
 		g.Go(func() error {
 			keyNode := resolvedNode.Content[i]
 			valueNode := resolvedNode.Content[i+1]
@@ -68,7 +55,7 @@ func unmarshalSequencedMap(ctx context.Context, node *yaml.Node, target sequence
 			// Resolve alias for key node to handle alias keys like *keyAlias :
 			resolvedKeyNode := yml.ResolveAlias(keyNode)
 			if resolvedKeyNode == nil {
-				return fmt.Errorf("failed to resolve key node alias")
+				return errors.New("failed to resolve key node alias")
 			}
 			key := resolvedKeyNode.Value
 
@@ -84,7 +71,7 @@ func unmarshalSequencedMap(ctx context.Context, node *yaml.Node, target sequence
 			}
 
 			// Unmarshal into the concrete value
-			validationErrs, err := UnmarshalKeyValuePair(ctx, keyNode, valueNode, concreteValue)
+			validationErrs, err := UnmarshalKeyValuePair(ctx, parentName, keyNode, valueNode, concreteValue)
 			if err != nil {
 				return err
 			}
@@ -125,24 +112,25 @@ func unmarshalSequencedMap(ctx context.Context, node *yaml.Node, target sequence
 }
 
 // populateSequencedMap populates a target sequenced map from a source sequenced map
-func populateSequencedMap(source any, target sequencedMapInterface) error {
+func populateSequencedMap(source any, target interfaces.SequencedMapInterface) error {
 	if source == nil {
 		return nil
 	}
 
 	sourceValue := reflect.ValueOf(source)
 
-	var sm sequencedMapInterface
+	var sm interfaces.SequencedMapInterface
 	var ok bool
 
 	// Handle both pointer and non-pointer cases
-	if sourceValue.Kind() == reflect.Ptr {
+	switch {
+	case sourceValue.Kind() == reflect.Ptr:
 		// Source is already a pointer
-		sm, ok = source.(sequencedMapInterface)
-	} else if sourceValue.CanAddr() {
+		sm, ok = source.(interfaces.SequencedMapInterface)
+	case sourceValue.CanAddr():
 		// Source is addressable, get a pointer to it
-		sm, ok = sourceValue.Addr().Interface().(sequencedMapInterface)
-	} else {
+		sm, ok = sourceValue.Addr().Interface().(interfaces.SequencedMapInterface)
+	default:
 		// Source is neither a pointer nor addressable
 		return fmt.Errorf("expected source to be addressable or a pointer to SequencedMap, got %s", sourceValue.Type())
 	}
@@ -196,21 +184,36 @@ func populateSequencedMap(source any, target sequencedMapInterface) error {
 }
 
 // syncSequencedMapChanges syncs changes from a source map to a target map using a sync function
-func syncSequencedMapChanges(ctx context.Context, target sequencedMapInterface, model any, valueNode *yaml.Node, syncFunc func(context.Context, any, any, *yaml.Node, bool) (*yaml.Node, error)) (*yaml.Node, error) {
+func syncSequencedMapChanges(ctx context.Context, target interfaces.SequencedMapInterface, model any, valueNode *yaml.Node, syncFunc func(context.Context, any, any, *yaml.Node, bool) (*yaml.Node, error)) (*yaml.Node, error) {
 	target.Init()
 
-	mg, ok := model.(MapGetter)
+	var mg MapGetter
+	var ok bool
+
+	// Try direct interface check first
+	mg, ok = model.(MapGetter)
+
+	// If that fails, try getting a pointer to the model (for value embeds)
+	if !ok {
+		modelValue := reflect.ValueOf(model)
+		if modelValue.CanAddr() {
+			mg, ok = modelValue.Addr().Interface().(MapGetter)
+		}
+	}
+
 	if !ok {
 		return nil, fmt.Errorf("SyncSequencedMapChanges expected model to be a MapGetter, got %s", reflect.TypeOf(model))
 	}
 
 	remainingKeys := []string{}
+	hasEntries := false
 
 	for k, v := range mg.AllUntyped() {
+		hasEntries = true
 		keyStr := fmt.Sprintf("%v", k) // TODO this might not work with non string keys
 
 		// Try to convert the key type if needed (similar to populateSequencedMap)
-		var targetKey any = k
+		targetKey := k
 		keyValue := reflect.ValueOf(k)
 		targetKeyType := target.GetKeyType()
 
@@ -264,6 +267,13 @@ func syncSequencedMapChanges(ctx context.Context, target sequencedMapInterface, 
 	for _, key := range keysToDelete {
 		target.DeleteAny(key)
 		valueNode = yml.DeleteMapNodeElement(ctx, fmt.Sprintf("%v", key), valueNode)
+	}
+
+	// If no entries were processed but we have an embedded map, ensure we create an empty mapping node
+	if !hasEntries && valueNode == nil {
+		valueNode = &yaml.Node{
+			Kind: yaml.MappingNode,
+		}
 	}
 
 	return valueNode, nil

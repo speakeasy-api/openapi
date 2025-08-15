@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -14,24 +15,26 @@ import (
 )
 
 type CriterionExpressionType struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"criterionExpressionType"`
+
 	Type    marshaller.Node[string] `key:"type"`
 	Version marshaller.Node[string] `key:"version"`
 }
 
 type CriterionTypeUnion struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"criterionTypeUnion"`
+
 	Type           *string
 	ExpressionType *CriterionExpressionType
 }
 
 var _ interfaces.CoreModel = (*CriterionTypeUnion)(nil)
 
-func (c *CriterionTypeUnion) Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error) {
+func (c *CriterionTypeUnion) Unmarshal(ctx context.Context, parentName string, node *yaml.Node) ([]error, error) {
 	resolvedNode := yml.ResolveAlias(node)
 
 	if resolvedNode == nil {
-		return nil, fmt.Errorf("node is nil")
+		return nil, errors.New("node is nil")
 	}
 
 	c.SetRootNode(node)
@@ -41,7 +44,7 @@ func (c *CriterionTypeUnion) Unmarshal(ctx context.Context, node *yaml.Node) ([]
 	switch resolvedNode.Kind {
 	case yaml.ScalarNode:
 		var err error
-		validationErrs, err = marshaller.DecodeNode(ctx, resolvedNode, &c.Type)
+		validationErrs, err = marshaller.DecodeNode(ctx, parentName, resolvedNode, &c.Type)
 		if err != nil {
 			return nil, err
 		}
@@ -60,7 +63,7 @@ func (c *CriterionTypeUnion) Unmarshal(ctx context.Context, node *yaml.Node) ([]
 		c.DetermineValidity(validationErrs)
 	default:
 		return []error{
-			validation.NewNodeError(validation.NewTypeMismatchError("expected scalar or mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+			validation.NewValidationError(validation.NewTypeMismatchError("criterionTypeUnion expected scalar or mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
 		}, nil
 	}
 
@@ -101,7 +104,8 @@ func (c *CriterionTypeUnion) SyncChanges(ctx context.Context, model any, valueNo
 }
 
 type Criterion struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"criterion"`
+
 	Context    marshaller.Node[*string]            `key:"context"`
 	Condition  marshaller.Node[string]             `key:"condition"`
 	Type       marshaller.Node[CriterionTypeUnion] `key:"type" required:"false"`

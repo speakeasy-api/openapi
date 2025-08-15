@@ -1,0 +1,61 @@
+# YAML file containing JSON schemas with nested structures
+definitions:
+  Address:
+    type: object
+    properties:
+      street:
+        type: string
+      city:
+        type: string
+      country:
+        type: string
+      postal_code:
+        type: string
+
+api:
+  v1:
+    schemas:
+      Customer:
+        type: object
+        properties:
+          id:
+            type: integer
+          name:
+            type: string
+          billing_address:
+            $ref: "#/definitions/Address"
+          shipping_address:
+            $ref: "./schemas.json#/definitions/ContactInfo"
+      Order:
+        type: object
+        properties:
+          order_id:
+            type: string
+          customer:
+            $ref: "#/api/v1/schemas/Customer"
+          items:
+            type: array
+            items:
+              $ref: "#/api/v1/schemas/OrderItem"
+      OrderItem:
+        type: object
+        properties:
+          product:
+            $ref: "./schemas.json#/schemas/Product"
+          quantity:
+            type: integer
+          price:
+            type: number
+
+legacy:
+  data:
+    types:
+      SimpleUser:
+        type: object
+        properties:
+          id:
+            type: string
+          name:
+            type: string
+          details:
+            $ref: "./schemas.json#/nested/data/models/Profile"

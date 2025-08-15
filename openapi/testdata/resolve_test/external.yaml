@@ -1,0 +1,83 @@
+openapi: 3.1.0
+info:
+  title: External Schema
+  version: 1.0.0
+components:
+  parameters:
+    ExternalParam:
+      name: "external-param"
+      in: "query"
+      description: "External parameter"
+      required: false
+      schema:
+        type: string
+  responses:
+    ExternalResponse:
+      description: External response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: string
+    ChainedExternalResponse:
+      $ref: "./chained.yaml#/components/responses/ChainedResponse"
+  examples:
+    ExternalExample:
+      summary: External example
+      value:
+        external: value
+  requestBodies:
+    ExternalRequestBody:
+      description: External request body
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: string
+  headers:
+    ExternalHeader:
+      description: External header
+      schema:
+        type: string
+  securitySchemes:
+    ExternalAuth:
+      type: apiKey
+      in: header
+      name: X-External-Key
+  links:
+    ExternalLink:
+      operationId: getUser
+      parameters:
+        id: $response.body#/id
+  callbacks:
+    ExternalCallback:
+      "{$request.body#/webhookUrl}":
+        post:
+          requestBody:
+            content:
+              application/json:
+                schema:
+                  type: object
+          responses:
+            "200":
+              description: External callback successful
+  schemas:
+    ExternalSchema:
+      type: object
+      properties:
+        data:
+          type: string
+        nested:
+          $ref: "#/components/schemas/NestedExternal"
+    NestedExternal:
+      type: object
+      properties:
+        value:
+          type: number
+    ChainedExternal:
+      $ref: "./chained.yaml#/components/schemas/ChainedSchema"
+paths: {}

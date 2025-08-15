@@ -7,7 +7,8 @@ import (
 )
 
 type RequestBody struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"requestBody"`
+
 	ContentType  marshaller.Node[*string]                      `key:"contentType"`
 	Payload      marshaller.Node[expression.ValueOrExpression] `key:"payload"`
 	Replacements marshaller.Node[[]*PayloadReplacement]        `key:"replacements"`

@@ -12,7 +12,7 @@ func NodeKindToString(kind yaml.Kind) string {
 	case yaml.SequenceNode:
 		return "sequence"
 	case yaml.MappingNode:
-		return "mapping"
+		return "object"
 	case yaml.ScalarNode:
 		return "scalar"
 	case yaml.AliasNode:

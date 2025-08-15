@@ -9,7 +9,7 @@ import (
 )
 
 type NodeMutator interface {
-	Unmarshal(ctx context.Context, keyNode, valueNode *yaml.Node) ([]error, error)
+	Unmarshal(ctx context.Context, parentName string, keyNode, valueNode *yaml.Node) ([]error, error)
 	SetPresent(present bool)
 	SyncValue(ctx context.Context, key string, value any) (*yaml.Node, *yaml.Node, error)
 }
@@ -32,14 +32,15 @@ var (
 	_ NodeMutator  = (*Node[any])(nil)
 )
 
-func (n *Node[V]) Unmarshal(ctx context.Context, keyNode, valueNode *yaml.Node) ([]error, error) {
-	if keyNode != nil {
-		n.Key = yml.ResolveAlias(keyNode).Value
+func (n *Node[V]) Unmarshal(ctx context.Context, parentName string, keyNode, valueNode *yaml.Node) ([]error, error) {
+	resolvedKeyNode := yml.ResolveAlias(keyNode)
+	if resolvedKeyNode != nil {
+		n.Key = resolvedKeyNode.Value
 		n.KeyNode = keyNode
 	}
 	n.ValueNode = valueNode
 
-	validationErrs, err := UnmarshalCore(ctx, n.ValueNode, &n.Value)
+	validationErrs, err := UnmarshalCore(ctx, parentName, n.ValueNode, &n.Value)
 
 	n.SetPresent(err == nil && len(validationErrs) == 0)
 
@@ -72,11 +73,23 @@ func (n *Node[V]) SetPresent(present bool) {
 	n.Present = present
 }
 
+func (n Node[V]) GetKeyNode() *yaml.Node {
+	return n.KeyNode
+}
+
 func (n Node[V]) GetKeyNodeOrRoot(rootNode *yaml.Node) *yaml.Node {
 	if !n.Present || n.KeyNode == nil {
 		return rootNode
 	}
 	return n.KeyNode
+}
+
+func (n Node[V]) GetKeyNodeOrRootLine(rootNode *yaml.Node) int {
+	keyNode := n.GetKeyNodeOrRoot(rootNode)
+	if keyNode == nil {
+		return -1
+	}
+	return keyNode.Line
 }
 
 func (n Node[V]) GetValueNode() *yaml.Node {
@@ -90,6 +103,14 @@ func (n Node[V]) GetValueNodeOrRoot(rootNode *yaml.Node) *yaml.Node {
 	return n.ValueNode
 }
 
+func (n Node[V]) GetValueNodeOrRootLine(rootNode *yaml.Node) int {
+	valueNode := n.GetValueNodeOrRoot(rootNode)
+	if valueNode == nil {
+		return -1
+	}
+	return valueNode.Line
+}
+
 // Will return the value node for the slice index, or the slice root node or the provided root node if the node is not present
 func (n Node[V]) GetSliceValueNodeOrRoot(idx int, rootNode *yaml.Node) *yaml.Node {
 	if !n.Present || n.ValueNode == nil {
@@ -97,6 +118,9 @@ func (n Node[V]) GetSliceValueNodeOrRoot(idx int, rootNode *yaml.Node) *yaml.Nod
 	}
 
 	resolvedNode := yml.ResolveAlias(n.ValueNode)
+	if resolvedNode == nil {
+		return rootNode
+	}
 
 	if idx < 0 || idx >= len(resolvedNode.Content) {
 		return n.ValueNode
@@ -112,6 +136,9 @@ func (n Node[V]) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Node) *yaml.Node
 	}
 
 	resolvedNode := yml.ResolveAlias(n.ValueNode)
+	if resolvedNode == nil {
+		return rootNode
+	}
 
 	for i := 0; i < len(resolvedNode.Content); i += 2 {
 		if resolvedNode.Content[i].Value == key {
@@ -122,6 +149,14 @@ func (n Node[V]) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Node) *yaml.Node
 	return n.ValueNode
 }
 
+func (n Node[V]) GetMapKeyNodeOrRootLine(key string, rootNode *yaml.Node) int {
+	keyNode := n.GetMapKeyNodeOrRoot(key, rootNode)
+	if keyNode == nil {
+		return -1
+	}
+	return keyNode.Line
+}
+
 // Will return the value node for the map key, or the map root node or the provided root node if the node is not present
 func (n Node[V]) GetMapValueNodeOrRoot(key string, rootNode *yaml.Node) *yaml.Node {
 	if !n.Present || n.ValueNode == nil {
@@ -129,6 +164,9 @@ func (n Node[V]) GetMapValueNodeOrRoot(key string, rootNode *yaml.Node) *yaml.No
 	}
 
 	resolvedNode := yml.ResolveAlias(n.ValueNode)
+	if resolvedNode == nil {
+		return rootNode
+	}
 
 	for i := 0; i < len(resolvedNode.Content); i += 2 {
 		if resolvedNode.Content[i].Value == key {

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -14,7 +15,8 @@ import (
 )
 
 type Reusable[T marshaller.CoreModeler] struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"reusable"`
+
 	Reference marshaller.Node[*string]      `key:"reference"`
 	Value     marshaller.Node[values.Value] `key:"value"`
 	Object    T                             `populatorValue:"true"`
@@ -22,11 +24,11 @@ type Reusable[T marshaller.CoreModeler] struct {
 
 var _ interfaces.CoreModel = (*Reusable[*Parameter])(nil)
 
-func (r *Reusable[T]) Unmarshal(ctx context.Context, node *yaml.Node) ([]error, error) {
+func (r *Reusable[T]) Unmarshal(ctx context.Context, parentName string, node *yaml.Node) ([]error, error) {
 	resolvedNode := yml.ResolveAlias(node)
 
 	if resolvedNode == nil {
-		return nil, fmt.Errorf("node is nil")
+		return nil, errors.New("node is nil")
 	}
 
 	if resolvedNode.Kind != yaml.MappingNode {
@@ -35,7 +37,7 @@ func (r *Reusable[T]) Unmarshal(ctx context.Context, node *yaml.Node) ([]error, 
 		r.SetValid(false, false)
 
 		return []error{
-			validation.NewNodeError(validation.NewTypeMismatchError("expected mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+			validation.NewValidationError(validation.NewTypeMismatchError("reusable expected mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
 		}, nil
 	}
 
@@ -44,7 +46,7 @@ func (r *Reusable[T]) Unmarshal(ctx context.Context, node *yaml.Node) ([]error, 
 	}
 
 	var obj T
-	validationErrs, err := marshaller.UnmarshalCore(ctx, node, &obj)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, parentName, node, &obj)
 	if err != nil {
 		return nil, err
 	}

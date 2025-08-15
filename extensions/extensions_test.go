@@ -23,7 +23,8 @@ type ModelWithExtensions struct {
 }
 
 type CoreModelWithExtensions struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"coreModelWithExtensions"`
+
 	Test       marshaller.Node[string]   `key:"test"`
 	Extensions coreExtensions.Extensions `key:"extensions"`
 }
@@ -36,14 +37,15 @@ type TestModel struct {
 }
 
 type TestCoreModel struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"testCoreModel"`
 
 	Name  marshaller.Node[string]     `key:"name"`
 	Value marshaller.Node[*yaml.Node] `key:"value" required:"true"`
 }
 
 func TestUnmarshalExtensionModel_Success(t *testing.T) {
-	ctx := context.Background()
+	t.Parallel()
+	ctx := t.Context()
 
 	m := getTestModelWithExtensions(ctx, t, `
 test: hello world
@@ -61,7 +63,8 @@ x-speakeasy-test:
 }
 
 func TestGetExtensionValue_Success(t *testing.T) {
-	ctx := context.Background()
+	t.Parallel()
+	ctx := t.Context()
 
 	m := getTestModelWithExtensions(ctx, t, `
 test: hello world
@@ -88,7 +91,7 @@ x-simple-model:
 	boolVal, err := extensions.GetExtensionValue[bool](m.Extensions, "x-bool")
 	require.NoError(t, err)
 	require.NotNil(t, boolVal)
-	assert.Equal(t, true, *boolVal)
+	assert.True(t, *boolVal)
 
 	simpleMapVal, err := extensions.GetExtensionValue[map[string]string](m.Extensions, "x-simple-map")
 	require.NoError(t, err)
@@ -113,7 +116,7 @@ func getTestModelWithExtensions(ctx context.Context, t *testing.T, data string) 
 	require.NoError(t, err)
 
 	var c CoreModelWithExtensions
-	validationErrs, err := marshaller.UnmarshalCore(ctx, &root, &c)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, "", &root, &c)
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 

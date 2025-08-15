@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "🧪 Running tests with gotestsum..."
+gotestsum --format testname -- -race ./...
+echo "✅ All tests passed!"

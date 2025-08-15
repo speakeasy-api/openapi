@@ -104,23 +104,25 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 	a := validation.GetContextObject[Arazzo](o)
 	if a == nil {
 		return []error{
-			errors.New("An Arazzo object must be passed via validation options to validate a Reusable Object"),
+			errors.New("an Arazzo object must be passed via validation options to validate a Reusable Object"),
 		}
 	}
 
 	core := r.GetCore()
 	errs := []error{}
 
-	switch reflect.TypeOf((*T)(nil)).Elem().Name() {
-	case "Parameter":
+	objComponentType := typeToComponentType(reflect.TypeOf((*T)(nil)).Elem())
+
+	switch objComponentType {
+	case "parameters":
 	default:
 		if r.Value != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("value is not allowed when object is not a parameter"), core, core.Value))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("reusableParameter field value is not allowed when object is not a parameter"), core, core.Value))
 		}
 	}
 
 	if r.Reference != nil {
-		errs = append(errs, r.validateReference(ctx, a, opts...)...)
+		errs = append(errs, r.validateReference(ctx, a, objComponentType, opts...)...)
 	} else if r.Object != nil {
 		errs = append(errs, r.Object.Validate(ctx, opts...)...)
 	}
@@ -130,11 +132,11 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 	return errs
 }
 
-func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, opts ...validation.Option) []error {
+func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, objComponentType string, opts ...validation.Option) []error {
 	core := r.GetCore()
 	if err := r.Reference.Validate(); err != nil {
 		return []error{
-			validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Reference),
+			validation.NewValueError(validation.NewValueValidationError("%s field reference is invalid: %s", componentTypeToReusableType(objComponentType), err.Error()), core, core.Reference),
 		}
 	}
 
@@ -142,50 +144,42 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 
 	if typ != expression.ExpressionTypeComponents {
 		return []error{
-			validation.NewValueError(validation.NewValueValidationError("reference must be a components expression, got %s", r.Reference.GetType()), core, core.Reference),
+			validation.NewValueError(validation.NewValueValidationError("%s field reference must be a components expression, got %s", componentTypeToReusableType(objComponentType), r.Reference.GetType()), core, core.Reference),
 		}
 	}
 
 	if componentType == "" || len(references) != 1 {
 		return []error{
-			validation.NewValueError(validation.NewValueValidationError("reference must be a components expression with 3 parts, got %s", *r.Reference), core, core.Reference),
+			validation.NewValueError(validation.NewValueValidationError("%s field reference must be a components expression with 3 parts, got %s", componentTypeToReusableType(objComponentType), *r.Reference), core, core.Reference),
 		}
 	}
 
 	componentName := references[0]
 
-	if a.Components == nil {
-		return []error{
-			validation.NewValueError(validation.NewValueValidationError("components not present, reference to missing component %s", *r.Reference), core, core.Reference),
-		}
-	}
-
-	objType := reflect.TypeOf(r.Object).Elem()
-
 	switch componentType {
 	case "parameters":
 		return validateComponentReference(ctx, validateComponentReferenceArgs[*Parameter]{
+			objComponentType:   objComponentType,
 			componentType:      componentType,
 			componentName:      componentName,
-			typ:                objType,
 			components:         a.Components.Parameters,
 			reference:          r.Reference,
 			referenceValueNode: core.Reference.GetValueNodeOrRoot(core.RootNode),
 		}, opts...)
 	case "successActions":
 		return validateComponentReference(ctx, validateComponentReferenceArgs[*SuccessAction]{
+			objComponentType:   objComponentType,
 			componentType:      componentType,
 			componentName:      componentName,
-			typ:                objType,
 			components:         a.Components.SuccessActions,
 			reference:          r.Reference,
 			referenceValueNode: core.Reference.GetValueNodeOrRoot(core.RootNode),
 		}, opts...)
 	case "failureActions":
 		return validateComponentReference(ctx, validateComponentReferenceArgs[*FailureAction]{
+			objComponentType:   objComponentType,
 			componentType:      componentType,
 			componentName:      componentName,
-			typ:                objType,
 			components:         a.Components.FailureActions,
 			reference:          r.Reference,
 			referenceValueNode: core.Reference.GetValueNodeOrRoot(core.RootNode),
@@ -198,33 +192,31 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, op
 }
 
 type validateComponentReferenceArgs[T any] struct {
+	objComponentType   string
 	componentType      string
 	componentName      string
-	typ                reflect.Type
 	components         *sequencedmap.Map[string, T]
 	reference          *expression.Expression
 	referenceValueNode *yaml.Node
 }
 
 func validateComponentReference[T any, V interfaces.Validator[T]](ctx context.Context, args validateComponentReferenceArgs[V], opts ...validation.Option) []error {
-	typ := reflect.TypeOf((*T)(nil)).Elem()
-
-	if args.typ != typ {
+	if args.componentType != args.objComponentType {
 		return []error{
-			validation.NewNodeError(validation.NewValueValidationError("expected a %s reference got %s", typeToComponentType(args.typ), args.componentType), args.referenceValueNode),
+			validation.NewValidationError(validation.NewValueValidationError("%s field reference expected a %s reference got %s", componentTypeToReusableType(args.objComponentType), args.objComponentType, args.componentType), args.referenceValueNode),
 		}
 	}
 
 	if args.components == nil {
 		return []error{
-			validation.NewNodeError(validation.NewValueValidationError("components.%s not present, reference to missing component %s", args.componentType, *args.reference), args.referenceValueNode),
+			validation.NewValidationError(validation.NewValueValidationError("%s field reference to missing component %s, components.%s not present", componentTypeToReusableType(args.objComponentType), *args.reference, args.componentType), args.referenceValueNode),
 		}
 	}
 
 	component, ok := args.components.Get(args.componentName)
 	if !ok {
 		return []error{
-			validation.NewNodeError(validation.NewValueValidationError("components.%s.%s not present, reference to missing component %s", args.componentType, args.componentName, *args.reference), args.referenceValueNode),
+			validation.NewValidationError(validation.NewValueValidationError("%s field reference to missing component %s, components.%s.%s not present", componentTypeToReusableType(args.objComponentType), *args.reference, args.componentType, args.componentName), args.referenceValueNode),
 		}
 	}
 
@@ -243,4 +235,17 @@ func typeToComponentType(typ reflect.Type) string {
 		return s
 	}
 	return string(lc) + s[size:] + "s"
+}
+
+func componentTypeToReusableType(componentType string) string {
+	switch componentType {
+	case "parameters":
+		return "reusableParameter"
+	case "successActions":
+		return "reusableSuccessAction"
+	case "failureActions":
+		return "reusableFailureAction"
+	default:
+		return ""
+	}
 }

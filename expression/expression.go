@@ -78,6 +78,12 @@ var (
 // Expression represents a runtime expression as defined by the OpenAPI & Arazzo specifications.
 type Expression string
 
+var _ fmt.Stringer = (*Expression)(nil)
+
+func (e Expression) String() string {
+	return string(e)
+}
+
 // Validate will validate the expression is valid as per the OpenAPI & Arazzo specifications.
 func (e Expression) Validate() error {
 	// First check basic format using ExtractExpressions
@@ -213,6 +219,9 @@ func (e Expression) GetType() ExpressionType {
 // GetParts will return the type, reference, expression parts and jsonpointer of the expression.
 func (e Expression) GetParts() (ExpressionType, string, []string, jsonpointer.JSONPointer) {
 	parts := strings.Split(string(e), "#")
+	if len(parts) < 1 {
+		return "", "", nil, jsonpointer.JSONPointer("")
+	}
 	expressionParts, typ := getType(parts[0])
 
 	reference := ""

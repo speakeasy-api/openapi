@@ -1,7 +1,6 @@
 package marshaller_test
 
 import (
-	"context"
 	"slices"
 	"testing"
 
@@ -26,12 +25,13 @@ type sequencedMapErrorTestCase[K comparable, V any] struct {
 
 // Helper to run SequencedMap success tests
 func runSequencedMapTest[K comparable, V any](t *testing.T, testCase *sequencedMapTestCase[K, V]) {
+	t.Helper()
 	var yamlNode yaml.Node
 	err := yaml.Unmarshal([]byte(testCase.yamlData), &yamlNode)
 	require.NoError(t, err)
 
 	var node marshaller.Node[*sequencedmap.Map[K, V]]
-	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 	require.NoError(t, err)
 	require.Empty(t, validationErrors)
 
@@ -57,6 +57,7 @@ func runSequencedMapTest[K comparable, V any](t *testing.T, testCase *sequencedM
 
 // Helper to run SequencedMap error tests
 func runSequencedMapErrorTest[K comparable, V any](t *testing.T, testCase *sequencedMapErrorTestCase[K, V]) {
+	t.Helper()
 	var yamlNode yaml.Node
 	err := yaml.Unmarshal([]byte(testCase.yamlData), &yamlNode)
 	if err != nil {
@@ -65,7 +66,7 @@ func runSequencedMapErrorTest[K comparable, V any](t *testing.T, testCase *seque
 	}
 
 	var node marshaller.Node[*sequencedmap.Map[K, V]]
-	validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+	validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 	if len(validationErrors) > 0 {
 		require.NotEmpty(t, validationErrors)
 	} else {
@@ -74,6 +75,8 @@ func runSequencedMapErrorTest[K comparable, V any](t *testing.T, testCase *seque
 }
 
 func TestSequencedMap_Unmarshal_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testCase *sequencedMapTestCase[string, string]
@@ -124,12 +127,16 @@ beta: "middle"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			runSequencedMapTest(t, tt.testCase)
 		})
 	}
 }
 
 func TestSequencedMap_Unmarshal_IntValues_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testCase *sequencedMapTestCase[string, int]
@@ -162,12 +169,16 @@ negative: -10
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			runSequencedMapTest(t, tt.testCase)
 		})
 	}
 }
 
 func TestSequencedMap_Unmarshal_Error(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testCase *sequencedMapErrorTestCase[string, string]
@@ -194,12 +205,16 @@ func TestSequencedMap_Unmarshal_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			runSequencedMapErrorTest(t, tt.testCase)
 		})
 	}
 }
 
 func TestSequencedMap_Sync_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testFunc func(*testing.T)
@@ -207,6 +222,7 @@ func TestSequencedMap_Sync_Success(t *testing.T) {
 		{
 			name: "sync map modifications",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				yamlData := `
 original1: "value1"
 original2: "value2"
@@ -216,7 +232,7 @@ original2: "value2"
 				require.NoError(t, err)
 
 				var node marshaller.Node[*sequencedmap.Map[string, string]]
-				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -227,7 +243,7 @@ original2: "value2"
 				node.Value.Set("new", "newValue")
 
 				// Sync the changes
-				_, _, err = node.SyncValue(context.Background(), "", node.Value)
+				_, _, err = node.SyncValue(t.Context(), "", node.Value)
 				require.NoError(t, err)
 
 				// Verify the changes
@@ -251,6 +267,7 @@ original2: "value2"
 		{
 			name: "sync map reordering",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				yamlData := `
 third: "3"
 first: "1"
@@ -261,7 +278,7 @@ second: "2"
 				require.NoError(t, err)
 
 				var node marshaller.Node[*sequencedmap.Map[string, string]]
-				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -270,7 +287,7 @@ second: "2"
 				assert.Equal(t, []string{"third", "first", "second"}, originalKeys)
 
 				// Sync should preserve the original order
-				_, _, err = node.SyncValue(context.Background(), "", node.Value)
+				_, _, err = node.SyncValue(t.Context(), "", node.Value)
 				require.NoError(t, err)
 
 				// Order should still be preserved
@@ -282,12 +299,16 @@ second: "2"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tt.testFunc(t)
 		})
 	}
 }
 
 func TestSequencedMap_Population_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testFunc func(*testing.T)
@@ -295,6 +316,7 @@ func TestSequencedMap_Population_Success(t *testing.T) {
 		{
 			name: "populate from core sequenced map",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				// Create a sequenced map
 				sm := sequencedmap.New[string, string]()
 				sm.Set("first", "1")
@@ -325,12 +347,16 @@ func TestSequencedMap_Population_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tt.testFunc(t)
 		})
 	}
 }
 
 func TestSequencedMap_WithExtensions_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		testFunc func(*testing.T)
@@ -338,6 +364,7 @@ func TestSequencedMap_WithExtensions_Success(t *testing.T) {
 		{
 			name: "sequenced map with extension keys",
 			testFunc: func(t *testing.T) {
+				t.Helper()
 				yamlData := `
 normalKey: "normal value"
 x-extension: "extension value"
@@ -349,7 +376,7 @@ x-vendor: "vendor extension"
 				require.NoError(t, err)
 
 				var node marshaller.Node[*sequencedmap.Map[string, string]]
-				validationErrors, err := node.Unmarshal(context.Background(), nil, &yamlNode)
+				validationErrors, err := node.Unmarshal(t.Context(), "", nil, &yamlNode)
 				require.NoError(t, err)
 				require.Empty(t, validationErrors)
 
@@ -381,6 +408,8 @@ x-vendor: "vendor extension"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tt.testFunc(t)
 		})
 	}

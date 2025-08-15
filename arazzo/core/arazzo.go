@@ -6,7 +6,7 @@ import (
 )
 
 type Arazzo struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"arazzo"`
 
 	Arazzo             marshaller.Node[string]               `key:"arazzo"`
 	Info               marshaller.Node[Info]                 `key:"info"`

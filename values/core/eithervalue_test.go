@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -19,7 +18,9 @@ type TestEitherValue[L any, R any] struct {
 }
 
 func TestEitherValue_SyncChanges_Success(t *testing.T) {
-	ctx := context.Background()
+	t.Parallel()
+
+	ctx := t.Context()
 
 	source := TestEitherValue[string, string]{
 		Left: pointer.From("some-value"),
@@ -33,13 +34,16 @@ func TestEitherValue_SyncChanges_Success(t *testing.T) {
 }
 
 func TestEitherValue_Unmarshal_BooleanValue_Success(t *testing.T) {
+	t.Parallel()
+
 	// Test case that reproduces the additionalProperties: false issue
 	// This should unmarshal as a boolean (Right type) when Left type (complex object) fails with validation errors
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a simple struct for Left type that would fail validation on a boolean
 	type ComplexType struct {
-		marshaller.CoreModel
+		marshaller.CoreModel `model:"complexType"`
+
 		Name marshaller.Node[string] `key:"name" required:"true"`
 	}
 
@@ -50,7 +54,7 @@ func TestEitherValue_Unmarshal_BooleanValue_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	var target EitherValue[ComplexType, bool]
-	validationErrs, err := marshaller.UnmarshalCore(ctx, node.Content[0], &target)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, "", node.Content[0], &target)
 
 	// Should succeed without syntax errors
 	require.NoError(t, err, "Should not have syntax errors")
@@ -59,14 +63,16 @@ func TestEitherValue_Unmarshal_BooleanValue_Success(t *testing.T) {
 	// Should have chosen the Right type (bool)
 	assert.True(t, target.IsRight, "Should have chosen Right type (bool)")
 	assert.False(t, target.IsLeft, "Should not have chosen Left type (ComplexType)")
-	assert.Equal(t, false, target.Right.Value, "Should have unmarshaled boolean value correctly")
+	assert.False(t, target.Right.Value, "Should have unmarshaled boolean value correctly")
 }
 
 // TestEitherValue_BothTypesFailValidation tests the case where both Left and Right types
 // fail with validation errors (not unmarshalling errors). In this case, the EitherValue
 // should return the combined validation errors instead of an unmarshalling error.
 func TestEitherValue_BothTypesFailValidation(t *testing.T) {
-	ctx := context.Background()
+	t.Parallel()
+
+	ctx := t.Context()
 
 	// Test case that reproduces the items array issue from burgershop.openapi-modified.yaml
 	// An array cannot be unmarshalled into either a string (expects scalar) or bool (expects scalar)
@@ -81,7 +87,7 @@ func TestEitherValue_BothTypesFailValidation(t *testing.T) {
 	// Create an EitherValue[string, bool] to test the logic
 	// An array should fail validation for both string (expects scalar) and bool (expects scalar)
 	var target EitherValue[string, bool]
-	validationErrs, err := marshaller.UnmarshalCore(ctx, node.Content[0], &target)
+	validationErrs, err := marshaller.UnmarshalCore(ctx, "", node.Content[0], &target)
 
 	// Should NOT have an unmarshalling error - this is the key fix
 	require.NoError(t, err, "Should not have unmarshalling errors when both types fail validation")

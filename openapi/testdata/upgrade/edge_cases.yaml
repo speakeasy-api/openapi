@@ -1,0 +1,54 @@
+openapi: 3.0.1
+info:
+  title: Edge Cases Test API
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
+    # Test schema with no example (should not crash)
+    NoExample:
+      type: string
+
+    # Test schema with exclusiveMinimum but no minimum
+    ExclusiveMinOnly:
+      type: number
+      exclusiveMinimum: true
+
+    # Test schema with exclusiveMaximum but no maximum
+    ExclusiveMaxOnly:
+      type: number
+      exclusiveMaximum: false
+
+    # Test schema with both exclusive and regular min/max
+    BothMinMax:
+      type: number
+      minimum: 0
+      exclusiveMinimum: false
+      maximum: 100
+      exclusiveMaximum: false
+
+    # Test schema that's not nullable (should not be modified)
+    NotNullable:
+      type: string
+      nullable: false
+
+    # Test schema with no type but nullable
+    NoTypeNullable:
+      nullable: true
+      properties:
+        name:
+          type: string
+
+    # Test schema with empty anyOf/oneOf
+    EmptyAnyOf:
+      anyOf: []
+      nullable: true
+
+    EmptyOneOf:
+      oneOf: []
+      nullable: true

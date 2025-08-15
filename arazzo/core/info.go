@@ -6,7 +6,8 @@ import (
 )
 
 type Info struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"info"`
+
 	Title       marshaller.Node[string]  `key:"title"`
 	Summary     marshaller.Node[*string] `key:"summary"`
 	Description marshaller.Node[*string] `key:"description"`

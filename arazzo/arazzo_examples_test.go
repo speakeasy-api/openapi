@@ -10,11 +10,12 @@ import (
 	"github.com/speakeasy-api/openapi/pointer"
 )
 
-// The below examples should be copied into the README.md file if ever changed TODO: automate this
-func Example_readAndMutate() {
+// Example_reading demonstrates how to read and parse an Arazzo document from a file.
+// Shows loading a document, handling validation errors, and making simple modifications.
+func Example_reading() {
 	ctx := context.Background()
 
-	r, err := os.Open("testdata/speakeasybar.arazzo.yaml")
+	r, err := os.Open("testdata/simple.arazzo.yaml")
 	if err != nil {
 		panic(err)
 	}
@@ -33,7 +34,7 @@ func Example_readAndMutate() {
 	}
 
 	// Mutate the document by just modifying the returned Arazzo object
-	a.Info.Title = "Speakeasy Bar Workflows"
+	a.Info.Title = "Updated Simple Workflow"
 
 	buf := bytes.NewBuffer([]byte{})
 
@@ -43,8 +44,29 @@ func Example_readAndMutate() {
 	}
 
 	fmt.Println(buf.String())
+	// Output:
+	// arazzo: 1.0.0
+	// info:
+	//   title: Updated Simple Workflow
+	//   version: 1.0.0
+	// sourceDescriptions:
+	//   - name: api
+	//     url: https://api.example.com/openapi.yaml
+	//     type: openapi
+	// workflows:
+	//   - workflowId: simpleWorkflow
+	//     summary: A simple workflow
+	//     steps:
+	//       - stepId: step1
+	//         operationId: getUser
+	//         parameters:
+	//           - name: id
+	//             in: path
+	//             value: "123"
 }
 
+// Example_creating demonstrates how to create an Arazzo document from scratch.
+// Shows building a basic workflow document with info and version programmatically.
 func Example_creating() {
 	ctx := context.Background()
 
@@ -66,12 +88,20 @@ func Example_creating() {
 	}
 
 	fmt.Printf("%s", buf.String())
+	// Output:
+	// arazzo: 1.0.1
+	// info:
+	//   title: My Workflow
+	//   summary: A summary
+	//   version: 1.0.1
 }
 
+// Example_mutating demonstrates how to modify an existing Arazzo document.
+// Shows loading a document, changing properties, and marshaling it back to YAML.
 func Example_mutating() {
 	ctx := context.Background()
 
-	f, err := os.Open("arazzo.yaml")
+	f, err := os.Open("testdata/simple.arazzo.yaml")
 	if err != nil {
 		panic(err)
 	}
@@ -81,7 +111,7 @@ func Example_mutating() {
 		panic(err)
 	}
 
-	a.Info.Title = "My updated workflow title"
+	a.Info.Title = "Updated Simple Workflow"
 
 	buf := bytes.NewBuffer([]byte{})
 
@@ -90,12 +120,33 @@ func Example_mutating() {
 	}
 
 	fmt.Printf("%s", buf.String())
+	// Output:
+	// arazzo: 1.0.0
+	// info:
+	//   title: Updated Simple Workflow
+	//   version: 1.0.0
+	// sourceDescriptions:
+	//   - name: api
+	//     url: https://api.example.com/openapi.yaml
+	//     type: openapi
+	// workflows:
+	//   - workflowId: simpleWorkflow
+	//     summary: A simple workflow
+	//     steps:
+	//       - stepId: step1
+	//         operationId: getUser
+	//         parameters:
+	//           - name: id
+	//             in: path
+	//             value: "123"
 }
 
+// Example_walking demonstrates how to traverse an Arazzo document using the iterator API.
+// Shows how to match different types of objects like workflows during traversal.
 func Example_walking() {
 	ctx := context.Background()
 
-	f, err := os.Open("arazzo.yaml")
+	f, err := os.Open("testdata/simple.arazzo.yaml")
 	if err != nil {
 		panic(err)
 	}
@@ -105,23 +156,27 @@ func Example_walking() {
 		panic(err)
 	}
 
-	err = arazzo.Walk(ctx, a, func(ctx context.Context, node, parent arazzo.MatchFunc, a *arazzo.Arazzo) error {
-		return node(arazzo.Matcher{
+	for item := range arazzo.Walk(ctx, a) {
+		err := item.Match(arazzo.Matcher{
 			Workflow: func(workflow *arazzo.Workflow) error {
 				fmt.Printf("Workflow: %s\n", workflow.WorkflowID)
 				return nil
 			},
 		})
-	})
-	if err != nil {
-		panic(err)
+		if err != nil {
+			panic(err)
+		}
 	}
+	// Output:
+	// Workflow: simpleWorkflow
 }
 
+// Example_validating demonstrates how to validate an Arazzo document.
+// Shows loading an invalid document and handling validation errors.
 func Example_validating() {
 	ctx := context.Background()
 
-	f, err := os.Open("arazzo.yaml")
+	f, err := os.Open("testdata/invalid.arazzo.yaml")
 	if err != nil {
 		panic(err)
 	}
@@ -134,4 +189,7 @@ func Example_validating() {
 	for _, err := range validationErrs {
 		fmt.Printf("%s\n", err.Error())
 	}
+	// Output:
+	// [3:3] info field version is missing
+	// [13:9] step at least one of operationId, operationPath or workflowId fields must be set
 }

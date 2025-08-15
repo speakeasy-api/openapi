@@ -9,7 +9,7 @@ import (
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/jsonschema/oas31"
+	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 )
@@ -40,7 +40,7 @@ type Workflow struct {
 	// Parameters is a list of Parameters that will be passed to the referenced operation or workflow.
 	Parameters []*ReusableParameter
 	// Inputs is a JSON Schema containing a set of inputs that will be passed to the referenced workflow.
-	Inputs oas31.JSONSchema
+	Inputs *oas3.JSONSchema[oas3.Referenceable]
 	// DependsOn is a list of workflowIds (or expressions to workflows) that must succeed before this workflow can be executed.
 	DependsOn []expression.Expression
 	// Steps is a list of steps that will be executed in the order they are listed.
@@ -68,7 +68,7 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	if a == nil {
 		return []error{
-			errors.New("An Arazzo object must be passed via validation options to validate a Workflow"),
+			errors.New("an Arazzo object must be passed via validation options to validate a Workflow"),
 		}
 	}
 
@@ -78,33 +78,30 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 	errs := []error{}
 
 	if core.WorkflowID.Present && w.WorkflowID == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("workflowId is required"), core, core.WorkflowID))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("workflow field workflowId is required"), core, core.WorkflowID))
 	}
 
 	if w.Inputs != nil {
-		inputsValNode := core.Inputs.GetValueNodeOrRoot(core.RootNode)
-		errs = append(errs, validateJSONSchema(ctx, w.Inputs, inputsValNode.Line, inputsValNode.Column, opts...)...)
+		errs = append(errs, w.Inputs.Validate(ctx, opts...)...)
 	}
 
 	for i, dependsOn := range w.DependsOn {
 		if dependsOn.IsExpression() {
 			if err := dependsOn.Validate(); err != nil {
-				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError(err.Error()), core, core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow field dependsOn expression is invalid: %s", err.Error()), core, core.DependsOn, i))
 			}
 
 			typ, sourceDescriptionName, _, _ := dependsOn.GetParts()
 
 			if typ != expression.ExpressionTypeSourceDescriptions {
-				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("dependsOn must be a sourceDescriptions expression if not a workflowId, got %s", typ), core, core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow field dependsOn must be a sourceDescriptions expression if not a workflowId, got %s", typ), core, core.DependsOn, i))
 			}
 
 			if a.SourceDescriptions.Find(sourceDescriptionName) == nil {
-				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("dependsOn sourceDescription %s not found", sourceDescriptionName), core, core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow field dependsOn sourceDescription %s not found", sourceDescriptionName), core, core.DependsOn, i))
 			}
-		} else {
-			if a.Workflows.Find(string(dependsOn)) == nil {
-				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("dependsOn workflowId %s not found", dependsOn), core, core.DependsOn, i))
-			}
+		} else if a.Workflows.Find(string(dependsOn)) == nil {
+			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow field dependsOn workflowId %s not found", dependsOn), core, core.DependsOn, i))
 		}
 	}
 
@@ -122,11 +119,11 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	for name, output := range w.Outputs.All() {
 		if !outputNameRegex.MatchString(name) {
-			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("output name must be a valid name [%s]: %s", outputNameRegex.String(), name), core, core.Outputs, name))
+			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("workflow field outputs name must be a valid name [%s]: %s", outputNameRegex.String(), name), core, core.Outputs, name))
 		}
 
 		if err := output.Validate(); err != nil {
-			errs = append(errs, validation.NewMapValueError(validation.NewValueValidationError(err.Error()), core, core.Outputs, name))
+			errs = append(errs, validation.NewMapValueError(validation.NewValueValidationError("workflow field outputs expression is invalid: %s", err.Error()), core, core.Outputs, name))
 		}
 	}
 

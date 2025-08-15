@@ -6,6 +6,7 @@
   <p align="center">An API for working with <a href="https://www.speakeasy.com/openapi/arazzo">Arazzo documents</a> including: read, walk, create, mutate, and validate
 </p>
   <p align="center">
+    <a href="https://www.speakeasy.com/openapi/arazzo"><img src="https://custom-icon-badges.demolab.com/badge/-Arazzo%20Reference-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
     <a href="https://speakeasy.com/"><img src="https://custom-icon-badges.demolab.com/badge/-Built%20By%20Speakeasy-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
     <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/speakeasy-api/openapi.svg?style=for-the-badge"></a>
     <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi/arazzo?tab=doc"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
@@ -16,199 +17,148 @@
   </p>
 </p>
 
-## Reading
+<!-- START USAGE EXAMPLES -->
+
+## Read and parse an Arazzo document from a file
+
+Shows loading a document, handling validation errors, and making simple modifications.
 
 ```go
-package main
+ctx := context.Background()
 
-import (
- "context"
- "fmt"
- "os"
+r, err := os.Open("testdata/simple.arazzo.yaml")
+if err != nil {
+	panic(err)
+}
+defer r.Close()
 
- "github.com/speakeasy-api/openapi/arazzo"
-)
+a, validationErrs, err := arazzo.Unmarshal(ctx, r)
+if err != nil {
+	panic(err)
+}
 
-func main() {
-    ctx := context.Background()
+for _, err := range validationErrs {
+	fmt.Println(err.Error())
+}
 
-    r, err := os.Open("testdata/speakeasybar.arazzo.yaml")
-    if err != nil {
-        panic(err)
-    }
-    defer r.Close()
+a.Info.Title = "Updated Simple Workflow"
 
-    // Unmarshal the Arazzo document which will also validate it against the Arazzo Specification
-    a, validationErrs, err := arazzo.Unmarshal(ctx, r)
-    if err != nil {
-        panic(err)
-    }
+buf := bytes.NewBuffer([]byte{})
 
-    // Validation errors are returned separately from any errors that block the document from being unmarshalled
-    // allowing an invalid document to be mutated and fixed before being marshalled again
-    for _, err := range validationErrs {
-        fmt.Println(err.Error())
-    }
+if err := arazzo.Marshal(ctx, a, buf); err != nil {
+	panic(err)
+}
 
-    // Mutate the document by just modifying the returned Arazzo object
-    a.Info.Title = "Speakeasy Bar Workflows"
+fmt.Println(buf.String())
+```
 
-    buf := bytes.NewBuffer([]byte{})
+## Create an Arazzo document from scratch
 
-    // Marshal the document to a writer
-    if err := arazzo.Marshal(ctx, a, buf); err != nil {
-        panic(err)
-    }
+Shows building a basic workflow document with info and version programmatically.
 
-    fmt.Println(buf.String())
+```go
+ctx := context.Background()
+
+a := &arazzo.Arazzo{
+	Arazzo: arazzo.Version,
+	Info: arazzo.Info{
+		Title:   "My Workflow",
+		Summary: pointer.From("A summary"),
+		Version: "1.0.1",
+	},
+}
+
+buf := bytes.NewBuffer([]byte{})
+
+err := arazzo.Marshal(ctx, a, buf)
+if err != nil {
+	panic(err)
+}
+
+fmt.Printf("%s", buf.String())
+```
+
+## Modify an existing Arazzo document
+
+Shows loading a document, changing properties, and marshaling it back to YAML.
+
+```go
+ctx := context.Background()
+
+f, err := os.Open("testdata/simple.arazzo.yaml")
+if err != nil {
+	panic(err)
+}
+
+a, _, err := arazzo.Unmarshal(ctx, f)
+if err != nil {
+	panic(err)
+}
+
+a.Info.Title = "Updated Simple Workflow"
+
+buf := bytes.NewBuffer([]byte{})
+
+if err := arazzo.Marshal(ctx, a, buf); err != nil {
+	panic(err)
+}
+
+fmt.Printf("%s", buf.String())
+```
+
+## Traverse an Arazzo document using the iterator API
+
+Shows how to match different types of objects like workflows during traversal.
+
+```go
+ctx := context.Background()
+
+f, err := os.Open("testdata/simple.arazzo.yaml")
+if err != nil {
+	panic(err)
+}
+
+a, _, err := arazzo.Unmarshal(ctx, f)
+if err != nil {
+	panic(err)
+}
+
+for item := range arazzo.Walk(ctx, a) {
+	err := item.Match(arazzo.Matcher{
+		Workflow: func(workflow *arazzo.Workflow) error {
+			fmt.Printf("Workflow: %s\n", workflow.WorkflowID)
+			return nil
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
 }
 ```
 
-## Creating
+## Validate an Arazzo document
+
+Shows loading an invalid document and handling validation errors.
 
 ```go
-package main
+ctx := context.Background()
 
-import (
- "context"
- "fmt"
+f, err := os.Open("testdata/invalid.arazzo.yaml")
+if err != nil {
+	panic(err)
+}
 
- "github.com/speakeasy-api/openapi/arazzo"
- "github.com/speakeasy-api/openapi/pointer"
-)
+_, validationErrs, err := arazzo.Unmarshal(ctx, f)
+if err != nil {
+	panic(err)
+}
 
-func main() {
-    ctx := context.Background()
-
-    arazzo := &arazzo.Arazzo{
-        Arazzo: arazzo.Version,
-        Info: arazzo.Info{
-            Title:   "My Workflow",
-            Summary: pointer.From("A summary"),
-            Version: "1.0.0",
-        },
-        // ...
-    }
-
-    buf := bytes.NewBuffer([]byte{})
-
-    err := arazzo.Marshal(ctx, buf)
-    if err != nil {
-        panic(err)
-    }
-
-    fmt.Printf("%s", buf.String())
+for _, err := range validationErrs {
+	fmt.Printf("%s\n", err.Error())
 }
 ```
 
-## Mutating
-
-```go
-package main
-
-import (
- "context"
- "fmt"
-
- "github.com/speakeasy-api/openapi/arazzo"
-)
-
-func main() {
-    ctx := context.Background()
-
-    f, err := os.Open("arazzo.yaml")
-    if err != nil {
-        panic(err)
-    }
-
-    arazzo, _, err := arazzo.Unmarshal(ctx, f)
-    if err != nil {
-        panic(err)
-    }
-
-    arazzo.Info.Title = "My updated workflow title"
-
-    buf := bytes.NewBuffer([]byte{})
-
-    if err := arazzo.Marshal(ctx, buf); err != nil {
-        panic(err)
-    }
-
-    fmt.Printf("%s", buf.String())
-}
-```
-
-## Walking
-
-```go
-package main
-
-import (
- "context"
- "fmt"
- "os"
-
- "github.com/speakeasy-api/openapi/arazzo"
-)
-
-func main() {
-    ctx := context.Background()
-
-    f, err := os.Open("arazzo.yaml")
-    if err != nil {
-        panic(err)
-    }
-
-    a, _, err := arazzo.Unmarshal(ctx, f)
-    if err != nil {
-        panic(err)
-    }
-
-    err = arazzo.Walk(ctx, a, func(ctx context.Context, node, parent arazzo.MatchFunc, a *arazzo.Arazzo) error {
-        return node(arazzo.Matcher{
-            Workflow: func(workflow *arazzo.Workflow) error {
-                fmt.Printf("Workflow: %s\n", workflow.WorkflowID)
-                return nil
-            },
-        })
-    })
-    if err != nil {
-        panic(err)
-    }
-}
-```
-
-## Validating
-
-```go
-package main
-
-import (
- "context"
- "fmt"
- "os"
-
- "github.com/speakeasy-api/openapi/arazzo"
-)
-
-func main() {
-    ctx := context.Background()
-
-    f, err := os.Open("arazzo.yaml")
-    if err != nil {
-        panic(err)
-    }
-
-    _, validationErrs, err := arazzo.Unmarshal(ctx, f)
-    if err != nil {
-        panic(err)
-    }
-
-    for _, err := range validationErrs {
-        fmt.Printf("%s\n", err.Error())
-    }
-}
-```
+<!-- END USAGE EXAMPLES -->
 
 ## Contributing
 

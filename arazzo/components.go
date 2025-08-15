@@ -7,7 +7,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/jsonschema/oas31"
+	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
@@ -18,7 +18,7 @@ type Components struct {
 	marshaller.Model[core.Components]
 
 	// Inputs provides a list of reusable JSON Schemas that can be referenced from inputs and other JSON Schemas.
-	Inputs *sequencedmap.Map[string, oas31.JSONSchema]
+	Inputs *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]]
 	// Parameters provides a list of reusable parameters that can be referenced from workflows and steps.
 	Parameters *sequencedmap.Map[string, *Parameter]
 	// SuccessActions provides a list of reusable success actions that can be referenced from workflows and steps.
@@ -44,11 +44,12 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	for key, input := range c.Inputs.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("input key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Inputs, key))
+			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field inputs key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Inputs, key))
 		}
 
 		if input.IsLeft() {
-			jsOpts := append(opts, validation.WithContextObject(&componentKey{name: key}))
+			jsOpts := opts
+			jsOpts = append(jsOpts, validation.WithContextObject(&componentKey{name: key}))
 
 			errs = append(errs, input.Left.Validate(ctx, jsOpts...)...)
 		}
@@ -56,30 +57,33 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	for key, parameter := range c.Parameters.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("parameter key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Parameters, key))
+			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field parameters key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Parameters, key))
 		}
 
-		paramOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
+		paramOps := opts
+		paramOps = append(paramOps, validation.WithContextObject(&componentKey{name: key}))
 
 		errs = append(errs, parameter.Validate(ctx, paramOps...)...)
 	}
 
 	for key, successAction := range c.SuccessActions.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("successAction key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.SuccessActions, key))
+			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field successActions key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.SuccessActions, key))
 		}
 
-		successActionOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
+		successActionOps := opts
+		successActionOps = append(successActionOps, validation.WithContextObject(&componentKey{name: key}))
 
 		errs = append(errs, successAction.Validate(ctx, successActionOps...)...)
 	}
 
 	for key, failureAction := range c.FailureActions.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("failureAction key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.FailureActions, key))
+			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field failureActions key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.FailureActions, key))
 		}
 
-		failureActionOps := append(opts, validation.WithContextObject(&componentKey{name: key}))
+		failureActionOps := opts
+		failureActionOps = append(failureActionOps, validation.WithContextObject(&componentKey{name: key}))
 
 		errs = append(errs, failureAction.Validate(ctx, failureActionOps...)...)
 	}

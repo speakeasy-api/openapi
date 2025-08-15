@@ -11,6 +11,7 @@ import (
 )
 
 func TestExpression_Validate_Success(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		e Expression
 	}
@@ -183,6 +184,7 @@ func TestExpression_Validate_Success(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := tt.args.e.Validate()
 			require.NoError(t, err)
 		})
@@ -190,6 +192,7 @@ func TestExpression_Validate_Success(t *testing.T) {
 }
 
 func TestExpression_Validate_Failure(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		e Expression
 	}
@@ -327,13 +330,15 @@ func TestExpression_Validate_Failure(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := tt.args.e.Validate()
-			assert.EqualError(t, err, tt.wantErr.Error())
+			require.EqualError(t, err, tt.wantErr.Error())
 		})
 	}
 }
 
 func TestExpression_IsExpression(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		e Expression
 	}
@@ -380,6 +385,7 @@ func TestExpression_IsExpression(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := tt.args.e.IsExpression()
 			assert.Equal(t, tt.want, got)
 		})
@@ -387,11 +393,13 @@ func TestExpression_IsExpression(t *testing.T) {
 }
 
 func TestExpression_GetType(t *testing.T) {
+	t.Parallel()
 	e := Expression("$request.body#/some/path")
 	assert.Equal(t, ExpressionTypeRequest, e.GetType())
 }
 
 func TestExpression_GetJSONPointer(t *testing.T) {
+	t.Parallel()
 	e := Expression("$request.body#/some/path")
 	assert.Equal(t, jsonpointer.JSONPointer("/some/path"), e.GetJSONPointer())
 

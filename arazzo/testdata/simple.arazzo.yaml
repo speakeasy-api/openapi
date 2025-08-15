@@ -1,0 +1,18 @@
+arazzo: 1.0.0
+info:
+  title: Simple Workflow
+  version: 1.0.0
+sourceDescriptions:
+  - name: api
+    url: https://api.example.com/openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: simpleWorkflow
+    summary: A simple workflow
+    steps:
+      - stepId: step1
+        operationId: getUser
+        parameters:
+          - name: id
+            in: path
+            value: "123"

@@ -1,7 +1,6 @@
 package criterion_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/arazzo/criterion"
@@ -13,6 +12,7 @@ import (
 )
 
 func TestCriterion_Validate_Success(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		c    *criterion.Criterion
 		opts []validation.Option
@@ -39,7 +39,8 @@ func TestCriterion_Validate_Success(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.args.c.Sync(context.Background())
+			t.Parallel()
+			err := tt.args.c.Sync(t.Context())
 			require.NoError(t, err)
 			errs := tt.args.c.Validate(tt.args.opts...)
 			assert.Empty(t, errs)

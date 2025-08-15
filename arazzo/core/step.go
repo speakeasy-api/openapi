@@ -6,7 +6,8 @@ import (
 )
 
 type Step struct {
-	marshaller.CoreModel
+	marshaller.CoreModel `model:"step"`
+
 	StepID          marshaller.Node[string]                      `key:"stepId"`
 	Description     marshaller.Node[*string]                     `key:"description"`
 	OperationID     marshaller.Node[*string]                     `key:"operationId"`
