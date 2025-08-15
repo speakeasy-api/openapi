@@ -22,14 +22,35 @@
 
 </p>
   <p align="center">
+    <!-- Badges -->
+    <!-- OpenAPI Hub Badge -->
     <a href="https://www.speakeasy.com/openapi"><img src="https://custom-icon-badges.demolab.com/badge/-OpenAPI%20Hub-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
-    <a href="https://speakeasy.com/"><img src="https://custom-icon-badges.demolab.com/badge/-Built%20By%20Speakeasy-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
-    <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/speakeasy-api/openapi.svg?style=for-the-badge"></a>
+    <!-- OpenAPI Support Badge -->
+    <a href="https://www.speakeasy.com/openapi"><img alt="OpenAPI Support" src="https://img.shields.io/badge/OpenAPI-3.0%20%7C%203.1-85EA2D.svg?style=for-the-badge&logo=openapiinitiative"></a>
+    <!-- Arazzo Support Badge -->
+    <img alt="Arazzo Support" src="https://img.shields.io/badge/Arazzo-1.0-purple.svg?style=for-the-badge">
     <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi?tab=doc"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
-   <br />
-    <a href="https://github.com/speakeasy-api/openapi/actions/workflows/ci.yaml"><img alt="GitHub Action: CI" src="https://img.shields.io/github/actions/workflow/status/speakeasy-api/openapi/ci.yaml?style=for-the-badge"></a>
+    <!-- Line Break --><br/>
+    <!-- Release Version Badge -->
+    <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/speakeasy-api/openapi.svg?style=for-the-badge"></a>
+    <!-- Go Report Card Badge -->
     <a href="https://goreportcard.com/report/github.com/speakeasy-api/openapi"><img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/speakeasy-api/openapi?style=for-the-badge"></a>
-    <a href="/LICENSE"><img alt="Software License" src="https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge"></a>
+    <!-- Security Badge -->
+    <a href="https://github.com/speakeasy-api/openapi/actions/workflows/ci.yaml"><img alt="Security" src="https://img.shields.io/badge/security-scanned-green.svg?style=for-the-badge&logo=security"></a>
+    <!-- CI Badge -->
+    <a href="https://github.com/speakeasy-api/openapi/actions/workflows/ci.yaml"><img alt="GitHub Action: CI" src="https://img.shields.io/github/actions/workflow/status/speakeasy-api/openapi/ci.yaml?style=for-the-badge"></a>
+    <!-- Line Break --><br/>
+    <!-- Go Version Badge -->
+    <a href="https://golang.org/"><img alt="Go Version" src="https://img.shields.io/badge/go-1.24.3+-00ADD8.svg?style=for-the-badge&logo=go"></a>
+    <!-- Platform Support Badge -->
+    <img alt="Platform Support" src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey.svg?style=for-the-badge">
+    <!-- Stars Badge -->
+    <a href="https://github.com/speakeasy-api/openapi/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/speakeasy-api/openapi.svg?style=for-the-badge&logo=github"></a>
+    <!-- Line Break --><br/>
+    <!-- Built By Speakeasy Badge -->
+    <a href="https://speakeasy.com/"><img src="https://custom-icon-badges.demolab.com/badge/-Built%20By%20Speakeasy-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
+    <!-- License Badge -->
+    <a href="/LICENSE"><img alt="Software License" src="https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge"></a>    
   </p>
 </p>
 
