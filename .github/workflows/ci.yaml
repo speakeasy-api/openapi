@@ -56,22 +56,28 @@ jobs:
           go-version-file: "go.mod"
           cache: true
 
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
       - name: Cache downloaded test files
         uses: actions/cache@v4
         with:
-          path: |
-            ~/tmp/speakeasy-api_arazzo
-            ${{ runner.temp }}/speakeasy-api_arazzo
-          key: arazzo-test-files-${{ hashFiles('arazzo/**/*.go') }}
+          path: ${{ runner.temp }}/speakeasy-api_arazzo
+          key: arazzo-test-files-${{ steps.date.outputs.date }}
           restore-keys: |
             arazzo-test-files-
 
       - name: Run tests with coverage
         if: matrix.os == 'ubuntu-latest'
+        env:
+          ARAZZO_CACHE_DIR: ${{ runner.temp }}
         run: mise run test-coverage
 
       - name: Run tests (Windows)
         if: matrix.os == 'windows-latest'
+        env:
+          ARAZZO_CACHE_DIR: ${{ runner.temp }}
         run: gotestsum --format testname -- -race ./...
 
       - name: Calculate coverage
@@ -233,3 +239,11 @@ jobs:
             exit 1
           fi
           echo "All checks passed successfully"
+
+  # Add this temporary job to satisfy the phantom check TODO remove once GitHub stops expecting it
+  test-and-build:
+    name: Legacy Status Check (Temporary)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Satisfy phantom check
+        run: echo "This job exists only to satisfy the phantom test-and-build status check. It will be removed once GitHub stops expecting it."
