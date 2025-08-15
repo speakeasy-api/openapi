@@ -1,4 +1,4 @@
-name: Test
+name: CI
 
 on:
   push:
@@ -47,8 +47,8 @@ jobs:
       - name: Check examples are up to date
         run: mise run examples-check
 
-  test-and-build:
-    name: Test and Build
+  test:
+    name: Test
     needs: lint
     strategy:
       matrix:
@@ -249,13 +249,13 @@ jobs:
   # This provides a single status check for branch protection
   test-summary:
     name: Test Summary
-    needs: [lint, test-and-build]
+    needs: [lint, test]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check test results
         run: |
-          if [ "${{ needs.test-and-build.result }}" != "success" ]; then
+          if [ "${{ needs.test.result }}" != "success" ]; then
             echo "Tests failed or were cancelled"
             exit 1
           fi
