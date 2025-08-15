@@ -3,11 +3,11 @@ module github.com/speakeasy-api/openapi
 go 1.24.3
 
 require (
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/speakeasy-api/jsonpath v0.6.2
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/sync v0.15.0
-	golang.org/x/text v0.18.0
+	golang.org/x/sync v0.16.0
+	golang.org/x/text v0.28.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
