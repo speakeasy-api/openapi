@@ -1,0 +1,18 @@
+# External UserProfile schema
+type: object
+properties:
+  bio:
+    type: string
+    maxLength: 500
+    description: User biography
+  avatar_url:
+    type: string
+    format: uri
+    description: URL to user's avatar image
+  social_links:
+    type: object
+    additionalProperties:
+      type: string
+      format: uri
+  preferences:
+    $ref: "external_user_preferences.yaml"

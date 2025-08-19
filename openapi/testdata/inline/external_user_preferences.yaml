@@ -1,0 +1,16 @@
+# External UserPreferences schema
+type: object
+properties:
+  theme:
+    type: string
+    enum: [light, dark, auto]
+    default: auto
+  notifications:
+    type: object
+    properties:
+      email:
+        type: boolean
+        default: true
+      push:
+        type: boolean
+        default: false

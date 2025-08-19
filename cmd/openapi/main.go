@@ -20,12 +20,24 @@ var rootCmd = &cobra.Command{
 	Long: `A comprehensive toolkit for working with OpenAPI specifications and Arazzo workflows.
 
 This CLI provides tools for:
-- Validating OpenAPI specifications
-- Validating Arazzo workflow documents
-- Working with OpenAPI overlays (apply, compare, validate)
-- Processing OpenAPI specifications
-- Working with Arazzo workflow specifications
-- Various utilities for OpenAPI and Arazzo development`,
+
+OpenAPI Specifications:
+- Validate OpenAPI specification documents for compliance
+- Upgrade OpenAPI specs to the latest supported version (3.1.1)
+- Inline all references to create self-contained documents
+- Bundle external references into components section while preserving structure
+
+Arazzo Workflows:
+- Validate Arazzo workflow documents for compliance
+
+OpenAPI Overlays:
+- Apply overlays to modify OpenAPI specifications
+- Compare two specifications and generate overlays
+- Validate overlay files for correctness
+
+Each command group provides specialized functionality for working with different
+aspects of the OpenAPI ecosystem, from basic validation to advanced document
+transformation and workflow management.`,
 	Version: version,
 }
 

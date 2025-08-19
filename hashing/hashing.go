@@ -9,11 +9,13 @@ import (
 	"strings"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"gopkg.in/yaml.v3"
 )
 
 func Hash(v any) string {
 	hasher := fnv.New64a()
-	_, _ = hasher.Write([]byte(toHashableString(v)))
+	hashableStr := toHashableString(v)
+	_, _ = hasher.Write([]byte(hashableStr))
 	return fmt.Sprintf("%016x", hasher.Sum64())
 }
 
@@ -62,7 +64,12 @@ func toHashableString(v any) string {
 			builder.WriteString(toHashableString(mapVal.MapIndex(key).Interface()))
 		}
 	case reflect.Struct:
-		builder.WriteString(structToHashableString(v))
+		// Check if this is a yaml.Node
+		if node, ok := v.(yaml.Node); ok {
+			builder.WriteString(yamlNodeToHashableString(&node))
+		} else {
+			builder.WriteString(structToHashableString(v))
+		}
 	case reflect.Ptr, reflect.Interface:
 		val := reflect.ValueOf(v)
 		if val.IsNil() {
@@ -81,6 +88,8 @@ func toHashableString(v any) string {
 			builder.WriteString(v)
 		case int:
 			builder.WriteString(strconv.Itoa(v))
+		case *yaml.Node:
+			builder.WriteString(yamlNodeToHashableString(v))
 		default:
 			builder.WriteString(fmt.Sprintf("%v", v))
 		}
@@ -135,6 +144,33 @@ func structToHashableString(v any) string {
 
 		builder.WriteString(fieldType.Name)
 		builder.WriteString(val)
+	}
+
+	return builder.String()
+}
+
+// yamlNodeToHashableString recursively processes a YAML node and its children,
+// including only semantic content (Tag, Value, Kind) and excluding positional
+// metadata (Line, Column, Style, etc.)
+func yamlNodeToHashableString(node *yaml.Node) string {
+	if node == nil {
+		return ""
+	}
+
+	var builder strings.Builder
+
+	// Include semantic fields only
+	builder.WriteString(fmt.Sprintf("Kind%d", node.Kind))
+	if node.Tag != "" {
+		builder.WriteString("Tag" + node.Tag)
+	}
+	if node.Value != "" {
+		builder.WriteString("Value" + node.Value)
+	}
+
+	// Recursively process children in Content array
+	for _, child := range node.Content {
+		builder.WriteString(yamlNodeToHashableString(child))
 	}
 
 	return builder.String()

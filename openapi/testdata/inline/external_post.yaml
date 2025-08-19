@@ -1,0 +1,33 @@
+# External Post schema - creates circular reference with external User
+type: object
+required:
+  - id
+  - title
+  - content
+  - author_id
+properties:
+  id:
+    type: string
+    format: uuid
+  title:
+    type: string
+    minLength: 1
+    maxLength: 200
+  content:
+    type: string
+    minLength: 1
+  author_id:
+    type: string
+    format: uuid
+  author:
+    $ref: "external_user.yaml"
+  tags:
+    type: array
+    items:
+      type: string
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time

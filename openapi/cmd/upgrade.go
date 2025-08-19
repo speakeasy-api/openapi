@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/spf13/cobra"
 )
@@ -51,55 +49,34 @@ func runUpgrade(cmd *cobra.Command, args []string) {
 	inputFile := args[0]
 
 	var outputFile string
-	if writeInPlace {
-		if len(args) > 1 {
-			fmt.Fprintf(os.Stderr, "Error: cannot specify output file when using --write flag\n")
-			os.Exit(1)
-		}
-		outputFile = inputFile
-	} else if len(args) > 1 {
+	if len(args) > 1 {
 		outputFile = args[1]
 	}
 
-	if err := upgradeOpenAPI(ctx, inputFile, outputFile, minorOnly); err != nil {
+	processor, err := NewOpenAPIProcessor(inputFile, outputFile, writeInPlace)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := upgradeOpenAPI(ctx, processor, minorOnly); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func upgradeOpenAPI(ctx context.Context, inputFile, outputFile string, minorOnly bool) error {
-	cleanInputFile := filepath.Clean(inputFile)
-
-	// Only print status messages if not writing to stdout (to keep stdout clean for piping)
-	writeToStdout := outputFile == ""
-	if !writeToStdout {
-		fmt.Printf("Upgrading OpenAPI document: %s\n", cleanInputFile)
-	}
-
-	// Read the input file
-	f, err := os.Open(cleanInputFile)
+func upgradeOpenAPI(ctx context.Context, processor *OpenAPIProcessor, minorOnly bool) error {
+	// Load the OpenAPI document
+	doc, validationErrors, err := processor.LoadDocument(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to open input file: %w", err)
-	}
-	defer f.Close()
-
-	// Parse the OpenAPI document
-	doc, validationErrors, err := openapi.Unmarshal(ctx, f)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal OpenAPI document: %w", err)
+		return err
 	}
 	if doc == nil {
 		return errors.New("failed to parse OpenAPI document: document is nil")
 	}
 
-	// Report validation errors but continue with upgrade (only if not writing to stdout)
-	if len(validationErrors) > 0 && !writeToStdout {
-		fmt.Printf("⚠️  Found %d validation errors in original document:\n", len(validationErrors))
-		for i, validationErr := range validationErrors {
-			fmt.Printf("  %d. %s\n", i+1, validationErr.Error())
-		}
-		fmt.Println()
-	}
+	// Report validation errors but continue with upgrade
+	processor.ReportValidationErrors(validationErrors)
 
 	// Prepare upgrade options
 	var opts []openapi.Option[openapi.UpgradeOptions]
@@ -118,43 +95,14 @@ func upgradeOpenAPI(ctx context.Context, inputFile, outputFile string, minorOnly
 	}
 
 	if !upgraded {
-		if !writeToStdout {
-			fmt.Printf("📋 No upgrade needed - document is already at version %s\n", originalVersion)
-		}
+		processor.PrintInfo("No upgrade needed - document is already at version " + originalVersion)
 		// Still output the document even if no upgrade was needed
-		return writeOutput(ctx, doc, outputFile, writeToStdout)
+		return processor.WriteDocument(ctx, doc)
 	}
 
-	if !writeToStdout {
-		fmt.Printf("✅ Successfully upgraded from %s to %s\n", originalVersion, doc.OpenAPI)
-	}
+	processor.PrintSuccess(fmt.Sprintf("Successfully upgraded from %s to %s", originalVersion, doc.OpenAPI))
 
-	return writeOutput(ctx, doc, outputFile, writeToStdout)
-}
-
-func writeOutput(ctx context.Context, doc *openapi.OpenAPI, outputFile string, writeToStdout bool) error {
-	if writeToStdout {
-		// Write to stdout (pipe-friendly)
-		return marshaller.Marshal(ctx, doc, os.Stdout)
-	}
-
-	// Write to file
-	cleanOutputFile := filepath.Clean(outputFile)
-	outFile, err := os.Create(cleanOutputFile)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
-	}
-	defer outFile.Close()
-
-	if err := marshaller.Marshal(ctx, doc, outFile); err != nil {
-		return fmt.Errorf("failed to write upgraded document: %w", err)
-	}
-
-	if cleanOutputFile == filepath.Clean(outputFile) {
-		fmt.Printf("📄 Upgraded document written to: %s\n", cleanOutputFile)
-	}
-
-	return nil
+	return processor.WriteDocument(ctx, doc)
 }
 
 // GetUpgradeCommand returns the upgrade command for external use

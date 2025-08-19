@@ -1,0 +1,34 @@
+# Conflicting User schema - different structure to test conflict detection
+User:
+  type: object
+  required:
+    - userId
+    - username
+  properties:
+    userId:
+      type: integer
+      description: Numeric user identifier (conflicts with string id)
+    username:
+      type: string
+      minLength: 3
+      maxLength: 50
+      description: User's username (conflicts with name field)
+    email:
+      type: string
+      format: email
+      description: User's email address
+    role:
+      type: string
+      enum:
+        - admin
+        - user
+        - guest
+      default: user
+      description: User's role in the system
+    createdAt:
+      type: string
+      format: date-time
+      description: When the user was created
+    manager:
+      $ref: "#/User"
+      description: User's manager (creates circular reference)
