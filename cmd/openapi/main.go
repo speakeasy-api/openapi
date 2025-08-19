@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
+	"strings"
 
 	arazzoCmd "github.com/speakeasy-api/openapi/arazzo/cmd"
 	openapiCmd "github.com/speakeasy-api/openapi/openapi/cmd"
@@ -15,6 +17,45 @@ var (
 	commit  = "none"
 	date    = "unknown"
 )
+
+// getVersionInfo returns version information, prioritizing ldflags values over build info
+func getVersionInfo() (string, string, string) {
+	// If version/commit/date were set via ldflags (GoReleaser), use those
+	if version != "dev" || commit != "none" || date != "unknown" {
+		return version, commit, date
+	}
+
+	// Otherwise, try to get info from build info
+	buildInfo, ok := debug.ReadBuildInfo()
+	if !ok {
+		return version, commit, date
+	}
+
+	// Use module version if available, otherwise fallback to "dev"
+	moduleVersion := version
+	if buildInfo.Main.Version != "" && buildInfo.Main.Version != "(devel)" {
+		moduleVersion = buildInfo.Main.Version
+	}
+
+	// Extract VCS information
+	vcsCommit := commit
+	vcsTime := date
+
+	for _, setting := range buildInfo.Settings {
+		switch setting.Key {
+		case "vcs.revision":
+			if len(setting.Value) >= 7 {
+				vcsCommit = setting.Value[:7] // Short commit hash
+			} else {
+				vcsCommit = setting.Value
+			}
+		case "vcs.time":
+			vcsTime = setting.Value
+		}
+	}
+
+	return moduleVersion, vcsCommit, vcsTime
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "openapi",
@@ -74,14 +115,25 @@ These commands help you validate and work with Arazzo documents.`,
 }
 
 func init() {
+	// Get version information (prioritizes ldflags, falls back to build info)
+	currentVersion, currentCommit, currentDate := getVersionInfo()
+
+	// Update root command version
+	rootCmd.Version = currentVersion
+
 	// Set version template with build info
-	if commit != "none" && date != "unknown" {
-		rootCmd.SetVersionTemplate(`{{printf "%s" .Version}}
-Build: ` + commit + `
-Built: ` + date)
-	} else {
-		rootCmd.SetVersionTemplate(`{{printf "%s" .Version}}`)
+	var versionTemplate strings.Builder
+	versionTemplate.WriteString(`{{printf "%s" .Version}}`)
+
+	if currentCommit != "none" && currentCommit != "" {
+		versionTemplate.WriteString("\nBuild: " + currentCommit)
 	}
+
+	if currentDate != "unknown" && currentDate != "" {
+		versionTemplate.WriteString("\nBuilt: " + currentDate)
+	}
+
+	rootCmd.SetVersionTemplate(versionTemplate.String())
 
 	// Add OpenAPI spec validation command
 	openapiCmd.Apply(openapiCmds)
