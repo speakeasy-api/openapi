@@ -1,0 +1,214 @@
+openapi: 3.1.0
+info:
+  title: Main API
+  version: 1.0.0
+  description: Main API for joining tests
+servers:
+  - url: https://main-api.example.com
+    description: Main server
+security:
+  - ApiKeyAuth: []
+tags:
+  - name: users
+    description: User operations
+  - name: products
+    description: Product operations
+paths:
+  /users:
+    get:
+      summary: Get users
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /products:
+    get:
+      summary: Get products
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+  /users#second:
+    post:
+      summary: Create user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User_1'
+      responses:
+        "201":
+          description: Created
+  /orders:
+    get:
+      summary: Get orders
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+webhooks:
+  userCreated:
+    post:
+      summary: User created webhook
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: OK
+  productUpdated:
+    post:
+      summary: Product updated webhook
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Product'
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+          format: float
+    User_1:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        active:
+          type: boolean
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        productId:
+          type: integer
+        quantity:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pending
+            - confirmed
+            - shipped
+            - delivered
+  responses:
+    NotFound:
+      description: The specified resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound_1:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+    Unauthorized:
+      description: Unauthorized access
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+  parameters:
+    limitParam:
+      name: limit
+      in: query
+      description: max records to return
+      schema:
+        type: integer
+        format: int32
+    offsetParam:
+      name: offset
+      in: query
+      description: number of items to skip
+      schema:
+        type: integer
+        format: int32
+    limitParam_1:
+      name: limit
+      in: query
+      description: maximum number of items to return
+      schema:
+        type: integer
+        format: int32
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

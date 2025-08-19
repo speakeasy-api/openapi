@@ -37,6 +37,132 @@ type (
 	ReferencedSecurityScheme = Reference[SecurityScheme, *SecurityScheme, *core.SecurityScheme]
 )
 
+// NewReferencedPathItemFromRef creates a new ReferencedPathItem from a reference.
+func NewReferencedPathItemFromRef(ref *references.Reference) *ReferencedPathItem {
+	return &ReferencedPathItem{
+		Reference: ref,
+	}
+}
+
+// NewReferencedPathItemFromPathItem creates a new ReferencedPathItem from a PathItem.
+func NewReferencedPathItemFromPathItem(pathItem *PathItem) *ReferencedPathItem {
+	return &ReferencedPathItem{
+		Object: pathItem,
+	}
+}
+
+// NewReferencedExampleFromRef creates a new ReferencedExample from a reference.
+func NewReferencedExampleFromRef(ref *references.Reference) *ReferencedExample {
+	return &ReferencedExample{
+		Reference: ref,
+	}
+}
+
+// NewReferencedExampleFromExample creates a new ReferencedExample from an Example.
+func NewReferencedExampleFromExample(example *Example) *ReferencedExample {
+	return &ReferencedExample{
+		Object: example,
+	}
+}
+
+// NewReferencedParameterFromRef creates a new ReferencedParameter from a reference.
+func NewReferencedParameterFromRef(ref *references.Reference) *ReferencedParameter {
+	return &ReferencedParameter{
+		Reference: ref,
+	}
+}
+
+// NewReferencedParameterFromParameter creates a new ReferencedParameter from a Parameter.
+func NewReferencedParameterFromParameter(parameter *Parameter) *ReferencedParameter {
+	return &ReferencedParameter{
+		Object: parameter,
+	}
+}
+
+// NewReferencedHeaderFromRef creates a new ReferencedHeader from a reference.
+func NewReferencedHeaderFromRef(ref *references.Reference) *ReferencedHeader {
+	return &ReferencedHeader{
+		Reference: ref,
+	}
+}
+
+// NewReferencedHeaderFromHeader creates a new ReferencedHeader from a Header.
+func NewReferencedHeaderFromHeader(header *Header) *ReferencedHeader {
+	return &ReferencedHeader{
+		Object: header,
+	}
+}
+
+// NewReferencedRequestBodyFromRef creates a new ReferencedRequestBody from a reference.
+func NewReferencedRequestBodyFromRef(ref *references.Reference) *ReferencedRequestBody {
+	return &ReferencedRequestBody{
+		Reference: ref,
+	}
+}
+
+// NewReferencedRequestBodyFromRequestBody creates a new ReferencedRequestBody from a RequestBody.
+func NewReferencedRequestBodyFromRequestBody(requestBody *RequestBody) *ReferencedRequestBody {
+	return &ReferencedRequestBody{
+		Object: requestBody,
+	}
+}
+
+// NewReferencedResponseFromRef creates a new ReferencedResponse from a reference.
+func NewReferencedResponseFromRef(ref *references.Reference) *ReferencedResponse {
+	return &ReferencedResponse{
+		Reference: ref,
+	}
+}
+
+// NewReferencedResponseFromResponse creates a new ReferencedResponse from a Response.
+func NewReferencedResponseFromResponse(response *Response) *ReferencedResponse {
+	return &ReferencedResponse{
+		Object: response,
+	}
+}
+
+// NewReferencedCallbackFromRef creates a new ReferencedCallback from a reference.
+func NewReferencedCallbackFromRef(ref *references.Reference) *ReferencedCallback {
+	return &ReferencedCallback{
+		Reference: ref,
+	}
+}
+
+// NewReferencedCallbackFromCallback creates a new ReferencedCallback from a Callback.
+func NewReferencedCallbackFromCallback(callback *Callback) *ReferencedCallback {
+	return &ReferencedCallback{
+		Object: callback,
+	}
+}
+
+// NewReferencedLinkFromRef creates a new ReferencedLink from a reference.
+func NewReferencedLinkFromRef(ref *references.Reference) *ReferencedLink {
+	return &ReferencedLink{
+		Reference: ref,
+	}
+}
+
+// NewReferencedLinkFromLink creates a new ReferencedLink from a Link.
+func NewReferencedLinkFromLink(link *Link) *ReferencedLink {
+	return &ReferencedLink{
+		Object: link,
+	}
+}
+
+// NewReferencedSecuritySchemeFromRef creates a new ReferencedSecurityScheme from a reference.
+func NewReferencedSecuritySchemeFromRef(ref *references.Reference) *ReferencedSecurityScheme {
+	return &ReferencedSecurityScheme{
+		Reference: ref,
+	}
+}
+
+// NewReferencedSecuritySchemeFromSecurityScheme creates a new ReferencedSecurityScheme from a SecurityScheme.
+func NewReferencedSecuritySchemeFromSecurityScheme(securityScheme *SecurityScheme) *ReferencedSecurityScheme {
+	return &ReferencedSecurityScheme{
+		Object: securityScheme,
+	}
+}
+
 type ReferencedObject[T any] interface {
 	IsReference() bool
 	GetObject() *T

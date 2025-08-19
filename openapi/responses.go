@@ -26,9 +26,9 @@ type Responses struct {
 var _ interfaces.Model[core.Responses] = (*Responses)(nil)
 
 // NewResponses creates a new Responses instance with an initialized map.
-func NewResponses() *Responses {
+func NewResponses(elements ...*sequencedmap.Element[string, *ReferencedResponse]) *Responses {
 	return &Responses{
-		Map: *sequencedmap.New[string, *ReferencedResponse](),
+		Map: *sequencedmap.New(elements...),
 	}
 }
 

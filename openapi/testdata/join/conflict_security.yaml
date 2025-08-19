@@ -1,0 +1,40 @@
+openapi: 3.1.0
+info:
+  title: Conflicting Security API
+  version: 1.0.0
+  description: API with different security that should push to operation level
+servers:
+  - url: https://main-api.example.com
+    description: Main server
+security:
+  - BearerAuth: []
+  - OAuth2: [read, write]
+paths:
+  /admin:
+    get:
+      summary: Admin endpoint with different security requirements
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    OAuth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://example.com/oauth/authorize
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read: Read access
+            write: Write access
