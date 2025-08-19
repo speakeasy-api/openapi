@@ -1,16 +1,19 @@
 package hashing
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/marshaller/tests"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/references"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/yml"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testEnum string
@@ -533,4 +536,69 @@ func TestHash_JSONSchemaReferenceVsResolved(t *testing.T) {
 				"Hash of unresolved reference should equal hash of resolved reference")
 		})
 	}
+}
+
+func TestHash_JSONSchemaFieldOrdering(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Two identical User schemas with different field ordering
+	userSchema1YAML := `type: object
+properties:
+  id:
+    type: string
+    format: uuid
+  name:
+    type: string
+    maxLength: 100
+    minLength: 1
+  email:
+    type: string
+    format: email
+required:
+  - id
+  - name
+  - email`
+
+	userSchema2YAML := `type: object
+required:
+  - id
+  - name
+  - email
+properties:
+  id:
+    type: string
+    format: uuid
+  name:
+    type: string
+    minLength: 1
+    maxLength: 100
+  email:
+    type: string
+    format: email`
+
+	// Parse both schemas using marshaller.Unmarshal
+	var schema1 oas3.Schema
+	_, err := marshaller.Unmarshal(ctx, strings.NewReader(userSchema1YAML), &schema1)
+	require.NoError(t, err, "should parse first schema")
+	_ = schema1.Validate(ctx)
+
+	var schema2 oas3.Schema
+	_, err = marshaller.Unmarshal(ctx, strings.NewReader(userSchema2YAML), &schema2)
+	require.NoError(t, err, "should parse second schema")
+
+	// Create JSONSchema wrappers
+	jsonSchema1 := oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&schema1)
+	jsonSchema2 := oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&schema2)
+
+	// Hash both schemas
+	hash1 := Hash(jsonSchema1)
+	hash2 := Hash(jsonSchema2)
+
+	t.Logf("Schema 1 hash: %s", hash1)
+	t.Logf("Schema 2 hash: %s", hash2)
+
+	// They should be equal since they represent the same schema
+	assert.Equal(t, hash1, hash2, "identical schemas should have the same hash regardless of field ordering")
 }

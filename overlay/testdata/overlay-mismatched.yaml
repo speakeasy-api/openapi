@@ -1,0 +1,16 @@
+overlay: 1.0.0
+x-speakeasy-jsonpath: rfc9535
+info:
+  title: Drinks Overlay
+  version: 0.0.0
+actions:
+  - target: $["unknown-attribute"]
+    description: "failing overlay due to this element"
+    update:
+      description: just a description
+  - target: $.info.title
+    description: "should change info.title to changed"
+    update: "changed"
+  - target: $.info.title
+    description: "should produce a warning"
+    update: "changed"

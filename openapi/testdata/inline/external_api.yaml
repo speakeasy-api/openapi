@@ -1,0 +1,129 @@
+openapi: 3.1.0
+info:
+  title: External API
+  version: 1.0.0
+  description: External API with User components
+
+components:
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique user identifier
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: User's full name
+        email:
+          type: string
+          format: email
+          description: User's email address
+        profile:
+          $ref: "#/components/schemas/UserProfile"
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+          description: Posts created by this user
+
+    UserProfile:
+      type: object
+      properties:
+        bio:
+          type: string
+          maxLength: 500
+          description: User biography
+        avatar_url:
+          type: string
+          format: uri
+          description: URL to user's avatar image
+        social_links:
+          type: object
+          additionalProperties:
+            type: string
+            format: uri
+        preferences:
+          $ref: "#/components/schemas/UserPreferences"
+
+    UserPreferences:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum: [light, dark, auto]
+          default: auto
+        notifications:
+          type: object
+          properties:
+            email:
+              type: boolean
+              default: true
+            push:
+              type: boolean
+              default: false
+
+    Post:
+      type: object
+      required:
+        - id
+        - title
+        - content
+        - author_id
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        content:
+          type: string
+          minLength: 1
+        author_id:
+          type: string
+          format: uuid
+        author:
+          $ref: "#/components/schemas/User"
+        tags:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # A different schema for variety
+    Organization:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+        website:
+          type: string
+          format: uri
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"

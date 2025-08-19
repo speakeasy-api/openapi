@@ -30,12 +30,12 @@ type Unmarshallable interface {
 }
 
 // Unmarshal will unmarshal the provided document into the specified model.
-func Unmarshal[T any](ctx context.Context, doc io.Reader, out CoreAccessor[T]) ([]error, error) {
+func Unmarshal[T any](ctx context.Context, in io.Reader, out CoreAccessor[T]) ([]error, error) {
 	if out == nil || reflect.ValueOf(out).IsNil() {
 		return nil, errors.New("out parameter cannot be nil")
 	}
 
-	data, err := io.ReadAll(doc)
+	data, err := io.ReadAll(in)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read document: %w", err)
 	}

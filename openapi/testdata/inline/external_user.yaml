@@ -1,0 +1,27 @@
+# External User schema - same as component but external
+type: object
+required:
+  - id
+  - name
+  - email
+properties:
+  id:
+    type: string
+    format: uuid
+    description: Unique user identifier
+  name:
+    type: string
+    minLength: 1
+    maxLength: 100
+    description: User's full name
+  email:
+    type: string
+    format: email
+    description: User's email address
+  profile:
+    $ref: "external_user_profile.yaml"
+  posts:
+    type: array
+    items:
+      $ref: "external_post.yaml"
+    description: Posts created by this user

@@ -38,8 +38,8 @@ func main() {
 func updateExamples() error {
 	fmt.Println("🔄 Updating examples in README files...")
 
-	// Process both packages
-	packages := []string{"openapi", "arazzo"}
+	// Process all packages
+	packages := []string{"openapi", "arazzo", "overlay"}
 
 	for _, pkg := range packages {
 		if err := processPackage(pkg); err != nil {

@@ -66,22 +66,65 @@ func (r *Reference[T]) SyncChanges(ctx context.Context, model any, valueNode *ya
 	}
 
 	of := mv.FieldByName("Object")
-	if of.IsZero() {
-		var err error
-		valueNode, err = marshaller.SyncValue(ctx, model, r, valueNode, true)
-		if err != nil {
-			return nil, err
-		}
-		r.SetValid(true, true)
-	} else {
+	rf := mv.FieldByName("Reference")
+
+	// Check if we have an object but no reference (inlined case)
+	hasObject := !of.IsZero()
+	hasReference := !rf.IsZero() && !rf.IsNil()
+
+	if hasObject && !hasReference {
+		// Inlined case: we have an object but no reference
+		// Clear the reference in the core model and sync only the object
+		r.Reference = marshaller.Node[*string]{}
+
 		var err error
 		valueNode, err = marshaller.SyncValue(ctx, of.Interface(), &r.Object, valueNode, false)
 		if err != nil {
 			return nil, err
 		}
 
+		// Also manually remove $ref from the YAML node if it exists
+		if valueNode != nil && valueNode.Kind == yaml.MappingNode {
+			// Remove $ref key-value pair from the mapping node
+			newContent := make([]*yaml.Node, 0, len(valueNode.Content))
+			for i := 0; i < len(valueNode.Content); i += 2 {
+				if i+1 < len(valueNode.Content) && valueNode.Content[i].Value != "$ref" {
+					newContent = append(newContent, valueNode.Content[i], valueNode.Content[i+1])
+				}
+			}
+			valueNode.Content = newContent
+		}
+
 		// We are valid if the object is valid
 		r.SetValid(r.Object.GetValid(), r.Object.GetValidYaml())
+	} else {
+		// Reference case: we have a reference but no object
+		// Clear the object and sync the reference
+		var zero T
+		r.Object = zero
+
+		var err error
+		valueNode, err = marshaller.SyncValue(ctx, model, r, valueNode, true)
+		if err != nil {
+			return nil, err
+		}
+
+		// Also manually remove object fields from the YAML node if it exists
+		// Keep only $ref, summary, and description fields
+		if valueNode != nil && valueNode.Kind == yaml.MappingNode {
+			newContent := make([]*yaml.Node, 0, len(valueNode.Content))
+			for i := 0; i < len(valueNode.Content); i += 2 {
+				if i+1 < len(valueNode.Content) {
+					key := valueNode.Content[i].Value
+					if key == "$ref" || key == "summary" || key == "description" {
+						newContent = append(newContent, valueNode.Content[i], valueNode.Content[i+1])
+					}
+				}
+			}
+			valueNode.Content = newContent
+		}
+
+		r.SetValid(true, true)
 	}
 
 	r.SetRootNode(valueNode)

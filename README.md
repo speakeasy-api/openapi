@@ -47,6 +47,11 @@
     <!-- Stars Badge -->
     <a href="https://github.com/speakeasy-api/openapi/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/speakeasy-api/openapi.svg?style=for-the-badge&logo=github"></a>
     <!-- Line Break --><br/>
+    <!-- CLI Tool Badge -->
+    <img alt="CLI Tool" src="https://img.shields.io/badge/CLI-Available-brightgreen.svg?style=for-the-badge&logo=terminal">
+    <!-- Go Install Badge -->
+    <img alt="Go Install" src="https://img.shields.io/badge/go%20install-ready-00ADD8.svg?style=for-the-badge&logo=go">
+    <!-- Line Break --><br/>
     <!-- Built By Speakeasy Badge -->
     <a href="https://speakeasy.com/"><img src="https://custom-icon-badges.demolab.com/badge/-Built%20By%20Speakeasy-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
     <!-- License Badge -->
@@ -63,6 +68,54 @@ The `arazzo` package provides an API for working with Arazzo documents including
 ### [openapi](./openapi)
 
 The `openapi` package provides an API for working with OpenAPI documents including reading, creating, mutating, walking, validating and upgrading them. Supports both OpenAPI 3.0.x and 3.1.x specifications.
+
+### [overlay](./overlay)
+
+The `overlay` package provides an API for working with OpenAPI Overlays including applying overlays to specifications, comparing specifications to generate overlays, and validating overlay documents.
+
+## CLI Tool
+
+This repository also provides a comprehensive CLI tool for working with OpenAPI specifications, Arazzo workflows, and OpenAPI overlays.
+
+### Installation
+
+Install the CLI tool using Go:
+
+```bash
+go install github.com/speakeasy-api/openapi/cmd/openapi@latest
+```
+
+### Usage
+
+The CLI provides three main command groups:
+
+- **`openapi openapi`** - Commands for working with OpenAPI specifications ([documentation](./openapi/cmd/README.md))
+- **`openapi arazzo`** - Commands for working with Arazzo workflow documents ([documentation](./arazzo/cmd/README.md))
+- **`openapi overlay`** - Commands for working with OpenAPI overlays ([documentation](./overlay/cmd/README.md))
+
+#### Quick Examples
+
+```bash
+# Validate an OpenAPI specification
+openapi openapi validate ./spec.yaml
+
+# Bundle external references into components section
+openapi openapi bundle ./spec.yaml ./bundled-spec.yaml
+
+# Inline all references to create a self-contained document
+openapi openapi inline ./spec.yaml ./inlined-spec.yaml
+
+# Upgrade OpenAPI spec to latest version
+openapi openapi upgrade ./spec.yaml ./upgraded-spec.yaml
+
+# Apply an overlay to a specification
+openapi overlay apply --overlay overlay.yaml --schema spec.yaml
+
+# Validate an Arazzo workflow document
+openapi arazzo validate ./workflow.arazzo.yaml
+```
+
+For detailed usage instructions for each command group, see the individual documentation linked above.
 
 ## Sub Packages
 
@@ -102,3 +155,4 @@ This repository is maintained by Speakeasy, but we welcome and encourage contrib
 All contributions, whether they're bug reports, feature requests, or code changes, help make this project better for everyone.
 
 Please ensure your contributions adhere to our coding standards and include appropriate tests where applicable.
+
