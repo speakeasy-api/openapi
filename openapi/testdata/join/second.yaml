@@ -1,0 +1,122 @@
+openapi: 3.1.0
+info:
+  title: Second API
+  version: 2.0.0
+  description: Second API for joining tests
+servers:
+  - url: https://main-api.example.com
+    description: Main server
+security:
+  - ApiKeyAuth: []
+tags:
+  - name: products
+    description: Product operations
+paths:
+  /products:
+    get:
+      summary: Get products
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+  /users:
+    # This conflicts with main.yaml /users path
+    post:
+      summary: Create user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '201':
+          description: Created
+webhooks:
+  productUpdated:
+    post:
+      summary: Product updated webhook
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Product'
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+          format: float
+    User:
+      # This conflicts with main.yaml User schema (different structure)
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        active:
+          type: boolean
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+  responses:
+    NotFound:
+      # This conflicts with main.yaml NotFound response (different description)
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+  parameters:
+    offsetParam:
+      name: offset
+      in: query
+      description: number of items to skip
+      schema:
+        type: integer
+        format: int32
+    limitParam:
+      # This conflicts with main.yaml limitParam (different description)
+      name: limit
+      in: query
+      description: maximum number of items to return
+      schema:
+        type: integer
+        format: int32
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
