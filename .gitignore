@@ -5,3 +5,5 @@ coverage.html
 # VSCode settings (user-specific)
 .vscode/*
 !.vscode/settings.example.json
+# Added by goreleaser init:
+dist/

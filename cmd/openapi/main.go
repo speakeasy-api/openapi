@@ -12,6 +12,8 @@ import (
 
 var (
 	version = "dev"
+	commit  = "none"
+	date    = "unknown"
 )
 
 var rootCmd = &cobra.Command{
@@ -72,8 +74,14 @@ These commands help you validate and work with Arazzo documents.`,
 }
 
 func init() {
-	// Set version template
-	rootCmd.SetVersionTemplate(`{{printf "%s" .Version}}`)
+	// Set version template with build info
+	if commit != "none" && date != "unknown" {
+		rootCmd.SetVersionTemplate(`{{printf "%s" .Version}}
+Build: ` + commit + `
+Built: ` + date)
+	} else {
+		rootCmd.SetVersionTemplate(`{{printf "%s" .Version}}`)
+	}
 
 	// Add OpenAPI spec validation command
 	openapiCmd.Apply(openapiCmds)
