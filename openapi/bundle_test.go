@@ -43,10 +43,6 @@ func TestBundle_Success(t *testing.T) {
 	require.NoError(t, err)
 	actualYAML := buf.Bytes()
 
-	// Save the current output for comparison
-	err = os.WriteFile("testdata/inline/bundled_current.yaml", actualYAML, 0644)
-	require.NoError(t, err)
-
 	// Load the expected output
 	expectedBytes, err := os.ReadFile("testdata/inline/bundled_expected.yaml")
 	require.NoError(t, err)
@@ -87,10 +83,6 @@ func TestBundle_CounterNaming_Success(t *testing.T) {
 	err = openapi.Marshal(ctx, inputDoc, &buf)
 	require.NoError(t, err)
 	actualYAML := buf.Bytes()
-
-	// Save the current output for comparison
-	err = os.WriteFile("testdata/inline/bundled_counter_current.yaml", actualYAML, 0644)
-	require.NoError(t, err)
 
 	// Load the expected output
 	expectedBytes, err := os.ReadFile("testdata/inline/bundled_counter_expected.yaml")

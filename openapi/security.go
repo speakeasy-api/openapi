@@ -205,9 +205,9 @@ type SecurityRequirement struct {
 var _ interfaces.Model[core.SecurityRequirement] = (*SecurityRequirement)(nil)
 
 // NewSecurityRequirement creates a new SecurityRequirement object with the embedded map initialized.
-func NewSecurityRequirement() *SecurityRequirement {
+func NewSecurityRequirement(elems ...*sequencedmap.Element[string, []string]) *SecurityRequirement {
 	return &SecurityRequirement{
-		Map: *sequencedmap.New[string, []string](),
+		Map: *sequencedmap.New(elems...),
 	}
 }
 

@@ -38,9 +38,9 @@ type (
 )
 
 // NewReferencedPathItemFromRef creates a new ReferencedPathItem from a reference.
-func NewReferencedPathItemFromRef(ref *references.Reference) *ReferencedPathItem {
+func NewReferencedPathItemFromRef(ref references.Reference) *ReferencedPathItem {
 	return &ReferencedPathItem{
-		Reference: ref,
+		Reference: &ref,
 	}
 }
 
@@ -52,9 +52,9 @@ func NewReferencedPathItemFromPathItem(pathItem *PathItem) *ReferencedPathItem {
 }
 
 // NewReferencedExampleFromRef creates a new ReferencedExample from a reference.
-func NewReferencedExampleFromRef(ref *references.Reference) *ReferencedExample {
+func NewReferencedExampleFromRef(ref references.Reference) *ReferencedExample {
 	return &ReferencedExample{
-		Reference: ref,
+		Reference: &ref,
 	}
 }
 
@@ -66,9 +66,9 @@ func NewReferencedExampleFromExample(example *Example) *ReferencedExample {
 }
 
 // NewReferencedParameterFromRef creates a new ReferencedParameter from a reference.
-func NewReferencedParameterFromRef(ref *references.Reference) *ReferencedParameter {
+func NewReferencedParameterFromRef(ref references.Reference) *ReferencedParameter {
 	return &ReferencedParameter{
-		Reference: ref,
+		Reference: &ref,
 	}
 }
 
@@ -80,9 +80,9 @@ func NewReferencedParameterFromParameter(parameter *Parameter) *ReferencedParame
 }
 
 // NewReferencedHeaderFromRef creates a new ReferencedHeader from a reference.
-func NewReferencedHeaderFromRef(ref *references.Reference) *ReferencedHeader {
+func NewReferencedHeaderFromRef(ref references.Reference) *ReferencedHeader {
 	return &ReferencedHeader{
-		Reference: ref,
+		Reference: &ref,
 	}
 }
 
@@ -94,9 +94,9 @@ func NewReferencedHeaderFromHeader(header *Header) *ReferencedHeader {
 }
 
 // NewReferencedRequestBodyFromRef creates a new ReferencedRequestBody from a reference.
-func NewReferencedRequestBodyFromRef(ref *references.Reference) *ReferencedRequestBody {
+func NewReferencedRequestBodyFromRef(ref references.Reference) *ReferencedRequestBody {
 	return &ReferencedRequestBody{
-		Reference: ref,
+		Reference: &ref,
 	}
 }
 
@@ -108,9 +108,9 @@ func NewReferencedRequestBodyFromRequestBody(requestBody *RequestBody) *Referenc
 }
 
 // NewReferencedResponseFromRef creates a new ReferencedResponse from a reference.
-func NewReferencedResponseFromRef(ref *references.Reference) *ReferencedResponse {
+func NewReferencedResponseFromRef(ref references.Reference) *ReferencedResponse {
 	return &ReferencedResponse{
-		Reference: ref,
+		Reference: &ref,
 	}
 }
 
@@ -122,9 +122,9 @@ func NewReferencedResponseFromResponse(response *Response) *ReferencedResponse {
 }
 
 // NewReferencedCallbackFromRef creates a new ReferencedCallback from a reference.
-func NewReferencedCallbackFromRef(ref *references.Reference) *ReferencedCallback {
+func NewReferencedCallbackFromRef(ref references.Reference) *ReferencedCallback {
 	return &ReferencedCallback{
-		Reference: ref,
+		Reference: &ref,
 	}
 }
 
@@ -136,9 +136,9 @@ func NewReferencedCallbackFromCallback(callback *Callback) *ReferencedCallback {
 }
 
 // NewReferencedLinkFromRef creates a new ReferencedLink from a reference.
-func NewReferencedLinkFromRef(ref *references.Reference) *ReferencedLink {
+func NewReferencedLinkFromRef(ref references.Reference) *ReferencedLink {
 	return &ReferencedLink{
-		Reference: ref,
+		Reference: &ref,
 	}
 }
 
@@ -150,9 +150,9 @@ func NewReferencedLinkFromLink(link *Link) *ReferencedLink {
 }
 
 // NewReferencedSecuritySchemeFromRef creates a new ReferencedSecurityScheme from a reference.
-func NewReferencedSecuritySchemeFromRef(ref *references.Reference) *ReferencedSecurityScheme {
+func NewReferencedSecuritySchemeFromRef(ref references.Reference) *ReferencedSecurityScheme {
 	return &ReferencedSecurityScheme{
-		Reference: ref,
+		Reference: &ref,
 	}
 }
 

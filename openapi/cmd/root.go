@@ -9,4 +9,5 @@ func Apply(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(inlineCmd)
 	rootCmd.AddCommand(bundleCmd)
 	rootCmd.AddCommand(joinCmd)
+	rootCmd.AddCommand(bootstrapCmd)
 }

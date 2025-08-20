@@ -2,6 +2,7 @@ package yml
 
 import (
 	"context"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -84,6 +85,30 @@ func CreateStringNode(value string) *yaml.Node {
 		Value: value,
 		Kind:  yaml.ScalarNode,
 		Tag:   "!!str",
+	}
+}
+
+func CreateIntNode(value int64) *yaml.Node {
+	return &yaml.Node{
+		Value: strconv.FormatInt(value, 10),
+		Kind:  yaml.ScalarNode,
+		Tag:   "!!int",
+	}
+}
+
+func CreateFloatNode(value float64) *yaml.Node {
+	return &yaml.Node{
+		Value: strconv.FormatFloat(value, 'f', -1, 64),
+		Kind:  yaml.ScalarNode,
+		Tag:   "!!float",
+	}
+}
+
+func CreateBoolNode(value bool) *yaml.Node {
+	return &yaml.Node{
+		Value: strconv.FormatBool(value),
+		Kind:  yaml.ScalarNode,
+		Tag:   "!!bool",
 	}
 }
 

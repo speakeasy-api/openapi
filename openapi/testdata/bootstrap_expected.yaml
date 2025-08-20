@@ -1,0 +1,142 @@
+openapi: "3.1.1"
+info:
+  title: "My API"
+  version: "1.0.0"
+  description: "A new OpenAPI document template ready to populate"
+  termsOfService: "https://example.com/terms"
+  contact:
+    name: "API Support"
+    url: "https://example.com/support"
+    email: "support@example.com"
+  license:
+    name: "MIT"
+    url: "https://opensource.org/licenses/MIT"
+tags:
+  - name: "users"
+    description: "User management operations"
+    externalDocs:
+      description: "User API documentation"
+      url: "https://docs.example.com/users"
+servers:
+  - url: "https://api.example.com/v1"
+    description: "Production server"
+  - url: "https://staging-api.example.com/v1"
+    description: "Staging server"
+security:
+  - ApiKeyAuth: []
+paths:
+  /users:
+    post:
+      operationId: "createUser"
+      summary: "Create a new user"
+      description: "Creates a new user account with the provided information"
+      tags:
+        - "users"
+      requestBody:
+        description: "User creation request"
+        content:
+          application/json:
+            schema:
+              type: "object"
+              properties:
+                name:
+                  type: "string"
+                  maxLength: 100
+                  minLength: 1
+                  description: "Full name of the user"
+                email:
+                  type: "string"
+                  format: "email"
+                  description: "Email address of the user"
+              required:
+                - "name"
+                - "email"
+        required: true
+      responses:
+        "201":
+          $ref: "#/components/responses/UserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedResponse"
+components:
+  schemas:
+    User:
+      type: "object"
+      properties:
+        id:
+          type: "integer"
+          examples:
+            - 123
+          format: "int64"
+          description: "Unique identifier for the user"
+        name:
+          type: "string"
+          examples:
+            - John Doe
+          maxLength: 100
+          minLength: 1
+          description: "Full name of the user"
+        email:
+          type: "string"
+          examples:
+            - john.doe@example.com
+          format: "email"
+          description: "Email address of the user"
+        status:
+          type: "string"
+          examples:
+            - active
+          enum:
+            - active
+            - inactive
+            - pending
+          description: "Current status of the user account"
+      title: "User"
+      required:
+        - "name"
+        - "email"
+      description: "A user account"
+    Error:
+      type: "object"
+      properties:
+        code:
+          type: "string"
+          examples:
+            - VALIDATION_ERROR
+          description: "Error code"
+        message:
+          type: "string"
+          examples:
+            - The request is invalid
+          description: "Human-readable error message"
+      title: "Error"
+      required:
+        - "code"
+        - "message"
+      description: "Error response"
+  responses:
+    UserResponse:
+      description: "User details"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/User"
+    BadRequestResponse:
+      description: "Bad request - validation error"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    UnauthorizedResponse:
+      description: "Unauthorized - authentication required"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  securitySchemes:
+    ApiKeyAuth:
+      type: "apiKey"
+      description: "API key for authentication"
+      name: "X-API-Key"
+      in: "header"
