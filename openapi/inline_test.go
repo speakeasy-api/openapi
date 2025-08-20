@@ -43,10 +43,6 @@ func TestInline_Success(t *testing.T) {
 	require.NoError(t, err)
 	actualYAML := buf.Bytes()
 
-	// Save the current output for comparison
-	err = os.WriteFile("testdata/inline/inline_current.yaml", actualYAML, 0644)
-	require.NoError(t, err)
-
 	// Load the expected output
 	expectedBytes, err := os.ReadFile("testdata/inline/inline_expected.yaml")
 	require.NoError(t, err)

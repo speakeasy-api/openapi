@@ -68,10 +68,6 @@ func TestJoin_Counter_Success(t *testing.T) {
 	require.NoError(t, err)
 	actualYAML := buf.Bytes()
 
-	// Save the current output for comparison
-	err = os.WriteFile("testdata/join/joined_counter_current.yaml", actualYAML, 0644)
-	require.NoError(t, err)
-
 	// Load the expected output
 	expectedBytes, err := os.ReadFile("testdata/join/joined_counter_expected.yaml")
 	require.NoError(t, err)
@@ -137,10 +133,6 @@ func TestJoin_FilePath_Success(t *testing.T) {
 	err = openapi.Marshal(ctx, mainDoc, &buf)
 	require.NoError(t, err)
 	actualYAML := buf.Bytes()
-
-	// Save the current output for comparison
-	err = os.WriteFile("testdata/join/joined_filepath_current.yaml", actualYAML, 0644)
-	require.NoError(t, err)
 
 	// Load the expected output
 	expectedBytes, err := os.ReadFile("testdata/join/joined_filepath_expected.yaml")
@@ -328,10 +320,6 @@ func TestJoin_ServersSecurityConflicts_Success(t *testing.T) {
 	err = openapi.Marshal(ctx, mainDoc, &buf)
 	require.NoError(t, err)
 	actualYAML := buf.Bytes()
-
-	// Save the current output for comparison
-	err = os.WriteFile("testdata/join/joined_conflicts_current.yaml", actualYAML, 0644)
-	require.NoError(t, err)
 
 	// Read expected output
 	expectedBytes, err := os.ReadFile("testdata/join/joined_conflicts_expected.yaml")
