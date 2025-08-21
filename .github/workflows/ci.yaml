@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
 
       - name: Install mise
         uses: jdx/mise-action@v2
@@ -46,6 +48,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
 
       - name: Install mise
         uses: jdx/mise-action@v2
@@ -55,6 +59,14 @@ jobs:
         with:
           go-version-file: "go.mod"
           cache: true
+
+      # Verify Docker is available for testcontainers (Ubuntu only)
+      - name: Verify Docker availability
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          docker --version
+          docker info
+          echo "Docker is available for testcontainers"
 
       - name: Get current date
         id: date
@@ -78,7 +90,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         env:
           ARAZZO_CACHE_DIR: ${{ runner.temp }}
-        run: gotestsum --format testname -- -race ./...
+        run: gotestsum --format testname -- -race $(go list ./... | grep -v 'jsonschema/oas3/tests')
 
       - name: Calculate coverage
         if: matrix.os == 'ubuntu-latest'
@@ -100,6 +112,11 @@ jobs:
 
           # Checkout main branch in a temporary directory
           git worktree add /tmp/main-branch main
+
+          # Initialize submodules in the main branch worktree
+          cd /tmp/main-branch
+          git submodule update --init --recursive || echo "Submodule initialization failed, continuing without submodules"
+          cd "$CURRENT_DIR"
 
           # Run tests on main branch to get coverage (with timeout)
           cd /tmp/main-branch

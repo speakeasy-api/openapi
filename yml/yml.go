@@ -38,6 +38,7 @@ func CreateOrUpdateScalarNode(ctx context.Context, value any, valueNode *yaml.No
 
 	if resolvedValueNode != nil {
 		resolvedValueNode.Value = convNode.Value
+		resolvedValueNode.Tag = convNode.Tag // Also update the tag to match the new value type
 		return valueNode
 	}
 

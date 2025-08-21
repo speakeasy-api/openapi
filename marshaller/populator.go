@@ -10,19 +10,24 @@ import (
 
 // Pre-computed reflection types for performance
 var (
-	nodeAccessorType   = reflect.TypeOf((*NodeAccessor)(nil)).Elem()
-	populatorType      = reflect.TypeOf((*Populator)(nil)).Elem()
-	sequencedMapType   = reflect.TypeOf((*interfaces.SequencedMapInterface)(nil)).Elem()
-	coreModelerType    = reflect.TypeOf((*CoreModeler)(nil)).Elem()
-	yamlNodePtrType    = reflect.TypeOf((*yaml.Node)(nil))
-	yamlNodeType       = reflect.TypeOf(yaml.Node{})
-	yamlNodePtrPtrType = reflect.TypeOf((**yaml.Node)(nil))
-	populatorValueTag  = "populatorValue"
-	populatorValueTrue = "true"
+	nodeAccessorType         = reflect.TypeOf((*NodeAccessor)(nil)).Elem()
+	populatorType            = reflect.TypeOf((*Populator)(nil)).Elem()
+	parentAwarePopulatorType = reflect.TypeOf((*ParentAwarePopulator)(nil)).Elem()
+	sequencedMapType         = reflect.TypeOf((*interfaces.SequencedMapInterface)(nil)).Elem()
+	coreModelerType          = reflect.TypeOf((*CoreModeler)(nil)).Elem()
+	yamlNodePtrType          = reflect.TypeOf((*yaml.Node)(nil))
+	yamlNodeType             = reflect.TypeOf(yaml.Node{})
+	yamlNodePtrPtrType       = reflect.TypeOf((**yaml.Node)(nil))
+	populatorValueTag        = "populatorValue"
+	populatorValueTrue       = "true"
 )
 
 type Populator interface {
 	Populate(source any) error
+}
+
+type ParentAwarePopulator interface {
+	PopulateWithParent(source any, parent any) error
 }
 
 func Populate(source any, target any) error {
@@ -59,10 +64,47 @@ func Populate(source any, target any) error {
 		}
 	}
 
-	return populateValue(source, t)
+	return populateValueWithParent(source, t, nil)
 }
 
-func populateModel(source any, target any) error {
+func PopulateWithParent(source any, target any, parent any) error {
+	t := reflect.ValueOf(target)
+
+	if t.Kind() == reflect.Ptr && t.IsNil() {
+		t.Set(CreateInstance(t.Type().Elem()))
+	}
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	s := reflect.ValueOf(source)
+	if s.Type().Implements(nodeAccessorType) {
+		source = source.(NodeAccessor).GetValue()
+	}
+
+	// Special case for yaml.Node conversion (similar to unmarshaller.go:216-223)
+	switch {
+	case t.Type() == yamlNodePtrType:
+		if node, ok := source.(yaml.Node); ok {
+			t.Set(reflect.ValueOf(&node))
+			return nil
+		}
+	case t.Type() == yamlNodeType:
+		if node, ok := source.(*yaml.Node); ok {
+			t.Set(reflect.ValueOf(*node))
+			return nil
+		}
+	case t.Type() == yamlNodePtrPtrType:
+		if node, ok := source.(*yaml.Node); ok {
+			t.Set(reflect.ValueOf(&node))
+			return nil
+		}
+	}
+
+	return populateValueWithParent(source, t, parent)
+}
+
+func PopulateModel(source any, target any) error {
 	s := reflect.ValueOf(source)
 	t := reflect.ValueOf(target)
 
@@ -113,7 +155,7 @@ func populateModel(source any, target any) error {
 		if field.Anonymous {
 			if targetSeqMap := getSequencedMapInterface(tField); targetSeqMap != nil {
 				sourceForPopulation := getSourceForPopulation(s.Field(i), fieldInt)
-				if err := populateSequencedMap(sourceForPopulation, targetSeqMap); err != nil {
+				if err := populateSequencedMap(sourceForPopulation, targetSeqMap, target); err != nil {
 					return err
 				}
 			}
@@ -160,7 +202,7 @@ func populateModel(source any, target any) error {
 			nodeValue = nodeAccessor.GetValue()
 		}
 
-		if err := populateValue(nodeValue, tField); err != nil {
+		if err := populateValueWithParent(nodeValue, tField, target); err != nil {
 			return err
 		}
 	}
@@ -168,7 +210,7 @@ func populateModel(source any, target any) error {
 	return nil
 }
 
-func populateValue(source any, target reflect.Value) error {
+func populateValueWithParent(source any, target reflect.Value, parent any) error {
 	value := reflect.ValueOf(source)
 
 	// Handle nil source early - when source is nil, reflect.ValueOf returns a zero Value
@@ -208,18 +250,21 @@ func populateValue(source any, target reflect.Value) error {
 	}
 
 	targetType := target.Type()
+	if targetType.Implements(parentAwarePopulatorType) {
+		return target.Interface().(ParentAwarePopulator).PopulateWithParent(value.Interface(), parent)
+	}
 	if targetType.Implements(populatorType) {
 		return target.Interface().(Populator).Populate(value.Interface())
 	}
 
 	// Check if target is a sequenced map and handle it specially
 	if targetType.Implements(sequencedMapType) && !isEmbeddedSequencedMapType(value.Type()) {
-		return populateSequencedMap(value.Interface(), target.Interface().(interfaces.SequencedMapInterface))
+		return populateSequencedMap(value.Interface(), target.Interface().(interfaces.SequencedMapInterface), parent)
 	}
 
 	// Check if target implements CoreSetter interface
 	if coreSetter, ok := target.Interface().(CoreSetter); ok {
-		if err := populateModel(value.Interface(), target.Interface()); err != nil {
+		if err := PopulateModel(value.Interface(), target.Interface()); err != nil {
 			return err
 		}
 
@@ -252,7 +297,7 @@ func populateValue(source any, target reflect.Value) error {
 				}
 			}
 
-			if err := populateValue(elementValue, target.Index(i)); err != nil {
+			if err := populateValueWithParent(elementValue, target.Index(i), target.Interface()); err != nil {
 				return err
 			}
 		}

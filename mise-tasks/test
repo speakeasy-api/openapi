@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Check if JSON Schema Test Suite submodule is initialized
+if [ ! -d "jsonschema/oas3/tests/testsuite/tests/draft2020-12" ] || [ -z "$(ls -A jsonschema/oas3/tests/testsuite/tests/draft2020-12 2>/dev/null)" ]; then
+    echo "⚠️  JSON Schema Test Suite submodule not initialized."
+    echo "   Some tests will be skipped. Run 'mise run setup-submodules' to enable all tests."
+    echo ""
+fi
+
 echo "🧪 Running tests with gotestsum..."
 gotestsum --format testname -- -race ./...
 echo "✅ All tests passed!"

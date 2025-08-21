@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/marshaller"
 )
 
 type model interface {
@@ -110,7 +111,20 @@ func navigateModel(sourceVal reflect.Value, currentPart navigationPart, stack []
 	}
 
 	if coreFieldIndex == -1 {
-		return nil, nil, ErrNotFound.Wrap(fmt.Errorf("key %s not found in core model at %s", currentPart.Value, currentPath))
+		// Field not found in core model, try searching the associated YAML node
+		// Check if the model implements CoreModeler interface (which has GetRootNode)
+		if coreModeler, ok := coreAny.(marshaller.CoreModeler); ok {
+			rootNode := coreModeler.GetRootNode()
+			if rootNode != nil {
+				// Use the existing YAML node navigation logic to search for the key
+				result, newStack, err := getYamlNodeTarget(rootNode, currentPart, stack, currentPath, o)
+				if err == nil {
+					return result, newStack, nil
+				}
+			}
+		}
+
+		return nil, nil, ErrNotFound.Wrap(fmt.Errorf("key %s not found in core model or YAML node at %s", currentPart.Value, currentPath))
 	}
 
 	// Find the corresponding field in the high-level model

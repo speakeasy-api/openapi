@@ -3,6 +3,7 @@ package oas3
 
 import (
 	_ "embed"
+	"fmt"
 	"reflect"
 
 	"github.com/speakeasy-api/openapi/extensions"
@@ -72,6 +73,11 @@ type Schema struct {
 	Schema                *string
 	XML                   *XML
 	Extensions            *extensions.Extensions
+
+	// Parent reference links - private fields to avoid serialization
+	// These are set when the schema was populated as a child of another schema.
+	// Used for circular reference detection during resolution.
+	parent *JSONSchema[Referenceable] // Immediate parent schema in the hierarchy
 }
 
 // ShallowCopy creates a shallow copy of the Schema.
@@ -127,6 +133,7 @@ func (s *Schema) ShallowCopy() *Schema {
 		Schema:                s.Schema,
 		XML:                   s.XML,
 		Extensions:            s.Extensions,
+		parent:                s.parent,
 	}
 
 	// Shallow copy slices - create new slice but reference same elements
@@ -867,6 +874,53 @@ func (s *Schema) IsEqual(other *Schema) bool {
 	// If we reach here, either both are nil, or one is nil and the other is empty, or both are equal
 
 	return true
+}
+
+// GetParent returns the immediate parent JSONSchema if this schema was populated as a child of another schema.
+// Returns nil if this schema has no parent or was not populated via parent-aware population.
+func (s *Schema) GetParent() *JSONSchema[Referenceable] {
+	if s == nil {
+		return nil
+	}
+	return s.parent
+}
+
+// SetParent sets the immediate parent JSONSchema for this schema.
+// This is used during parent-aware population to establish parent relationships.
+func (s *Schema) SetParent(parent *JSONSchema[Referenceable]) {
+	if s == nil {
+		return
+	}
+	s.parent = parent
+}
+
+// PopulateWithParent implements the ParentAwarePopulator interface to establish parent relationships during population
+func (s *Schema) PopulateWithParent(source any, parent any) error {
+	// If we have a parent that is a JSONSchema, establish the parent relationship
+	if parent != nil {
+		if parentSchema, ok := parent.(*JSONSchema[Referenceable]); ok {
+			s.SetParent(parentSchema)
+		}
+	}
+
+	var coreSchema *core.Schema
+	switch src := source.(type) {
+	case *core.Schema:
+		coreSchema = src
+	case core.Schema:
+		coreSchema = &src
+	default:
+		return fmt.Errorf("expected *core.Reference[C] or core.Reference[C], got %T", source)
+	}
+
+	// First, perform the standard population
+	if err := marshaller.PopulateModel(source, s); err != nil {
+		return err
+	}
+
+	s.SetCore(coreSchema)
+
+	return nil
 }
 
 // Helper functions for equality comparison

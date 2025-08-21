@@ -31,7 +31,16 @@ func (r Reference) GetJSONPointer() jsonpointer.JSONPointer {
 	if len(parts) < 2 {
 		return ""
 	}
-	return jsonpointer.JSONPointer(strings.TrimSpace(parts[1]))
+
+	pointer := strings.TrimSpace(parts[1])
+
+	// URL decode the JSON pointer to handle percent-encoded characters
+	// like %25 (which represents %)
+	if decoded, err := url.QueryUnescape(pointer); err == nil {
+		pointer = decoded
+	}
+
+	return jsonpointer.JSONPointer(pointer)
 }
 
 func (r Reference) Validate() error {

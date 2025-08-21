@@ -92,7 +92,7 @@ func (e *EitherValue[L, LCore, R, RCore]) RightValue() R {
 	return *e.Right
 }
 
-func (e *EitherValue[L, LCore, R, RCore]) Populate(source any) error {
+func (e *EitherValue[L, LCore, R, RCore]) PopulateWithParent(source any, parent any) error {
 	var ec *core.EitherValue[LCore, RCore]
 	switch v := source.(type) {
 	case *core.EitherValue[LCore, RCore]:
@@ -107,7 +107,7 @@ func (e *EitherValue[L, LCore, R, RCore]) Populate(source any) error {
 	e.SetCoreAny(ec)
 
 	if ec.IsLeft {
-		if err := marshaller.Populate(ec.Left, &e.Left); err != nil {
+		if err := marshaller.PopulateWithParent(ec.Left, &e.Left, parent); err != nil {
 			return fmt.Errorf("failed to populate left: %w", err)
 		}
 

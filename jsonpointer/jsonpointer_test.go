@@ -50,6 +50,12 @@ func TestJSONPointer_Validate_Success(t *testing.T) {
 				j: JSONPointer("/paths/~1special-events~1{eventId}/get"),
 			},
 		},
+		{
+			name: "empty tokens (consecutive slashes)",
+			args: args{
+				j: JSONPointer("/some//path"),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -94,11 +100,11 @@ func TestJSONPointer_Validate_Error(t *testing.T) {
 			wantErr: errors.New("validation error -- jsonpointer part must be a valid token [^(?:[\x00-.0-}\x7f-\uffff]|~[01])+$]: /~/some~path"),
 		},
 		{
-			name: "empty part in path",
+			name: "invalid path with unescaped tilde in middle",
 			args: args{
-				j: JSONPointer("/some//path"),
+				j: JSONPointer("/some/~invalid/path"),
 			},
-			wantErr: errors.New("validation error -- jsonpointer part must not be empty: /some//path"),
+			wantErr: errors.New("validation error -- jsonpointer part must be a valid token [^(?:[\x00-.0-}\x7f-\uffff]|~[01])+$]: /some/~invalid/path"),
 		},
 	}
 	for _, tt := range tests {
@@ -272,6 +278,18 @@ func TestGetTarget_Success(t *testing.T) {
 				pointer: JSONPointer("/c/b/a"),
 			},
 			want: 4,
+		},
+		{
+			name: "empty tokens in JSON pointer",
+			args: args{
+				source: map[string]any{
+					"": map[string]any{
+						"": "value",
+					},
+				},
+				pointer: JSONPointer("//"),
+			},
+			want: "value",
 		},
 	}
 	for _, tt := range tests {
