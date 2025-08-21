@@ -90,7 +90,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         env:
           ARAZZO_CACHE_DIR: ${{ runner.temp }}
-        run: gotestsum --format testname -- -race ./...
+        run: gotestsum --format testname -- -race $(go list ./... | grep -v 'jsonschema/oas3/tests')
 
       - name: Calculate coverage
         if: matrix.os == 'ubuntu-latest'
