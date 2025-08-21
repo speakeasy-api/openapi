@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
@@ -112,6 +114,37 @@ const testSuiteDir = "testsuite/tests/draft2020-12"
 // Global variable to hold the remote server instance
 var remoteServer *RemoteServer
 
+// Thread-safe coverage tracking
+type CoverageTracker struct {
+	totalFiles   int64
+	skippedFiles int64
+	totalCases   int64
+	skippedCases int64
+	passedCases  int64
+}
+
+func (c *CoverageTracker) AddFile() {
+	atomic.AddInt64(&c.totalFiles, 1)
+}
+
+func (c *CoverageTracker) AddSkippedFile() {
+	atomic.AddInt64(&c.skippedFiles, 1)
+}
+
+func (c *CoverageTracker) AddCases(total, skipped, passed int64) {
+	atomic.AddInt64(&c.totalCases, total)
+	atomic.AddInt64(&c.skippedCases, skipped)
+	atomic.AddInt64(&c.passedCases, passed)
+}
+
+func (c *CoverageTracker) GetStats() (int, int, int, int, int) {
+	return int(atomic.LoadInt64(&c.totalFiles)),
+		int(atomic.LoadInt64(&c.skippedFiles)),
+		int(atomic.LoadInt64(&c.totalCases)),
+		int(atomic.LoadInt64(&c.skippedCases)),
+		int(atomic.LoadInt64(&c.passedCases))
+}
+
 func TestMain(m *testing.M) {
 	// Check if the git submodule is initialized
 	if !isSubmoduleInitialized(testSuiteDir) {
@@ -148,32 +181,35 @@ func TestJSONSchemaTestSuite_RoundTrip(t *testing.T) {
 	// Get all test files
 	testFiles := getAllTestFiles(t, testSuiteDir)
 
-	// Track coverage statistics
-	var totalFiles, skippedFiles, totalCases, skippedCases, passedCases int
+	// Thread-safe coverage tracking
+	tracker := &CoverageTracker{}
+	var wg sync.WaitGroup
 
 	for _, testFile := range testFiles {
-		totalFiles++
+		tracker.AddFile()
 
 		// Check if this file is blacklisted
 		if reason, isBlacklisted := blacklistedFiles[testFile]; isBlacklisted {
-			skippedFiles++
+			tracker.AddSkippedFile()
 			t.Run(testFile, func(t *testing.T) {
 				t.Skipf("Skipping blacklisted file: %s", reason)
 			})
 			continue
 		}
 
+		wg.Add(1)
 		t.Run(testFile, func(t *testing.T) {
+			defer wg.Done()
 			t.Parallel()
 			fileCases, fileSkipped, filePassed := runRoundTripTestFile(t, filepath.Join(testSuiteDir, testFile))
-			totalCases += fileCases
-			skippedCases += fileSkipped
-			passedCases += filePassed
+			tracker.AddCases(int64(fileCases), int64(fileSkipped), int64(filePassed))
 		})
 	}
 
-	// Print coverage summary
+	// Print coverage summary after all tests complete
 	t.Cleanup(func() {
+		wg.Wait() // Wait for all parallel tests to complete
+		totalFiles, skippedFiles, totalCases, skippedCases, passedCases := tracker.GetStats()
 		printCoverageSummary(t, totalFiles, skippedFiles, totalCases, skippedCases, passedCases)
 	})
 }

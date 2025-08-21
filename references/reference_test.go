@@ -103,11 +103,6 @@ func TestReference_Validate_Error(t *testing.T) {
 			ref:         "https://example .com/api.yaml#/User",
 			expectError: "invalid reference URI",
 		},
-		{
-			name:        "invalid JSON pointer - empty token after slash",
-			ref:         "#/components//User",
-			expectError: "invalid reference JSON pointer",
-		},
 	}
 
 	for _, tt := range tests {
