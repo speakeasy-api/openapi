@@ -251,3 +251,26 @@ func (j *JSONSchema[T]) ShallowCopy() *JSONSchema[T] {
 
 	return result
 }
+
+// PopulateWithParent implements the ParentAwarePopulator interface to establish parent relationships during population
+func (j *JSONSchema[T]) PopulateWithParent(source any, parent any) error {
+	// If we have a parent that is also a JSONSchema, establish the parent relationship
+	if parent != nil {
+		if parentSchema, ok := parent.(*Schema); ok {
+			j.SetParent(parentSchema.GetParent())
+			// If the parent has a top-level parent, inherit it; otherwise, the parent is the top-level
+			if parentSchema.GetParent().GetTopLevelParent() != nil {
+				j.SetTopLevelParent(parentSchema.GetParent().GetTopLevelParent())
+			} else {
+				j.SetTopLevelParent(parentSchema.GetParent())
+			}
+		}
+	}
+
+	// First, perform the standard population
+	if err := j.EitherValue.PopulateWithParent(source, j); err != nil {
+		return err
+	}
+
+	return nil
+}

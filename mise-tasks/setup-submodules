@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "🔧 Setting up git submodules..."
+
+# Check if we're in a git repository
+if [ ! -d ".git" ]; then
+    echo "❌ Error: Not in a git repository"
+    exit 1
+fi
+
+# Initialize and update submodules
+echo "📥 Initializing and updating git submodules..."
+git submodule update --init --recursive
+
+# Verify the JSON Schema Test Suite submodule is properly set up
+if [ -d "jsonschema/oas3/tests/testsuite/tests/draft2020-12" ] && [ -n "$(ls -A jsonschema/oas3/tests/testsuite/tests/draft2020-12 2>/dev/null)" ]; then
+    echo "✅ JSON Schema Test Suite submodule successfully initialized!"
+    echo "   Location: jsonschema/oas3/tests/testsuite"
+    echo "   Test files: $(find jsonschema/oas3/tests/testsuite/tests/draft2020-12 -name "*.json" | wc -l) JSON test files available"
+else
+    echo "⚠️  Warning: JSON Schema Test Suite submodule may not be fully initialized"
+    echo "   Expected location: jsonschema/oas3/tests/testsuite/tests/draft2020-12"
+fi
+
+echo ""
+echo "🧪 You can now run 'mise run test' to execute all tests including JSON Schema Test Suite tests."

@@ -54,15 +54,12 @@ func (j JSONPointer) getNavigationStack() ([]navigationPart, error) {
 	strParts := strings.Split(strings.TrimPrefix(string(j), "/"), "/")
 
 	for _, part := range strParts {
-		if len(part) == 0 {
-			return nil, fmt.Errorf("jsonpointer part must not be empty: %s", string(j))
-		}
-
-		if !tokenRegex.MatchString(part) {
+		// Empty parts are valid according to RFC 6901 - they represent empty string keys
+		if len(part) > 0 && !tokenRegex.MatchString(part) {
 			return nil, fmt.Errorf("jsonpointer part must be a valid token [%s]: %s", tokenRegex.String(), string(j))
 		}
 
-		if digitOnlyRegex.MatchString(part) && (len(part) == 1 || part[0] != '0') {
+		if len(part) > 0 && digitOnlyRegex.MatchString(part) && (len(part) == 1 || part[0] != '0') {
 			stack = append(stack, navigationPart{
 				Type:  partTypeIndex,
 				Value: part,

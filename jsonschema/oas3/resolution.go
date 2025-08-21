@@ -153,9 +153,14 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 
 	// Special case: detect self-referencing schemas (references to root document)
 	// This catches cases like "#" which reference the root document itself
+	// Only consider it circular if this schema has no parent (i.e., it's at the root level)
 	if ref.GetURI() == "" && ref.GetJSONPointer() == "" {
-		s.circularErrorFound = true
-		return nil, nil, errors.New("circular reference detected: self-referencing schema")
+		// Check if this schema has a parent - if it does, then referencing "#" is legitimate
+		// If it has no parent, then it's the root schema referencing itself, which is circular
+		if s.GetParent() == nil && s.GetTopLevelParent() == nil {
+			s.circularErrorFound = true
+			return nil, nil, errors.New("circular reference detected: self-referencing schema")
+		}
 	}
 
 	// Check for circular reference by looking for the current reference in the chain
