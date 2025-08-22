@@ -386,17 +386,46 @@ func removeUnusedComponents(doc *OpenAPI, preserveSchemas map[string]*oas3.JSONS
 		return
 	}
 
-	// Create new components with only the schemas we moved from $defs
+	// Find security schemes that are referenced by global security requirements
+	preserveSecuritySchemes := make(map[string]*ReferencedSecurityScheme)
+	if doc.Security != nil && doc.Components.SecuritySchemes != nil {
+		for _, securityRequirement := range doc.Security {
+			if securityRequirement != nil {
+				for schemeName := range securityRequirement.All() {
+					if scheme, exists := doc.Components.SecuritySchemes.Get(schemeName); exists {
+						preserveSecuritySchemes[schemeName] = scheme
+					}
+				}
+			}
+		}
+	}
+
+	// Create new components with preserved schemas and security schemes
+	newComponents := &Components{}
+
+	// Preserve schemas moved from $defs
 	if len(preserveSchemas) > 0 {
 		newSchemas := sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]]()
 		for name, schema := range preserveSchemas {
 			newSchemas.Set(name, schema)
 		}
-		doc.Components = &Components{
-			Schemas: newSchemas,
+		newComponents.Schemas = newSchemas
+	}
+
+	// Preserve security schemes referenced by global security requirements
+	if len(preserveSecuritySchemes) > 0 {
+		newSecuritySchemes := sequencedmap.New[string, *ReferencedSecurityScheme]()
+		for name, scheme := range preserveSecuritySchemes {
+			newSecuritySchemes.Set(name, scheme)
 		}
+		newComponents.SecuritySchemes = newSecuritySchemes
+	}
+
+	// Only set components if we have something to preserve
+	if newComponents.Schemas != nil || newComponents.SecuritySchemes != nil {
+		doc.Components = newComponents
 	} else {
-		// No schemas to preserve, clear all components
+		// No components to preserve, clear all components
 		doc.Components = nil
 	}
 }

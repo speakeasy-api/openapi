@@ -233,26 +233,87 @@ jobs:
             coverage.out
             coverage.html
 
-      - name: Build (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+  # Build jobs (run in parallel)
+  build-ubuntu:
+    name: Build (Ubuntu)
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+
+      - name: Setup Go with caching
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Build project
         run: mise run build
 
-      - name: Build (Windows)
-        if: matrix.os == 'windows-latest'
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+
+      - name: Setup Go with caching
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Build project
         run: go build -v ./...
 
-  # Summary job that depends on all matrix jobs
+  # CLI integration tests (Linux only, run in parallel)
+  cli-tests:
+    name: CLI Integration Tests
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+
+      - name: Setup Go with caching
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Run CLI integration tests
+        run: mise run test-cli
+
+  # Summary job that depends on all jobs
   # This provides a single status check for branch protection
   test-summary:
     name: Test Summary
-    needs: [lint, test]
+    needs: [lint, test, cli-tests, build-ubuntu, build-windows]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check test results
         run: |
-          if [ "${{ needs.lint.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ]; then
-            echo "Lint or tests failed or were cancelled"
+          if [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.cli-tests.result }}" != "success" ] || \
+             [ "${{ needs.build-ubuntu.result }}" != "success" ] || \
+             [ "${{ needs.build-windows.result }}" != "success" ]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           fi
           echo "All checks passed successfully"

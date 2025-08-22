@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/spf13/cobra"
@@ -39,16 +40,16 @@ Smart conflict handling:
 
 Examples:
   # Join to stdout (pipe-friendly)
-  openapi openapi join ./main.yaml ./api1.yaml ./api2.yaml
+  openapi spec join ./main.yaml ./api1.yaml ./api2.yaml
 
   # Join to specific file
-  openapi openapi join ./main.yaml ./api1.yaml ./api2.yaml ./joined.yaml
+  openapi spec join ./main.yaml ./api1.yaml ./api2.yaml ./joined.yaml
 
   # Join in-place with counter strategy
-  openapi openapi join -w --strategy counter ./main.yaml ./api1.yaml
+  openapi spec join -w --strategy counter ./main.yaml ./api1.yaml
 
   # Join with filepath strategy (default)
-  openapi openapi join --strategy filepath ./main.yaml ./api1.yaml ./joined.yaml`,
+  openapi spec join --strategy filepath ./main.yaml ./api1.yaml ./joined.yaml`,
 	Args: cobra.MinimumNArgs(2),
 	RunE: runJoinCommand,
 }
@@ -152,12 +153,21 @@ func runJoinCommand(cmd *cobra.Command, args []string) error {
 
 	// Prepare document info slice
 	var documentInfos []openapi.JoinDocumentInfo
+	mainDir := filepath.Dir(mainFile)
+
 	for i, doc := range documents {
 		docInfo := openapi.JoinDocumentInfo{
 			Document: doc,
 		}
 		if i < len(filePaths) {
-			docInfo.FilePath = filePaths[i]
+			// Compute relative path from main document's directory
+			relPath, err := filepath.Rel(mainDir, filePaths[i])
+			if err != nil {
+				// If we can't compute relative path, use the original path
+				docInfo.FilePath = filePaths[i]
+			} else {
+				docInfo.FilePath = relPath
+			}
 		}
 		documentInfos = append(documentInfos, docInfo)
 	}

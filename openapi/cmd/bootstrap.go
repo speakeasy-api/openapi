@@ -29,13 +29,13 @@ resource for OpenAPI best practices.
 
 Examples:
   # Create bootstrap document and output to stdout
-  openapi openapi bootstrap
+  openapi spec bootstrap
 
   # Create bootstrap document and save to file
-  openapi openapi bootstrap ./my-api.yaml
+  openapi spec bootstrap ./my-api.yaml
 
   # Create bootstrap document in current directory
-  openapi openapi bootstrap ./openapi.yaml`,
+  openapi spec bootstrap ./openapi.yaml`,
 	Args: cobra.MaximumNArgs(1),
 	Run:  runBootstrap,
 }

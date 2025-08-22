@@ -4,6 +4,17 @@ Commands for working with Arazzo workflow documents.
 
 Arazzo workflows describe sequences of API calls and their dependencies. These commands help you validate and work with Arazzo documents according to the [Arazzo Specification](https://spec.openapis.org/arazzo/v1.0.0).
 
+## Table of Contents
+
+- [Table of Contents](#table-of-contents)
+- [Available Commands](#available-commands)
+  - [`validate`](#validate)
+- [What is Arazzo?](#what-is-arazzo)
+  - [Example Arazzo Document](#example-arazzo-document)
+- [Common Use Cases](#common-use-cases)
+- [Common Options](#common-options)
+- [Output Formats](#output-formats)
+
 ## Available Commands
 
 ### `validate`

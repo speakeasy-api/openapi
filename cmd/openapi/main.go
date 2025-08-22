@@ -97,7 +97,7 @@ without directly editing the original files. This is useful for:
 }
 
 var openapiCmds = &cobra.Command{
-	Use:   "openapi",
+	Use:   "spec",
 	Short: "Work with OpenAPI specifications",
 	Long: `Commands for working with OpenAPI specifications.
 
