@@ -39,16 +39,16 @@ Smart conflict handling:
 
 Examples:
   # Join to stdout (pipe-friendly)
-  openapi openapi join ./main.yaml ./api1.yaml ./api2.yaml
+  openapi spec join ./main.yaml ./api1.yaml ./api2.yaml
 
   # Join to specific file
-  openapi openapi join ./main.yaml ./api1.yaml ./api2.yaml ./joined.yaml
+  openapi spec join ./main.yaml ./api1.yaml ./api2.yaml ./joined.yaml
 
   # Join in-place with counter strategy
-  openapi openapi join -w --strategy counter ./main.yaml ./api1.yaml
+  openapi spec join -w --strategy counter ./main.yaml ./api1.yaml
 
   # Join with filepath strategy (default)
-  openapi openapi join --strategy filepath ./main.yaml ./api1.yaml ./joined.yaml`,
+  openapi spec join --strategy filepath ./main.yaml ./api1.yaml ./joined.yaml`,
 	Args: cobra.MinimumNArgs(2),
 	RunE: runJoinCommand,
 }

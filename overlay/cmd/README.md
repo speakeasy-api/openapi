@@ -4,6 +4,24 @@ Commands for working with OpenAPI Overlays.
 
 OpenAPI Overlays provide a way to modify OpenAPI and Arazzo specifications without directly editing the original files. This is useful for adding vendor-specific extensions, modifying specifications for different environments, and applying transformations to third-party APIs.
 
+## Table of Contents
+
+- [Table of Contents](#table-of-contents)
+- [Available Commands](#available-commands)
+  - [`apply`](#apply)
+  - [`validate`](#validate)
+  - [`compare`](#compare)
+- [What are OpenAPI Overlays?](#what-are-openapi-overlays)
+  - [Example Overlay](#example-overlay)
+- [Common Use Cases](#common-use-cases)
+- [Overlay Operations](#overlay-operations)
+- [Common Options](#common-options)
+- [Output Formats](#output-formats)
+- [Examples](#examples)
+  - [Basic Workflow](#basic-workflow)
+  - [Environment-Specific Modifications](#environment-specific-modifications)
+  - [Integration with Other Commands](#integration-with-other-commands)
+
 ## Available Commands
 
 ### `apply`
@@ -130,6 +148,7 @@ All commands work with both YAML and JSON input files, but always output YAML at
 ## Examples
 
 ### Basic Workflow
+
 ```bash
 # Create an overlay by comparing two specs
 openapi overlay compare --before original.yaml --after modified.yaml --out changes.overlay.yaml
@@ -142,6 +161,7 @@ openapi overlay apply --overlay changes.overlay.yaml --schema original.yaml --ou
 ```
 
 ### Environment-Specific Modifications
+
 ```bash
 # Apply production overlay
 openapi overlay apply --overlay prod.overlay.yaml --schema base-spec.yaml --out prod-spec.yaml
@@ -151,8 +171,9 @@ openapi overlay apply --overlay dev.overlay.yaml --schema base-spec.yaml --out d
 ```
 
 ### Integration with Other Commands
+
 ```bash
 # Validate base spec, apply overlay, then validate result
-openapi openapi validate ./base-spec.yaml
+openapi spec validate ./base-spec.yaml
 openapi overlay apply --overlay ./modifications.yaml --schema ./base-spec.yaml --out ./modified-spec.yaml
-openapi openapi validate ./modified-spec.yaml
+openapi spec validate ./modified-spec.yaml

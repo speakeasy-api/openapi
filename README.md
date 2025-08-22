@@ -89,7 +89,7 @@ go install github.com/speakeasy-api/openapi/cmd/openapi@latest
 
 The CLI provides three main command groups:
 
-- **`openapi openapi`** - Commands for working with OpenAPI specifications ([documentation](./openapi/cmd/README.md))
+- **`openapi spec`** - Commands for working with OpenAPI specifications ([documentation](./openapi/cmd/README.md))
 - **`openapi arazzo`** - Commands for working with Arazzo workflow documents ([documentation](./arazzo/cmd/README.md))
 - **`openapi overlay`** - Commands for working with OpenAPI overlays ([documentation](./overlay/cmd/README.md))
 
@@ -97,16 +97,16 @@ The CLI provides three main command groups:
 
 ```bash
 # Validate an OpenAPI specification
-openapi openapi validate ./spec.yaml
+openapi spec validate ./spec.yaml
 
 # Bundle external references into components section
-openapi openapi bundle ./spec.yaml ./bundled-spec.yaml
+openapi spec bundle ./spec.yaml ./bundled-spec.yaml
 
 # Inline all references to create a self-contained document
-openapi openapi inline ./spec.yaml ./inlined-spec.yaml
+openapi spec inline ./spec.yaml ./inlined-spec.yaml
 
 # Upgrade OpenAPI spec to latest version
-openapi openapi upgrade ./spec.yaml ./upgraded-spec.yaml
+openapi spec upgrade ./spec.yaml ./upgraded-spec.yaml
 
 # Apply an overlay to a specification
 openapi overlay apply --overlay overlay.yaml --schema spec.yaml

@@ -32,16 +32,16 @@ The bundle command supports two naming strategies:
 
 Examples:
   # Bundle to stdout (pipe-friendly)
-  openapi openapi bundle ./spec-with-refs.yaml
+  openapi spec bundle ./spec-with-refs.yaml
 
   # Bundle to specific file
-  openapi openapi bundle ./spec.yaml ./bundled-spec.yaml
+  openapi spec bundle ./spec.yaml ./bundled-spec.yaml
 
   # Bundle in-place with counter naming
-  openapi openapi bundle -w --naming counter ./spec.yaml
+  openapi spec bundle -w --naming counter ./spec.yaml
 
   # Bundle with filepath naming (default)
-  openapi openapi bundle --naming filepath ./spec.yaml ./bundled.yaml`,
+  openapi spec bundle --naming filepath ./spec.yaml ./bundled.yaml`,
 	Args: cobra.RangeArgs(1, 2),
 	RunE: runBundleCommand,
 }

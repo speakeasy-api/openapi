@@ -4,6 +4,23 @@ Commands for working with OpenAPI specifications.
 
 OpenAPI specifications define REST APIs in a standard format. These commands help you validate, transform, and work with OpenAPI documents.
 
+## Table of Contents
+
+- [Table of Contents](#table-of-contents)
+- [Available Commands](#available-commands)
+  - [`validate`](#validate)
+  - [`upgrade`](#upgrade)
+  - [`inline`](#inline)
+  - [`bundle`](#bundle)
+    - [Bundle vs Inline](#bundle-vs-inline)
+  - [`join`](#join)
+  - [`bootstrap`](#bootstrap)
+- [Common Options](#common-options)
+- [Output Formats](#output-formats)
+- [Examples](#examples)
+  - [Validation Workflow](#validation-workflow)
+  - [Processing Pipeline](#processing-pipeline)
+
 ## Available Commands
 
 ### `validate`
@@ -12,10 +29,10 @@ Validate an OpenAPI specification document for compliance with the OpenAPI Speci
 
 ```bash
 # Validate a specification file
-openapi openapi validate ./spec.yaml
+openapi spec validate ./spec.yaml
 
 # Validate with verbose output
-openapi openapi validate -v ./spec.yaml
+openapi spec validate -v ./spec.yaml
 ```
 
 This command checks for:
@@ -31,16 +48,16 @@ Upgrade an OpenAPI specification to the latest supported version (3.1.1).
 
 ```bash
 # Upgrade to stdout
-openapi openapi upgrade ./spec.yaml
+openapi spec upgrade ./spec.yaml
 
 # Upgrade to specific file
-openapi openapi upgrade ./spec.yaml ./upgraded-spec.yaml
+openapi spec upgrade ./spec.yaml ./upgraded-spec.yaml
 
 # Upgrade in-place
-openapi openapi upgrade -w ./spec.yaml
+openapi spec upgrade -w ./spec.yaml
 
 # Upgrade with specific target version
-openapi openapi upgrade --version 3.1.0 ./spec.yaml
+openapi spec upgrade --version 3.1.0 ./spec.yaml
 ```
 
 Features:
@@ -56,13 +73,13 @@ Inline all references in an OpenAPI specification to create a self-contained doc
 
 ```bash
 # Inline to stdout (pipe-friendly)
-openapi openapi inline ./spec-with-refs.yaml
+openapi spec inline ./spec-with-refs.yaml
 
 # Inline to specific file
-openapi openapi inline ./spec.yaml ./inlined-spec.yaml
+openapi spec inline ./spec.yaml ./inlined-spec.yaml
 
 # Inline in-place
-openapi openapi inline -w ./spec.yaml
+openapi spec inline -w ./spec.yaml
 ```
 
 What inlining does:
@@ -116,16 +133,16 @@ Bundle external references into the components section while preserving the refe
 
 ```bash
 # Bundle to stdout (pipe-friendly)
-openapi openapi bundle ./spec-with-refs.yaml
+openapi spec bundle ./spec-with-refs.yaml
 
 # Bundle to specific file with filepath naming (default)
-openapi openapi bundle ./spec.yaml ./bundled-spec.yaml
+openapi spec bundle ./spec.yaml ./bundled-spec.yaml
 
 # Bundle in-place with counter naming
-openapi openapi bundle -w --naming counter ./spec.yaml
+openapi spec bundle -w --naming counter ./spec.yaml
 
 # Bundle with filepath naming (explicit)
-openapi openapi bundle --naming filepath ./spec.yaml ./bundled.yaml
+openapi spec bundle --naming filepath ./spec.yaml ./bundled.yaml
 ```
 
 **Naming Strategies:**
@@ -175,7 +192,7 @@ components:
         name: {type: string}
 ```
 
-## Bundle vs Inline
+#### Bundle vs Inline
 
 **Use Bundle when:**
 
@@ -190,6 +207,58 @@ components:
 - Your tooling doesn't support references well
 - You want the simplest possible document structure
 - You're creating documentation or examples
+
+### `join`
+
+Join multiple OpenAPI specifications into a single document.
+
+```bash
+# Join specifications to stdout
+openapi spec join ./main.yaml ./additional.yaml
+
+# Join specifications to specific file
+openapi spec join ./main.yaml ./additional.yaml ./joined-spec.yaml
+
+# Join in-place (modifies the first file)
+openapi spec join -w ./main.yaml ./additional.yaml
+
+# Join with conflict resolution strategy
+openapi spec join --strategy merge ./main.yaml ./additional.yaml
+```
+
+Features:
+
+- Combines multiple OpenAPI specifications into one
+- Handles conflicts between specifications intelligently
+- Merges paths, components, and other sections
+- Preserves all valid OpenAPI structure and references
+
+### `bootstrap`
+
+Create a new OpenAPI document with best practice examples.
+
+```bash
+# Create bootstrap document and output to stdout
+openapi spec bootstrap
+
+# Create bootstrap document and save to file
+openapi spec bootstrap ./my-api.yaml
+
+# Create bootstrap document in current directory
+openapi spec bootstrap ./openapi.yaml
+```
+
+What bootstrap creates:
+
+- Complete OpenAPI specification template with comprehensive examples
+- Proper document structure and metadata (info, servers, tags)
+- Example operations with request/response definitions
+- Reusable components (schemas, responses, security schemes)
+- Reference usage ($ref) for component reuse
+- Security scheme definitions (API key authentication)
+- Comprehensive schema examples with validation rules
+
+The generated document serves as both a template for new APIs and a learning resource for OpenAPI best practices.
 
 ## Common Options
 
@@ -209,22 +278,22 @@ All commands work with both YAML and JSON input files and preserve the original 
 
 ```bash
 # Validate before processing
-openapi openapi validate ./spec.yaml
+openapi spec validate ./spec.yaml
 
 # Upgrade if needed
-openapi openapi upgrade ./spec.yaml ./spec-v3.1.yaml
+openapi spec upgrade ./spec.yaml ./spec-v3.1.yaml
 
 # Bundle external references
-openapi openapi bundle ./spec-v3.1.yaml ./spec-bundled.yaml
+openapi spec bundle ./spec-v3.1.yaml ./spec-bundled.yaml
 
 # Final validation
-openapi openapi validate ./spec-bundled.yaml
+openapi spec validate ./spec-bundled.yaml
 ```
 
 ### Processing Pipeline
 
 ```bash
 # Create a processing pipeline
-openapi openapi bundle ./spec.yaml | \
-openapi openapi upgrade | \
-openapi openapi validate
+openapi spec bundle ./spec.yaml | \
+openapi spec upgrade | \
+openapi spec validate
