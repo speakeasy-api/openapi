@@ -25,7 +25,7 @@ func TestJoin_Counter_Success(t *testing.T) {
 	require.Empty(t, validationErrs, "Main document should be valid")
 
 	// Load the second document
-	secondFile, err := os.Open("testdata/join/second.yaml")
+	secondFile, err := os.Open("testdata/join/subdir/second.yaml")
 	require.NoError(t, err)
 	defer secondFile.Close()
 
@@ -46,7 +46,7 @@ func TestJoin_Counter_Success(t *testing.T) {
 	documents := []openapi.JoinDocumentInfo{
 		{
 			Document: secondDoc,
-			FilePath: "second.yaml",
+			FilePath: "subdir/second.yaml",
 		},
 		{
 			Document: thirdDoc,
@@ -91,7 +91,7 @@ func TestJoin_FilePath_Success(t *testing.T) {
 	require.Empty(t, validationErrs, "Main document should be valid")
 
 	// Load the second document
-	secondFile, err := os.Open("testdata/join/second.yaml")
+	secondFile, err := os.Open("testdata/join/subdir/second.yaml")
 	require.NoError(t, err)
 	defer secondFile.Close()
 
@@ -112,7 +112,7 @@ func TestJoin_FilePath_Success(t *testing.T) {
 	documents := []openapi.JoinDocumentInfo{
 		{
 			Document: secondDoc,
-			FilePath: "second.yaml",
+			FilePath: "subdir/second.yaml",
 		},
 		{
 			Document: thirdDoc,
@@ -234,7 +234,7 @@ func TestJoin_NoFilePath_Success(t *testing.T) {
 	require.Empty(t, validationErrs, "Main document should be valid")
 
 	// Load the second document
-	secondFile, err := os.Open("testdata/join/second.yaml")
+	secondFile, err := os.Open("testdata/join/subdir/second.yaml")
 	require.NoError(t, err)
 	defer secondFile.Close()
 

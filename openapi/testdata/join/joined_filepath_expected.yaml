@@ -47,7 +47,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/second_yaml~User'
+              $ref: '#/components/schemas/subdir_second_yaml~User'
       responses:
         "201":
           description: Created
@@ -113,7 +113,7 @@ components:
         price:
           type: number
           format: float
-    second_yaml~User:
+    subdir_second_yaml~User:
       type: object
       properties:
         id:
@@ -154,7 +154,7 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-    second_yaml~NotFound:
+    subdir_second_yaml~NotFound:
       description: Resource not found
       content:
         application/json:
@@ -196,7 +196,7 @@ components:
       schema:
         type: integer
         format: int32
-    second_yaml~limitParam:
+    subdir_second_yaml~limitParam:
       name: limit
       in: query
       description: maximum number of items to return

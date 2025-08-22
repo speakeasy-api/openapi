@@ -910,5 +910,11 @@ components:
       required:
         - userId
         - username
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
 security:
   - BearerAuth: []

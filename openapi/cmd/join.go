@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/spf13/cobra"
@@ -152,12 +153,21 @@ func runJoinCommand(cmd *cobra.Command, args []string) error {
 
 	// Prepare document info slice
 	var documentInfos []openapi.JoinDocumentInfo
+	mainDir := filepath.Dir(mainFile)
+
 	for i, doc := range documents {
 		docInfo := openapi.JoinDocumentInfo{
 			Document: doc,
 		}
 		if i < len(filePaths) {
-			docInfo.FilePath = filePaths[i]
+			// Compute relative path from main document's directory
+			relPath, err := filepath.Rel(mainDir, filePaths[i])
+			if err != nil {
+				// If we can't compute relative path, use the original path
+				docInfo.FilePath = filePaths[i]
+			} else {
+				docInfo.FilePath = relPath
+			}
 		}
 		documentInfos = append(documentInfos, docInfo)
 	}
