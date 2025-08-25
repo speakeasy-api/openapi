@@ -7,7 +7,7 @@
 </p>
   <p align="center">
     <!-- Arazzo Reference badge -->
-     <a href="https://speakeasy.com/"><img alt="Arazzo reference" src="https://www.speakeasy.com/assets/badges/arazzo-reference.svg" /></a>
+     <a href="https://www.speakeasy.com/openapi/arazzo"><img alt="Arazzo reference" src="https://www.speakeasy.com/assets/badges/arazzo-reference.svg" /></a>
      <!-- Built By Speakeasy Badge -->
      <a href="https://speakeasy.com/"><img alt="Built by Speakeasy" src="https://www.speakeasy.com/assets/badges/built-by-speakeasy.svg" /></a>
     <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/speakeasy-api/openapi.svg?style=for-the-badge"></a>
