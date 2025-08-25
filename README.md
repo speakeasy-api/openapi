@@ -18,7 +18,7 @@
     <img  width="200px" alt="OpenAPI" src="https://github.com/user-attachments/assets/555a0899-5719-42ee-b4b1-ece8d1d812ea">
   </p>
   <h1 align="center"><b>OpenAPI</b></h1>
-  <p align="center">A set of packages and tools for working with <a href="https://www.speakeasy.com/openapi">OpenAPI Specification documents</a>. <br /> Used directly in Speakeasy's product to power our <a href="https://www.speakeasy.com/docs/create-client-sdks">SDK Generator</a> and <a href="https://www.speakeasy.com/docs/testing">Contract Testing</a> tools.
+  <p align="center">A set of packages and tools for working with <a href="https://www.speakeasy.com/openapi">OpenAPI Specification documents</a>. <br /> Used directly in Speakeasy's product to power our <a href="https://www.speakeasy.com/product/sdk-generation">SDK Generation</a> and <a href="https://www.speakeasy.com/product/gram">Gram</a> products.
 
 </p>
   <p align="center">
