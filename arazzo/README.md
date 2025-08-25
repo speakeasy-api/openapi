@@ -6,8 +6,10 @@
   <p align="center">An API for working with <a href="https://www.speakeasy.com/openapi/arazzo">Arazzo documents</a> including: read, walk, create, mutate, and validate
 </p>
   <p align="center">
-    <a href="https://www.speakeasy.com/openapi/arazzo"><img src="https://custom-icon-badges.demolab.com/badge/-Arazzo%20Reference-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
-    <a href="https://speakeasy.com/"><img src="https://custom-icon-badges.demolab.com/badge/-Built%20By%20Speakeasy-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
+    <!-- Arazzo Reference badge -->
+     <a href="https://speakeasy.com/"><img alt="Arazzo reference" src="https://www.speakeasy.com/assets/badges/arazzo-reference.svg" /></a>
+     <!-- Built By Speakeasy Badge -->
+     <a href="https://speakeasy.com/"><img alt="Built by Speakeasy" src="https://www.speakeasy.com/assets/badges/built-by-speakeasy.svg" /></a>
     <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/speakeasy-api/openapi.svg?style=for-the-badge"></a>
     <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi/arazzo?tab=doc"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
    <br />
@@ -28,17 +30,17 @@ ctx := context.Background()
 
 r, err := os.Open("testdata/simple.arazzo.yaml")
 if err != nil {
-	panic(err)
+ panic(err)
 }
 defer r.Close()
 
 a, validationErrs, err := arazzo.Unmarshal(ctx, r)
 if err != nil {
-	panic(err)
+ panic(err)
 }
 
 for _, err := range validationErrs {
-	fmt.Println(err.Error())
+ fmt.Println(err.Error())
 }
 
 a.Info.Title = "Updated Simple Workflow"
@@ -46,7 +48,7 @@ a.Info.Title = "Updated Simple Workflow"
 buf := bytes.NewBuffer([]byte{})
 
 if err := arazzo.Marshal(ctx, a, buf); err != nil {
-	panic(err)
+ panic(err)
 }
 
 fmt.Println(buf.String())
@@ -60,19 +62,19 @@ Shows building a basic workflow document with info and version programmatically.
 ctx := context.Background()
 
 a := &arazzo.Arazzo{
-	Arazzo: arazzo.Version,
-	Info: arazzo.Info{
-		Title:   "My Workflow",
-		Summary: pointer.From("A summary"),
-		Version: "1.0.1",
-	},
+ Arazzo: arazzo.Version,
+ Info: arazzo.Info{
+  Title:   "My Workflow",
+  Summary: pointer.From("A summary"),
+  Version: "1.0.1",
+ },
 }
 
 buf := bytes.NewBuffer([]byte{})
 
 err := arazzo.Marshal(ctx, a, buf)
 if err != nil {
-	panic(err)
+ panic(err)
 }
 
 fmt.Printf("%s", buf.String())
@@ -87,12 +89,12 @@ ctx := context.Background()
 
 f, err := os.Open("testdata/simple.arazzo.yaml")
 if err != nil {
-	panic(err)
+ panic(err)
 }
 
 a, _, err := arazzo.Unmarshal(ctx, f)
 if err != nil {
-	panic(err)
+ panic(err)
 }
 
 a.Info.Title = "Updated Simple Workflow"
@@ -100,7 +102,7 @@ a.Info.Title = "Updated Simple Workflow"
 buf := bytes.NewBuffer([]byte{})
 
 if err := arazzo.Marshal(ctx, a, buf); err != nil {
-	panic(err)
+ panic(err)
 }
 
 fmt.Printf("%s", buf.String())
@@ -115,24 +117,24 @@ ctx := context.Background()
 
 f, err := os.Open("testdata/simple.arazzo.yaml")
 if err != nil {
-	panic(err)
+ panic(err)
 }
 
 a, _, err := arazzo.Unmarshal(ctx, f)
 if err != nil {
-	panic(err)
+ panic(err)
 }
 
 for item := range arazzo.Walk(ctx, a) {
-	err := item.Match(arazzo.Matcher{
-		Workflow: func(workflow *arazzo.Workflow) error {
-			fmt.Printf("Workflow: %s\n", workflow.WorkflowID)
-			return nil
-		},
-	})
-	if err != nil {
-		panic(err)
-	}
+ err := item.Match(arazzo.Matcher{
+  Workflow: func(workflow *arazzo.Workflow) error {
+   fmt.Printf("Workflow: %s\n", workflow.WorkflowID)
+   return nil
+  },
+ })
+ if err != nil {
+  panic(err)
+ }
 }
 ```
 
@@ -145,16 +147,16 @@ ctx := context.Background()
 
 f, err := os.Open("testdata/invalid.arazzo.yaml")
 if err != nil {
-	panic(err)
+ panic(err)
 }
 
 _, validationErrs, err := arazzo.Unmarshal(ctx, f)
 if err != nil {
-	panic(err)
+ panic(err)
 }
 
 for _, err := range validationErrs {
-	fmt.Printf("%s\n", err.Error())
+ fmt.Printf("%s\n", err.Error())
 }
 ```
 

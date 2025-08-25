@@ -53,7 +53,7 @@
     <img alt="Go Install" src="https://img.shields.io/badge/go%20install-ready-00ADD8.svg?style=for-the-badge&logo=go">
     <!-- Line Break --><br/>
     <!-- Built By Speakeasy Badge -->
-    <a href="https://speakeasy.com/"><img src="https://www.speakeasy.com/assets/badges/built-by-speakeasy.svg" /></a>
+    <a href="https://speakeasy.com/"><img alt="Built by Speakeasy" src="https://www.speakeasy.com/assets/badges/built-by-speakeasy.svg" /></a>
     <!-- License Badge -->
     <a href="/LICENSE"><img alt="Software License" src="https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge"></a>
   </p>
