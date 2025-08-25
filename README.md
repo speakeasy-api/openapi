@@ -24,7 +24,7 @@
   <p align="center">
     <!-- Badges -->
     <!-- OpenAPI Hub Badge -->
-    <a href="https://www.speakeasy.com/openapi"><img src="https://custom-icon-badges.demolab.com/badge/-OpenAPI%20Hub-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
+    <a href="https://www.speakeasy.com/openapi"><img alt="OpenAPI Hub" src="https://www.speakeasy.com/assets/badges/openapi-hub.svg" /></a>
     <!-- OpenAPI Support Badge -->
     <a href="https://www.speakeasy.com/openapi"><img alt="OpenAPI Support" src="https://img.shields.io/badge/OpenAPI-3.0%20%7C%203.1-85EA2D.svg?style=for-the-badge&logo=openapiinitiative"></a>
     <!-- Arazzo Support Badge -->
@@ -53,9 +53,9 @@
     <img alt="Go Install" src="https://img.shields.io/badge/go%20install-ready-00ADD8.svg?style=for-the-badge&logo=go">
     <!-- Line Break --><br/>
     <!-- Built By Speakeasy Badge -->
-    <a href="https://speakeasy.com/"><img src="https://custom-icon-badges.demolab.com/badge/-Built%20By%20Speakeasy-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
+    <a href="https://speakeasy.com/"><img src="https://www.speakeasy.com/assets/badges/built-by-speakeasy.svg" /></a>
     <!-- License Badge -->
-    <a href="/LICENSE"><img alt="Software License" src="https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge"></a>    
+    <a href="/LICENSE"><img alt="Software License" src="https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge"></a>
   </p>
 </p>
 
@@ -155,4 +155,3 @@ This repository is maintained by Speakeasy, but we welcome and encourage contrib
 All contributions, whether they're bug reports, feature requests, or code changes, help make this project better for everyone.
 
 Please ensure your contributions adhere to our coding standards and include appropriate tests where applicable.
-
