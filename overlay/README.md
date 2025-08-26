@@ -71,27 +71,27 @@ paths:
 overlayFile := "temp_overlay.yaml"
 openAPIFile := "temp_openapi.yaml"
 if err := os.WriteFile(overlayFile, []byte(overlayContent), 0644); err != nil {
- panic(err)
+	panic(err)
 }
 if err := os.WriteFile(openAPIFile, []byte(openAPIContent), 0644); err != nil {
- panic(err)
+	panic(err)
 }
 defer os.Remove(overlayFile)
 defer os.Remove(openAPIFile)
 
 overlayDoc, err := overlay.Parse(overlayFile)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 openAPINode, err := loader.LoadSpecification(openAPIFile)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 err = overlayDoc.ApplyTo(openAPINode)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 // Convert back to YAML string
@@ -100,7 +100,7 @@ encoder := yaml.NewEncoder(&buf)
 encoder.SetIndent(2)
 err = encoder.Encode(openAPINode)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 fmt.Printf("Transformed document:\n%s", buf.String())
@@ -116,26 +116,26 @@ var updateNode yaml.Node
 updateNode.SetString("Enhanced API with additional features")
 
 overlayDoc := &overlay.Overlay{
- Version: "1.0.0",
- Info: overlay.Info{
-  Title:   "API Enhancement Overlay",
-  Version: "1.0.0",
- },
- Actions: []overlay.Action{
-  {
-   Target: "$.info.description",
-   Update: updateNode,
-  },
-  {
-   Target: "$.paths['/deprecated-endpoint']",
-   Remove: true,
-  },
- },
+	Version: "1.0.0",
+	Info: overlay.Info{
+		Title:   "API Enhancement Overlay",
+		Version: "1.0.0",
+	},
+	Actions: []overlay.Action{
+		{
+			Target: "$.info.description",
+			Update: updateNode,
+		},
+		{
+			Target: "$.paths['/deprecated-endpoint']",
+			Remove: true,
+		},
+	},
 }
 
 result, err := overlayDoc.ToString()
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 fmt.Printf("Overlay specification:\n%s", result)
@@ -158,13 +158,13 @@ actions:
 
 overlayFile := "temp_overlay.yaml"
 if err := os.WriteFile(overlayFile, []byte(overlayContent), 0644); err != nil {
- panic(err)
+	panic(err)
 }
 defer func() { _ = os.Remove(overlayFile) }()
 
 overlayDoc, err := overlay.Parse(overlayFile)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 fmt.Printf("Overlay Version: %s\n", overlayDoc.Version)
@@ -172,7 +172,7 @@ fmt.Printf("Title: %s\n", overlayDoc.Info.Title)
 fmt.Printf("Number of Actions: %d\n", len(overlayDoc.Actions))
 
 for i, action := range overlayDoc.Actions {
- fmt.Printf("Action %d Target: %s\n", i+1, action.Target)
+	fmt.Printf("Action %d Target: %s\n", i+1, action.Target)
 }
 ```
 
@@ -190,22 +190,22 @@ actions:
 
 overlayFile := "temp_invalid_overlay.yaml"
 if err := os.WriteFile(overlayFile, []byte(invalidOverlay), 0644); err != nil {
- panic(err)
+	panic(err)
 }
 defer func() { _ = os.Remove(overlayFile) }()
 
 overlayDoc, err := overlay.Parse(overlayFile)
 if err != nil {
- fmt.Printf("Parse error: %s\n", err.Error())
- return
+	fmt.Printf("Parse error: %s\n", err.Error())
+	return
 }
 
 validationErr := overlayDoc.Validate()
 if validationErr != nil {
- fmt.Println("Validation errors:")
- fmt.Printf("  %s\n", validationErr.Error())
+	fmt.Println("Validation errors:")
+	fmt.Printf("  %s\n", validationErr.Error())
 } else {
- fmt.Println("Overlay specification is valid!")
+	fmt.Println("Overlay specification is valid!")
 }
 ```
 
@@ -241,27 +241,27 @@ actions:
 openAPIFile := "temp_openapi.yaml"
 overlayFile := "temp_overlay.yaml"
 if err := os.WriteFile(openAPIFile, []byte(openAPIContent), 0644); err != nil {
- panic(err)
+	panic(err)
 }
 if err := os.WriteFile(overlayFile, []byte(overlayContent), 0644); err != nil {
- panic(err)
+	panic(err)
 }
 defer func() { _ = os.Remove(openAPIFile) }()
 defer func() { _ = os.Remove(overlayFile) }()
 
 overlayDoc, err := overlay.Parse(overlayFile)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 openAPINode, err := loader.LoadSpecification(openAPIFile)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 err = overlayDoc.ApplyTo(openAPINode)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 var buf strings.Builder
@@ -269,7 +269,7 @@ encoder := yaml.NewEncoder(&buf)
 encoder.SetIndent(2)
 err = encoder.Encode(openAPINode)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 fmt.Printf("Document after removing deprecated endpoint:\n%s", buf.String())

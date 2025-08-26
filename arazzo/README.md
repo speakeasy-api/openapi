@@ -30,17 +30,17 @@ ctx := context.Background()
 
 r, err := os.Open("testdata/simple.arazzo.yaml")
 if err != nil {
- panic(err)
+	panic(err)
 }
 defer r.Close()
 
 a, validationErrs, err := arazzo.Unmarshal(ctx, r)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 for _, err := range validationErrs {
- fmt.Println(err.Error())
+	fmt.Println(err.Error())
 }
 
 a.Info.Title = "Updated Simple Workflow"
@@ -48,7 +48,7 @@ a.Info.Title = "Updated Simple Workflow"
 buf := bytes.NewBuffer([]byte{})
 
 if err := arazzo.Marshal(ctx, a, buf); err != nil {
- panic(err)
+	panic(err)
 }
 
 fmt.Println(buf.String())
@@ -62,19 +62,19 @@ Shows building a basic workflow document with info and version programmatically.
 ctx := context.Background()
 
 a := &arazzo.Arazzo{
- Arazzo: arazzo.Version,
- Info: arazzo.Info{
-  Title:   "My Workflow",
-  Summary: pointer.From("A summary"),
-  Version: "1.0.1",
- },
+	Arazzo: arazzo.Version,
+	Info: arazzo.Info{
+		Title:   "My Workflow",
+		Summary: pointer.From("A summary"),
+		Version: "1.0.1",
+	},
 }
 
 buf := bytes.NewBuffer([]byte{})
 
 err := arazzo.Marshal(ctx, a, buf)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 fmt.Printf("%s", buf.String())
@@ -89,12 +89,12 @@ ctx := context.Background()
 
 f, err := os.Open("testdata/simple.arazzo.yaml")
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 a, _, err := arazzo.Unmarshal(ctx, f)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 a.Info.Title = "Updated Simple Workflow"
@@ -102,7 +102,7 @@ a.Info.Title = "Updated Simple Workflow"
 buf := bytes.NewBuffer([]byte{})
 
 if err := arazzo.Marshal(ctx, a, buf); err != nil {
- panic(err)
+	panic(err)
 }
 
 fmt.Printf("%s", buf.String())
@@ -117,24 +117,24 @@ ctx := context.Background()
 
 f, err := os.Open("testdata/simple.arazzo.yaml")
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 a, _, err := arazzo.Unmarshal(ctx, f)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 for item := range arazzo.Walk(ctx, a) {
- err := item.Match(arazzo.Matcher{
-  Workflow: func(workflow *arazzo.Workflow) error {
-   fmt.Printf("Workflow: %s\n", workflow.WorkflowID)
-   return nil
-  },
- })
- if err != nil {
-  panic(err)
- }
+	err := item.Match(arazzo.Matcher{
+		Workflow: func(workflow *arazzo.Workflow) error {
+			fmt.Printf("Workflow: %s\n", workflow.WorkflowID)
+			return nil
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
 }
 ```
 
@@ -147,16 +147,16 @@ ctx := context.Background()
 
 f, err := os.Open("testdata/invalid.arazzo.yaml")
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 _, validationErrs, err := arazzo.Unmarshal(ctx, f)
 if err != nil {
- panic(err)
+	panic(err)
 }
 
 for _, err := range validationErrs {
- fmt.Printf("%s\n", err.Error())
+	fmt.Printf("%s\n", err.Error())
 }
 ```
 
