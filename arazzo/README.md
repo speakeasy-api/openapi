@@ -6,8 +6,10 @@
   <p align="center">An API for working with <a href="https://www.speakeasy.com/openapi/arazzo">Arazzo documents</a> including: read, walk, create, mutate, and validate
 </p>
   <p align="center">
-    <a href="https://www.speakeasy.com/openapi/arazzo"><img src="https://custom-icon-badges.demolab.com/badge/-Arazzo%20Reference-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
-    <a href="https://speakeasy.com/"><img src="https://custom-icon-badges.demolab.com/badge/-Built%20By%20Speakeasy-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
+    <!-- Arazzo Reference badge -->
+     <a href="https://www.speakeasy.com/openapi/arazzo"><img alt="Arazzo reference" src="https://www.speakeasy.com/assets/badges/arazzo-reference.svg" /></a>
+     <!-- Built By Speakeasy Badge -->
+     <a href="https://speakeasy.com/"><img alt="Built by Speakeasy" src="https://www.speakeasy.com/assets/badges/built-by-speakeasy.svg" /></a>
     <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/speakeasy-api/openapi.svg?style=for-the-badge"></a>
     <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi/arazzo?tab=doc"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
    <br />

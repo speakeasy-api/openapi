@@ -738,7 +738,7 @@ func Example_workingWithComponents() {
 	//         type: integer
 }
 
-// Example_inliningSchema demonstrates how to inline all references in a JSON Schema,
+// Example_inliningSchema demonstrates how to inline all references in a JSON Schema
 // creating a self-contained schema that doesn't depend on external definitions.
 func Example_inliningSchema() {
 	ctx := context.Background()

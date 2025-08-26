@@ -6,7 +6,10 @@
   <p align="center">An implementation of the <a href="https://github.com/OAI/Overlay-Specification/blob/3f398c6/versions/1.0.0.md">OpenAPI Overlay Specification</a> for applying modifications to OpenAPI documents
 </p>
   <p align="center">
-    <a href="https://speakeasy.com/openapi/overlays"><img src="https://custom-icon-badges.demolab.com/badge/-Overlay%20Reference-212015?style=for-the-badge&logoColor=FBE331&logo=speakeasy&labelColor=545454" /></a>
+    <!-- Overlay Reference badge -->
+    <a href="https://speakeasy.com/openapi/overlays"><img alt="Overlay reference" src="https://www.speakeasy.com/assets/badges/overlay-reference.svg" /></a>
+    <!-- Built By Speakeasy Badge -->
+    <a href="https://speakeasy.com/"><img alt="Built by Speakeasy" src="https://www.speakeasy.com/assets/badges/built-by-speakeasy.svg" /></a>
     <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/speakeasy-api/openapi.svg?style=for-the-badge"></a>
     <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi-overlay?tab=doc"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
    <br />
