@@ -137,13 +137,26 @@ func Inline(ctx context.Context, doc *OpenAPI, opts InlineOptions) error {
 		return nil
 	}
 
-	inlinedSchemas := map[*oas3.JSONSchema[oas3.Referenceable]]*oas3.JSONSchema[oas3.Referenceable]{}
-
 	// Track collected $defs to avoid duplication
-	collectedDefs := make(map[string]*oas3.JSONSchema[oas3.Referenceable])
+	collectedDefs := sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]]()
 	defHashes := make(map[string]string) // name -> hash
 
-	for item := range Walk(ctx, doc) {
+	if err := inlineObject(ctx, doc, doc, opts.ResolveOptions, collectedDefs, defHashes); err != nil {
+		return err
+	}
+
+	// Remove unused components if requested
+	if opts.RemoveUnusedComponents {
+		removeUnusedComponents(doc, collectedDefs)
+	}
+
+	return nil
+}
+
+func inlineObject[T any](ctx context.Context, obj *T, doc *OpenAPI, opts ResolveOptions, collectedDefs *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]], defHashes map[string]string) error {
+	inlinedSchemas := map[*oas3.JSONSchema[oas3.Referenceable]]*oas3.JSONSchema[oas3.Referenceable]{}
+
+	for item := range Walk(ctx, obj) {
 		err := item.Match(Matcher{
 			Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
 				location := item.Location.ToJSONPointer().String()
@@ -175,10 +188,7 @@ func Inline(ctx context.Context, doc *OpenAPI, opts InlineOptions) error {
 				}
 
 				inlineOpts := oas3.InlineOptions{
-					ResolveOptions: oas3.ResolveOptions{
-						RootDocument:   doc,
-						TargetLocation: opts.ResolveOptions.TargetLocation,
-					},
+					ResolveOptions:   opts,
 					RemoveUnusedDefs: true,
 				}
 
@@ -198,7 +208,7 @@ func Inline(ctx context.Context, doc *OpenAPI, opts InlineOptions) error {
 	}
 
 	// Walk through the document and inline all references
-	for item := range Walk(ctx, doc) {
+	for item := range Walk(ctx, obj) {
 		err := item.Match(Matcher{
 			// Handle JSON Schema references using the existing oas3.Inline functionality
 			Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
@@ -246,7 +256,7 @@ func Inline(ctx context.Context, doc *OpenAPI, opts InlineOptions) error {
 						// Store the schema if it's new
 						if _, exists := defHashes[targetName]; !exists {
 							defHashes[targetName] = defHash
-							collectedDefs[targetName] = defSchema
+							collectedDefs.Set(targetName, defSchema)
 							doc.Components.Schemas.Set(targetName, defSchema)
 						}
 					}
@@ -265,31 +275,31 @@ func Inline(ctx context.Context, doc *OpenAPI, opts InlineOptions) error {
 
 			// Handle OpenAPI component references
 			ReferencedPathItem: func(ref *ReferencedPathItem) error {
-				return inlineReference(ctx, ref, opts)
+				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
 			},
 			ReferencedParameter: func(ref *ReferencedParameter) error {
-				return inlineReference(ctx, ref, opts)
+				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
 			},
 			ReferencedExample: func(ref *ReferencedExample) error {
-				return inlineReference(ctx, ref, opts)
+				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
 			},
 			ReferencedRequestBody: func(ref *ReferencedRequestBody) error {
-				return inlineReference(ctx, ref, opts)
+				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
 			},
 			ReferencedResponse: func(ref *ReferencedResponse) error {
-				return inlineReference(ctx, ref, opts)
+				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
 			},
 			ReferencedHeader: func(ref *ReferencedHeader) error {
-				return inlineReference(ctx, ref, opts)
+				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
 			},
 			ReferencedCallback: func(ref *ReferencedCallback) error {
-				return inlineReference(ctx, ref, opts)
+				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
 			},
 			ReferencedLink: func(ref *ReferencedLink) error {
-				return inlineReference(ctx, ref, opts)
+				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
 			},
 			ReferencedSecurityScheme: func(ref *ReferencedSecurityScheme) error {
-				return inlineReference(ctx, ref, opts)
+				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
 			},
 		})
 
@@ -298,22 +308,17 @@ func Inline(ctx context.Context, doc *OpenAPI, opts InlineOptions) error {
 		}
 	}
 
-	// Remove unused components if requested
-	if opts.RemoveUnusedComponents {
-		removeUnusedComponents(doc, collectedDefs)
-	}
-
 	return nil
 }
 
 // inlineReference inlines a generic OpenAPI reference by resolving it and replacing the reference with the actual object
-func inlineReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, ref *Reference[T, V, C], opts InlineOptions) error {
+func inlineReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, ref *Reference[T, V, C], doc *OpenAPI, opts references.ResolveOptions, collectedDefs *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]], defHashes map[string]string) error {
 	if ref == nil || !ref.IsReference() {
 		return nil
 	}
 
 	// Resolve the reference
-	validationErrs, err := ref.Resolve(ctx, opts.ResolveOptions)
+	validationErrs, err := ref.Resolve(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("failed to resolve reference %s: %w", ref.GetReference(), err)
 	}
@@ -331,11 +336,25 @@ func inlineReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler]
 		return fmt.Errorf("reference %s resolved to nil object", ref.GetReference())
 	}
 
+	targetDocInfo := ref.GetReferenceResolutionInfo()
+
 	// Replace the reference with the actual object in place
 	ref.Reference = nil
 	ref.Object = obj
 	ref.Summary = nil
 	ref.Description = nil
+
+	// Recursively inline any references within the newly inlined object
+	if targetDocInfo != nil && targetDocInfo.ResolvedDocument != nil {
+		recursiveOpts := ResolveOptions{
+			RootDocument:   opts.RootDocument,
+			TargetDocument: targetDocInfo.ResolvedDocument,
+			TargetLocation: targetDocInfo.AbsoluteReference,
+		}
+		if err := inlineObject(ctx, ref, doc, recursiveOpts, collectedDefs, defHashes); err != nil {
+			return fmt.Errorf("failed to inline nested references in %s: %w", ref.GetReference(), err)
+		}
+	}
 
 	return nil
 }
@@ -381,19 +400,19 @@ func rewriteRefsWithMapping(schema *oas3.JSONSchema[oas3.Referenceable], nameMap
 }
 
 // removeUnusedComponents removes components that are no longer referenced after inlining
-func removeUnusedComponents(doc *OpenAPI, preserveSchemas map[string]*oas3.JSONSchema[oas3.Referenceable]) {
+func removeUnusedComponents(doc *OpenAPI, preserveSchemas *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]]) {
 	if doc == nil || doc.Components == nil {
 		return
 	}
 
 	// Find security schemes that are referenced by global security requirements
-	preserveSecuritySchemes := make(map[string]*ReferencedSecurityScheme)
+	preserveSecuritySchemes := sequencedmap.New[string, *ReferencedSecurityScheme]()
 	if doc.Security != nil && doc.Components.SecuritySchemes != nil {
 		for _, securityRequirement := range doc.Security {
 			if securityRequirement != nil {
 				for schemeName := range securityRequirement.All() {
 					if scheme, exists := doc.Components.SecuritySchemes.Get(schemeName); exists {
-						preserveSecuritySchemes[schemeName] = scheme
+						preserveSecuritySchemes.Set(schemeName, scheme)
 					}
 				}
 			}
@@ -404,21 +423,13 @@ func removeUnusedComponents(doc *OpenAPI, preserveSchemas map[string]*oas3.JSONS
 	newComponents := &Components{}
 
 	// Preserve schemas moved from $defs
-	if len(preserveSchemas) > 0 {
-		newSchemas := sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]]()
-		for name, schema := range preserveSchemas {
-			newSchemas.Set(name, schema)
-		}
-		newComponents.Schemas = newSchemas
+	if preserveSchemas != nil && preserveSchemas.Len() > 0 {
+		newComponents.Schemas = preserveSchemas
 	}
 
 	// Preserve security schemes referenced by global security requirements
-	if len(preserveSecuritySchemes) > 0 {
-		newSecuritySchemes := sequencedmap.New[string, *ReferencedSecurityScheme]()
-		for name, scheme := range preserveSecuritySchemes {
-			newSecuritySchemes.Set(name, scheme)
-		}
-		newComponents.SecuritySchemes = newSecuritySchemes
+	if preserveSecuritySchemes.Len() > 0 {
+		newComponents.SecuritySchemes = preserveSecuritySchemes
 	}
 
 	// Only set components if we have something to preserve

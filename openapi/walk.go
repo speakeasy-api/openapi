@@ -4,6 +4,8 @@ import (
 	"context"
 	"iter"
 
+	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 )
@@ -15,19 +17,107 @@ type WalkItem struct {
 	OpenAPI  *OpenAPI
 }
 
-// Walk returns an iterator that yields MatchFunc items for each model in the OpenAPI document.
+// Walk returns an iterator that yields MatchFunc items for each model in the provided OpenAPI model.
 // Users can iterate over the results using a for loop and break out at any time.
-func Walk(ctx context.Context, openAPI *OpenAPI) iter.Seq[WalkItem] {
+// When called with *OpenAPI, it walks the entire document. When called with other types,
+// it walks from that specific component.
+func Walk[T any](ctx context.Context, start *T) iter.Seq[WalkItem] {
 	return func(yield func(WalkItem) bool) {
-		if openAPI == nil {
+		if start == nil {
 			return
 		}
-		walk(ctx, openAPI, yield)
+		walkFrom(ctx, start, yield)
+	}
+}
+
+// walkFrom handles walking from different starting points using type switching
+func walkFrom[T any](ctx context.Context, start *T, yield func(WalkItem) bool) {
+	switch v := any(start).(type) {
+	case *OpenAPI:
+		walk(ctx, v, yield)
+	case *oas3.JSONSchema[oas3.Referenceable]:
+		walkSchema(ctx, v, []LocationContext{}, nil, yield)
+	case *oas3.ExternalDocumentation:
+		walkExternalDocs(ctx, v, []LocationContext{}, nil, yield)
+	case *Info:
+		walkInfo(ctx, v, []LocationContext{}, nil, yield)
+	case *Contact:
+		// Contact doesn't have its own walk function, use getMatchFunc
+		yield(WalkItem{Match: getMatchFunc(v), Location: []LocationContext{}, OpenAPI: nil})
+	case *License:
+		// License doesn't have its own walk function, use getMatchFunc
+		yield(WalkItem{Match: getMatchFunc(v), Location: []LocationContext{}, OpenAPI: nil})
+	case *Tag:
+		walkTag(ctx, v, []LocationContext{}, nil, yield)
+	case *Server:
+		walkServer(ctx, v, []LocationContext{}, nil, yield)
+	case *ServerVariable:
+		walkVariable(ctx, v, []LocationContext{}, nil, yield)
+	case *SecurityRequirement:
+		walkSecurityRequirement(ctx, v, []LocationContext{}, nil, yield)
+	case *Paths:
+		walkPaths(ctx, v, []LocationContext{}, nil, yield)
+	case *ReferencedPathItem:
+		walkReferencedPathItem(ctx, v, []LocationContext{}, nil, yield)
+	case *PathItem:
+		walkPathItem(ctx, v, getMatchFunc(v), []LocationContext{}, nil, yield)
+	case *Operation:
+		walkOperation(ctx, v, []LocationContext{}, nil, yield)
+	case *ReferencedParameter:
+		walkReferencedParameter(ctx, v, []LocationContext{}, nil, yield)
+	case *Parameter:
+		walkParameter(ctx, v, getMatchFunc(v), []LocationContext{}, nil, yield)
+	case *ReferencedRequestBody:
+		walkReferencedRequestBody(ctx, v, []LocationContext{}, nil, yield)
+	case *RequestBody:
+		walkRequestBody(ctx, v, getMatchFunc(v), []LocationContext{}, nil, yield)
+	case *Responses:
+		walkResponses(ctx, v, []LocationContext{}, nil, yield)
+	case *ReferencedResponse:
+		walkReferencedResponse(ctx, v, []LocationContext{}, nil, yield)
+	case *Response:
+		walkResponse(ctx, v, getMatchFunc(v), []LocationContext{}, nil, yield)
+	case *MediaType:
+		walkMediaType(ctx, v, []LocationContext{}, nil, yield)
+	case *Encoding:
+		walkEncoding(ctx, v, []LocationContext{}, nil, yield)
+	case *ReferencedHeader:
+		walkReferencedHeader(ctx, v, []LocationContext{}, nil, yield)
+	case *Header:
+		walkHeader(ctx, v, getMatchFunc(v), []LocationContext{}, nil, yield)
+	case *ReferencedExample:
+		walkReferencedExample(ctx, v, []LocationContext{}, nil, yield)
+	case *Example:
+		walkExample(ctx, v, getMatchFunc(v), []LocationContext{}, nil, yield)
+	case *ReferencedLink:
+		walkReferencedLink(ctx, v, []LocationContext{}, nil, yield)
+	case *Link:
+		walkLink(ctx, v, getMatchFunc(v), []LocationContext{}, nil, yield)
+	case *ReferencedCallback:
+		walkReferencedCallback(ctx, v, []LocationContext{}, nil, yield)
+	case *Callback:
+		walkCallback(ctx, v, getMatchFunc(v), []LocationContext{}, nil, yield)
+	case *Components:
+		walkComponents(ctx, v, []LocationContext{}, nil, yield)
+	case *ReferencedSecurityScheme:
+		walkReferencedSecurityScheme(ctx, v, []LocationContext{}, nil, yield)
+	case *SecurityScheme:
+		walkSecurityScheme(ctx, v, getMatchFunc(v), []LocationContext{}, nil, yield)
+	case *OAuthFlows:
+		walkOAuthFlows(ctx, v, []LocationContext{}, nil, yield)
+	case *OAuthFlow:
+		walkOAuthFlow(ctx, v, []LocationContext{}, nil, yield)
+	case *extensions.Extensions:
+		// Extensions doesn't have its own walk function, use getMatchFunc
+		yield(WalkItem{Match: getMatchFunc(v), Location: []LocationContext{}, OpenAPI: nil})
+	default:
+		// For unknown types, use the original start parameter with getMatchFunc
+		yield(WalkItem{Match: getMatchFunc(start), Location: []LocationContext{}, OpenAPI: nil})
 	}
 }
 
 func walk(ctx context.Context, openAPI *OpenAPI, yield func(WalkItem) bool) {
-	openAPIMatchFunc := geMatchFunc(openAPI)
+	openAPIMatchFunc := getMatchFunc(openAPI)
 
 	// Visit the root OpenAPI document first, location nil to specify the root
 	if !yield(WalkItem{Match: openAPIMatchFunc, Location: nil, OpenAPI: openAPI}) {
@@ -70,7 +160,7 @@ func walk(ctx context.Context, openAPI *OpenAPI, yield func(WalkItem) bool) {
 	}
 
 	// Visit OpenAPI Extensions
-	yield(WalkItem{Match: geMatchFunc(openAPI.Extensions), Location: append(loc, LocationContext{Parent: openAPIMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	yield(WalkItem{Match: getMatchFunc(openAPI.Extensions), Location: append(loc, LocationContext{Parent: openAPIMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 func walkInfo(_ context.Context, info *Info, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
@@ -78,7 +168,7 @@ func walkInfo(_ context.Context, info *Info, loc []LocationContext, openAPI *Ope
 		return true
 	}
 
-	infoMatchFunc := geMatchFunc(info)
+	infoMatchFunc := getMatchFunc(info)
 
 	if !yield(WalkItem{Match: infoMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -86,7 +176,7 @@ func walkInfo(_ context.Context, info *Info, loc []LocationContext, openAPI *Ope
 
 	// Visit Contact and its Extensions
 	if info.Contact != nil {
-		contactMatchFunc := geMatchFunc(info.Contact)
+		contactMatchFunc := getMatchFunc(info.Contact)
 
 		contactLoc := loc
 		contactLoc = append(contactLoc, LocationContext{Parent: infoMatchFunc, ParentField: "contact"})
@@ -95,14 +185,14 @@ func walkInfo(_ context.Context, info *Info, loc []LocationContext, openAPI *Ope
 			return false
 		}
 
-		if !yield(WalkItem{Match: geMatchFunc(info.Contact.Extensions), Location: append(contactLoc, LocationContext{Parent: contactMatchFunc, ParentField: ""}), OpenAPI: openAPI}) {
+		if !yield(WalkItem{Match: getMatchFunc(info.Contact.Extensions), Location: append(contactLoc, LocationContext{Parent: contactMatchFunc, ParentField: ""}), OpenAPI: openAPI}) {
 			return false
 		}
 	}
 
 	// Visit License and its Extensions
 	if info.License != nil {
-		licenseMatchFunc := geMatchFunc(info.License)
+		licenseMatchFunc := getMatchFunc(info.License)
 
 		licenseLoc := loc
 		licenseLoc = append(licenseLoc, LocationContext{Parent: infoMatchFunc, ParentField: "license"})
@@ -111,13 +201,13 @@ func walkInfo(_ context.Context, info *Info, loc []LocationContext, openAPI *Ope
 			return false
 		}
 
-		if !yield(WalkItem{Match: geMatchFunc(info.License.Extensions), Location: append(licenseLoc, LocationContext{Parent: licenseMatchFunc, ParentField: ""}), OpenAPI: openAPI}) {
+		if !yield(WalkItem{Match: getMatchFunc(info.License.Extensions), Location: append(licenseLoc, LocationContext{Parent: licenseMatchFunc, ParentField: ""}), OpenAPI: openAPI}) {
 			return false
 		}
 	}
 
 	// Visit Info Extensions
-	return yield(WalkItem{Match: geMatchFunc(info.Extensions), Location: append(loc, LocationContext{Parent: infoMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(info.Extensions), Location: append(loc, LocationContext{Parent: infoMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkPaths walks through the paths object
@@ -126,7 +216,7 @@ func walkPaths(ctx context.Context, paths *Paths, loc []LocationContext, openAPI
 		return true
 	}
 
-	pathsMatchFunc := geMatchFunc(paths)
+	pathsMatchFunc := getMatchFunc(paths)
 
 	if !yield(WalkItem{Match: pathsMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -139,7 +229,7 @@ func walkPaths(ctx context.Context, paths *Paths, loc []LocationContext, openAPI
 	}
 
 	// Visit Paths Extensions
-	return yield(WalkItem{Match: geMatchFunc(paths.Extensions), Location: append(loc, LocationContext{Parent: pathsMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(paths.Extensions), Location: append(loc, LocationContext{Parent: pathsMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedPathItem walks through a referenced path item
@@ -148,7 +238,7 @@ func walkReferencedPathItem(ctx context.Context, pathItem *ReferencedPathItem, l
 		return true
 	}
 
-	referencedPathItemMatchFunc := geMatchFunc(pathItem)
+	referencedPathItemMatchFunc := getMatchFunc(pathItem)
 
 	if !yield(WalkItem{Match: referencedPathItemMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -186,7 +276,7 @@ func walkPathItem(ctx context.Context, pathItem *PathItem, parent MatchFunc, loc
 	}
 
 	// Visit PathItem Extensions
-	return yield(WalkItem{Match: geMatchFunc(pathItem.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(pathItem.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkOperation walks through an operation
@@ -195,7 +285,7 @@ func walkOperation(ctx context.Context, operation *Operation, loc []LocationCont
 		return true
 	}
 
-	operationMatchFunc := geMatchFunc(operation)
+	operationMatchFunc := getMatchFunc(operation)
 
 	if !yield(WalkItem{Match: operationMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -237,7 +327,7 @@ func walkOperation(ctx context.Context, operation *Operation, loc []LocationCont
 	}
 
 	// Visit Operation Extensions
-	return yield(WalkItem{Match: geMatchFunc(operation.Extensions), Location: append(loc, LocationContext{Parent: operationMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(operation.Extensions), Location: append(loc, LocationContext{Parent: operationMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedParameters walks through referenced parameters
@@ -266,7 +356,7 @@ func walkReferencedParameter(ctx context.Context, parameter *ReferencedParameter
 		return true
 	}
 
-	referencedParameterMatchFunc := geMatchFunc(parameter)
+	referencedParameterMatchFunc := getMatchFunc(parameter)
 
 	if !yield(WalkItem{Match: referencedParameterMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -302,7 +392,7 @@ func walkParameter(ctx context.Context, parameter *Parameter, parent MatchFunc, 
 	}
 
 	// Visit Parameter Extensions
-	return yield(WalkItem{Match: geMatchFunc(parameter.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(parameter.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedRequestBody walks through a referenced request body
@@ -311,7 +401,7 @@ func walkReferencedRequestBody(ctx context.Context, requestBody *ReferencedReque
 		return true
 	}
 
-	referencedRequestBodyMatchFunc := geMatchFunc(requestBody)
+	referencedRequestBodyMatchFunc := getMatchFunc(requestBody)
 
 	if !yield(WalkItem{Match: referencedRequestBodyMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -337,7 +427,7 @@ func walkRequestBody(ctx context.Context, requestBody *RequestBody, parent Match
 	}
 
 	// Visit RequestBody Extensions
-	return yield(WalkItem{Match: geMatchFunc(requestBody.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(requestBody.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkResponses walks through responses
@@ -346,7 +436,7 @@ func walkResponses(ctx context.Context, responses *Responses, loc []LocationCont
 		return true
 	}
 
-	responsesMatchFunc := geMatchFunc(responses)
+	responsesMatchFunc := getMatchFunc(responses)
 
 	if !yield(WalkItem{Match: responsesMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -365,7 +455,7 @@ func walkResponses(ctx context.Context, responses *Responses, loc []LocationCont
 	}
 
 	// Visit Responses Extensions
-	return yield(WalkItem{Match: geMatchFunc(responses.Extensions), Location: append(loc, LocationContext{Parent: responsesMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(responses.Extensions), Location: append(loc, LocationContext{Parent: responsesMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedResponse walks through a referenced response
@@ -374,7 +464,7 @@ func walkReferencedResponse(ctx context.Context, response *ReferencedResponse, l
 		return true
 	}
 
-	referencedResponseMatchFunc := geMatchFunc(response)
+	referencedResponseMatchFunc := getMatchFunc(response)
 
 	if !yield(WalkItem{Match: referencedResponseMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -410,7 +500,7 @@ func walkResponse(ctx context.Context, response *Response, parent MatchFunc, loc
 	}
 
 	// Visit Response Extensions
-	return yield(WalkItem{Match: geMatchFunc(response.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(response.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkMediaTypes walks through media types
@@ -439,7 +529,7 @@ func walkMediaType(ctx context.Context, mediaType *MediaType, loc []LocationCont
 		return true
 	}
 
-	mediaTypeMatchFunc := geMatchFunc(mediaType)
+	mediaTypeMatchFunc := getMatchFunc(mediaType)
 
 	if !yield(WalkItem{Match: mediaTypeMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -461,7 +551,7 @@ func walkMediaType(ctx context.Context, mediaType *MediaType, loc []LocationCont
 	}
 
 	// Visit MediaType Extensions
-	return yield(WalkItem{Match: geMatchFunc(mediaType.Extensions), Location: append(loc, LocationContext{Parent: mediaTypeMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(mediaType.Extensions), Location: append(loc, LocationContext{Parent: mediaTypeMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkEncodings walks through encodings
@@ -490,7 +580,7 @@ func walkEncoding(ctx context.Context, encoding *Encoding, loc []LocationContext
 		return true
 	}
 
-	encodingMatchFunc := geMatchFunc(encoding)
+	encodingMatchFunc := getMatchFunc(encoding)
 
 	if !yield(WalkItem{Match: encodingMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -502,7 +592,7 @@ func walkEncoding(ctx context.Context, encoding *Encoding, loc []LocationContext
 	}
 
 	// Visit Encoding Extensions
-	return yield(WalkItem{Match: geMatchFunc(encoding.Extensions), Location: append(loc, LocationContext{Parent: encodingMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(encoding.Extensions), Location: append(loc, LocationContext{Parent: encodingMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedHeaders walks through referenced headers
@@ -531,7 +621,7 @@ func walkReferencedHeader(ctx context.Context, header *ReferencedHeader, loc []L
 		return true
 	}
 
-	referencedHeaderMatchFunc := geMatchFunc(header)
+	referencedHeaderMatchFunc := getMatchFunc(header)
 
 	if !yield(WalkItem{Match: referencedHeaderMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -567,7 +657,7 @@ func walkHeader(ctx context.Context, header *Header, parent MatchFunc, loc []Loc
 	}
 
 	// Visit Header Extensions
-	return yield(WalkItem{Match: geMatchFunc(header.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(header.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedExamples walks through referenced examples
@@ -596,7 +686,7 @@ func walkReferencedExample(ctx context.Context, example *ReferencedExample, loc 
 		return true
 	}
 
-	referencedExampleMatchFunc := geMatchFunc(example)
+	referencedExampleMatchFunc := getMatchFunc(example)
 
 	if !yield(WalkItem{Match: referencedExampleMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -617,5 +707,5 @@ func walkExample(_ context.Context, example *Example, parent MatchFunc, loc []Lo
 	}
 
 	// Visit Example Extensions
-	return yield(WalkItem{Match: geMatchFunc(example.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(example.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
 }

@@ -291,6 +291,14 @@ func TestGetTarget_Success(t *testing.T) {
 			},
 			want: "value",
 		},
+		{
+			name: "numeric string as key in map",
+			args: args{
+				source:  map[string]any{"400": "Bad Request", "200": "OK"},
+				pointer: JSONPointer("/400"),
+			},
+			want: "Bad Request",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

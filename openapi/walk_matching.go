@@ -149,7 +149,7 @@ var matchRegistry = map[reflect.Type]any{
 	},
 }
 
-func geMatchFunc[T any](target *T) MatchFunc {
+func getMatchFunc[T any](target *T) MatchFunc {
 	t := reflect.TypeOf(target)
 
 	h, ok := matchRegistry[t]

@@ -278,6 +278,33 @@ paths:
                       $ref: "#/components/schemas/Post"
                   total:
                     type: integer
+  # Test complex external parameter bundling with multi-level references
+  /external/complex-filter:
+    get:
+      tags: [external]
+      summary: Test external parameter with complex reference chain
+      parameters:
+        - $ref: '#/components/parameters/ComplexFilterParam'
+        - $ref: '#/components/parameters/PaginationParam'
+      responses:
+        "200":
+          description: Filtered results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+                  pagination:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      page:
+                        type: integer
 components:
   parameters:
     LimitParam:
@@ -305,6 +332,18 @@ components:
       schema:
         type: string
         format: uuid
+    ComplexFilterParam:
+      name: filter
+      in: query
+      description: Complex filtering parameter with local schema that has external references
+      schema:
+        $ref: '#/components/schemas/FilterCriteria'
+    PaginationParam:
+      name: pagination
+      in: query
+      description: Pagination parameter with nested external references
+      schema:
+        $ref: '#/components/schemas/PaginationRequest'
   schemas:
     User:
       type: object
@@ -541,6 +580,138 @@ components:
             push:
               type: boolean
               default: false
+    FilterCriteria:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/apiProblem'
+        userProfile:
+          $ref: '#/components/schemas/external_user_profile'
+        userPreferences:
+          $ref: '#/components/schemas/external_user_preferences'
+        tags:
+          type: array
+          items:
+            type: string
+      description: Filter criteria with external references
+    apiProblem:
+      type: object
+      properties:
+        type:
+          type: string
+          maxLength: 2048
+          format: uri-reference
+          description: |
+            A [URI reference (RFC3986)](https://tools.ietf.org/html/rfc3986) that identifies the problem type. If present, this is the URL of human-readable HTML documentation for the problem type. When this member is not present, its value is assumed to be `"about:blank"`.
+        title:
+          type: string
+          maxLength: 120
+          format: text
+          description: |
+            A short, human-readable summary of the problem type. The title is usually the same for all problems with the same `type`.
+        status:
+          type: integer
+          maximum: 599
+          minimum: 100
+          format: int32
+          description: |
+            The [HTTP status code](https://datatracker.ietf.org/doc/html/rfc7231#section-6) for this occurrence of the problem.
+        detail:
+          type: string
+          maxLength: 256
+          format: text
+          description: |
+            A human-readable explanation specific to this occurrence of the problem.
+        instance:
+          type: string
+          maxLength: 2048
+          format: uri-reference
+          description: |
+            A URI reference that identifies the specific occurrence of the problem. This is the URI of an API resource that the problem is related to, with a unique error correlation ID URI fragment
+      title: API Problem
+      description: API problem or error, as per [RFC 7807 application/problem+json](https://tools.ietf.org/html/rfc7807).
+    PaginationRequest:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+        size:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+        sortUser:
+          $ref: '#/components/schemas/external_user'
+        metadata:
+          $ref: '#/components/schemas/abstractBody'
+      description: Pagination request with external validation schema
+    external_user:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique user identifier
+        name:
+          type: string
+          maxLength: 100
+          minLength: 1
+          description: User's full name
+        email:
+          type: string
+          format: email
+          description: User's email address
+        profile:
+          $ref: '#/components/schemas/external_user_profile'
+        posts:
+          type: array
+          items:
+            $ref: external_post.yaml
+          description: Posts created by this user
+      required:
+        - id
+        - name
+        - email
+    external_post:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+        content:
+          type: string
+          minLength: 1
+        author_id:
+          type: string
+          format: uuid
+        author:
+          $ref: '#/components/schemas/external_user'
+        tags:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - content
+        - author_id
+    abstractBody:
+      type: object
+      properties: {}
+      title: Abstract Body
+      description: An abstract schema used to define other request and response body model schemas.
   requestBodies:
     CreateUserRequest:
       description: Request body for creating a user

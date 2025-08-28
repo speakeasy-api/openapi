@@ -15,9 +15,6 @@ type model interface {
 
 func navigateModel(sourceVal reflect.Value, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
 	// Models support both key-based and index-based navigation (treat index as key)
-	if currentPart.Type != partTypeKey && currentPart.Type != partTypeIndex {
-		return nil, nil, ErrInvalidPath.Wrap(fmt.Errorf("models only support key or index navigation, got %s at %s", currentPart.Type, currentPath))
-	}
 
 	// Ensure we have a model interface
 	if !sourceVal.CanInterface() {

@@ -118,54 +118,86 @@ func Bundle(ctx context.Context, doc *OpenAPI, opts BundleOptions) error {
 		return nil
 	}
 
-	// Track external references and their new component names
-	externalRefs := make(map[string]string) // original ref -> new component name
-	componentSchemas := sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]]()
-	componentNames := make(map[string]bool) // track used names to avoid conflicts
-	schemaHashes := make(map[string]string) // component name -> hash for conflict detection
+	componentStorage := &componentStorage{
+		schemaStorage:    sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]](),
+		referenceStorage: sequencedmap.New[string, *sequencedmap.Map[string, any]](),
+		externalRefs:     make(map[string]string),
+		componentNames:   make(map[string]bool),
+		schemaHashes:     make(map[string]string),
+	}
 
 	// Initialize existing component names and hashes to avoid conflicts
 	if doc.Components != nil && doc.Components.Schemas != nil {
 		for name, schema := range doc.Components.Schemas.All() {
-			componentNames[name] = true
+			componentStorage.componentNames[name] = true
 			if schema != nil {
-				schemaHashes[name] = hashing.Hash(schema)
+				componentStorage.schemaHashes[name] = hashing.Hash(schema)
 			}
 		}
 	}
 
-	// First pass: collect all external references and resolve them
-	for item := range Walk(ctx, doc) {
+	if err := bundleObject(ctx, doc, opts.NamingStrategy, "", opts.ResolveOptions, componentStorage); err != nil {
+		return err
+	}
+
+	// Rewrite references within bundled schemas to handle circular references
+	err := rewriteRefsInBundledSchemas(ctx, componentStorage)
+	if err != nil {
+		return fmt.Errorf("failed to rewrite references in bundled schemas: %w", err)
+	}
+
+	// Second pass: update all references to point to new component names
+	err = updateReferencesToComponents(ctx, doc, componentStorage)
+	if err != nil {
+		return fmt.Errorf("failed to update references: %w", err)
+	}
+
+	// Add collected components to document
+	addComponentsToDocument(doc, componentStorage)
+
+	return nil
+}
+
+type componentStorage struct {
+	schemaStorage    *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]]
+	referenceStorage *sequencedmap.Map[string, *sequencedmap.Map[string, any]]
+	externalRefs     map[string]string // original ref -> new component name
+	componentNames   map[string]bool   // track used names to avoid conflicts
+	schemaHashes     map[string]string // component name -> hash for conflict detection
+}
+
+func bundleObject[T any](ctx context.Context, obj *T, namingStrategy BundleNamingStrategy, parentLocation string, opts ResolveOptions, componentStorage *componentStorage) error {
+	for item := range Walk(ctx, obj) {
 		err := item.Match(Matcher{
 			Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
-				return bundleSchema(ctx, schema, opts, externalRefs, componentSchemas, componentNames, schemaHashes)
+				return bundleSchema(ctx, schema, namingStrategy, parentLocation, opts, componentStorage)
 			},
 			ReferencedPathItem: func(ref *ReferencedPathItem) error {
-				return bundleReference(ctx, ref, opts, externalRefs, componentNames)
+				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "pathItems")
 			},
 			ReferencedParameter: func(ref *ReferencedParameter) error {
-				return bundleReference(ctx, ref, opts, externalRefs, componentNames)
+				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "parameters")
 			},
 			ReferencedExample: func(ref *ReferencedExample) error {
-				return bundleReference(ctx, ref, opts, externalRefs, componentNames)
+				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "examples")
 			},
 			ReferencedRequestBody: func(ref *ReferencedRequestBody) error {
-				return bundleReference(ctx, ref, opts, externalRefs, componentNames)
+				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "requestBodies")
 			},
 			ReferencedResponse: func(ref *ReferencedResponse) error {
-				return bundleReference(ctx, ref, opts, externalRefs, componentNames)
+				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "responses")
 			},
 			ReferencedHeader: func(ref *ReferencedHeader) error {
-				return bundleReference(ctx, ref, opts, externalRefs, componentNames)
+				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "headers")
 			},
 			ReferencedCallback: func(ref *ReferencedCallback) error {
-				return bundleReference(ctx, ref, opts, externalRefs, componentNames)
+				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "callbacks")
 			},
 			ReferencedLink: func(ref *ReferencedLink) error {
-				return bundleReference(ctx, ref, opts, externalRefs, componentNames)
+				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "links")
 			},
 			ReferencedSecurityScheme: func(ref *ReferencedSecurityScheme) error {
-				return bundleReference(ctx, ref, opts, externalRefs, componentNames)
+				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "securitySchemes")
 			},
 		})
 		if err != nil {
@@ -173,48 +205,35 @@ func Bundle(ctx context.Context, doc *OpenAPI, opts BundleOptions) error {
 		}
 	}
 
-	// Rewrite references within bundled schemas to handle circular references
-	err := rewriteRefsInBundledSchemas(ctx, componentSchemas, externalRefs)
-	if err != nil {
-		return fmt.Errorf("failed to rewrite references in bundled schemas: %w", err)
-	}
-
-	// Second pass: update all references to point to new component names
-	err = updateReferencesToComponents(ctx, doc, externalRefs)
-	if err != nil {
-		return fmt.Errorf("failed to update references: %w", err)
-	}
-
-	// Add collected schemas to components
-	addSchemasToComponents(doc, componentSchemas)
-
 	return nil
 }
 
 // bundleSchema handles bundling of JSON schemas with external references
-func bundleSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceable], opts BundleOptions, externalRefs map[string]string, componentSchemas *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]], componentNames map[string]bool, schemaHashes map[string]string) error {
+func bundleSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceable], namingStrategy BundleNamingStrategy, parentLocation string, opts ResolveOptions, componentStorage *componentStorage) error {
 	if !schema.IsReference() {
 		return nil
 	}
 
-	ref := string(schema.GetRef())
+	ref, classification := handleReference(schema.GetRef(), parentLocation, opts.TargetLocation)
+	if classification == nil {
+		return nil // Invalid reference, skip
+	}
 
-	// Check if this is an external reference using the utility function
-	classification, err := utils.ClassifyReference(ref)
-	if err != nil || classification.IsFragment {
-		//nolint:nilerr
-		return nil // Internal reference or invalid, skip
+	// If it's a fragment reference, check if it's pointing to a different document
+	if classification.IsFragment {
+		return nil // Internal reference within the root document, skip
 	}
 
 	// Check if we've already processed this reference
-	if _, exists := externalRefs[ref]; exists {
+	if _, exists := componentStorage.externalRefs[ref]; exists {
 		return nil
 	}
 
 	// Resolve the external reference
 	resolveOpts := oas3.ResolveOptions{
-		RootDocument:   opts.ResolveOptions.RootDocument,
-		TargetLocation: opts.ResolveOptions.TargetLocation,
+		RootDocument:   opts.RootDocument,
+		TargetDocument: opts.TargetDocument,
+		TargetLocation: opts.TargetLocation,
 	}
 
 	if _, err := schema.Resolve(ctx, resolveOpts); err != nil {
@@ -234,59 +253,25 @@ func bundleSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceabl
 	resolvedHash := hashing.Hash(resolvedRefSchema)
 
 	// Generate component name with smart conflict resolution
-	componentName := generateComponentNameWithHashConflictResolution(ref, opts.NamingStrategy, componentNames, schemaHashes, resolvedHash)
-
-	// Only add to componentSchemas if it's a new schema (not a duplicate)
-	if _, exists := schemaHashes[componentName]; !exists {
-		componentNames[componentName] = true
-		schemaHashes[componentName] = resolvedHash
-		componentSchemas.Set(componentName, resolvedRefSchema)
-
-		// Recursively process any external references within this resolved schema
-		err = processNestedExternalReferences(ctx, resolvedRefSchema, opts, externalRefs, componentSchemas, componentNames, schemaHashes)
-		if err != nil {
-			return fmt.Errorf("failed to process nested references in %s: %w", ref, err)
-		}
-	}
+	componentName := generateComponentNameWithHashConflictResolution(ref, namingStrategy, componentStorage.componentNames, componentStorage.schemaHashes, resolvedHash)
 
 	// Store the mapping
-	externalRefs[ref] = componentName
+	componentStorage.externalRefs[ref] = componentName
 
-	return nil
-}
+	// Only add to componentSchemas if it's a new schema (not a duplicate)
+	if _, exists := componentStorage.schemaHashes[componentName]; !exists {
+		componentStorage.componentNames[componentName] = true
+		componentStorage.schemaHashes[componentName] = resolvedHash
+		componentStorage.schemaStorage.Set(componentName, resolvedRefSchema)
 
-// processNestedExternalReferences recursively processes external references within a resolved schema
-func processNestedExternalReferences(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceable], opts BundleOptions, externalRefs map[string]string, componentSchemas *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]], componentNames map[string]bool, schemaHashes map[string]string) error {
-	if schema == nil {
-		return nil
-	}
+		targetDocInfo := schema.GetReferenceResolutionInfo()
 
-	// Walk through the schema to find any external references
-	for item := range oas3.Walk(ctx, schema) {
-		err := item.Match(oas3.SchemaMatcher{
-			Schema: func(nestedSchema *oas3.JSONSchema[oas3.Referenceable]) error {
-				// First, process the nested schema to bundle any external references
-				err := bundleSchema(ctx, nestedSchema, opts, externalRefs, componentSchemas, componentNames, schemaHashes)
-				if err != nil {
-					return err
-				}
-
-				// Only process nested external references during the first pass
-				// Reference updating will be handled in the second pass
-				if nestedSchema.IsReference() {
-					// Just process the nested schema to bundle any external references
-					// Don't update references here - that will be done in the second pass
-					err := bundleSchema(ctx, nestedSchema, opts, externalRefs, componentSchemas, componentNames, schemaHashes)
-					if err != nil {
-						return err
-					}
-				}
-
-				return nil
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("failed to process nested schema: %w", err)
+		if err := bundleObject(ctx, resolvedRefSchema, namingStrategy, opts.TargetLocation, references.ResolveOptions{
+			RootDocument:   opts.RootDocument,
+			TargetDocument: targetDocInfo.ResolvedDocument,
+			TargetLocation: targetDocInfo.AbsoluteReference,
+		}, componentStorage); err != nil {
+			return fmt.Errorf("failed to bundle nested references in %s: %w", ref, err)
 		}
 	}
 
@@ -294,10 +279,10 @@ func processNestedExternalReferences(ctx context.Context, schema *oas3.JSONSchem
 }
 
 // rewriteRefsInBundledSchemas rewrites references within bundled schemas to point to their new component locations
-func rewriteRefsInBundledSchemas(ctx context.Context, componentSchemas *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]], externalRefs map[string]string) error {
+func rewriteRefsInBundledSchemas(ctx context.Context, componentStorage *componentStorage) error {
 	// Walk through each bundled schema and rewrite internal references
-	for _, schema := range componentSchemas.All() {
-		err := rewriteRefsInSchema(ctx, schema, externalRefs)
+	for _, schema := range componentStorage.schemaStorage.All() {
+		err := rewriteRefsInSchema(ctx, schema, componentStorage)
 		if err != nil {
 			return err
 		}
@@ -306,7 +291,7 @@ func rewriteRefsInBundledSchemas(ctx context.Context, componentSchemas *sequence
 }
 
 // rewriteRefsInSchema rewrites references within a single schema
-func rewriteRefsInSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceable], externalRefs map[string]string) error {
+func rewriteRefsInSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceable], componentStorage *componentStorage) error {
 	if schema == nil {
 		return nil
 	}
@@ -320,14 +305,14 @@ func rewriteRefsInSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Refer
 					refStr := schemaObj.Ref.String()
 
 					// Check for direct external reference match
-					if newName, exists := externalRefs[refStr]; exists {
+					if newName, exists := componentStorage.externalRefs[refStr]; exists {
 						newRef := "#/components/schemas/" + newName
 						*schemaObj.Ref = references.Reference(newRef)
 					} else if strings.HasPrefix(refStr, "#/") && !strings.HasPrefix(refStr, "#/components/") {
 						// Handle circular references within external schemas
 						// e.g., "#/User" should be mapped to "#/components/schemas/User_1"
 						defName := strings.TrimPrefix(refStr, "#/")
-						for externalRef, componentName := range externalRefs {
+						for externalRef, componentName := range componentStorage.externalRefs {
 							// Check if the external reference ends with this fragment
 							// e.g., "external_conflicting_user.yaml#/User" ends with "#/User"
 							if strings.HasSuffix(externalRef, "#/"+defName) {
@@ -348,48 +333,73 @@ func rewriteRefsInSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Refer
 	return nil
 }
 
-// bundleReference handles bundling of generic OpenAPI component references
-func bundleReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, ref *Reference[T, V, C], opts BundleOptions, externalRefs map[string]string, componentNames map[string]bool) error {
+// bundleGenericReference handles bundling of generic OpenAPI component references
+func bundleGenericReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, ref *Reference[T, V, C], namingStrategy BundleNamingStrategy, parentLocation string, opts ResolveOptions, componentStorage *componentStorage, componentType string) error {
 	if ref == nil || !ref.IsReference() {
 		return nil
 	}
 
-	refValue := ref.GetReference()
-	refStr := string(refValue)
+	refStr, classification := handleReference(ref.GetReference(), parentLocation, opts.TargetLocation)
+	if classification == nil {
+		return nil // Invalid reference, skip
+	}
 
-	// Check if this is an external reference using the utility function
-	classification, err := utils.ClassifyReference(refStr)
-	if err != nil || classification.IsFragment {
-		//nolint:nilerr
-		return nil // Internal reference or invalid, skip
+	if classification.IsFragment {
+		return nil // Internal reference within the root document, skip
 	}
 
 	// Check if we've already processed this reference
-	if _, exists := externalRefs[refStr]; exists {
+	if _, exists := componentStorage.externalRefs[refStr]; exists {
 		return nil
 	}
 
-	// For OpenAPI component references, we need to resolve and bring the content into components
-	// This is simpler than schema references as they don't have circular reference concerns
+	// Resolve the external reference
 	resolveOpts := ResolveOptions{
-		RootDocument:   opts.ResolveOptions.RootDocument,
-		TargetLocation: opts.ResolveOptions.TargetLocation,
+		RootDocument:   opts.RootDocument,
+		TargetDocument: opts.TargetDocument,
+		TargetLocation: opts.TargetLocation,
 	}
 
 	_, resolveErr := ref.Resolve(ctx, resolveOpts)
 	if resolveErr != nil {
-		return fmt.Errorf("failed to resolve external reference %s: %w", refStr, resolveErr)
+		return fmt.Errorf("failed to resolve external %s reference %s: %w", componentType, refStr, resolveErr)
 	}
 
 	// Generate component name
-	componentName := generateComponentName(refStr, opts.NamingStrategy, componentNames)
-	componentNames[componentName] = true
+	componentName := generateComponentName(refStr, namingStrategy, componentStorage.componentNames)
+	componentStorage.componentNames[componentName] = true
 
-	// Store the mapping - for OpenAPI references, we'll handle them in the second pass
-	externalRefs[refStr] = componentName
+	// Store the mapping
+	componentStorage.externalRefs[refStr] = componentName
 
-	// Note: For non-schema references, we don't store them in componentSchemas
-	// as they will be handled differently based on their type
+	// Get the resolved content and create a new non-reference version
+	resolvedValue := ref.GetObject()
+	if resolvedValue == nil {
+		return fmt.Errorf("failed to get resolved %s for reference %s", componentType, refStr)
+	}
+
+	// Create a new Reference with the resolved content (not a reference)
+	bundledRef := &Reference[T, V, C]{}
+	bundledRef.Object = resolvedValue
+
+	if !componentStorage.referenceStorage.Has(componentType) {
+		componentStorage.referenceStorage.Set(componentType, sequencedmap.New[string, any]())
+	}
+
+	// Store the resolved component (not the reference) if it's a new component
+	if !componentStorage.referenceStorage.GetOrZero(componentType).Has(componentName) {
+		componentStorage.referenceStorage.GetOrZero(componentType).Set(componentName, bundledRef)
+
+		targetDocInfo := ref.GetReferenceResolutionInfo()
+
+		if err := bundleObject(ctx, bundledRef, namingStrategy, opts.TargetLocation, references.ResolveOptions{
+			RootDocument:   opts.RootDocument,
+			TargetDocument: targetDocInfo.ResolvedDocument,
+			TargetLocation: targetDocInfo.AbsoluteReference,
+		}, componentStorage); err != nil {
+			return fmt.Errorf("failed to bundle nested references in %s: %w", ref.GetReference(), err)
+		}
+	}
 
 	return nil
 }
@@ -599,20 +609,20 @@ func generateCounterBasedName(ref string, usedNames map[string]bool) string {
 }
 
 // updateReferencesToComponents updates all references in the document to point to new component names
-func updateReferencesToComponents(ctx context.Context, doc *OpenAPI, externalRefs map[string]string) error {
+func updateReferencesToComponents(ctx context.Context, doc *OpenAPI, componentStorage *componentStorage) error {
 	for item := range Walk(ctx, doc) {
 		err := item.Match(Matcher{
 			Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
 				if schema.IsReference() {
 					ref := string(schema.GetRef())
-					if newName, exists := externalRefs[ref]; exists {
+					if newName, exists := componentStorage.externalRefs[ref]; exists {
 						// Update the reference to point to the new component
 						newRef := "#/components/schemas/" + newName
 						*schema.GetLeft().Ref = references.Reference(newRef)
 					} else if strings.HasPrefix(ref, "#/") && !strings.HasPrefix(ref, "#/components/") {
 						// Handle circular references within external schemas
 						// Look for a matching external reference that ends with this fragment
-						for externalRef, componentName := range externalRefs {
+						for externalRef, componentName := range componentStorage.externalRefs {
 							// Check if the external reference ends with this fragment
 							// e.g., "external_conflicting_user.yaml#/User" ends with "#/User"
 							if strings.HasSuffix(externalRef, ref) {
@@ -627,31 +637,31 @@ func updateReferencesToComponents(ctx context.Context, doc *OpenAPI, externalRef
 				return nil
 			},
 			ReferencedPathItem: func(ref *ReferencedPathItem) error {
-				return updateReference(ref, externalRefs, "pathItems")
+				return updateReference(ref, componentStorage, "pathItems")
 			},
 			ReferencedParameter: func(ref *ReferencedParameter) error {
-				return updateReference(ref, externalRefs, "parameters")
+				return updateReference(ref, componentStorage, "parameters")
 			},
 			ReferencedExample: func(ref *ReferencedExample) error {
-				return updateReference(ref, externalRefs, "examples")
+				return updateReference(ref, componentStorage, "examples")
 			},
 			ReferencedRequestBody: func(ref *ReferencedRequestBody) error {
-				return updateReference(ref, externalRefs, "requestBodies")
+				return updateReference(ref, componentStorage, "requestBodies")
 			},
 			ReferencedResponse: func(ref *ReferencedResponse) error {
-				return updateReference(ref, externalRefs, "responses")
+				return updateReference(ref, componentStorage, "responses")
 			},
 			ReferencedHeader: func(ref *ReferencedHeader) error {
-				return updateReference(ref, externalRefs, "headers")
+				return updateReference(ref, componentStorage, "headers")
 			},
 			ReferencedCallback: func(ref *ReferencedCallback) error {
-				return updateReference(ref, externalRefs, "callbacks")
+				return updateReference(ref, componentStorage, "callbacks")
 			},
 			ReferencedLink: func(ref *ReferencedLink) error {
-				return updateReference(ref, externalRefs, "links")
+				return updateReference(ref, componentStorage, "links")
 			},
 			ReferencedSecurityScheme: func(ref *ReferencedSecurityScheme) error {
-				return updateReference(ref, externalRefs, "securitySchemes")
+				return updateReference(ref, componentStorage, "securitySchemes")
 			},
 		})
 		if err != nil {
@@ -662,13 +672,13 @@ func updateReferencesToComponents(ctx context.Context, doc *OpenAPI, externalRef
 }
 
 // updateReference updates a generic reference to point to the new component name
-func updateReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ref *Reference[T, V, C], externalRefs map[string]string, componentSection string) error {
+func updateReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ref *Reference[T, V, C], componentStorage *componentStorage, componentSection string) error {
 	if ref == nil || !ref.IsReference() {
 		return nil
 	}
 
 	refStr := string(ref.GetReference())
-	if newName, exists := externalRefs[refStr]; exists {
+	if newName, exists := componentStorage.externalRefs[refStr]; exists {
 		// Update the reference to point to the new component
 		newRef := "#/components/" + componentSection + "/" + newName
 		*ref.Reference = references.Reference(newRef)
@@ -676,22 +686,167 @@ func updateReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler]
 	return nil
 }
 
-// addSchemasToComponents adds the collected schemas to the document's components section
-func addSchemasToComponents(doc *OpenAPI, componentSchemas *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]]) {
-	if componentSchemas.Len() == 0 {
-		return
-	}
-
+// addComponentsToDocument adds all collected components to the document's components section
+func addComponentsToDocument(doc *OpenAPI, componentStorage *componentStorage) {
 	// Ensure components section exists
 	if doc.Components == nil {
 		doc.Components = &Components{}
 	}
-	if doc.Components.Schemas == nil {
-		doc.Components.Schemas = sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]]()
+
+	// Add schemas
+	if componentStorage.schemaStorage.Len() > 0 {
+		if doc.Components.Schemas == nil {
+			doc.Components.Schemas = sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]]()
+		}
+		for name, schema := range componentStorage.schemaStorage.All() {
+			doc.Components.Schemas.Set(name, schema)
+		}
 	}
 
-	// Add all collected schemas in insertion order
-	for name, schema := range componentSchemas.All() {
-		doc.Components.Schemas.Set(name, schema)
+	// Add responses
+	if componentStorage.referenceStorage.GetOrZero("responses").Len() > 0 {
+		if doc.Components.Responses == nil {
+			doc.Components.Responses = sequencedmap.New[string, *ReferencedResponse]()
+		}
+		for name, response := range componentStorage.referenceStorage.GetOrZero("responses").All() {
+			doc.Components.Responses.Set(name, response.(*ReferencedResponse))
+		}
+	}
+
+	// Add parameters
+	if componentStorage.referenceStorage.GetOrZero("parameters").Len() > 0 {
+		if doc.Components.Parameters == nil {
+			doc.Components.Parameters = sequencedmap.New[string, *ReferencedParameter]()
+		}
+		for name, parameter := range componentStorage.referenceStorage.GetOrZero("parameters").All() {
+			doc.Components.Parameters.Set(name, parameter.(*ReferencedParameter))
+		}
+	}
+
+	// Add examples
+	if componentStorage.referenceStorage.GetOrZero("examples").Len() > 0 {
+		if doc.Components.Examples == nil {
+			doc.Components.Examples = sequencedmap.New[string, *ReferencedExample]()
+		}
+		for name, example := range componentStorage.referenceStorage.GetOrZero("examples").All() {
+			doc.Components.Examples.Set(name, example.(*ReferencedExample))
+		}
+	}
+
+	// Add request bodies
+	if componentStorage.referenceStorage.GetOrZero("requestBodies").Len() > 0 {
+		if doc.Components.RequestBodies == nil {
+			doc.Components.RequestBodies = sequencedmap.New[string, *ReferencedRequestBody]()
+		}
+		for name, requestBody := range componentStorage.referenceStorage.GetOrZero("requestBodies").All() {
+			doc.Components.RequestBodies.Set(name, requestBody.(*ReferencedRequestBody))
+		}
+	}
+
+	// Add headers
+	if componentStorage.referenceStorage.GetOrZero("headers").Len() > 0 {
+		if doc.Components.Headers == nil {
+			doc.Components.Headers = sequencedmap.New[string, *ReferencedHeader]()
+		}
+		for name, header := range componentStorage.referenceStorage.GetOrZero("headers").All() {
+			doc.Components.Headers.Set(name, header.(*ReferencedHeader))
+		}
+	}
+
+	// Add callbacks
+	if componentStorage.referenceStorage.GetOrZero("callbacks").Len() > 0 {
+		if doc.Components.Callbacks == nil {
+			doc.Components.Callbacks = sequencedmap.New[string, *ReferencedCallback]()
+		}
+		for name, callback := range componentStorage.referenceStorage.GetOrZero("callbacks").All() {
+			doc.Components.Callbacks.Set(name, callback.(*ReferencedCallback))
+		}
+	}
+
+	// Add links
+	if componentStorage.referenceStorage.GetOrZero("links").Len() > 0 {
+		if doc.Components.Links == nil {
+			doc.Components.Links = sequencedmap.New[string, *ReferencedLink]()
+		}
+		for name, link := range componentStorage.referenceStorage.GetOrZero("links").All() {
+			doc.Components.Links.Set(name, link.(*ReferencedLink))
+		}
+	}
+
+	// Add security schemes
+	if componentStorage.referenceStorage.GetOrZero("securitySchemes").Len() > 0 {
+		if doc.Components.SecuritySchemes == nil {
+			doc.Components.SecuritySchemes = sequencedmap.New[string, *ReferencedSecurityScheme]()
+		}
+		for name, securityScheme := range componentStorage.referenceStorage.GetOrZero("securitySchemes").All() {
+			doc.Components.SecuritySchemes.Set(name, securityScheme.(*ReferencedSecurityScheme))
+		}
+	}
+
+	// Add path items
+	if componentStorage.referenceStorage.GetOrZero("pathItems").Len() > 0 {
+		if doc.Components.PathItems == nil {
+			doc.Components.PathItems = sequencedmap.New[string, *ReferencedPathItem]()
+		}
+		for name, pathItem := range componentStorage.referenceStorage.GetOrZero("pathItems").All() {
+			doc.Components.PathItems.Set(name, pathItem.(*ReferencedPathItem))
+		}
+	}
+}
+
+func handleReference(ref references.Reference, parentLocation, targetLocation string) (string, *utils.ReferenceClassification) {
+	r := ref.String()
+
+	// Check if this is an external reference using the utility function
+	classification, err := utils.ClassifyReference(r)
+	if err != nil {
+		return "", nil // Invalid reference, skip
+	}
+
+	if parentLocation != "" {
+		relPath, err := filepath.Rel(filepath.Dir(parentLocation), targetLocation)
+		if err == nil {
+			if classification.IsFragment {
+				r = relPath + r
+			} else {
+				if ref.GetURI() != "" {
+					r = filepath.Join(filepath.Dir(relPath), r)
+				} else {
+					r = filepath.Join(relPath, r)
+				}
+			}
+		}
+
+		// convert paths back to original separators
+		// detect original separators from the original reference
+		pathStyle := detectPathStyle(ref.String())
+		switch pathStyle {
+		case "windows":
+			r = strings.ReplaceAll(r, "/", "\\")
+		default:
+			r = strings.ReplaceAll(r, "\\", "/")
+		}
+
+		cl, err := utils.ClassifyReference(r)
+		if err == nil {
+			classification = cl
+		}
+	}
+
+	return r, classification
+}
+
+var winAbs = regexp.MustCompile(`^[a-zA-Z]:\\`)
+
+func detectPathStyle(p string) string {
+	switch {
+	case winAbs.MatchString(p):
+		return "windows"
+	case strings.Contains(p, "\\"):
+		return "windows"
+	case strings.Contains(p, "/"):
+		return "unix"
+	default:
+		return "unknown"
 	}
 }

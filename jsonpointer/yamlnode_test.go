@@ -129,6 +129,44 @@ api:
 				assert.Equal(t, "Get user", node.Value)
 			},
 		},
+		{
+			name: "numeric string as key in yaml mapping",
+			args: args{
+				yamlContent: `responses:
+  "200": "OK"
+  "400": "Bad Request"
+  "500": "Internal Server Error"`,
+				pointer: JSONPointer("/responses/400"),
+			},
+			validate: func(t *testing.T, result any) {
+				t.Helper()
+				node, ok := result.(*yaml.Node)
+				require.True(t, ok, "result should be *yaml.Node")
+				assert.Equal(t, yaml.ScalarNode, node.Kind)
+				assert.Equal(t, "Bad Request", node.Value)
+			},
+		},
+		{
+			name: "numeric string as key in nested yaml mapping",
+			args: args{
+				yamlContent: `components:
+  responses:
+    "400":
+      description: "Bad Request"
+      content:
+        application/json:
+          schema:
+            type: object`,
+				pointer: JSONPointer("/components/responses/400/description"),
+			},
+			validate: func(t *testing.T, result any) {
+				t.Helper()
+				node, ok := result.(*yaml.Node)
+				require.True(t, ok, "result should be *yaml.Node")
+				assert.Equal(t, yaml.ScalarNode, node.Kind)
+				assert.Equal(t, "Bad Request", node.Value)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -181,12 +219,12 @@ func TestGetTarget_YamlNode_Error(t *testing.T) {
 			wantErr: "not found -- index 5 out of range for yaml sequence of length 3 at /items/5",
 		},
 		{
-			name: "wrong type - using index on mapping",
+			name: "numeric key not found in mapping",
 			args: args{
 				yamlContent: `name: test`,
 				pointer:     JSONPointer("/0"),
 			},
-			wantErr: "invalid path -- expected key, got index at /0",
+			wantErr: "not found -- key 0 not found in yaml mapping at /0",
 		},
 		{
 			name: "wrong type - using key on sequence",

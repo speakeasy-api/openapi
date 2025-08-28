@@ -149,9 +149,6 @@ func getMapTarget(sourceVal reflect.Value, currentPart navigationPart, stack []n
 	sourceValElem := reflect.Indirect(sourceVal)
 
 	// Allow both partTypeKey and partTypeIndex for maps (integer keys should be treated as string keys)
-	if currentPart.Type != partTypeKey && currentPart.Type != partTypeIndex {
-		return nil, nil, ErrInvalidPath.Wrap(fmt.Errorf("expected key or index, got %s at %s", currentPart.Type, currentPath))
-	}
 	if sourceValElem.IsNil() {
 		return nil, nil, ErrNotFound.Wrap(fmt.Errorf("map is nil at %s", currentPath))
 	}

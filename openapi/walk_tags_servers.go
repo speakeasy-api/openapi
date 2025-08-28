@@ -27,7 +27,7 @@ func walkTag(ctx context.Context, tag *Tag, loc []LocationContext, openAPI *Open
 		return true
 	}
 
-	tagMatchFunc := geMatchFunc(tag)
+	tagMatchFunc := getMatchFunc(tag)
 
 	if !yield(WalkItem{Match: tagMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -38,7 +38,7 @@ func walkTag(ctx context.Context, tag *Tag, loc []LocationContext, openAPI *Open
 	}
 
 	// Visit Tag Extensions
-	return yield(WalkItem{Match: geMatchFunc(tag.Extensions), Location: append(loc, LocationContext{Parent: tagMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(tag.Extensions), Location: append(loc, LocationContext{Parent: tagMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 func walkServers(ctx context.Context, servers []*Server, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
@@ -61,7 +61,7 @@ func walkServer(ctx context.Context, server *Server, loc []LocationContext, open
 		return true
 	}
 
-	serverMatchFunc := geMatchFunc(server)
+	serverMatchFunc := getMatchFunc(server)
 
 	if !yield(WalkItem{Match: serverMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -71,7 +71,7 @@ func walkServer(ctx context.Context, server *Server, loc []LocationContext, open
 		return false
 	}
 
-	return yield(WalkItem{Match: geMatchFunc(server.Extensions), Location: append(loc, LocationContext{Parent: serverMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(server.Extensions), Location: append(loc, LocationContext{Parent: serverMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 func walkVariables(ctx context.Context, variables *sequencedmap.Map[string, *ServerVariable], loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
@@ -89,11 +89,11 @@ func walkVariables(ctx context.Context, variables *sequencedmap.Map[string, *Ser
 }
 
 func walkVariable(_ context.Context, variable *ServerVariable, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
-	variableMatchFunc := geMatchFunc(variable)
+	variableMatchFunc := getMatchFunc(variable)
 
 	if !yield(WalkItem{Match: variableMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
 	}
 
-	return yield(WalkItem{Match: geMatchFunc(variable.Extensions), Location: append(loc, LocationContext{Parent: variableMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(variable.Extensions), Location: append(loc, LocationContext{Parent: variableMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
