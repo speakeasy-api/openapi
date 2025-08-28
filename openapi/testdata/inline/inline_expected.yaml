@@ -693,6 +693,155 @@ paths:
                       $ref: "#/components/schemas/Post"
                   total:
                     type: integer
+  # Test complex external parameter bundling with multi-level references
+  /external/complex-filter:
+    get:
+      tags: [external]
+      summary: Test external parameter with complex reference chain
+      parameters:
+        - name: filter
+          in: query
+          description: Complex filtering parameter with local schema that has external references
+          schema:
+            type: object
+            properties:
+              status:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    maxLength: 2048
+                    format: uri-reference
+                    description: |
+                      A [URI reference (RFC3986)](https://tools.ietf.org/html/rfc3986) that identifies the problem type. If present, this is the URL of human-readable HTML documentation for the problem type. When this member is not present, its value is assumed to be `"about:blank"`.
+                  title:
+                    type: string
+                    maxLength: 120
+                    format: text
+                    description: |
+                      A short, human-readable summary of the problem type. The title is usually the same for all problems with the same `type`.
+                  status:
+                    type: integer
+                    maximum: 599
+                    minimum: 100
+                    format: int32
+                    description: |
+                      The [HTTP status code](https://datatracker.ietf.org/doc/html/rfc7231#section-6) for this occurrence of the problem.
+                  detail:
+                    type: string
+                    maxLength: 256
+                    format: text
+                    description: |
+                      A human-readable explanation specific to this occurrence of the problem.
+                  instance:
+                    type: string
+                    maxLength: 2048
+                    format: uri-reference
+                    description: |
+                      A URI reference that identifies the specific occurrence of the problem. This is the URI of an API resource that the problem is related to, with a unique error correlation ID URI fragment
+                title: API Problem
+                description: API problem or error, as per [RFC 7807 application/problem+json](https://tools.ietf.org/html/rfc7807).
+              userProfile:
+                type: object
+                properties:
+                  bio:
+                    type: string
+                    maxLength: 500
+                    description: User biography
+                  avatar_url:
+                    type: string
+                    format: uri
+                    description: URL to user's avatar image
+                  social_links:
+                    type: object
+                    additionalProperties:
+                      type: string
+                      format: uri
+                  preferences:
+                    type: object
+                    properties:
+                      theme:
+                        type: string
+                        enum:
+                          - light
+                          - dark
+                          - auto
+                        default: auto
+                      notifications:
+                        type: object
+                        properties:
+                          email:
+                            type: boolean
+                            default: true
+                          push:
+                            type: boolean
+                            default: false
+              userPreferences:
+                type: object
+                properties:
+                  theme:
+                    type: string
+                    enum:
+                      - light
+                      - dark
+                      - auto
+                    default: auto
+                  notifications:
+                    type: object
+                    properties:
+                      email:
+                        type: boolean
+                        default: true
+                      push:
+                        type: boolean
+                        default: false
+              tags:
+                type: array
+                items:
+                  type: string
+            description: Filter criteria with external references
+        - name: pagination
+          in: query
+          description: Pagination parameter with nested external references
+          schema:
+            type: object
+            properties:
+              page:
+                type: integer
+                minimum: 1
+                default: 1
+              size:
+                type: integer
+                maximum: 100
+                minimum: 1
+                default: 20
+              sortUser:
+                $ref: '#/components/schemas/external_user_yaml'
+              metadata:
+                type: object
+                properties: {}
+                title: Abstract Body
+                description: An abstract schema used to define other request and response body model schemas.
+            description: Pagination request with external validation schema
+      responses:
+        "200":
+          description: Filtered results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+                  pagination:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      page:
+                        type: integer
 components:
   schemas:
     User:
@@ -910,6 +1059,33 @@ components:
       required:
         - userId
         - username
+    external_user_yaml:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique user identifier
+        name:
+          type: string
+          maxLength: 100
+          minLength: 1
+          description: User's full name
+        email:
+          type: string
+          format: email
+          description: User's email address
+        profile:
+          $ref: '#/components/schemas/external_user_yaml'
+        posts:
+          type: array
+          items:
+            $ref: '#/components/schemas/external_user_yaml'
+          description: Posts created by this user
+      required:
+        - id
+        - name
+        - email
   securitySchemes:
     BearerAuth:
       type: http

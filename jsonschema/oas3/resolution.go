@@ -59,10 +59,15 @@ func (j *JSONSchema[Referenceable]) GetAbsRef() references.Reference {
 // Validation errors can be skipped by setting the skipValidation flag to true. This will skip the missing field errors that occur during unmarshaling.
 // Resolution doesn't run the Validate function on the resolved object. So if you want to fully validate the object after resolution, you need to call the Validate function manually.
 func (s *JSONSchema[Referenceable]) Resolve(ctx context.Context, opts ResolveOptions) ([]error, error) {
+	targetDocument := opts.TargetDocument
+	if targetDocument == nil {
+		targetDocument = opts.RootDocument
+	}
+
 	return resolveJSONSchemaWithTracking(ctx, (*JSONSchemaReferenceable)(unsafe.Pointer(s)), references.ResolveOptions{ //nolint:gosec
 		TargetLocation:      opts.TargetLocation,
 		RootDocument:        opts.RootDocument,
-		TargetDocument:      opts.RootDocument,
+		TargetDocument:      targetDocument,
 		DisableExternalRefs: opts.DisableExternalRefs,
 		VirtualFS:           opts.VirtualFS,
 		HTTPClient:          opts.HTTPClient,
@@ -119,6 +124,22 @@ func (s *JSONSchema[Referenceable]) MustGetResolvedSchema() *JSONSchema[Concrete
 		panic("unresolved reference, resolve first")
 	}
 	return obj
+}
+
+func (r *JSONSchema[Referenceable]) GetReferenceResolutionInfo() *references.ResolveResult[JSONSchemaReferenceable] {
+	if r == nil {
+		return nil
+	}
+
+	if !r.IsReference() {
+		return nil
+	}
+
+	if r.referenceResolutionCache == nil {
+		return nil
+	}
+
+	return r.referenceResolutionCache
 }
 
 func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references.ResolveOptions, referenceChain []string) ([]string, []error, error) {

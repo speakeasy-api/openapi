@@ -53,7 +53,7 @@ func walkReferencedLink(ctx context.Context, link *ReferencedLink, loc []Locatio
 		return true
 	}
 
-	referencedLinkMatchFunc := geMatchFunc(link)
+	referencedLinkMatchFunc := getMatchFunc(link)
 
 	if !yield(WalkItem{Match: referencedLinkMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -79,7 +79,7 @@ func walkLink(ctx context.Context, link *Link, parent MatchFunc, loc []LocationC
 	}
 
 	// Visit Link Extensions
-	return yield(WalkItem{Match: geMatchFunc(link.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(link.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedCallbacks walks through referenced callbacks
@@ -108,7 +108,7 @@ func walkReferencedCallback(ctx context.Context, callback *ReferencedCallback, l
 		return true
 	}
 
-	referencedCallbackMatchFunc := geMatchFunc(callback)
+	referencedCallbackMatchFunc := getMatchFunc(callback)
 
 	if !yield(WalkItem{Match: referencedCallbackMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -136,5 +136,5 @@ func walkCallback(ctx context.Context, callback *Callback, parent MatchFunc, loc
 	}
 
 	// Visit Callback Extensions
-	return yield(WalkItem{Match: geMatchFunc(callback.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(callback.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
 }

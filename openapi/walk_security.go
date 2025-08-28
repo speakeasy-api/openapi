@@ -32,7 +32,7 @@ func walkSecurityRequirement(_ context.Context, securityRequirement *SecurityReq
 		return true
 	}
 
-	securityMatchFunc := geMatchFunc(securityRequirement)
+	securityMatchFunc := getMatchFunc(securityRequirement)
 
 	return yield(WalkItem{Match: securityMatchFunc, Location: loc, OpenAPI: openAPI})
 }
@@ -43,7 +43,7 @@ func walkReferencedSecurityScheme(ctx context.Context, securityScheme *Reference
 		return true
 	}
 
-	referencedSecuritySchemeMatchFunc := geMatchFunc(securityScheme)
+	referencedSecuritySchemeMatchFunc := getMatchFunc(securityScheme)
 
 	if !yield(WalkItem{Match: referencedSecuritySchemeMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -69,7 +69,7 @@ func walkSecurityScheme(ctx context.Context, securityScheme *SecurityScheme, par
 	}
 
 	// Visit SecurityScheme Extensions
-	return yield(WalkItem{Match: geMatchFunc(securityScheme.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(securityScheme.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkOAuthFlows walks through OAuth flows
@@ -78,7 +78,7 @@ func walkOAuthFlows(ctx context.Context, flows *OAuthFlows, loc []LocationContex
 		return true
 	}
 
-	flowsMatchFunc := geMatchFunc(flows)
+	flowsMatchFunc := getMatchFunc(flows)
 
 	if !yield(WalkItem{Match: flowsMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -102,7 +102,7 @@ func walkOAuthFlows(ctx context.Context, flows *OAuthFlows, loc []LocationContex
 	}
 
 	// Visit OAuthFlows Extensions
-	return yield(WalkItem{Match: geMatchFunc(flows.Extensions), Location: append(loc, LocationContext{Parent: flowsMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(flows.Extensions), Location: append(loc, LocationContext{Parent: flowsMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkOAuthFlow walks through an OAuth flow
@@ -111,12 +111,12 @@ func walkOAuthFlow(_ context.Context, flow *OAuthFlow, loc []LocationContext, op
 		return true
 	}
 
-	flowMatchFunc := geMatchFunc(flow)
+	flowMatchFunc := getMatchFunc(flow)
 
 	if !yield(WalkItem{Match: flowMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
 	}
 
 	// Visit OAuthFlow Extensions
-	return yield(WalkItem{Match: geMatchFunc(flow.Extensions), Location: append(loc, LocationContext{Parent: flowMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(flow.Extensions), Location: append(loc, LocationContext{Parent: flowMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }

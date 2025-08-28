@@ -218,10 +218,15 @@ func (r *Reference[T, V, C]) Resolve(ctx context.Context, opts ResolveOptions) (
 		return nil, nil
 	}
 
+	targetDocument := opts.TargetDocument
+	if targetDocument == nil {
+		targetDocument = opts.RootDocument
+	}
+
 	return resolveObjectWithTracking(ctx, r, references.ResolveOptions{
 		RootDocument:        opts.RootDocument,
 		TargetLocation:      opts.TargetLocation,
-		TargetDocument:      opts.RootDocument,
+		TargetDocument:      targetDocument,
 		DisableExternalRefs: opts.DisableExternalRefs,
 		VirtualFS:           opts.VirtualFS,
 		HTTPClient:          opts.HTTPClient,
@@ -437,6 +442,26 @@ func (r *Reference[T, V, C]) GetNavigableNode() (any, error) {
 		return nil, errors.New("unresolved reference")
 	}
 	return obj, nil
+}
+
+func (r *Reference[T, V, C]) GetReferenceResolutionInfo() *references.ResolveResult[Reference[T, V, C]] {
+	if r == nil {
+		return nil
+	}
+
+	if !r.IsReference() {
+		return nil
+	}
+
+	r.ensureMutex()
+	r.cacheMutex.RLock()
+	defer r.cacheMutex.RUnlock()
+
+	if r.referenceResolutionCache == nil {
+		return nil
+	}
+
+	return r.referenceResolutionCache
 }
 
 func (r *Reference[T, V, C]) resolve(ctx context.Context, opts references.ResolveOptions) (*T, *Reference[T, V, C], []error, error) {

@@ -1,0 +1,30 @@
+openapi: 3.1.0
+info:
+  title: Test
+  description: Test speakeasy openapi bundle
+  version: 0.1.0
+
+servers:
+  - url: /test
+
+tags:
+  - name: Test
+    description: Test
+
+paths:
+  /test:
+    get:
+      summary: Test
+      operationId: test
+      description: Test
+      tags:
+        - Test
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '../common/openapi.yaml#/components/responses/400'

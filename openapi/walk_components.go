@@ -14,7 +14,7 @@ func walkComponents(ctx context.Context, components *Components, loc []LocationC
 		return true
 	}
 
-	componentsMatchFunc := geMatchFunc(components)
+	componentsMatchFunc := getMatchFunc(components)
 
 	if !yield(WalkItem{Match: componentsMatchFunc, Location: loc, OpenAPI: openAPI}) {
 		return false
@@ -71,7 +71,7 @@ func walkComponents(ctx context.Context, components *Components, loc []LocationC
 	}
 
 	// Visit Components Extensions
-	return yield(WalkItem{Match: geMatchFunc(components.Extensions), Location: append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(components.Extensions), Location: append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkComponentSchemas walks through component schemas

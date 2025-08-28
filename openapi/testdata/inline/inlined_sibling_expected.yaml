@@ -1,0 +1,118 @@
+openapi: 3.1.0
+info:
+  title: Test
+  description: Test speakeasy openapi bundle
+  version: 0.1.0
+servers:
+  - url: /test
+tags:
+  - name: Test
+    description: Test
+paths:
+  /test:
+    get:
+      summary: Test
+      operationId: test
+      description: Test
+      tags:
+        - Test
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Bad Request. The request body, request headers, and/or query parameters are not well-formed.
+          content:
+            application/problem+json:
+              schema:
+                type: object
+                allOf:
+                  - type: object
+                    properties: {}
+                    title: Abstract Body
+                    description: An abstract schema used to define other request and response body model schemas.
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        maxLength: 2048
+                        format: uri-reference
+                        description: |
+                          A [URI reference (RFC3986)](https://tools.ietf.org/html/rfc3986) that identifies the problem type. If present, this is the URL of human-readable HTML documentation for the problem type. When this member is not present, its value is assumed to be `"about:blank"`.
+                      title:
+                        type: string
+                        maxLength: 120
+                        format: text
+                        description: |
+                          A short, human-readable summary of the problem type. The title is usually the same for all problems with the same `type`.
+                      status:
+                        type: integer
+                        maximum: 599
+                        minimum: 100
+                        format: int32
+                        description: |
+                          The [HTTP status code](https://datatracker.ietf.org/doc/html/rfc7231#section-6) for this occurrence of the problem.
+                      detail:
+                        type: string
+                        maxLength: 256
+                        format: text
+                        description: |
+                          A human-readable explanation specific to this occurrence of the problem.
+                      instance:
+                        type: string
+                        maxLength: 2048
+                        format: uri-reference
+                        description: |
+                          A URI reference that identifies the specific occurrence of the problem. This is the URI of an API resource that the problem is related to, with a unique error correlation ID URI fragment
+                    title: API Problem
+                    description: API problem or error, as per [RFC 7807 application/problem+json](https://tools.ietf.org/html/rfc7807).
+                title: Problem Response
+                description: API problem or error response, as per [RFC 9457 application/problem+json](https://tools.ietf.org/html/rfc9457).
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - type: object
+                    properties: {}
+                    title: Abstract Body
+                    description: An abstract schema used to define other request and response body model schemas.
+                  - type: object
+                    properties:
+                      type:
+                        type: string
+                        maxLength: 2048
+                        format: uri-reference
+                        description: |
+                          A [URI reference (RFC3986)](https://tools.ietf.org/html/rfc3986) that identifies the problem type. If present, this is the URL of human-readable HTML documentation for the problem type. When this member is not present, its value is assumed to be `"about:blank"`.
+                      title:
+                        type: string
+                        maxLength: 120
+                        format: text
+                        description: |
+                          A short, human-readable summary of the problem type. The title is usually the same for all problems with the same `type`.
+                      status:
+                        type: integer
+                        maximum: 599
+                        minimum: 100
+                        format: int32
+                        description: |
+                          The [HTTP status code](https://datatracker.ietf.org/doc/html/rfc7231#section-6) for this occurrence of the problem.
+                      detail:
+                        type: string
+                        maxLength: 256
+                        format: text
+                        description: |
+                          A human-readable explanation specific to this occurrence of the problem.
+                      instance:
+                        type: string
+                        maxLength: 2048
+                        format: uri-reference
+                        description: |
+                          A URI reference that identifies the specific occurrence of the problem. This is the URI of an API resource that the problem is related to, with a unique error correlation ID URI fragment
+                    title: API Problem
+                    description: API problem or error, as per [RFC 7807 application/problem+json](https://tools.ietf.org/html/rfc7807).
+                title: Problem Response
+                description: API problem or error response, as per [RFC 9457 application/problem+json](https://tools.ietf.org/html/rfc9457).

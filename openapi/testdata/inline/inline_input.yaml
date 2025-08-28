@@ -293,6 +293,34 @@ paths:
                   total:
                     type: integer
 
+  # Test complex external parameter bundling with multi-level references
+  /external/complex-filter:
+    get:
+      tags: [external]
+      summary: Test external parameter with complex reference chain
+      parameters:
+        - $ref: 'external/parameters.yaml#/components/parameters/ComplexFilterParam'
+        - $ref: 'external/parameters.yaml#/components/parameters/PaginationParam'
+      responses:
+        "200":
+          description: Filtered results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+                  pagination:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      page:
+                        type: integer
+
 components:
   parameters:
     LimitParam:

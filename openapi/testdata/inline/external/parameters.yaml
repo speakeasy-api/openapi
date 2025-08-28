@@ -1,0 +1,54 @@
+openapi: 3.1.0
+info:
+  title: External Parameters
+  version: 1.0.0
+
+components:
+  parameters:
+    ComplexFilterParam:
+      name: filter
+      in: query
+      description: Complex filtering parameter with local schema that has external references
+      schema:
+        $ref: "#/components/schemas/FilterCriteria"
+
+    PaginationParam:
+      name: pagination
+      in: query
+      description: Pagination parameter with nested external references
+      schema:
+        $ref: "#/components/schemas/PaginationRequest"
+
+  schemas:
+    FilterCriteria:
+      type: object
+      description: Filter criteria with external references
+      properties:
+        status:
+          $ref: "../common/openapi.yaml#/components/schemas/apiProblem"
+        userProfile:
+          $ref: "../external_user_profile.yaml"
+        userPreferences:
+          $ref: "../external_user_preferences.yaml"
+        tags:
+          type: array
+          items:
+            type: string
+
+    PaginationRequest:
+      type: object
+      description: Pagination request with external validation schema
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+        sortUser:
+          $ref: "../external_user.yaml"
+        metadata:
+          $ref: "../common/openapi.yaml#/components/schemas/abstractBody"

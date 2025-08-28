@@ -79,3 +79,44 @@ func TestInline_EmptyDocument(t *testing.T) {
 	err = openapi.Inline(ctx, doc, opts)
 	assert.NoError(t, err)
 }
+
+func TestInline_SiblingDirectories_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Load the input document from test subdirectory
+	inputFile, err := os.Open("testdata/inline/test/openapi.yaml")
+	require.NoError(t, err)
+	defer inputFile.Close()
+
+	inputDoc, validationErrs, err := openapi.Unmarshal(ctx, inputFile)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs, "Input document should be valid")
+
+	// Configure inlining options
+	opts := openapi.InlineOptions{
+		ResolveOptions: openapi.ResolveOptions{
+			RootDocument:   inputDoc,
+			TargetLocation: "testdata/inline/test/openapi.yaml",
+		},
+		RemoveUnusedComponents: true,
+	}
+
+	// Inline all references
+	err = openapi.Inline(ctx, inputDoc, opts)
+	require.NoError(t, err)
+
+	// Marshal the inlined document to YAML
+	var buf bytes.Buffer
+	err = openapi.Marshal(ctx, inputDoc, &buf)
+	require.NoError(t, err)
+	actualYAML := buf.Bytes()
+
+	// Load the expected output
+	expectedBytes, err := os.ReadFile("testdata/inline/inlined_sibling_expected.yaml")
+	require.NoError(t, err)
+
+	// Compare the actual output with expected output
+	assert.Equal(t, string(expectedBytes), string(actualYAML), "Inlined document should match expected output")
+}

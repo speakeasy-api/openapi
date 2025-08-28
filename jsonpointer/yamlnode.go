@@ -58,10 +58,6 @@ func getYamlDocumentTarget(node *yaml.Node, currentPart navigationPart, stack []
 }
 
 func getYamlMappingTarget(node *yaml.Node, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
-	if currentPart.Type != partTypeKey {
-		return nil, nil, ErrInvalidPath.Wrap(fmt.Errorf("expected key, got %s at %s", currentPart.Type, currentPath))
-	}
-
 	key := currentPart.unescapeValue()
 
 	// YAML mapping nodes have content in pairs: [key1, value1, key2, value2, ...]
