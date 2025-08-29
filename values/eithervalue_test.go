@@ -5,7 +5,24 @@ import (
 
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// CustomType is a test type that implements IsEqual method
+type CustomType struct {
+	Value string
+}
+
+// IsEqual implements custom equality logic for CustomType
+func (c *CustomType) IsEqual(other *CustomType) bool {
+	if c == nil && other == nil {
+		return true
+	}
+	if c == nil || other == nil {
+		return false
+	}
+	return c.Value == other.Value
+}
 
 // Test the IsLeft() method for nil safety and functionality
 func TestEitherValue_IsLeft_Success(t *testing.T) {
@@ -537,4 +554,396 @@ func TestEitherValue_EdgeCases(t *testing.T) {
 		assert.Equal(t, "test", *either.GetRight())  // Dereference pointer
 		assert.Equal(t, "test", either.RightValue()) // RightValue returns value directly
 	})
+}
+
+// Test the IsEqual() method for comprehensive equality checking
+func TestEitherValue_IsEqual_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		either1  *EitherValue[string, string, int, int]
+		either2  *EitherValue[string, string, int, int]
+		expected bool
+	}{
+		{
+			name:     "both nil should be equal",
+			either1:  nil,
+			either2:  nil,
+			expected: true,
+		},
+		{
+			name:     "one nil should not be equal",
+			either1:  nil,
+			either2:  &EitherValue[string, string, int, int]{Left: pointer.From("test")},
+			expected: false,
+		},
+		{
+			name:     "nil vs non-nil should not be equal",
+			either1:  &EitherValue[string, string, int, int]{Left: pointer.From("test")},
+			either2:  nil,
+			expected: false,
+		},
+		{
+			name: "same left values should be equal",
+			either1: &EitherValue[string, string, int, int]{
+				Left: pointer.From("test"),
+			},
+			either2: &EitherValue[string, string, int, int]{
+				Left: pointer.From("test"),
+			},
+			expected: true,
+		},
+		{
+			name: "different left values should not be equal",
+			either1: &EitherValue[string, string, int, int]{
+				Left: pointer.From("test1"),
+			},
+			either2: &EitherValue[string, string, int, int]{
+				Left: pointer.From("test2"),
+			},
+			expected: false,
+		},
+		{
+			name: "same right values should be equal",
+			either1: &EitherValue[string, string, int, int]{
+				Right: pointer.From(42),
+			},
+			either2: &EitherValue[string, string, int, int]{
+				Right: pointer.From(42),
+			},
+			expected: true,
+		},
+		{
+			name: "different right values should not be equal",
+			either1: &EitherValue[string, string, int, int]{
+				Right: pointer.From(42),
+			},
+			either2: &EitherValue[string, string, int, int]{
+				Right: pointer.From(24),
+			},
+			expected: false,
+		},
+		{
+			name: "left vs right should not be equal",
+			either1: &EitherValue[string, string, int, int]{
+				Left: pointer.From("test"),
+			},
+			either2: &EitherValue[string, string, int, int]{
+				Right: pointer.From(42),
+			},
+			expected: false,
+		},
+		{
+			name: "both empty should be equal",
+			either1: &EitherValue[string, string, int, int]{
+				Left:  nil,
+				Right: nil,
+			},
+			either2: &EitherValue[string, string, int, int]{
+				Left:  nil,
+				Right: nil,
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := tt.either1.IsEqual(tt.either2)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// Test IsEqual with types that have IsEqual methods
+func TestEitherValue_IsEqual_WithIsEqualMethod_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		either1  *EitherValue[CustomType, CustomType, int, int]
+		either2  *EitherValue[CustomType, CustomType, int, int]
+		expected bool
+	}{
+		{
+			name: "custom types with same values should be equal",
+			either1: &EitherValue[CustomType, CustomType, int, int]{
+				Left: &CustomType{Value: "test"},
+			},
+			either2: &EitherValue[CustomType, CustomType, int, int]{
+				Left: &CustomType{Value: "test"},
+			},
+			expected: true,
+		},
+		{
+			name: "custom types with different values should not be equal",
+			either1: &EitherValue[CustomType, CustomType, int, int]{
+				Left: &CustomType{Value: "test1"},
+			},
+			either2: &EitherValue[CustomType, CustomType, int, int]{
+				Left: &CustomType{Value: "test2"},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := tt.either1.IsEqual(tt.either2)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// Test IsEqual with slice and map types (empty collection handling)
+func TestEitherValue_IsEqual_EmptyCollections_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		either1  *EitherValue[[]string, []string, map[string]int, map[string]int]
+		either2  *EitherValue[[]string, []string, map[string]int, map[string]int]
+		expected bool
+	}{
+		{
+			name: "nil slice vs empty slice should be equal",
+			either1: &EitherValue[[]string, []string, map[string]int, map[string]int]{
+				Left: nil,
+			},
+			either2: &EitherValue[[]string, []string, map[string]int, map[string]int]{
+				Left: &[]string{},
+			},
+			expected: true,
+		},
+		{
+			name: "empty slice vs nil slice should be equal",
+			either1: &EitherValue[[]string, []string, map[string]int, map[string]int]{
+				Left: &[]string{},
+			},
+			either2: &EitherValue[[]string, []string, map[string]int, map[string]int]{
+				Left: nil,
+			},
+			expected: true,
+		},
+		{
+			name: "nil map vs empty map should not be equal (reflect.DeepEqual behavior)",
+			either1: &EitherValue[[]string, []string, map[string]int, map[string]int]{
+				Right: nil,
+			},
+			either2: &EitherValue[[]string, []string, map[string]int, map[string]int]{
+				Right: &map[string]int{},
+			},
+			expected: false,
+		},
+		{
+			name: "empty map vs nil map should not be equal (reflect.DeepEqual behavior)",
+			either1: &EitherValue[[]string, []string, map[string]int, map[string]int]{
+				Right: &map[string]int{},
+			},
+			either2: &EitherValue[[]string, []string, map[string]int, map[string]int]{
+				Right: nil,
+			},
+			expected: false,
+		},
+		{
+			name: "non-empty slice vs empty slice should not be equal",
+			either1: &EitherValue[[]string, []string, map[string]int, map[string]int]{
+				Left: &[]string{"test"},
+			},
+			either2: &EitherValue[[]string, []string, map[string]int, map[string]int]{
+				Left: &[]string{},
+			},
+			expected: false,
+		},
+		{
+			name: "non-empty map vs empty map should not be equal",
+			either1: &EitherValue[[]string, []string, map[string]int, map[string]int]{
+				Right: &map[string]int{"key": 42},
+			},
+			either2: &EitherValue[[]string, []string, map[string]int, map[string]int]{
+				Right: &map[string]int{},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := tt.either1.IsEqual(tt.either2)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// Test the equalWithIsEqualMethod function indirectly through IsEqual
+func TestEqualWithIsEqualMethod_Success(t *testing.T) {
+	t.Parallel()
+
+	// Test with types that don't have IsEqual method (fallback to reflect.DeepEqual)
+	t.Run("fallback to reflect.DeepEqual", func(t *testing.T) {
+		t.Parallel()
+
+		either1 := &EitherValue[string, string, int, int]{
+			Left: pointer.From("test"),
+		}
+		either2 := &EitherValue[string, string, int, int]{
+			Left: pointer.From("test"),
+		}
+
+		assert.True(t, either1.IsEqual(either2))
+	})
+
+	// Test with nil values
+	t.Run("both nil values", func(t *testing.T) {
+		t.Parallel()
+
+		either1 := &EitherValue[string, string, int, int]{
+			Left: nil,
+		}
+		either2 := &EitherValue[string, string, int, int]{
+			Left: nil,
+		}
+
+		assert.True(t, either1.IsEqual(either2))
+	})
+
+	// Test with one nil value
+	t.Run("one nil value", func(t *testing.T) {
+		t.Parallel()
+
+		either1 := &EitherValue[string, string, int, int]{
+			Left: nil,
+		}
+		either2 := &EitherValue[string, string, int, int]{
+			Left: pointer.From("test"),
+		}
+
+		assert.False(t, either1.IsEqual(either2))
+	})
+}
+
+// Test the isEmptyCollection function indirectly through IsEqual
+func TestIsEmptyCollection_Success(t *testing.T) {
+	t.Parallel()
+
+	// Test with slice types
+	t.Run("slice types", func(t *testing.T) {
+		t.Parallel()
+
+		// Test nil slice vs empty slice
+		either1 := &EitherValue[[]string, []string, int, int]{
+			Left: nil, // nil slice
+		}
+		either2 := &EitherValue[[]string, []string, int, int]{
+			Left: &[]string{}, // empty slice
+		}
+
+		assert.True(t, either1.IsEqual(either2), "nil slice should equal empty slice")
+
+		// Test non-empty slice vs empty slice
+		either3 := &EitherValue[[]string, []string, int, int]{
+			Left: &[]string{"test"}, // non-empty slice
+		}
+		either4 := &EitherValue[[]string, []string, int, int]{
+			Left: &[]string{}, // empty slice
+		}
+
+		assert.False(t, either3.IsEqual(either4), "non-empty slice should not equal empty slice")
+	})
+
+	// Test with map types
+	t.Run("map types", func(t *testing.T) {
+		t.Parallel()
+
+		// Test nil map vs empty map
+		either1 := &EitherValue[map[string]int, map[string]int, int, int]{
+			Left: nil, // nil map
+		}
+		either2 := &EitherValue[map[string]int, map[string]int, int, int]{
+			Left: &map[string]int{}, // empty map
+		}
+
+		assert.True(t, either1.IsEqual(either2), "nil map should equal empty map")
+
+		// Test non-empty map vs empty map
+		either3 := &EitherValue[map[string]int, map[string]int, int, int]{
+			Left: &map[string]int{"key": 42}, // non-empty map
+		}
+		either4 := &EitherValue[map[string]int, map[string]int, int, int]{
+			Left: &map[string]int{}, // empty map
+		}
+
+		assert.False(t, either3.IsEqual(either4), "non-empty map should not equal empty map")
+	})
+}
+
+// Test GetNavigableNode method
+func TestEitherValue_GetNavigableNode_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		either      *EitherValue[string, string, int, int]
+		expectedVal interface{}
+		expectError bool
+	}{
+		{
+			name: "left value set returns left",
+			either: &EitherValue[string, string, int, int]{
+				Left: pointer.From("test"),
+			},
+			expectedVal: pointer.From("test"),
+			expectError: false,
+		},
+		{
+			name: "right value set returns right",
+			either: &EitherValue[string, string, int, int]{
+				Right: pointer.From(42),
+			},
+			expectedVal: pointer.From(42),
+			expectError: false,
+		},
+		{
+			name: "both values set returns left (precedence)",
+			either: &EitherValue[string, string, int, int]{
+				Left:  pointer.From("test"),
+				Right: pointer.From(42),
+			},
+			expectedVal: pointer.From("test"),
+			expectError: false,
+		},
+		{
+			name: "no values set returns error",
+			either: &EitherValue[string, string, int, int]{
+				Left:  nil,
+				Right: nil,
+			},
+			expectedVal: nil,
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := tt.either.GetNavigableNode()
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Nil(t, result)
+				assert.Contains(t, err.Error(), "EitherValue has no value set")
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedVal, result)
+			}
+		})
+	}
 }

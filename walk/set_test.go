@@ -282,3 +282,232 @@ func TestSetAtLocation_Success(t *testing.T) {
 		})
 	}
 }
+
+func TestSetAtLocation_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		parent      any
+		location    walk.LocationContext[string]
+		value       any
+		expectError string
+	}{
+		{
+			name:        "non-pointer parent",
+			parent:      "not a pointer",
+			location:    walk.LocationContext[string]{},
+			value:       "value",
+			expectError: "expected map, slice, or struct, got string",
+		},
+		{
+			name:        "unsupported parent type",
+			parent:      42,
+			location:    walk.LocationContext[string]{},
+			value:       "value",
+			expectError: "expected map, slice, or struct, got int",
+		},
+		{
+			name:   "map with nil parent key",
+			parent: map[string]string{},
+			location: walk.LocationContext[string]{
+				ParentKey: nil,
+			},
+			value:       "value",
+			expectError: "parent key is nil",
+		},
+		{
+			name:   "slice with nil parent index",
+			parent: []string{"item"},
+			location: walk.LocationContext[string]{
+				ParentIndex: nil,
+			},
+			value:       "value",
+			expectError: "parent index is nil",
+		},
+		{
+			name: "struct without model interface or sequenced map",
+			parent: &struct {
+				Field string
+			}{},
+			location: walk.LocationContext[string]{
+				ParentField: "field",
+			},
+			value:       "value",
+			expectError: "expected model interface or sequenced map interface",
+		},
+		{
+			name: "sequenced map with nil parent key",
+			parent: &tests.TestEmbeddedMapHighModel{
+				Map: *sequencedmap.New[string, string](),
+			},
+			location: walk.LocationContext[string]{
+				ParentField: "someField", // This will trigger "field not found" since it's not found
+			},
+			value:       "value",
+			expectError: "field someField not found in core model",
+		},
+		{
+			name: "field not found in core model",
+			parent: &tests.TestPrimitiveHighModel{
+				StringField: "test",
+			},
+			location: walk.LocationContext[string]{
+				ParentField: "nonExistentField",
+			},
+			value:       "value",
+			expectError: "field nonExistentField not found in core model",
+		},
+		{
+			name: "empty parent field",
+			parent: &tests.TestPrimitiveHighModel{
+				StringField: "test",
+			},
+			location: walk.LocationContext[string]{
+				ParentField: "",
+			},
+			value:       "value",
+			expectError: "parent field is unset",
+		},
+		{
+			name:   "field not found with both parent field and key",
+			parent: &tests.TestComplexHighModel{},
+			location: walk.LocationContext[string]{
+				ParentField: "nonExistentField",
+				ParentKey:   pointer.From("key"),
+			},
+			value:       "value",
+			expectError: "field nonExistentField not found in core model",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parent := tt.parent
+			if reflect.TypeOf(parent).Kind() != reflect.Ptr {
+				parent = &tt.parent
+			}
+
+			err := walk.SetAtLocation(parent, tt.location, tt.value)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.expectError)
+		})
+	}
+}
+
+func TestToJSONPointer_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		locations walk.Locations[string]
+		expected  string
+	}{
+		{
+			name:      "empty locations",
+			locations: walk.Locations[string]{},
+			expected:  "/",
+		},
+		{
+			name: "single field location",
+			locations: walk.Locations[string]{
+				{ParentField: "field1"},
+			},
+			expected: "/field1",
+		},
+		{
+			name: "field with key",
+			locations: walk.Locations[string]{
+				{
+					ParentField: "field1",
+					ParentKey:   pointer.From("key1"),
+				},
+			},
+			expected: "/field1/key1",
+		},
+		{
+			name: "field with index",
+			locations: walk.Locations[string]{
+				{
+					ParentField: "field1",
+					ParentIndex: pointer.From(0),
+				},
+			},
+			expected: "/field1/0",
+		},
+		{
+			name: "multiple fields",
+			locations: walk.Locations[string]{
+				{ParentField: "field1"},
+				{ParentField: "field2"},
+			},
+			expected: "/field1/field2",
+		},
+		{
+			name: "complex nested structure",
+			locations: walk.Locations[string]{
+				{ParentField: "root"},
+				{
+					ParentField: "items",
+					ParentIndex: pointer.From(2),
+				},
+				{
+					ParentField: "properties",
+					ParentKey:   pointer.From("name"),
+				},
+			},
+			expected: "/root/items/2/properties/name",
+		},
+		{
+			name: "key only (no field)",
+			locations: walk.Locations[string]{
+				{ParentKey: pointer.From("topLevelKey")},
+			},
+			expected: "//topLevelKey",
+		},
+		{
+			name: "index only (no field)",
+			locations: walk.Locations[string]{
+				{ParentIndex: pointer.From(5)},
+			},
+			expected: "//5",
+		},
+		{
+			name: "field with special characters requiring escaping",
+			locations: walk.Locations[string]{
+				{
+					ParentField: "field~with/special",
+					ParentKey:   pointer.From("key~with/special"),
+				},
+			},
+			expected: "/field~0with~1special/key~0with~1special",
+		},
+		{
+			name: "mixed field, key, and index",
+			locations: walk.Locations[string]{
+				{ParentField: "users"},
+				{ParentIndex: pointer.From(1)},
+				{ParentKey: pointer.From("profile")},
+				{ParentField: "settings"},
+			},
+			expected: "/users/1/profile/settings",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.locations.ToJSONPointer()
+			assert.Equal(t, tt.expected, string(result))
+		})
+	}
+}
+
+func TestErrTerminate(t *testing.T) {
+	t.Parallel()
+
+	// Test that ErrTerminate is a proper error
+	require.Error(t, walk.ErrTerminate)
+	assert.Equal(t, "terminate", walk.ErrTerminate.Error())
+}
