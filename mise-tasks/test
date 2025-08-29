@@ -10,4 +10,8 @@ fi
 
 echo "🧪 Running tests with gotestsum..."
 gotestsum --format testname -- -race ./...
+
+echo "🧪 Running tests in separate modules..."
+(cd jsonschema/oas3/tests && gotestsum --format testname -- -race ./...)
+
 echo "✅ All tests passed!"
