@@ -1,0 +1,180 @@
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+security:
+  - ApiKeyAuth: []
+paths:
+  /users:
+    get:
+      security:
+        - BearerAuth: ["read:users"]
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              examples:
+                user_example:
+                  $ref: "#/components/examples/UserExample"
+          links:
+            GetUserByUserId:
+              $ref: "#/components/links/GetUserByUserId"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /posts:
+    post:
+      requestBody:
+        $ref: "#/components/requestBodies/PostRequest"
+      callbacks:
+        webhook:
+          $ref: "#/components/callbacks/WebhookCallback"
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              $ref: "#/components/headers/LocationHeader"
+  /admin:
+    $ref: "#/components/pathItems/AdminPathItem"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+    UnusedSchema:
+      type: string
+      description: This schema is not referenced anywhere
+    Post:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: integer
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    UnusedResponse:
+      description: This response is not referenced anywhere
+      content:
+        text/plain:
+          schema:
+            type: string
+  parameters:
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+    UnusedParam:
+      name: unused
+      in: query
+      schema:
+        type: string
+  requestBodies:
+    PostRequest:
+      description: Post creation request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Post"
+    UnusedRequestBody:
+      description: This request body is not referenced anywhere
+      content:
+        application/json:
+          schema:
+            type: object
+  headers:
+    LocationHeader:
+      description: Location of the created resource
+      schema:
+        type: string
+        format: uri
+    UnusedHeader:
+      description: This header is not referenced anywhere
+      schema:
+        type: string
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+    UnusedAuth:
+      type: http
+      scheme: basic
+  examples:
+    UserExample:
+      summary: Example user
+      value:
+        id: 1
+        name: John Doe
+    UnusedExample:
+      summary: This example is not referenced anywhere
+      value:
+        unused: true
+  links:
+    GetUserByUserId:
+      description: Link to get user by ID
+      parameters:
+        userId: $response.body#/id
+    UnusedLink:
+      description: Unused link
+      parameters:
+        id: $response.body#/id
+  callbacks:
+    WebhookCallback:
+      "{$request.body#/callbackUrl}":
+        post:
+          requestBody:
+            description: Callback payload
+            content:
+              application/json:
+                schema:
+                  type: object
+          responses:
+            "200":
+              description: Callback received
+    UnusedCallback:
+      "{$request.body#/unusedUrl}":
+        post:
+          responses:
+            "200":
+              description: Unused callback
+  pathItems:
+    AdminPathItem:
+      get:
+        summary: Admin endpoint
+        responses:
+          "200":
+            description: Admin response
+    UnusedPathItem:
+      get:
+        summary: This path item is not referenced anywhere
+        responses:
+          "200":
+            description: Unused path item response

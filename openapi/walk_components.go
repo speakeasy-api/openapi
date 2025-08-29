@@ -21,57 +21,57 @@ func walkComponents(ctx context.Context, components *Components, loc []LocationC
 	}
 
 	// Walk through schemas
-	if !walkComponentSchemas(ctx, components.Schemas, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "schemas"}), openAPI, yield) {
+	if !walkComponentSchemas(ctx, components.Schemas, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "schemas"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through responses
-	if !walkComponentResponses(ctx, components.Responses, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "responses"}), openAPI, yield) {
+	if !walkComponentResponses(ctx, components.Responses, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "responses"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through parameters
-	if !walkComponentParameters(ctx, components.Parameters, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "parameters"}), openAPI, yield) {
+	if !walkComponentParameters(ctx, components.Parameters, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "parameters"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through examples
-	if !walkComponentExamples(ctx, components.Examples, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "examples"}), openAPI, yield) {
+	if !walkComponentExamples(ctx, components.Examples, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "examples"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through request bodies
-	if !walkComponentRequestBodies(ctx, components.RequestBodies, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "requestBodies"}), openAPI, yield) {
+	if !walkComponentRequestBodies(ctx, components.RequestBodies, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "requestBodies"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through headers
-	if !walkComponentHeaders(ctx, components.Headers, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "headers"}), openAPI, yield) {
+	if !walkComponentHeaders(ctx, components.Headers, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "headers"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through security schemes
-	if !walkComponentSecuritySchemes(ctx, components.SecuritySchemes, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "securitySchemes"}), openAPI, yield) {
+	if !walkComponentSecuritySchemes(ctx, components.SecuritySchemes, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "securitySchemes"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through links
-	if !walkComponentLinks(ctx, components.Links, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "links"}), openAPI, yield) {
+	if !walkComponentLinks(ctx, components.Links, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "links"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through callbacks
-	if !walkComponentCallbacks(ctx, components.Callbacks, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "callbacks"}), openAPI, yield) {
+	if !walkComponentCallbacks(ctx, components.Callbacks, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "callbacks"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through path items
-	if !walkComponentPathItems(ctx, components.PathItems, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "pathItems"}), openAPI, yield) {
+	if !walkComponentPathItems(ctx, components.PathItems, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "pathItems"}), openAPI, yield) {
 		return false
 	}
 
 	// Visit Components Extensions
-	return yield(WalkItem{Match: getMatchFunc(components.Extensions), Location: append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(components.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkComponentSchemas walks through component schemas

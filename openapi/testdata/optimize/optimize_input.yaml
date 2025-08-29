@@ -1,0 +1,608 @@
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        email:
+                          type: string
+                          format: email
+                        profile:
+                          type: object
+                          properties:
+                            bio:
+                              type: string
+                            avatar:
+                              type: string
+                              format: uri
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                profile:
+                  type: object
+                  properties:
+                    bio:
+                      type: string
+                    avatar:
+                      type: string
+                      format: uri
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+                  profile:
+                    type: object
+                    properties:
+                      bio:
+                        type: string
+                      avatar:
+                        type: string
+                        format: uri
+  /products:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      oneOf:
+                        - type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            type:
+                              type: string
+                              const: "physical"
+                            weight:
+                              type: number
+                            dimensions:
+                              type: object
+                              properties:
+                                length:
+                                  type: number
+                                width:
+                                  type: number
+                                height:
+                                  type: number
+                        - type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            type:
+                              type: string
+                              const: "digital"
+                            downloadUrl:
+                              type: string
+                              format: uri
+                            fileSize:
+                              type: integer
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+                    type:
+                      type: string
+                      const: "physical"
+                    weight:
+                      type: number
+                    dimensions:
+                      type: object
+                      properties:
+                        length:
+                          type: number
+                        width:
+                          type: number
+                        height:
+                          type: number
+                - type: object
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+                    type:
+                      type: string
+                      const: "digital"
+                    downloadUrl:
+                      type: string
+                      format: uri
+                    fileSize:
+                      type: integer
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      type:
+                        type: string
+                        const: "physical"
+                      weight:
+                        type: number
+                      dimensions:
+                        type: object
+                        properties:
+                          length:
+                            type: number
+                          width:
+                            type: number
+                          height:
+                            type: number
+                  - type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      type:
+                        type: string
+                        const: "digital"
+                      downloadUrl:
+                        type: string
+                        format: uri
+                      fileSize:
+                        type: integer
+  /orders:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      allOf:
+                        - type: object
+                          properties:
+                            id:
+                              type: integer
+                            createdAt:
+                              type: string
+                              format: date-time
+                            updatedAt:
+                              type: string
+                              format: date-time
+                        - type: object
+                          properties:
+                            status:
+                              type: string
+                              enum:
+                                [
+                                  "pending",
+                                  "processing",
+                                  "shipped",
+                                  "delivered",
+                                  "cancelled",
+                                ]
+                            items:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  productId:
+                                    type: integer
+                                  quantity:
+                                    type: integer
+                                  price:
+                                    type: number
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              allOf:
+                - type: object
+                  properties:
+                    id:
+                      type: integer
+                    createdAt:
+                      type: string
+                      format: date-time
+                    updatedAt:
+                      type: string
+                      format: date-time
+                - type: object
+                  properties:
+                    status:
+                      type: string
+                      enum:
+                        [
+                          "pending",
+                          "processing",
+                          "shipped",
+                          "delivered",
+                          "cancelled",
+                        ]
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          productId:
+                            type: integer
+                          quantity:
+                            type: integer
+                          price:
+                            type: number
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - type: object
+                    properties:
+                      id:
+                        type: integer
+                      createdAt:
+                        type: string
+                        format: date-time
+                      updatedAt:
+                        type: string
+                        format: date-time
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                          [
+                            "pending",
+                            "processing",
+                            "shipped",
+                            "delivered",
+                            "cancelled",
+                          ]
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            productId:
+                              type: integer
+                            quantity:
+                              type: integer
+                            price:
+                              type: number
+  /notifications:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      anyOf:
+                        - type: object
+                          properties:
+                            id:
+                              type: integer
+                            type:
+                              type: string
+                              const: "email"
+                            recipient:
+                              type: string
+                              format: email
+                            subject:
+                              type: string
+                            body:
+                              type: string
+                        - type: object
+                          properties:
+                            id:
+                              type: integer
+                            type:
+                              type: string
+                              const: "sms"
+                            recipient:
+                              type: string
+                            message:
+                              type: string
+                        - type: object
+                          properties:
+                            id:
+                              type: integer
+                            type:
+                              type: string
+                              const: "push"
+                            deviceId:
+                              type: string
+                            title:
+                              type: string
+                            body:
+                              type: string
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - type: object
+                  properties:
+                    id:
+                      type: integer
+                    type:
+                      type: string
+                      const: "email"
+                    recipient:
+                      type: string
+                      format: email
+                    subject:
+                      type: string
+                    body:
+                      type: string
+                - type: object
+                  properties:
+                    id:
+                      type: integer
+                    type:
+                      type: string
+                      const: "sms"
+                    recipient:
+                      type: string
+                    message:
+                      type: string
+                - type: object
+                  properties:
+                    id:
+                      type: integer
+                    type:
+                      type: string
+                      const: "push"
+                    deviceId:
+                      type: string
+                    title:
+                      type: string
+                    body:
+                      type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    properties:
+                      id:
+                        type: integer
+                      type:
+                        type: string
+                        const: "email"
+                      recipient:
+                        type: string
+                        format: email
+                      subject:
+                        type: string
+                      body:
+                        type: string
+                  - type: object
+                    properties:
+                      id:
+                        type: integer
+                      type:
+                        type: string
+                        const: "sms"
+                      recipient:
+                        type: string
+                      message:
+                        type: string
+                  - type: object
+                    properties:
+                      id:
+                        type: integer
+                      type:
+                        type: string
+                        const: "push"
+                      deviceId:
+                        type: string
+                      title:
+                        type: string
+                      body:
+                        type: string
+  /categories:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        description:
+                          type: string
+                        status:
+                          type: string
+                          enum: ["active", "inactive", "archived"]
+  /search:
+    get:
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: ["active", "inactive", "archived"]
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      not:
+                        type: object
+                        properties:
+                          deleted:
+                            type: boolean
+                            const: true
+  /conditional:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    if:
+                      properties:
+                        type:
+                          const: "premium"
+                    then:
+                      properties:
+                        features:
+                          type: array
+                          items:
+                            type: string
+                        maxUsers:
+                          type: integer
+                    else:
+                      properties:
+                        features:
+                          type: array
+                          items:
+                            type: string
+                          maxItems: 3
+                        maxUsers:
+                          type: integer
+                          maximum: 10
+  /mixed-types:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value:
+                    type: ["string", "number", "boolean"]
+                  metadata:
+                    type: object
+                    properties:
+                      tags:
+                        type: array
+                        items:
+                          type: string
+                    additionalProperties:
+                      type: string
+                    patternProperties:
+                      "^x-":
+                        type: string
+components:
+  schemas:
+    ExistingUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        profile:
+          type: object
+          properties:
+            bio:
+              type: string
+            avatar:
+              type: string
+              format: uri
+    SimpleString:
+      type: string
+      description: A simple string type that should not be optimized
+    StatusEnum:
+      type: string
+      enum: ["active", "inactive", "archived"]

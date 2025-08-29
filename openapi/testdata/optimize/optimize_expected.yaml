@@ -1,0 +1,380 @@
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExistingUser'
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExistingUser'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExistingUser'
+  /products:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Schema_13c3942f'
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Schema_13c3942f'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schema_13c3942f'
+  /orders:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Schema_76a1fb01'
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Schema_76a1fb01'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schema_76a1fb01'
+  /notifications:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Schema_2e1336d2'
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Schema_2e1336d2'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schema_2e1336d2'
+  /categories:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        description:
+                          type: string
+                        status:
+                          $ref: '#/components/schemas/StatusEnum'
+  /search:
+    get:
+      parameters:
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/StatusEnum'
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      not:
+                        type: object
+                        properties:
+                          deleted:
+                            type: boolean
+                            const: true
+  /conditional:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    if:
+                      properties:
+                        type:
+                          const: "premium"
+                    then:
+                      properties:
+                        features:
+                          type: array
+                          items:
+                            type: string
+                        maxUsers:
+                          type: integer
+                    else:
+                      properties:
+                        features:
+                          type: array
+                          items:
+                            type: string
+                          maxItems: 3
+                        maxUsers:
+                          type: integer
+                          maximum: 10
+  /mixed-types:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value:
+                    type: ["string", "number", "boolean"]
+                  metadata:
+                    type: object
+                    properties:
+                      tags:
+                        type: array
+                        items:
+                          type: string
+                    additionalProperties:
+                      type: string
+                    patternProperties:
+                      "^x-":
+                        type: string
+components:
+  schemas:
+    ExistingUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        profile:
+          type: object
+          properties:
+            bio:
+              type: string
+            avatar:
+              type: string
+              format: uri
+    SimpleString:
+      type: string
+      description: A simple string type that should not be optimized
+    StatusEnum:
+      type: string
+      enum: ["active", "inactive", "archived"]
+    Schema_da0c4bbf:
+      type: object
+      properties:
+        productId:
+          type: integer
+        quantity:
+          type: integer
+        price:
+          type: number
+    Schema_22b284ff:
+      type: string
+      enum:
+        - "pending"
+        - "processing"
+        - "shipped"
+        - "delivered"
+        - "cancelled"
+    Schema_a89b7799:
+      type: object
+      properties:
+        length:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+    Schema_7a715a64:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          const: "digital"
+        downloadUrl:
+          type: string
+          format: uri
+        fileSize:
+          type: integer
+    Schema_8054b7a2:
+      type: object
+      properties:
+        id:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Schema_93d337a4:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/Schema_22b284ff'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Schema_da0c4bbf'
+    Schema_4f8aeb0f:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          const: "physical"
+        weight:
+          type: number
+        dimensions:
+          $ref: '#/components/schemas/Schema_a89b7799'
+    Schema_5eb90aa8:
+      type: object
+      properties:
+        bio:
+          type: string
+        avatar:
+          type: string
+          format: uri
+    Schema_8c71cc44:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          const: "email"
+        recipient:
+          type: string
+          format: email
+        subject:
+          type: string
+        body:
+          type: string
+    Schema_faf3f3c6:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          const: "sms"
+        recipient:
+          type: string
+        message:
+          type: string
+    Schema_09e719fb:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          const: "push"
+        deviceId:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+    Schema_13c3942f:
+      oneOf:
+        - $ref: '#/components/schemas/Schema_4f8aeb0f'
+        - $ref: '#/components/schemas/Schema_7a715a64'
+    Schema_2e1336d2:
+      anyOf:
+        - $ref: '#/components/schemas/Schema_8c71cc44'
+        - $ref: '#/components/schemas/Schema_faf3f3c6'
+        - $ref: '#/components/schemas/Schema_09e719fb'
+    Schema_76a1fb01:
+      allOf:
+        - $ref: '#/components/schemas/Schema_8054b7a2'
+        - $ref: '#/components/schemas/Schema_93d337a4'

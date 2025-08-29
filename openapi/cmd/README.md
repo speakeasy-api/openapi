@@ -11,9 +11,11 @@ OpenAPI specifications define REST APIs in a standard format. These commands hel
   - [`validate`](#validate)
   - [`upgrade`](#upgrade)
   - [`inline`](#inline)
+  - [`clean`](#clean)
   - [`bundle`](#bundle)
     - [Bundle vs Inline](#bundle-vs-inline)
   - [`join`](#join)
+  - [`optimize`](#optimize)
   - [`bootstrap`](#bootstrap)
 - [Common Options](#common-options)
 - [Output Formats](#output-formats)
@@ -127,6 +129,93 @@ paths:
 # components section removed (unused after inlining)
 ```
 
+### `clean`
+
+Remove unused components from an OpenAPI specification to create a cleaner, more maintainable document.
+
+```bash
+# Clean to stdout (pipe-friendly)
+openapi spec clean ./spec.yaml
+
+# Clean to specific file
+openapi spec clean ./spec.yaml ./cleaned-spec.yaml
+
+# Clean in-place
+openapi spec clean -w ./spec.yaml
+```
+
+What cleaning does:
+
+- Removes unused components from all component types (schemas, responses, parameters, etc.)
+- Tracks all references throughout the document including `$ref` and security scheme name references
+- Preserves all components that are actually used in the specification
+- Handles complex reference patterns including circular references and nested components
+
+**Before cleaning:**
+
+```yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          $ref: "#/components/responses/UserResponse"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        name:
+          type: string
+    UnusedSchema:  # This will be removed
+      type: object
+      properties:
+        id:
+          type: string
+  responses:
+    UserResponse:
+      description: User response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/User"
+    UnusedResponse:  # This will be removed
+      description: Unused response
+```
+
+**After cleaning:**
+
+```yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          $ref: "#/components/responses/UserResponse"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        name:
+          type: string
+  responses:
+    UserResponse:
+      description: User response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/User"
+# UnusedSchema and UnusedResponse removed
+```
+
+**Use Clean when:**
+
+- You want to remove unused components after refactoring
+- You're preparing a specification for publication or distribution
+- You want to reduce document size and complexity
+- You're maintaining a large specification with many components
+
 ### `bundle`
 
 Bundle external references into the components section while preserving the reference structure.
@@ -233,6 +322,113 @@ Features:
 - Merges paths, components, and other sections
 - Preserves all valid OpenAPI structure and references
 
+### `optimize`
+
+Optimize an OpenAPI specification by finding duplicate inline schemas and extracting them to reusable components.
+
+```bash
+# Interactive optimization (shows schemas, prompts for custom names)
+openapi spec optimize ./spec.yaml
+
+# Non-interactive optimization (auto-generated names)
+openapi spec optimize ./spec.yaml --non-interactive
+
+# Optimize to specific file
+openapi spec optimize ./spec.yaml ./optimized-spec.yaml
+
+# Optimize in-place
+openapi spec optimize -w ./spec.yaml
+```
+
+What optimization does:
+
+- Finds inline JSON schemas that appear multiple times with identical content
+- Replaces duplicate inline schemas with references to newly created components
+- Preserves existing component schemas (not modified or replaced)
+- Only processes complex schemas (objects, enums, oneOf/allOf/anyOf, conditionals)
+- Ignores simple type schemas (string, number, boolean) that don't benefit from extraction
+
+**Interactive Mode (default):**
+
+- Shows each duplicate schema in a beautiful formatted code block
+- Displays all locations where the schema appears
+- Prompts for custom component names
+- Allows meaningful naming instead of auto-generated names
+
+**Non-Interactive Mode (`--non-interactive`):**
+
+- Uses automatically generated names based on schema content hash
+- No user prompts - suitable for automation and CI/CD pipelines
+- Generates names like `Schema_da0c4bbf` based on content
+
+**Before optimization:**
+
+```yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: integer}
+                  name: {type: string}
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: {type: integer}
+                name: {type: string}
+```
+
+**After optimization:**
+
+```yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+```
+
+**Benefits of optimization:**
+
+- Reduces document size by eliminating duplicate schema definitions
+- Improves maintainability by centralizing schema definitions
+- Enhances reusability by making schemas available as components
+- Optimizes tooling performance with smaller, cleaner documents
+- Follows OpenAPI best practices for schema organization
+
+**Use Optimize when:**
+
+- You have inline schemas that are duplicated across your specification
+- You want to improve document maintainability and reduce redundancy
+- You're preparing specifications for better tooling support
+- You want to follow OpenAPI best practices for component reuse
+
 ### `bootstrap`
 
 Create a new OpenAPI document with best practice examples.
@@ -295,5 +491,11 @@ openapi spec validate ./spec-bundled.yaml
 ```bash
 # Create a processing pipeline
 openapi spec bundle ./spec.yaml | \
+openapi spec clean | \
 openapi spec upgrade | \
 openapi spec validate
+
+# Alternative: Clean after bundling to remove unused components
+openapi spec bundle ./spec.yaml ./bundled.yaml
+openapi spec clean ./bundled.yaml ./clean-bundled.yaml
+openapi spec validate ./clean-bundled.yaml

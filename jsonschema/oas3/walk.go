@@ -69,21 +69,21 @@ func walkSchema(ctx context.Context, schema *JSONSchema[Referenceable], loc walk
 
 		// Walk through allOf schemas
 		for i, schema := range js.AllOf {
-			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "allOf", ParentIndex: pointer.From(i)}), rootSchema, yield) {
+			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "allOf", ParentIndex: pointer.From(i)}), rootSchema, yield) {
 				return false
 			}
 		}
 
 		// Walk through oneOf schemas
 		for i, schema := range js.OneOf {
-			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "oneOf", ParentIndex: pointer.From(i)}), rootSchema, yield) {
+			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "oneOf", ParentIndex: pointer.From(i)}), rootSchema, yield) {
 				return false
 			}
 		}
 
 		// Walk through anyOf schemas
 		for i, schema := range js.AnyOf {
-			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "anyOf", ParentIndex: pointer.From(i)}), rootSchema, yield) {
+			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "anyOf", ParentIndex: pointer.From(i)}), rootSchema, yield) {
 				return false
 			}
 		}
@@ -93,105 +93,105 @@ func walkSchema(ctx context.Context, schema *JSONSchema[Referenceable], loc walk
 			discriminatorMatchFunc := getSchemaMatchFunc(js.Discriminator)
 
 			discriminatorLoc := loc
-			discriminatorLoc = append(discriminatorLoc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "discriminator"})
+			discriminatorLoc = append(discriminatorLoc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "discriminator"})
 
 			if !yield(SchemaWalkItem{Match: discriminatorMatchFunc, Location: discriminatorLoc, Schema: rootSchema}) {
 				return false
 			}
 
 			// Visit discriminator Extensions
-			if !yield(SchemaWalkItem{Match: getSchemaMatchFunc(js.Discriminator.Extensions), Location: append(discriminatorLoc, walk.LocationContext[SchemaMatchFunc]{Parent: discriminatorMatchFunc, ParentField: ""}), Schema: rootSchema}) {
+			if !yield(SchemaWalkItem{Match: getSchemaMatchFunc(js.Discriminator.Extensions), Location: append(discriminatorLoc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: discriminatorMatchFunc, ParentField: ""}), Schema: rootSchema}) {
 				return false
 			}
 		}
 
 		// Walk through prefixItems schemas
 		for i, schema := range js.PrefixItems {
-			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "prefixItems", ParentIndex: pointer.From(i)}), rootSchema, yield) {
+			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "prefixItems", ParentIndex: pointer.From(i)}), rootSchema, yield) {
 				return false
 			}
 		}
 
 		// Visit contains schema
-		if !walkSchema(ctx, js.Contains, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "contains"}), rootSchema, yield) {
+		if !walkSchema(ctx, js.Contains, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "contains"}), rootSchema, yield) {
 			return false
 		}
 
 		// Visit if schema
-		if !walkSchema(ctx, js.If, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "if"}), rootSchema, yield) {
+		if !walkSchema(ctx, js.If, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "if"}), rootSchema, yield) {
 			return false
 		}
 
 		// Visit then schema
-		if !walkSchema(ctx, js.Then, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "then"}), rootSchema, yield) {
+		if !walkSchema(ctx, js.Then, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "then"}), rootSchema, yield) {
 			return false
 		}
 
 		// Visit else schema
-		if !walkSchema(ctx, js.Else, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "else"}), rootSchema, yield) {
+		if !walkSchema(ctx, js.Else, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "else"}), rootSchema, yield) {
 			return false
 		}
 
 		// Walk through dependentSchemas schemas
 		for property, schema := range js.DependentSchemas.All() {
-			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "dependentSchemas", ParentKey: pointer.From(property)}), rootSchema, yield) {
+			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "dependentSchemas", ParentKey: pointer.From(property)}), rootSchema, yield) {
 				return false
 			}
 		}
 
 		// Walk through patternProperties schemas
 		for property, schema := range js.PatternProperties.All() {
-			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "patternProperties", ParentKey: pointer.From(property)}), rootSchema, yield) {
+			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "patternProperties", ParentKey: pointer.From(property)}), rootSchema, yield) {
 				return false
 			}
 		}
 
 		// Visit propertyNames schema
-		if !walkSchema(ctx, js.PropertyNames, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "propertyNames"}), rootSchema, yield) {
+		if !walkSchema(ctx, js.PropertyNames, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "propertyNames"}), rootSchema, yield) {
 			return false
 		}
 
 		// Visit unevaluatedItems schema
-		if !walkSchema(ctx, js.UnevaluatedItems, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "unevaluatedItems"}), rootSchema, yield) {
+		if !walkSchema(ctx, js.UnevaluatedItems, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "unevaluatedItems"}), rootSchema, yield) {
 			return false
 		}
 
 		// Visit unevaluatedProperties schema
-		if !walkSchema(ctx, js.UnevaluatedProperties, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "unevaluatedProperties"}), rootSchema, yield) {
+		if !walkSchema(ctx, js.UnevaluatedProperties, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "unevaluatedProperties"}), rootSchema, yield) {
 			return false
 		}
 
 		// Visit items schema
-		if !walkSchema(ctx, js.Items, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "items"}), rootSchema, yield) {
+		if !walkSchema(ctx, js.Items, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "items"}), rootSchema, yield) {
 			return false
 		}
 
 		// Visit not schema
-		if !walkSchema(ctx, js.Not, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "not"}), rootSchema, yield) {
+		if !walkSchema(ctx, js.Not, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "not"}), rootSchema, yield) {
 			return false
 		}
 
 		// Walk through properties schemas
 		for property, schema := range js.Properties.All() {
-			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "properties", ParentKey: pointer.From(property)}), rootSchema, yield) {
+			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "properties", ParentKey: pointer.From(property)}), rootSchema, yield) {
 				return false
 			}
 		}
 
 		// Walk through $defs schemas
 		for property, schema := range js.Defs.All() {
-			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "$defs", ParentKey: pointer.From(property)}), rootSchema, yield) {
+			if !walkSchema(ctx, schema, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "$defs", ParentKey: pointer.From(property)}), rootSchema, yield) {
 				return false
 			}
 		}
 
 		// Visit additionalProperties schema
-		if !walkSchema(ctx, js.AdditionalProperties, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "additionalProperties"}), rootSchema, yield) {
+		if !walkSchema(ctx, js.AdditionalProperties, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "additionalProperties"}), rootSchema, yield) {
 			return false
 		}
 
 		// Visit externalDocs
-		if !walkExternalDocs(ctx, js.ExternalDocs, append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "externalDocs"}), rootSchema, yield) {
+		if !walkExternalDocs(ctx, js.ExternalDocs, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "externalDocs"}), rootSchema, yield) {
 			return false
 		}
 
@@ -199,20 +199,20 @@ func walkSchema(ctx context.Context, schema *JSONSchema[Referenceable], loc walk
 			xmlMatchFunc := getSchemaMatchFunc(js.XML)
 
 			xmlLoc := loc
-			xmlLoc = append(xmlLoc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: "xml"})
+			xmlLoc = append(xmlLoc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "xml"})
 
 			if !yield(SchemaWalkItem{Match: xmlMatchFunc, Location: xmlLoc, Schema: rootSchema}) {
 				return false
 			}
 
 			// Visit xml Extensions
-			if !yield(SchemaWalkItem{Match: getSchemaMatchFunc(js.XML.Extensions), Location: append(xmlLoc, walk.LocationContext[SchemaMatchFunc]{Parent: xmlMatchFunc, ParentField: ""}), Schema: rootSchema}) {
+			if !yield(SchemaWalkItem{Match: getSchemaMatchFunc(js.XML.Extensions), Location: append(xmlLoc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: xmlMatchFunc, ParentField: ""}), Schema: rootSchema}) {
 				return false
 			}
 		}
 
 		// Visit extensions
-		if !yield(SchemaWalkItem{Match: getSchemaMatchFunc(js.Extensions), Location: append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: schemaMatchFunc, ParentField: ""}), Schema: rootSchema}) {
+		if !yield(SchemaWalkItem{Match: getSchemaMatchFunc(js.Extensions), Location: append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: ""}), Schema: rootSchema}) {
 			return false
 		}
 	}
@@ -231,7 +231,7 @@ func walkExternalDocs(_ context.Context, externalDocs *ExternalDocumentation, lo
 		return false
 	}
 
-	return yield(SchemaWalkItem{Match: getSchemaMatchFunc(externalDocs.Extensions), Location: append(loc, walk.LocationContext[SchemaMatchFunc]{Parent: externalDocsMatchFunc, ParentField: ""}), Schema: rootSchema})
+	return yield(SchemaWalkItem{Match: getSchemaMatchFunc(externalDocs.Extensions), Location: append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: externalDocsMatchFunc, ParentField: ""}), Schema: rootSchema})
 }
 
 type schemaMatchHandler[T any] struct {

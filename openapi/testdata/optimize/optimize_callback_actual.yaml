@@ -1,0 +1,380 @@
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExistingUser'
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExistingUser'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExistingUser'
+  /products:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Product'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+  /orders:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Order'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+  /notifications:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Notification'
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Notification'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+  /categories:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        description:
+                          type: string
+                        status:
+                          $ref: '#/components/schemas/StatusEnum'
+  /search:
+    get:
+      parameters:
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/StatusEnum'
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      not:
+                        type: object
+                        properties:
+                          deleted:
+                            type: boolean
+                            const: true
+  /conditional:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    if:
+                      properties:
+                        type:
+                          const: "premium"
+                    then:
+                      properties:
+                        features:
+                          type: array
+                          items:
+                            type: string
+                        maxUsers:
+                          type: integer
+                    else:
+                      properties:
+                        features:
+                          type: array
+                          items:
+                            type: string
+                          maxItems: 3
+                        maxUsers:
+                          type: integer
+                          maximum: 10
+  /mixed-types:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  value:
+                    type: ["string", "number", "boolean"]
+                  metadata:
+                    type: object
+                    properties:
+                      tags:
+                        type: array
+                        items:
+                          type: string
+                    additionalProperties:
+                      type: string
+                    patternProperties:
+                      "^x-":
+                        type: string
+components:
+  schemas:
+    ExistingUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        profile:
+          type: object
+          properties:
+            bio:
+              type: string
+            avatar:
+              type: string
+              format: uri
+    SimpleString:
+      type: string
+      description: A simple string type that should not be optimized
+    StatusEnum:
+      type: string
+      enum: ["active", "inactive", "archived"]
+    OrderItem:
+      type: object
+      properties:
+        productId:
+          type: integer
+        quantity:
+          type: integer
+        price:
+          type: number
+    OrderStatus:
+      type: string
+      enum:
+        - "pending"
+        - "processing"
+        - "shipped"
+        - "delivered"
+        - "cancelled"
+    Dimensions:
+      type: object
+      properties:
+        length:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+    DigitalProduct:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          const: "digital"
+        downloadUrl:
+          type: string
+          format: uri
+        fileSize:
+          type: integer
+    BaseEntity:
+      type: object
+      properties:
+        id:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    OrderDetails:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+    PhysicalProduct:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          const: "physical"
+        weight:
+          type: number
+        dimensions:
+          $ref: '#/components/schemas/Dimensions'
+    Profile:
+      type: object
+      properties:
+        bio:
+          type: string
+        avatar:
+          type: string
+          format: uri
+    EmailNotification:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          const: "email"
+        recipient:
+          type: string
+          format: email
+        subject:
+          type: string
+        body:
+          type: string
+    SmsNotification:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          const: "sms"
+        recipient:
+          type: string
+        message:
+          type: string
+    PushNotification:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          const: "push"
+        deviceId:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+    Product:
+      oneOf:
+        - $ref: '#/components/schemas/PhysicalProduct'
+        - $ref: '#/components/schemas/DigitalProduct'
+    Notification:
+      anyOf:
+        - $ref: '#/components/schemas/EmailNotification'
+        - $ref: '#/components/schemas/SmsNotification'
+        - $ref: '#/components/schemas/PushNotification'
+    Order:
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - $ref: '#/components/schemas/OrderDetails'

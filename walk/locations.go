@@ -17,10 +17,10 @@ const (
 // LocationContext represents the context of where an element is located within its parent.
 // It uses generics to work with different MatchFunc types from different packages.
 type LocationContext[T any] struct {
-	Parent      T
-	ParentField string
-	ParentKey   *string
-	ParentIndex *int
+	ParentMatchFunc T
+	ParentField     string
+	ParentKey       *string
+	ParentIndex     *int
 }
 
 // Locations represents a slice of location contexts that can be converted to a JSON pointer.

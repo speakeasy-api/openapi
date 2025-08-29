@@ -68,24 +68,24 @@ func walk(ctx context.Context, arazzo *Arazzo, yield func(WalkItem) bool) {
 	// Visit each of the top level fields in turn populating their location context with field and any key/index information
 	loc := Locations{}
 
-	if !walkInfo(ctx, &arazzo.Info, append(loc, LocationContext{Parent: arazzoMatchFunc, ParentField: "info"}), arazzo, yield) {
+	if !walkInfo(ctx, &arazzo.Info, append(loc, LocationContext{ParentMatchFunc: arazzoMatchFunc, ParentField: "info"}), arazzo, yield) {
 		return
 	}
 
-	if !walkSourceDescriptions(ctx, arazzo.SourceDescriptions, append(loc, LocationContext{Parent: arazzoMatchFunc, ParentField: "sourceDescriptions"}), arazzo, yield) {
+	if !walkSourceDescriptions(ctx, arazzo.SourceDescriptions, append(loc, LocationContext{ParentMatchFunc: arazzoMatchFunc, ParentField: "sourceDescriptions"}), arazzo, yield) {
 		return
 	}
 
-	if !walkWorkflows(ctx, arazzo.Workflows, append(loc, LocationContext{Parent: arazzoMatchFunc, ParentField: "workflows"}), arazzo, yield) {
+	if !walkWorkflows(ctx, arazzo.Workflows, append(loc, LocationContext{ParentMatchFunc: arazzoMatchFunc, ParentField: "workflows"}), arazzo, yield) {
 		return
 	}
 
-	if !walkComponents(ctx, arazzo.Components, append(loc, LocationContext{Parent: arazzoMatchFunc, ParentField: "components"}), arazzo, yield) {
+	if !walkComponents(ctx, arazzo.Components, append(loc, LocationContext{ParentMatchFunc: arazzoMatchFunc, ParentField: "components"}), arazzo, yield) {
 		return
 	}
 
 	// Visit Arazzo Extensions
-	yield(WalkItem{Match: getMatchFunc(arazzo.Extensions), Location: append(loc, LocationContext{Parent: arazzoMatchFunc, ParentField: ""}), Arazzo: arazzo})
+	yield(WalkItem{Match: getMatchFunc(arazzo.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: arazzoMatchFunc, ParentField: ""}), Arazzo: arazzo})
 }
 
 func walkInfo(_ context.Context, info *Info, loc Locations, arazzo *Arazzo, yield func(WalkItem) bool) bool {
@@ -100,7 +100,7 @@ func walkInfo(_ context.Context, info *Info, loc Locations, arazzo *Arazzo, yiel
 	}
 
 	// Visit Info Extensions
-	return yield(WalkItem{Match: getMatchFunc(info.Extensions), Location: append(loc, LocationContext{Parent: infoMatchFunc, ParentField: ""}), Arazzo: arazzo})
+	return yield(WalkItem{Match: getMatchFunc(info.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: infoMatchFunc, ParentField: ""}), Arazzo: arazzo})
 }
 
 func walkSourceDescriptions(ctx context.Context, sourceDescriptions []*SourceDescription, loc Locations, arazzo *Arazzo, yield func(WalkItem) bool) bool {
@@ -134,7 +134,7 @@ func walkSourceDescription(_ context.Context, sd *SourceDescription, loc Locatio
 	}
 
 	// Visit SourceDescription Extensions
-	return yield(WalkItem{Match: getMatchFunc(sd.Extensions), Location: append(loc, LocationContext{Parent: sdMatchFunc, ParentField: ""}), Arazzo: arazzo})
+	return yield(WalkItem{Match: getMatchFunc(sd.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: sdMatchFunc, ParentField: ""}), Arazzo: arazzo})
 }
 
 func walkWorkflows(ctx context.Context, workflows []*Workflow, loc Locations, arazzo *Arazzo, yield func(WalkItem) bool) bool {
@@ -168,32 +168,32 @@ func walkWorkflow(ctx context.Context, workflow *Workflow, loc Locations, arazzo
 	}
 
 	// Walk through parameters
-	if !walkReusableParameters(ctx, workflow.Parameters, append(loc, LocationContext{Parent: workflowMatchFunc, ParentField: "parameters"}), arazzo, yield) {
+	if !walkReusableParameters(ctx, workflow.Parameters, append(loc, LocationContext{ParentMatchFunc: workflowMatchFunc, ParentField: "parameters"}), arazzo, yield) {
 		return false
 	}
 
 	// Walk through inputs schema using oas3 walking
-	if !walkJSONSchema(ctx, workflow.Inputs, append(loc, LocationContext{Parent: workflowMatchFunc, ParentField: "inputs"}), arazzo, yield) {
+	if !walkJSONSchema(ctx, workflow.Inputs, append(loc, LocationContext{ParentMatchFunc: workflowMatchFunc, ParentField: "inputs"}), arazzo, yield) {
 		return false
 	}
 
 	// Walk through steps
-	if !walkSteps(ctx, workflow.Steps, append(loc, LocationContext{Parent: workflowMatchFunc, ParentField: "steps"}), arazzo, yield) {
+	if !walkSteps(ctx, workflow.Steps, append(loc, LocationContext{ParentMatchFunc: workflowMatchFunc, ParentField: "steps"}), arazzo, yield) {
 		return false
 	}
 
 	// Walk through success actions
-	if !walkReusableSuccessActions(ctx, workflow.SuccessActions, append(loc, LocationContext{Parent: workflowMatchFunc, ParentField: "successActions"}), arazzo, yield) {
+	if !walkReusableSuccessActions(ctx, workflow.SuccessActions, append(loc, LocationContext{ParentMatchFunc: workflowMatchFunc, ParentField: "successActions"}), arazzo, yield) {
 		return false
 	}
 
 	// Walk through failure actions
-	if !walkReusableFailureActions(ctx, workflow.FailureActions, append(loc, LocationContext{Parent: workflowMatchFunc, ParentField: "failureActions"}), arazzo, yield) {
+	if !walkReusableFailureActions(ctx, workflow.FailureActions, append(loc, LocationContext{ParentMatchFunc: workflowMatchFunc, ParentField: "failureActions"}), arazzo, yield) {
 		return false
 	}
 
 	// Visit Workflow Extensions
-	return yield(WalkItem{Match: getMatchFunc(workflow.Extensions), Location: append(loc, LocationContext{Parent: workflowMatchFunc, ParentField: ""}), Arazzo: arazzo})
+	return yield(WalkItem{Match: getMatchFunc(workflow.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: workflowMatchFunc, ParentField: ""}), Arazzo: arazzo})
 }
 
 func walkReusableParameters(ctx context.Context, parameters []*ReusableParameter, loc Locations, arazzo *Arazzo, yield func(WalkItem) bool) bool {
@@ -273,10 +273,10 @@ func convertSchemaLocation(schemaLoc walkpkg.Locations[oas3.SchemaMatchFunc], ba
 	// Convert each oas3 location context to arazzo location context
 	for _, schemaLocCtx := range schemaLoc {
 		result = append(result, LocationContext{
-			Parent:      convertSchemaMatchFunc(schemaLocCtx.Parent),
-			ParentField: schemaLocCtx.ParentField,
-			ParentKey:   schemaLocCtx.ParentKey,
-			ParentIndex: schemaLocCtx.ParentIndex,
+			ParentMatchFunc: convertSchemaMatchFunc(schemaLocCtx.ParentMatchFunc),
+			ParentField:     schemaLocCtx.ParentField,
+			ParentKey:       schemaLocCtx.ParentKey,
+			ParentIndex:     schemaLocCtx.ParentIndex,
 		})
 	}
 
@@ -314,22 +314,22 @@ func walkStep(ctx context.Context, step *Step, loc Locations, arazzo *Arazzo, yi
 	}
 
 	// Walk through parameters
-	if !walkReusableParameters(ctx, step.Parameters, append(loc, LocationContext{Parent: stepMatchFunc, ParentField: "parameters"}), arazzo, yield) {
+	if !walkReusableParameters(ctx, step.Parameters, append(loc, LocationContext{ParentMatchFunc: stepMatchFunc, ParentField: "parameters"}), arazzo, yield) {
 		return false
 	}
 
 	// Walk through success actions
-	if !walkReusableSuccessActions(ctx, step.OnSuccess, append(loc, LocationContext{Parent: stepMatchFunc, ParentField: "onSuccess"}), arazzo, yield) {
+	if !walkReusableSuccessActions(ctx, step.OnSuccess, append(loc, LocationContext{ParentMatchFunc: stepMatchFunc, ParentField: "onSuccess"}), arazzo, yield) {
 		return false
 	}
 
 	// Walk through failure actions
-	if !walkReusableFailureActions(ctx, step.OnFailure, append(loc, LocationContext{Parent: stepMatchFunc, ParentField: "onFailure"}), arazzo, yield) {
+	if !walkReusableFailureActions(ctx, step.OnFailure, append(loc, LocationContext{ParentMatchFunc: stepMatchFunc, ParentField: "onFailure"}), arazzo, yield) {
 		return false
 	}
 
 	// Visit Step Extensions
-	return yield(WalkItem{Match: getMatchFunc(step.Extensions), Location: append(loc, LocationContext{Parent: stepMatchFunc, ParentField: ""}), Arazzo: arazzo})
+	return yield(WalkItem{Match: getMatchFunc(step.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: stepMatchFunc, ParentField: ""}), Arazzo: arazzo})
 }
 
 func walkReusableSuccessActions(ctx context.Context, actions []*ReusableSuccessAction, loc Locations, arazzo *Arazzo, yield func(WalkItem) bool) bool {
@@ -414,27 +414,27 @@ func walkComponents(ctx context.Context, components *Components, loc Locations, 
 	}
 
 	// Walk through inputs
-	if !walkComponentInputs(ctx, components.Inputs, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "inputs"}), arazzo, yield) {
+	if !walkComponentInputs(ctx, components.Inputs, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "inputs"}), arazzo, yield) {
 		return false
 	}
 
 	// Walk through parameters
-	if !walkComponentParameters(ctx, components.Parameters, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "parameters"}), arazzo, yield) {
+	if !walkComponentParameters(ctx, components.Parameters, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "parameters"}), arazzo, yield) {
 		return false
 	}
 
 	// Walk through success actions
-	if !walkComponentSuccessActions(ctx, components.SuccessActions, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "successActions"}), arazzo, yield) {
+	if !walkComponentSuccessActions(ctx, components.SuccessActions, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "successActions"}), arazzo, yield) {
 		return false
 	}
 
 	// Walk through failure actions
-	if !walkComponentFailureActions(ctx, components.FailureActions, append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: "failureActions"}), arazzo, yield) {
+	if !walkComponentFailureActions(ctx, components.FailureActions, append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: "failureActions"}), arazzo, yield) {
 		return false
 	}
 
 	// Visit Components Extensions
-	return yield(WalkItem{Match: getMatchFunc(components.Extensions), Location: append(loc, LocationContext{Parent: componentsMatchFunc, ParentField: ""}), Arazzo: arazzo})
+	return yield(WalkItem{Match: getMatchFunc(components.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: componentsMatchFunc, ParentField: ""}), Arazzo: arazzo})
 }
 
 func walkComponentInputs(ctx context.Context, inputs *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]], loc Locations, arazzo *Arazzo, yield func(WalkItem) bool) bool {
@@ -487,7 +487,7 @@ func walkParameter(_ context.Context, parameter *Parameter, loc Locations, arazz
 	}
 
 	// Visit Parameter Extensions
-	return yield(WalkItem{Match: getMatchFunc(parameter.Extensions), Location: append(loc, LocationContext{Parent: parameterMatchFunc, ParentField: ""}), Arazzo: arazzo})
+	return yield(WalkItem{Match: getMatchFunc(parameter.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: parameterMatchFunc, ParentField: ""}), Arazzo: arazzo})
 }
 
 func walkComponentSuccessActions(ctx context.Context, actions *sequencedmap.Map[string, *SuccessAction], loc Locations, arazzo *Arazzo, yield func(WalkItem) bool) bool {
@@ -521,7 +521,7 @@ func walkSuccessAction(_ context.Context, action *SuccessAction, loc Locations, 
 	}
 
 	// Visit SuccessAction Extensions
-	return yield(WalkItem{Match: getMatchFunc(action.Extensions), Location: append(loc, LocationContext{Parent: actionMatchFunc, ParentField: ""}), Arazzo: arazzo})
+	return yield(WalkItem{Match: getMatchFunc(action.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: actionMatchFunc, ParentField: ""}), Arazzo: arazzo})
 }
 
 func walkComponentFailureActions(ctx context.Context, actions *sequencedmap.Map[string, *FailureAction], loc Locations, arazzo *Arazzo, yield func(WalkItem) bool) bool {
@@ -555,7 +555,7 @@ func walkFailureAction(_ context.Context, action *FailureAction, loc Locations, 
 	}
 
 	// Visit FailureAction Extensions
-	return yield(WalkItem{Match: getMatchFunc(action.Extensions), Location: append(loc, LocationContext{Parent: actionMatchFunc, ParentField: ""}), Arazzo: arazzo})
+	return yield(WalkItem{Match: getMatchFunc(action.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: actionMatchFunc, ParentField: ""}), Arazzo: arazzo})
 }
 
 type matchHandler[T any] struct {

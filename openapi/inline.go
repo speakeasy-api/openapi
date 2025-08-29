@@ -173,7 +173,7 @@ func inlineObject[T any](ctx context.Context, obj *T, doc *OpenAPI, opts Resolve
 					}
 				}
 
-				parent := item.Location[len(item.Location)-1].Parent
+				parent := item.Location[len(item.Location)-1].ParentMatchFunc
 
 				parentIsSchema := false
 				_ = parent(Matcher{

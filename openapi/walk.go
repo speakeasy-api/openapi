@@ -127,40 +127,40 @@ func walk(ctx context.Context, openAPI *OpenAPI, yield func(WalkItem) bool) {
 	// Visit each of the top level fields in turn populating their location context with field and any key/index information
 	loc := []LocationContext{}
 
-	if !walkInfo(ctx, &openAPI.Info, append(loc, LocationContext{Parent: openAPIMatchFunc, ParentField: "info"}), openAPI, yield) {
+	if !walkInfo(ctx, &openAPI.Info, append(loc, LocationContext{ParentMatchFunc: openAPIMatchFunc, ParentField: "info"}), openAPI, yield) {
 		return
 	}
 
-	if !walkExternalDocs(ctx, openAPI.ExternalDocs, append(loc, LocationContext{Parent: openAPIMatchFunc, ParentField: "externalDocs"}), openAPI, yield) {
+	if !walkExternalDocs(ctx, openAPI.ExternalDocs, append(loc, LocationContext{ParentMatchFunc: openAPIMatchFunc, ParentField: "externalDocs"}), openAPI, yield) {
 		return
 	}
 
-	if !walkTags(ctx, openAPI.Tags, append(loc, LocationContext{Parent: openAPIMatchFunc, ParentField: "tags"}), openAPI, yield) {
+	if !walkTags(ctx, openAPI.Tags, append(loc, LocationContext{ParentMatchFunc: openAPIMatchFunc, ParentField: "tags"}), openAPI, yield) {
 		return
 	}
 
-	if !walkServers(ctx, openAPI.Servers, append(loc, LocationContext{Parent: openAPIMatchFunc, ParentField: "servers"}), openAPI, yield) {
+	if !walkServers(ctx, openAPI.Servers, append(loc, LocationContext{ParentMatchFunc: openAPIMatchFunc, ParentField: "servers"}), openAPI, yield) {
 		return
 	}
 
-	if !walkSecurity(ctx, openAPI.Security, append(loc, LocationContext{Parent: openAPIMatchFunc, ParentField: "security"}), openAPI, yield) {
+	if !walkSecurity(ctx, openAPI.Security, append(loc, LocationContext{ParentMatchFunc: openAPIMatchFunc, ParentField: "security"}), openAPI, yield) {
 		return
 	}
 
-	if !walkPaths(ctx, openAPI.Paths, append(loc, LocationContext{Parent: openAPIMatchFunc, ParentField: "paths"}), openAPI, yield) {
+	if !walkPaths(ctx, openAPI.Paths, append(loc, LocationContext{ParentMatchFunc: openAPIMatchFunc, ParentField: "paths"}), openAPI, yield) {
 		return
 	}
 
-	if !walkWebhooks(ctx, openAPI.Webhooks, append(loc, LocationContext{Parent: openAPIMatchFunc, ParentField: "webhooks"}), openAPI, yield) {
+	if !walkWebhooks(ctx, openAPI.Webhooks, append(loc, LocationContext{ParentMatchFunc: openAPIMatchFunc, ParentField: "webhooks"}), openAPI, yield) {
 		return
 	}
 
-	if !walkComponents(ctx, openAPI.Components, append(loc, LocationContext{Parent: openAPIMatchFunc, ParentField: "components"}), openAPI, yield) {
+	if !walkComponents(ctx, openAPI.Components, append(loc, LocationContext{ParentMatchFunc: openAPIMatchFunc, ParentField: "components"}), openAPI, yield) {
 		return
 	}
 
 	// Visit OpenAPI Extensions
-	yield(WalkItem{Match: getMatchFunc(openAPI.Extensions), Location: append(loc, LocationContext{Parent: openAPIMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	yield(WalkItem{Match: getMatchFunc(openAPI.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: openAPIMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 func walkInfo(_ context.Context, info *Info, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
@@ -179,13 +179,13 @@ func walkInfo(_ context.Context, info *Info, loc []LocationContext, openAPI *Ope
 		contactMatchFunc := getMatchFunc(info.Contact)
 
 		contactLoc := loc
-		contactLoc = append(contactLoc, LocationContext{Parent: infoMatchFunc, ParentField: "contact"})
+		contactLoc = append(contactLoc, LocationContext{ParentMatchFunc: infoMatchFunc, ParentField: "contact"})
 
 		if !yield(WalkItem{Match: contactMatchFunc, Location: contactLoc, OpenAPI: openAPI}) {
 			return false
 		}
 
-		if !yield(WalkItem{Match: getMatchFunc(info.Contact.Extensions), Location: append(contactLoc, LocationContext{Parent: contactMatchFunc, ParentField: ""}), OpenAPI: openAPI}) {
+		if !yield(WalkItem{Match: getMatchFunc(info.Contact.Extensions), Location: append(contactLoc, LocationContext{ParentMatchFunc: contactMatchFunc, ParentField: ""}), OpenAPI: openAPI}) {
 			return false
 		}
 	}
@@ -195,19 +195,19 @@ func walkInfo(_ context.Context, info *Info, loc []LocationContext, openAPI *Ope
 		licenseMatchFunc := getMatchFunc(info.License)
 
 		licenseLoc := loc
-		licenseLoc = append(licenseLoc, LocationContext{Parent: infoMatchFunc, ParentField: "license"})
+		licenseLoc = append(licenseLoc, LocationContext{ParentMatchFunc: infoMatchFunc, ParentField: "license"})
 
 		if !yield(WalkItem{Match: licenseMatchFunc, Location: licenseLoc, OpenAPI: openAPI}) {
 			return false
 		}
 
-		if !yield(WalkItem{Match: getMatchFunc(info.License.Extensions), Location: append(licenseLoc, LocationContext{Parent: licenseMatchFunc, ParentField: ""}), OpenAPI: openAPI}) {
+		if !yield(WalkItem{Match: getMatchFunc(info.License.Extensions), Location: append(licenseLoc, LocationContext{ParentMatchFunc: licenseMatchFunc, ParentField: ""}), OpenAPI: openAPI}) {
 			return false
 		}
 	}
 
 	// Visit Info Extensions
-	return yield(WalkItem{Match: getMatchFunc(info.Extensions), Location: append(loc, LocationContext{Parent: infoMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(info.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: infoMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkPaths walks through the paths object
@@ -223,13 +223,13 @@ func walkPaths(ctx context.Context, paths *Paths, loc []LocationContext, openAPI
 	}
 
 	for path, pathItem := range paths.All() {
-		if !walkReferencedPathItem(ctx, pathItem, append(loc, LocationContext{Parent: pathsMatchFunc, ParentKey: pointer.From(path)}), openAPI, yield) {
+		if !walkReferencedPathItem(ctx, pathItem, append(loc, LocationContext{ParentMatchFunc: pathsMatchFunc, ParentKey: pointer.From(path)}), openAPI, yield) {
 			return false
 		}
 	}
 
 	// Visit Paths Extensions
-	return yield(WalkItem{Match: getMatchFunc(paths.Extensions), Location: append(loc, LocationContext{Parent: pathsMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(paths.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: pathsMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedPathItem walks through a referenced path item
@@ -259,24 +259,24 @@ func walkPathItem(ctx context.Context, pathItem *PathItem, parent MatchFunc, loc
 	}
 
 	// Walk through servers
-	if !walkServers(ctx, pathItem.Servers, append(loc, LocationContext{Parent: parent, ParentField: "servers"}), openAPI, yield) {
+	if !walkServers(ctx, pathItem.Servers, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "servers"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through parameters
-	if !walkReferencedParameters(ctx, pathItem.Parameters, append(loc, LocationContext{Parent: parent, ParentField: "parameters"}), openAPI, yield) {
+	if !walkReferencedParameters(ctx, pathItem.Parameters, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "parameters"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through operations
 	for method, operation := range pathItem.All() {
-		if !walkOperation(ctx, operation, append(loc, LocationContext{Parent: parent, ParentKey: pointer.From(string(method))}), openAPI, yield) {
+		if !walkOperation(ctx, operation, append(loc, LocationContext{ParentMatchFunc: parent, ParentKey: pointer.From(string(method))}), openAPI, yield) {
 			return false
 		}
 	}
 
 	// Visit PathItem Extensions
-	return yield(WalkItem{Match: getMatchFunc(pathItem.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(pathItem.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkOperation walks through an operation
@@ -292,42 +292,42 @@ func walkOperation(ctx context.Context, operation *Operation, loc []LocationCont
 	}
 
 	// Walk through servers
-	if !walkServers(ctx, operation.Servers, append(loc, LocationContext{Parent: operationMatchFunc, ParentField: "servers"}), openAPI, yield) {
+	if !walkServers(ctx, operation.Servers, append(loc, LocationContext{ParentMatchFunc: operationMatchFunc, ParentField: "servers"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through security
-	if !walkSecurity(ctx, operation.Security, append(loc, LocationContext{Parent: operationMatchFunc, ParentField: "security"}), openAPI, yield) {
+	if !walkSecurity(ctx, operation.Security, append(loc, LocationContext{ParentMatchFunc: operationMatchFunc, ParentField: "security"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through parameters
-	if !walkReferencedParameters(ctx, operation.Parameters, append(loc, LocationContext{Parent: operationMatchFunc, ParentField: "parameters"}), openAPI, yield) {
+	if !walkReferencedParameters(ctx, operation.Parameters, append(loc, LocationContext{ParentMatchFunc: operationMatchFunc, ParentField: "parameters"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through request body
-	if !walkReferencedRequestBody(ctx, operation.RequestBody, append(loc, LocationContext{Parent: operationMatchFunc, ParentField: "requestBody"}), openAPI, yield) {
+	if !walkReferencedRequestBody(ctx, operation.RequestBody, append(loc, LocationContext{ParentMatchFunc: operationMatchFunc, ParentField: "requestBody"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through responses
-	if !walkResponses(ctx, operation.Responses, append(loc, LocationContext{Parent: operationMatchFunc, ParentField: "responses"}), openAPI, yield) {
+	if !walkResponses(ctx, operation.Responses, append(loc, LocationContext{ParentMatchFunc: operationMatchFunc, ParentField: "responses"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through callbacks
-	if !walkReferencedCallbacks(ctx, operation.Callbacks, append(loc, LocationContext{Parent: operationMatchFunc, ParentField: "callbacks"}), openAPI, yield) {
+	if !walkReferencedCallbacks(ctx, operation.Callbacks, append(loc, LocationContext{ParentMatchFunc: operationMatchFunc, ParentField: "callbacks"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through external docs
-	if !walkExternalDocs(ctx, operation.ExternalDocs, append(loc, LocationContext{Parent: operationMatchFunc, ParentField: "externalDocs"}), openAPI, yield) {
+	if !walkExternalDocs(ctx, operation.ExternalDocs, append(loc, LocationContext{ParentMatchFunc: operationMatchFunc, ParentField: "externalDocs"}), openAPI, yield) {
 		return false
 	}
 
 	// Visit Operation Extensions
-	return yield(WalkItem{Match: getMatchFunc(operation.Extensions), Location: append(loc, LocationContext{Parent: operationMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(operation.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: operationMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedParameters walks through referenced parameters
@@ -377,22 +377,22 @@ func walkParameter(ctx context.Context, parameter *Parameter, parent MatchFunc, 
 	}
 
 	// Walk through schema
-	if !walkSchema(ctx, parameter.Schema, append(loc, LocationContext{Parent: parent, ParentField: "schema"}), openAPI, yield) {
+	if !walkSchema(ctx, parameter.Schema, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "schema"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through content
-	if !walkMediaTypes(ctx, parameter.Content, append(loc, LocationContext{Parent: parent, ParentField: "content"}), openAPI, yield) {
+	if !walkMediaTypes(ctx, parameter.Content, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "content"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through examples
-	if !walkReferencedExamples(ctx, parameter.Examples, append(loc, LocationContext{Parent: parent, ParentField: "examples"}), openAPI, yield) {
+	if !walkReferencedExamples(ctx, parameter.Examples, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "examples"}), openAPI, yield) {
 		return false
 	}
 
 	// Visit Parameter Extensions
-	return yield(WalkItem{Match: getMatchFunc(parameter.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(parameter.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedRequestBody walks through a referenced request body
@@ -422,12 +422,12 @@ func walkRequestBody(ctx context.Context, requestBody *RequestBody, parent Match
 	}
 
 	// Walk through content
-	if !walkMediaTypes(ctx, requestBody.Content, append(loc, LocationContext{Parent: parent, ParentField: "content"}), openAPI, yield) {
+	if !walkMediaTypes(ctx, requestBody.Content, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "content"}), openAPI, yield) {
 		return false
 	}
 
 	// Visit RequestBody Extensions
-	return yield(WalkItem{Match: getMatchFunc(requestBody.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(requestBody.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkResponses walks through responses
@@ -443,19 +443,19 @@ func walkResponses(ctx context.Context, responses *Responses, loc []LocationCont
 	}
 
 	// Walk through default response
-	if !walkReferencedResponse(ctx, responses.Default, append(loc, LocationContext{Parent: responsesMatchFunc, ParentField: "default"}), openAPI, yield) {
+	if !walkReferencedResponse(ctx, responses.Default, append(loc, LocationContext{ParentMatchFunc: responsesMatchFunc, ParentField: "default"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through status code responses
 	for statusCode, response := range responses.All() {
-		if !walkReferencedResponse(ctx, response, append(loc, LocationContext{Parent: responsesMatchFunc, ParentKey: pointer.From(statusCode)}), openAPI, yield) {
+		if !walkReferencedResponse(ctx, response, append(loc, LocationContext{ParentMatchFunc: responsesMatchFunc, ParentKey: pointer.From(statusCode)}), openAPI, yield) {
 			return false
 		}
 	}
 
 	// Visit Responses Extensions
-	return yield(WalkItem{Match: getMatchFunc(responses.Extensions), Location: append(loc, LocationContext{Parent: responsesMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(responses.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: responsesMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedResponse walks through a referenced response
@@ -485,22 +485,22 @@ func walkResponse(ctx context.Context, response *Response, parent MatchFunc, loc
 	}
 
 	// Walk through headers
-	if !walkReferencedHeaders(ctx, response.Headers, append(loc, LocationContext{Parent: parent, ParentField: "headers"}), openAPI, yield) {
+	if !walkReferencedHeaders(ctx, response.Headers, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "headers"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through content
-	if !walkMediaTypes(ctx, response.Content, append(loc, LocationContext{Parent: parent, ParentField: "content"}), openAPI, yield) {
+	if !walkMediaTypes(ctx, response.Content, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "content"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through links
-	if !walkReferencedLinks(ctx, response.Links, append(loc, LocationContext{Parent: parent, ParentField: "links"}), openAPI, yield) {
+	if !walkReferencedLinks(ctx, response.Links, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "links"}), openAPI, yield) {
 		return false
 	}
 
 	// Visit Response Extensions
-	return yield(WalkItem{Match: getMatchFunc(response.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(response.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkMediaTypes walks through media types
@@ -536,22 +536,22 @@ func walkMediaType(ctx context.Context, mediaType *MediaType, loc []LocationCont
 	}
 
 	// Walk through schema
-	if !walkSchema(ctx, mediaType.Schema, append(loc, LocationContext{Parent: mediaTypeMatchFunc, ParentField: "schema"}), openAPI, yield) {
+	if !walkSchema(ctx, mediaType.Schema, append(loc, LocationContext{ParentMatchFunc: mediaTypeMatchFunc, ParentField: "schema"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through encoding
-	if !walkEncodings(ctx, mediaType.Encoding, append(loc, LocationContext{Parent: mediaTypeMatchFunc, ParentField: "encoding"}), openAPI, yield) {
+	if !walkEncodings(ctx, mediaType.Encoding, append(loc, LocationContext{ParentMatchFunc: mediaTypeMatchFunc, ParentField: "encoding"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through examples
-	if !walkReferencedExamples(ctx, mediaType.Examples, append(loc, LocationContext{Parent: mediaTypeMatchFunc, ParentField: "examples"}), openAPI, yield) {
+	if !walkReferencedExamples(ctx, mediaType.Examples, append(loc, LocationContext{ParentMatchFunc: mediaTypeMatchFunc, ParentField: "examples"}), openAPI, yield) {
 		return false
 	}
 
 	// Visit MediaType Extensions
-	return yield(WalkItem{Match: getMatchFunc(mediaType.Extensions), Location: append(loc, LocationContext{Parent: mediaTypeMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(mediaType.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: mediaTypeMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkEncodings walks through encodings
@@ -587,12 +587,12 @@ func walkEncoding(ctx context.Context, encoding *Encoding, loc []LocationContext
 	}
 
 	// Walk through headers
-	if !walkReferencedHeaders(ctx, encoding.Headers, append(loc, LocationContext{Parent: encodingMatchFunc, ParentField: "headers"}), openAPI, yield) {
+	if !walkReferencedHeaders(ctx, encoding.Headers, append(loc, LocationContext{ParentMatchFunc: encodingMatchFunc, ParentField: "headers"}), openAPI, yield) {
 		return false
 	}
 
 	// Visit Encoding Extensions
-	return yield(WalkItem{Match: getMatchFunc(encoding.Extensions), Location: append(loc, LocationContext{Parent: encodingMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(encoding.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: encodingMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedHeaders walks through referenced headers
@@ -642,22 +642,22 @@ func walkHeader(ctx context.Context, header *Header, parent MatchFunc, loc []Loc
 	}
 
 	// Walk through schema
-	if !walkSchema(ctx, header.Schema, append(loc, LocationContext{Parent: parent, ParentField: "schema"}), openAPI, yield) {
+	if !walkSchema(ctx, header.Schema, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "schema"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through content
-	if !walkMediaTypes(ctx, header.Content, append(loc, LocationContext{Parent: parent, ParentField: "content"}), openAPI, yield) {
+	if !walkMediaTypes(ctx, header.Content, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "content"}), openAPI, yield) {
 		return false
 	}
 
 	// Walk through examples
-	if !walkReferencedExamples(ctx, header.Examples, append(loc, LocationContext{Parent: parent, ParentField: "examples"}), openAPI, yield) {
+	if !walkReferencedExamples(ctx, header.Examples, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "examples"}), openAPI, yield) {
 		return false
 	}
 
 	// Visit Header Extensions
-	return yield(WalkItem{Match: getMatchFunc(header.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(header.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedExamples walks through referenced examples
@@ -707,5 +707,5 @@ func walkExample(_ context.Context, example *Example, parent MatchFunc, loc []Lo
 	}
 
 	// Visit Example Extensions
-	return yield(WalkItem{Match: getMatchFunc(example.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(example.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: parent, ParentField: ""}), OpenAPI: openAPI})
 }

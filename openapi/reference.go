@@ -301,6 +301,15 @@ func (r *Reference[T, V, C]) MustGetObject() *T {
 	return obj
 }
 
+// GetObjectAny returns the referenced object. If this is a reference and its unresolved, this will return nil.
+// This is a convenience method for use with the various reflection based utility functions.
+func (r *Reference[T, V, C]) GetObjectAny() any {
+	if r == nil {
+		return nil
+	}
+	return r.GetObject()
+}
+
 // GetSummary returns the value of the Summary field. Returns empty string if not set.
 func (r *Reference[T, V, C]) GetSummary() string {
 	if r == nil || r.Summary == nil {
