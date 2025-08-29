@@ -160,7 +160,7 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, parentName string,
 					// Get the parent match function from the location
 					parentLoc := item.Location[len(item.Location)-1]
 
-					err := parentLoc.Parent(Matcher{
+					err := parentLoc.ParentMatchFunc(Matcher{
 						Workflow: func(workflow *Workflow) error {
 							return item.Match(Matcher{
 								Step: func(step *Step) error {

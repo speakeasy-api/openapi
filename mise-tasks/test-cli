@@ -25,6 +25,7 @@ echo "  ✓ Testing subcommand help..."
 $CLI spec validate --help > /dev/null
 $CLI spec upgrade --help > /dev/null
 $CLI spec inline --help > /dev/null
+$CLI spec clean --help > /dev/null
 $CLI spec bundle --help > /dev/null
 $CLI spec join --help > /dev/null
 $CLI spec bootstrap --help > /dev/null
@@ -104,6 +105,23 @@ if ! diff -q dist/test/test-bundled-counter.yaml openapi/testdata/inline/bundled
     exit 1
 fi
 
+# Test clean command with known test files
+echo "  ✓ Testing clean command..."
+$CLI spec clean openapi/testdata/clean/clean_input.yaml dist/test/test-cleaned.yaml > /dev/null
+$CLI spec clean openapi/testdata/clean/clean_empty_input.yaml dist/test/test-cleaned-empty.yaml > /dev/null
+
+# Compare clean outputs with expected
+echo "  ✓ Comparing clean outputs with expected..."
+if ! diff -q dist/test/test-cleaned.yaml openapi/testdata/clean/clean_expected.yaml > /dev/null; then
+    echo "    ❌ Clean output differs from expected"
+    exit 1
+fi
+
+if ! diff -q dist/test/test-cleaned-empty.yaml openapi/testdata/clean/clean_empty_expected.yaml > /dev/null; then
+    echo "    ❌ Clean empty output differs from expected"
+    exit 1
+fi
+
 # Test join command with known test files
 echo "  ✓ Testing join command..."
 $CLI spec join openapi/testdata/join/main.yaml openapi/testdata/join/subdir/second.yaml openapi/testdata/join/third.yaml dist/test/test-joined-counter.yaml > /dev/null
@@ -141,6 +159,8 @@ $CLI spec validate dist/test/test-bundled.yaml > /dev/null
 $CLI spec validate dist/test/test-bundled-counter.yaml > /dev/null
 $CLI spec validate dist/test/test-joined-counter.yaml > /dev/null
 $CLI spec validate dist/test/test-joined-filepath.yaml > /dev/null
+$CLI spec validate dist/test/test-cleaned.yaml > /dev/null
+$CLI spec validate dist/test/test-cleaned-empty.yaml > /dev/null
 $CLI spec validate dist/test/test-joined-conflicts.yaml > /dev/null
 
 # Test arazzo validation with known test files
@@ -212,7 +232,7 @@ echo "✅ All CLI integration tests passed!"
 echo "📊 Test summary:"
 echo "   - Tested all command help outputs"
 echo "   - Validated known good and bad files"
-echo "   - Tested bootstrap, upgrade, inline, bundle, join commands"
+echo "   - Tested bootstrap, upgrade, inline, clean, bundle, join commands"
 echo "   - Compared outputs with expected results"
 echo "   - Tested arazzo validation"
 echo "   - Tested overlay validation, apply, and compare"

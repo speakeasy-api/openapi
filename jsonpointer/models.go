@@ -46,8 +46,6 @@ func navigateModel(sourceVal reflect.Value, currentPart navigationPart, stack []
 
 	key := currentPart.unescapeValue()
 
-	// First, check if this is an embedded map (anonymous field that implements sequenced map interface)
-	// This follows the same pattern as in marshaller/unmarshaller.go
 	sourceType := sourceVal.Type()
 	if sourceType.Kind() == reflect.Ptr {
 		sourceType = sourceType.Elem()

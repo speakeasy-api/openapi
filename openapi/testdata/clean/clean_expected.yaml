@@ -1,0 +1,133 @@
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+security:
+  - ApiKeyAuth: []
+paths:
+  /users:
+    get:
+      security:
+        - BearerAuth: ["read:users"]
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              examples:
+                user_example:
+                  $ref: "#/components/examples/UserExample"
+          links:
+            GetUserByUserId:
+              $ref: "#/components/links/GetUserByUserId"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /posts:
+    post:
+      requestBody:
+        $ref: "#/components/requestBodies/PostRequest"
+      callbacks:
+        webhook:
+          $ref: "#/components/callbacks/WebhookCallback"
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              $ref: "#/components/headers/LocationHeader"
+  /admin:
+    $ref: "#/components/pathItems/AdminPathItem"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+    Post:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: integer
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  parameters:
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+  requestBodies:
+    PostRequest:
+      description: Post creation request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Post"
+  headers:
+    LocationHeader:
+      description: Location of the created resource
+      schema:
+        type: string
+        format: uri
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+  examples:
+    UserExample:
+      summary: Example user
+      value:
+        id: 1
+        name: John Doe
+  links:
+    GetUserByUserId:
+      description: Link to get user by ID
+      parameters:
+        userId: $response.body#/id
+  callbacks:
+    WebhookCallback:
+      "{$request.body#/callbackUrl}":
+        post:
+          requestBody:
+            description: Callback payload
+            content:
+              application/json:
+                schema:
+                  type: object
+          responses:
+            "200":
+              description: Callback received
+  pathItems:
+    AdminPathItem:
+      get:
+        summary: Admin endpoint
+        responses:
+          "200":
+            description: Admin response

@@ -673,7 +673,9 @@ func (s *Schema) IsEqual(other *Schema) bool {
 		// Both nil, continue
 	case s.Type == nil || other.Type == nil:
 		return false
-	case !s.Type.IsEqual(other.Type):
+	}
+	// Compare both type arrays have the same types
+	if !equalSlices(s.GetType(), other.GetType()) {
 		return false
 	}
 
@@ -806,7 +808,7 @@ func (s *Schema) IsEqual(other *Schema) bool {
 	}
 
 	// Compare string slices
-	if !equalStringSlices(s.Required, other.Required) {
+	if !equalSlices(s.Required, other.Required) {
 		return false
 	}
 
@@ -980,7 +982,7 @@ func equalSequencedMaps(a, b *sequencedmap.Map[string, *JSONSchema[Referenceable
 	return a.IsEqualFunc(b, equalJSONSchemas)
 }
 
-func equalStringSlices(a, b []string) bool {
+func equalSlices[T any](a, b []T) bool {
 	// Treat nil and empty slices as equal
 	if len(a) == 0 && len(b) == 0 {
 		return true
@@ -988,8 +990,8 @@ func equalStringSlices(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	for i, itemA := range a {
-		if itemA != b[i] {
+	for i := range a {
+		if !reflect.DeepEqual(a[i], b[i]) {
 			return false
 		}
 	}

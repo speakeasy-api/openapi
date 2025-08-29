@@ -133,7 +133,7 @@ func extractMethodAndPath(locations openapi.Locations) (string, string) {
 
 func getParentType(location openapi.LocationContext) string {
 	parentType := ""
-	_ = location.Parent(openapi.Matcher{
+	_ = location.ParentMatchFunc(openapi.Matcher{
 		Any: func(a any) error {
 			switch a.(type) {
 			case *openapi.Paths:

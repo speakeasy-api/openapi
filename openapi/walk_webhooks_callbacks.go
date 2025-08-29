@@ -74,12 +74,12 @@ func walkLink(ctx context.Context, link *Link, parent MatchFunc, loc []LocationC
 	}
 
 	// Walk through server
-	if !walkServer(ctx, link.Server, append(loc, LocationContext{Parent: parent, ParentField: "server"}), openAPI, yield) {
+	if !walkServer(ctx, link.Server, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "server"}), openAPI, yield) {
 		return false
 	}
 
 	// Visit Link Extensions
-	return yield(WalkItem{Match: getMatchFunc(link.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(link.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkReferencedCallbacks walks through referenced callbacks
@@ -130,11 +130,11 @@ func walkCallback(ctx context.Context, callback *Callback, parent MatchFunc, loc
 
 	// Walk through callback path items
 	for expression, pathItem := range callback.All() {
-		if !walkReferencedPathItem(ctx, pathItem, append(loc, LocationContext{Parent: parent, ParentKey: pointer.From(string(expression))}), openAPI, yield) {
+		if !walkReferencedPathItem(ctx, pathItem, append(loc, LocationContext{ParentMatchFunc: parent, ParentKey: pointer.From(string(expression))}), openAPI, yield) {
 			return false
 		}
 	}
 
 	// Visit Callback Extensions
-	return yield(WalkItem{Match: getMatchFunc(callback.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(callback.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: parent, ParentField: ""}), OpenAPI: openAPI})
 }

@@ -8,13 +8,11 @@ updates:
       day: "monday"
       time: "09:00"
     open-pull-requests-limit: 10
-    reviewers:
-      - "speakeasy-api/maintainers"
     assignees:
       - "speakeasy-api/maintainers"
     commit-message:
-      prefix: "deps"
-      prefix-development: "deps"
+      prefix: "fix"
+      prefix-development: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -42,8 +40,6 @@ updates:
       day: "monday"
       time: "09:00"
     open-pull-requests-limit: 5
-    reviewers:
-      - "speakeasy-api/maintainers"
     assignees:
       - "speakeasy-api/maintainers"
     commit-message:

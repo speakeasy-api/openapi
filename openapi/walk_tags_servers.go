@@ -33,12 +33,12 @@ func walkTag(ctx context.Context, tag *Tag, loc []LocationContext, openAPI *Open
 		return false
 	}
 
-	if !walkExternalDocs(ctx, tag.ExternalDocs, append(loc, LocationContext{Parent: tagMatchFunc, ParentField: "externalDocs"}), openAPI, yield) {
+	if !walkExternalDocs(ctx, tag.ExternalDocs, append(loc, LocationContext{ParentMatchFunc: tagMatchFunc, ParentField: "externalDocs"}), openAPI, yield) {
 		return false
 	}
 
 	// Visit Tag Extensions
-	return yield(WalkItem{Match: getMatchFunc(tag.Extensions), Location: append(loc, LocationContext{Parent: tagMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(tag.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: tagMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 func walkServers(ctx context.Context, servers []*Server, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
@@ -67,11 +67,11 @@ func walkServer(ctx context.Context, server *Server, loc []LocationContext, open
 		return false
 	}
 
-	if !walkVariables(ctx, server.Variables, append(loc, LocationContext{Parent: serverMatchFunc, ParentField: "variables"}), openAPI, yield) {
+	if !walkVariables(ctx, server.Variables, append(loc, LocationContext{ParentMatchFunc: serverMatchFunc, ParentField: "variables"}), openAPI, yield) {
 		return false
 	}
 
-	return yield(WalkItem{Match: getMatchFunc(server.Extensions), Location: append(loc, LocationContext{Parent: serverMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(server.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: serverMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 func walkVariables(ctx context.Context, variables *sequencedmap.Map[string, *ServerVariable], loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
@@ -95,5 +95,5 @@ func walkVariable(_ context.Context, variable *ServerVariable, loc []LocationCon
 		return false
 	}
 
-	return yield(WalkItem{Match: getMatchFunc(variable.Extensions), Location: append(loc, LocationContext{Parent: variableMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(variable.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: variableMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }

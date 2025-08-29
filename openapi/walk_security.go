@@ -64,12 +64,12 @@ func walkSecurityScheme(ctx context.Context, securityScheme *SecurityScheme, par
 	}
 
 	// Walk through flows if it's OAuth2
-	if !walkOAuthFlows(ctx, securityScheme.Flows, append(loc, LocationContext{Parent: parent, ParentField: "flows"}), openAPI, yield) {
+	if !walkOAuthFlows(ctx, securityScheme.Flows, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "flows"}), openAPI, yield) {
 		return false
 	}
 
 	// Visit SecurityScheme Extensions
-	return yield(WalkItem{Match: getMatchFunc(securityScheme.Extensions), Location: append(loc, LocationContext{Parent: parent, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(securityScheme.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: parent, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkOAuthFlows walks through OAuth flows
@@ -85,24 +85,24 @@ func walkOAuthFlows(ctx context.Context, flows *OAuthFlows, loc []LocationContex
 	}
 
 	// Walk through individual flows
-	if !walkOAuthFlow(ctx, flows.Implicit, append(loc, LocationContext{Parent: flowsMatchFunc, ParentField: "implicit"}), openAPI, yield) {
+	if !walkOAuthFlow(ctx, flows.Implicit, append(loc, LocationContext{ParentMatchFunc: flowsMatchFunc, ParentField: "implicit"}), openAPI, yield) {
 		return false
 	}
 
-	if !walkOAuthFlow(ctx, flows.Password, append(loc, LocationContext{Parent: flowsMatchFunc, ParentField: "password"}), openAPI, yield) {
+	if !walkOAuthFlow(ctx, flows.Password, append(loc, LocationContext{ParentMatchFunc: flowsMatchFunc, ParentField: "password"}), openAPI, yield) {
 		return false
 	}
 
-	if !walkOAuthFlow(ctx, flows.ClientCredentials, append(loc, LocationContext{Parent: flowsMatchFunc, ParentField: "clientCredentials"}), openAPI, yield) {
+	if !walkOAuthFlow(ctx, flows.ClientCredentials, append(loc, LocationContext{ParentMatchFunc: flowsMatchFunc, ParentField: "clientCredentials"}), openAPI, yield) {
 		return false
 	}
 
-	if !walkOAuthFlow(ctx, flows.AuthorizationCode, append(loc, LocationContext{Parent: flowsMatchFunc, ParentField: "authorizationCode"}), openAPI, yield) {
+	if !walkOAuthFlow(ctx, flows.AuthorizationCode, append(loc, LocationContext{ParentMatchFunc: flowsMatchFunc, ParentField: "authorizationCode"}), openAPI, yield) {
 		return false
 	}
 
 	// Visit OAuthFlows Extensions
-	return yield(WalkItem{Match: getMatchFunc(flows.Extensions), Location: append(loc, LocationContext{Parent: flowsMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(flows.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: flowsMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
 
 // walkOAuthFlow walks through an OAuth flow
@@ -118,5 +118,5 @@ func walkOAuthFlow(_ context.Context, flow *OAuthFlow, loc []LocationContext, op
 	}
 
 	// Visit OAuthFlow Extensions
-	return yield(WalkItem{Match: getMatchFunc(flow.Extensions), Location: append(loc, LocationContext{Parent: flowMatchFunc, ParentField: ""}), OpenAPI: openAPI})
+	return yield(WalkItem{Match: getMatchFunc(flow.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: flowMatchFunc, ParentField: ""}), OpenAPI: openAPI})
 }
