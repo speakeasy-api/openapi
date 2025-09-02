@@ -129,8 +129,10 @@ func TestRegisterType_Success(t *testing.T) {
 	assert.Equal(t, "test", customInstance.Value)
 }
 
+//nolint:paralleltest // Global state manipulation requires sequential execution
 func TestClearGlobalFieldCache_Success(t *testing.T) {
-	t.Parallel()
+	// Note: Not using t.Parallel() because this test manipulates global cache state
+	// that could interfere with other parallel tests
 
 	// Define a test struct to build cache for
 	type TestStruct struct {
@@ -156,8 +158,10 @@ func TestClearGlobalFieldCache_Success(t *testing.T) {
 	assert.True(t, stats.Size < initialSize || initialSize == 0)
 }
 
+//nolint:paralleltest // Global state manipulation requires sequential execution
 func TestGetFieldCacheStats_Success(t *testing.T) {
-	t.Parallel()
+	// Note: Not using t.Parallel() because this test manipulates global cache state
+	// that could interfere with other parallel tests
 
 	// Clear cache first to get a clean state
 	ClearGlobalFieldCache()
