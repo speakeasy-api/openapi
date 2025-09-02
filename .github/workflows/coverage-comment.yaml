@@ -1,0 +1,140 @@
+name: Coverage Comment
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+
+jobs:
+  comment:
+    name: Post Coverage Comment
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.event == 'pull_request'
+    permissions:
+      pull-requests: write
+      actions: read
+
+    steps:
+      - name: Download coverage artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }},
+            });
+
+            const coverageArtifact = artifacts.data.artifacts.find(artifact => 
+              artifact.name === 'coverage-report'
+            );
+
+            if (!coverageArtifact) {
+              console.log('No coverage artifact found');
+              return;
+            }
+
+            const download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: coverageArtifact.id,
+              archive_format: 'zip',
+            });
+
+            const fs = require('fs');
+            fs.writeFileSync('coverage-report.zip', Buffer.from(download.data));
+
+      - name: Extract and process coverage
+        run: |
+          if [ -f coverage-report.zip ]; then
+            unzip -q coverage-report.zip
+            
+            if [ -f coverage-summary.md ]; then
+              echo "Coverage summary found"
+              cat coverage-summary.md
+            else
+              echo "No coverage summary found in artifact"
+              exit 1
+            fi
+          else
+            echo "No coverage artifact downloaded"
+            exit 1
+          fi
+
+      - name: Get PR number
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pullRequests } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: '${{ github.event.workflow_run.head_repository.owner.login }}:${{ github.event.workflow_run.head_branch }}',
+              state: 'open'
+            });
+
+            if (pullRequests.length > 0) {
+              return pullRequests[0].number;
+            }
+
+            console.log('No matching PR found');
+            return null;
+
+      - name: Comment PR with coverage
+        if: steps.pr.outputs.result != 'null'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const prNumber = ${{ steps.pr.outputs.result }};
+
+            if (!prNumber) {
+              console.log('No PR number available');
+              return;
+            }
+
+            let coverageSummary;
+            try {
+              coverageSummary = fs.readFileSync('coverage-summary.md', 'utf8');
+            } catch (error) {
+              console.log('Could not read coverage summary:', error.message);
+              return;
+            }
+
+            // Look for existing coverage comment
+            const comments = await github.rest.issues.listComments({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const botComment = comments.data.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('📊 Test Coverage Report')
+            );
+
+            try {
+              if (botComment) {
+                // Update existing comment
+                await github.rest.issues.updateComment({
+                  comment_id: botComment.id,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: coverageSummary
+                });
+                console.log('Updated existing coverage comment');
+              } else {
+                // Create new comment
+                await github.rest.issues.createComment({
+                  issue_number: prNumber,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: coverageSummary
+                });
+                console.log('Created new coverage comment');
+              }
+            } catch (error) {
+              console.log('Failed to post comment:', error.message);
+              console.log('Coverage information is available in workflow artifacts');
+            }
