@@ -79,6 +79,12 @@ This repository also provides a comprehensive CLI tool for working with OpenAPI 
 
 ### Installation
 
+Install the CLI tool using Homebrew:
+
+```bash
+brew install openapi
+```
+
 Install the CLI tool using Go:
 
 ```bash
