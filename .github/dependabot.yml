@@ -1,8 +1,14 @@
 version: 2
 updates:
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
+    schedule:
+      interval: "weekly"
   # Enable version updates for Go modules
   - package-ecosystem: "gomod"
-    directory: "/"
+    directories:
+      - "/"
+      - "jsonschema/oas3/tests"
     schedule:
       interval: "weekly"
       day: "monday"
