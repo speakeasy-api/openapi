@@ -27,6 +27,10 @@ func YAMLToJSON(node *yaml.Node, indentation int, buffer io.Writer) error {
 }
 
 func handleYAMLNode(node *yaml.Node) (any, error) {
+	if node == nil {
+		return nil, nil
+	}
+
 	switch node.Kind {
 	case yaml.DocumentNode:
 		return handleYAMLNode(node.Content[0])

@@ -205,6 +205,8 @@ type Reference[T any, V interfaces.Validator[T], C marshaller.CoreModeler] struc
 	topLevelParent *Reference[T, V, C] // Top-level parent (root of the reference chain)
 }
 
+var _ references.Resolvable[Info] = (*Reference[Info, *Info, *core.Info])(nil)
+
 var _ interfaces.Model[core.Reference[*core.Info]] = (*Reference[Info, *Info, *core.Info])(nil)
 
 // ResolveOptions represent the options available when resolving a reference.
@@ -265,7 +267,18 @@ func (r *Reference[T, V, C]) GetReference() references.Reference {
 	return *r.Reference
 }
 
+// GetResolvedObject will return the referenced object. If this is a reference and its unresolved, this will return nil.
+// This methods is identical to GetObject but was added to support the Resolvable interface
+func (r *Reference[T, V, C]) GetResolvedObject() *T {
+	if r == nil {
+		return nil
+	}
+
+	return r.GetObject()
+}
+
 // GetObject returns the referenced object. If this is a reference and its unresolved, this will return nil.
+// This methods is identical to GetResolvedObject but was kept for backwards compatibility
 func (r *Reference[T, V, C]) GetObject() *T {
 	if r == nil {
 		return nil

@@ -40,6 +40,8 @@ type JSONSchema[T Referenceable | Concrete] struct {
 	topLevelParent *JSONSchema[Referenceable] // Top-level parent (root of the reference chain)
 }
 
+var _ references.Resolvable[JSONSchema[Concrete]] = (*JSONSchema[Referenceable])(nil)
+
 func NewJSONSchemaFromSchema[T Referenceable | Concrete](value *Schema) *JSONSchema[T] {
 	return &JSONSchema[T]{
 		EitherValue: values.EitherValue[Schema, core.Schema, bool, bool]{

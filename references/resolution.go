@@ -24,6 +24,11 @@ type ResolutionTarget interface {
 	StoreReferenceDocumentInCache(key string, doc []byte)
 }
 
+type Resolvable[T any] interface {
+	Resolve(ctx context.Context, opts ResolveOptions) ([]error, error)
+	GetResolvedObject() *T
+}
+
 // AbsoluteReferenceResult contains the result of resolving an absolute reference
 type AbsoluteReferenceResult struct {
 	// AbsoluteReference is the resolved absolute reference string
