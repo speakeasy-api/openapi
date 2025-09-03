@@ -52,14 +52,3 @@ jobs:
             dist/
             !dist/*.txt
           retention-days: 30
-
-  homebrew:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Update Homebrew formula
-        uses: dawidd6/action-homebrew-bump-formula@v5
-        with:
-          # Personal access token with 'public_repo' and 'workflow' scopes
-          token: ${{ secrets.HOMEBREW_TOKEN }}
-          # Formula name in homebrew/core
-          formula: openapi
