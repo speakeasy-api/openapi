@@ -74,7 +74,18 @@ func (s *JSONSchema[Referenceable]) Resolve(ctx context.Context, opts ResolveOpt
 	}, []string{})
 }
 
+// GetResolvedObject will return either this schema or the referenced schema if previously resolved.
+// This methods is identical to GetResolvedSchema but was added to support the Resolvable interface
+func (s *JSONSchema[Referenceable]) GetResolvedObject() *JSONSchema[Concrete] {
+	if s == nil {
+		return nil
+	}
+
+	return s.GetResolvedSchema()
+}
+
 // GetResolvedSchema will return either this schema or the referenced schema if previously resolved.
+// This methods is identical to GetResolvedObject but was kept for backwards compatibility
 func (s *JSONSchema[Referenceable]) GetResolvedSchema() *JSONSchema[Concrete] {
 	if s == nil || !s.IsResolved() {
 		return nil
