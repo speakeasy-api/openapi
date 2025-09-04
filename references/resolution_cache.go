@@ -64,21 +64,23 @@ func (c *RefCache) Resolve(ref Reference, targetLocation string) (*AbsoluteRefer
 func resolveAbsoluteReferenceUncached(ref Reference, targetLocation string) (*AbsoluteReferenceResult, error) {
 	uri := ref.GetURI()
 
+	// Handle empty targetLocation by treating it as current directory
+	if targetLocation == "" {
+		targetLocation = "."
+	}
+
+	// Classify the target location once
+	classification, err := utils.ClassifyReference(targetLocation)
+	if err != nil {
+		return nil, err
+	}
+
 	// If the reference is empty, it's relative to the target document
 	if uri == "" {
-		classification, err := utils.ClassifyReference(targetLocation)
-		if err != nil {
-			return nil, err
-		}
 		return &AbsoluteReferenceResult{
 			AbsoluteReference: targetLocation,
 			Classification:    classification,
 		}, nil
-	}
-
-	classification, err := utils.ClassifyReference(targetLocation)
-	if err != nil {
-		return nil, err
 	}
 
 	// Check if the URI is already absolute - if so, use it as-is instead of joining

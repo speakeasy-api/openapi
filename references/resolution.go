@@ -80,7 +80,7 @@ func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T]
 		return nil, nil, errors.New("root document is required")
 	}
 	if opts.TargetLocation == "" {
-		return nil, nil, errors.New("target location is required")
+		opts.TargetLocation = "."
 	}
 	if opts.TargetDocument == nil {
 		return nil, nil, errors.New("target document is required")
