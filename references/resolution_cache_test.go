@@ -287,3 +287,206 @@ func BenchmarkRefCache_vs_Uncached(b *testing.B) {
 		}
 	})
 }
+
+// Tests for empty targetLocation bug fix
+func TestResolveAbsoluteReferenceUncached_EmptyTargetLocation_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                string
+		targetLocation      string
+		reference           string
+		expectedAbsoluteRef string
+		description         string
+	}{
+		{
+			name:                "empty_target_with_empty_reference",
+			targetLocation:      "",
+			reference:           "",
+			expectedAbsoluteRef: ".",
+			description:         "Empty target location should default to current directory",
+		},
+		{
+			name:                "empty_target_with_relative_reference",
+			targetLocation:      "",
+			reference:           "schemas/user.yaml",
+			expectedAbsoluteRef: "schemas/user.yaml",
+			description:         "Empty target location with relative reference should resolve relative to current directory",
+		},
+		{
+			name:                "empty_target_with_absolute_file_reference",
+			targetLocation:      "",
+			reference:           "/absolute/path/schema.yaml",
+			expectedAbsoluteRef: "/absolute/path/schema.yaml",
+			description:         "Empty target location with absolute file reference should use absolute path as-is",
+		},
+		{
+			name:                "empty_target_with_absolute_url_reference",
+			targetLocation:      "",
+			reference:           "https://example.com/schema.yaml",
+			expectedAbsoluteRef: "https://example.com/schema.yaml",
+			description:         "Empty target location with absolute URL reference should use URL as-is",
+		},
+		{
+			name:                "empty_target_with_fragment_reference",
+			targetLocation:      "",
+			reference:           "#/components/schemas/User",
+			expectedAbsoluteRef: ".",
+			description:         "Empty target location with fragment reference should resolve to current directory",
+		},
+		{
+			name:                "empty_target_with_uri_and_fragment_reference",
+			targetLocation:      "",
+			reference:           "schemas/user.yaml#/User",
+			expectedAbsoluteRef: "schemas/user.yaml",
+			description:         "Empty target location with URI and fragment should resolve URI relative to current directory",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ref := Reference(tt.reference)
+			result, err := resolveAbsoluteReferenceUncached(ref, tt.targetLocation)
+
+			require.NoError(t, err, tt.description)
+			require.NotNil(t, result)
+			assert.Equal(t, tt.expectedAbsoluteRef, result.AbsoluteReference, tt.description)
+			assert.NotNil(t, result.Classification, "Classification should not be nil")
+		})
+	}
+}
+
+func TestRefCache_Resolve_EmptyTargetLocation_Success(t *testing.T) {
+	t.Parallel()
+	cache := &RefCache{}
+
+	t.Run("empty_target_location_cached_correctly", func(t *testing.T) {
+		t.Parallel()
+		ref := Reference("schemas/user.yaml")
+
+		// First call with empty target location
+		result1, err1 := cache.Resolve(ref, "")
+		require.NoError(t, err1)
+		require.NotNil(t, result1)
+		assert.Equal(t, "schemas/user.yaml", result1.AbsoluteReference)
+
+		// Second call with same parameters should return cached result
+		result2, err2 := cache.Resolve(ref, "")
+		require.NoError(t, err2)
+		require.NotNil(t, result2)
+		assert.Equal(t, result1.AbsoluteReference, result2.AbsoluteReference)
+		assert.Equal(t, result1.Classification.Type, result2.Classification.Type)
+
+		// Results should be copies (not the same instance) to prevent mutation
+		assert.NotSame(t, result1, result2, "Cached results should be copies to prevent mutation")
+		assert.Equal(t, result1.AbsoluteReference, result2.AbsoluteReference, "But content should be identical")
+	})
+
+	t.Run("empty_vs_dot_target_location_different_cache_keys", func(t *testing.T) {
+		t.Parallel()
+		ref := Reference("test.yaml")
+
+		// Call with empty target location (internally becomes ".")
+		result1, err1 := cache.Resolve(ref, "")
+		require.NoError(t, err1)
+		require.NotNil(t, result1)
+
+		// Call with explicit "." target location
+		result2, err2 := cache.Resolve(ref, ".")
+		require.NoError(t, err2)
+		require.NotNil(t, result2)
+
+		// Both should have the same absolute reference result
+		assert.Equal(t, result1.AbsoluteReference, result2.AbsoluteReference)
+		assert.Equal(t, result1.Classification.Type, result2.Classification.Type)
+
+		// But they should be cached separately (different cache keys)
+		// This is expected behavior since the cache key includes the original targetLocation
+		assert.NotSame(t, result1, result2, "Different target locations should have separate cache entries")
+	})
+}
+
+//nolint:paralleltest // This test uses global cache and cannot be parallel
+func TestResolveAbsoluteReferenceCached_EmptyTargetLocation_Global(t *testing.T) {
+	// Clear global cache before test
+	ClearGlobalRefCache()
+
+	ref := Reference("schemas/user.yaml")
+
+	// Resolve using global function with empty target location
+	result1, err := ResolveAbsoluteReferenceCached(ref, "")
+	require.NoError(t, err)
+	assert.Equal(t, "schemas/user.yaml", result1.AbsoluteReference)
+
+	// Verify it's cached globally
+	stats := GetRefCacheStats()
+	assert.Equal(t, int64(1), stats.Size)
+
+	// Resolve again - should use cache
+	result2, err := ResolveAbsoluteReferenceCached(ref, "")
+	require.NoError(t, err)
+	assert.Equal(t, result1.AbsoluteReference, result2.AbsoluteReference)
+	assert.NotSame(t, result1, result2, "should return copies")
+
+	// Clean up
+	ClearGlobalRefCache()
+}
+
+func TestResolveAbsoluteReferenceUncached_EmptyTargetLocation_InMemoryDocuments(t *testing.T) {
+	t.Parallel()
+
+	// Test scenarios that represent in-memory documents (uploaded files, database content, etc.)
+	tests := []struct {
+		name        string
+		reference   string
+		expected    string
+		description string
+	}{
+		{
+			name:        "in_memory_document_self_reference",
+			reference:   "",
+			expected:    ".",
+			description: "In-memory document referencing itself should resolve to current directory",
+		},
+		{
+			name:        "in_memory_document_relative_schema",
+			reference:   "components/schemas/User.yaml",
+			expected:    "components/schemas/User.yaml",
+			description: "In-memory document with relative schema reference",
+		},
+		{
+			name:        "in_memory_document_json_pointer",
+			reference:   "#/components/schemas/User",
+			expected:    ".",
+			description: "In-memory document with JSON pointer reference",
+		},
+		{
+			name:        "in_memory_document_external_url",
+			reference:   "https://schemas.example.com/common.yaml",
+			expected:    "https://schemas.example.com/common.yaml",
+			description: "In-memory document referencing external URL should preserve absolute URL",
+		},
+		{
+			name:        "in_memory_document_uri_with_fragment",
+			reference:   "components/schemas/User.yaml#/properties/name",
+			expected:    "components/schemas/User.yaml",
+			description: "In-memory document with URI and fragment should resolve to the URI part only",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ref := Reference(tt.reference)
+			result, err := resolveAbsoluteReferenceUncached(ref, "")
+
+			require.NoError(t, err, tt.description)
+			require.NotNil(t, result)
+			assert.Equal(t, tt.expected, result.AbsoluteReference, tt.description)
+			assert.NotNil(t, result.Classification, "Classification should not be nil")
+		})
+	}
+}

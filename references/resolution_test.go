@@ -377,18 +377,22 @@ func TestResolve_Caching(t *testing.T) {
 func TestResolve_Errors(t *testing.T) {
 	t.Parallel()
 
-	t.Run("missing root location", func(t *testing.T) {
+	t.Run("empty target location defaults to current directory", func(t *testing.T) {
 		t.Parallel()
+		root := NewMockResolutionTarget()
 		opts := ResolveOptions{
-			RootDocument: NewMockResolutionTarget(),
+			RootDocument:   root,
+			TargetDocument: root,
 		}
 
-		result, validationErrs, err := Resolve(t.Context(), Reference("#/test"), testPrimitiveUnmarshaler, opts)
+		result, validationErrs, err := Resolve(t.Context(), Reference(""), func(ctx context.Context, node *yaml.Node, skipValidation bool) (*MockResolutionTarget, []error, error) {
+			return root, nil, nil
+		}, opts)
 
-		require.Error(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
-		assert.Nil(t, result)
-		assert.Contains(t, err.Error(), "target location is required")
+		require.NotNil(t, result)
+		assert.Equal(t, ".", result.AbsoluteReference)
 	})
 
 	t.Run("missing root document", func(t *testing.T) {

@@ -670,27 +670,6 @@ $ref: "circular1.yaml"
 func TestJSONSchema_Resolve_Errors(t *testing.T) {
 	t.Parallel()
 
-	t.Run("missing root location", func(t *testing.T) {
-		t.Parallel()
-		ref := "external.yaml#/test" // Use external reference to trigger location validation
-		schema := createSchemaWithRef(ref)
-
-		opts := ResolveOptions{
-			RootDocument: NewMockResolutionTarget(),
-			// TargetLocation deliberately omitted to trigger the error
-		}
-
-		validationErrs, err := schema.Resolve(t.Context(), opts)
-
-		require.Error(t, err)
-		assert.Nil(t, validationErrs)
-		// The error can be either "target location is required" or "empty reference" depending on the implementation
-		assert.True(t,
-			strings.Contains(err.Error(), "target location is required") ||
-				strings.Contains(err.Error(), "empty reference"),
-			"Expected error about target location or empty reference, got: %s", err.Error())
-	})
-
 	t.Run("missing root document", func(t *testing.T) {
 		t.Parallel()
 		ref := "#/test"
