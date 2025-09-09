@@ -27,6 +27,7 @@ func (s *JSONSchema[Referenceable]) IsResolved() bool {
 	return !s.IsReference() || s.resolvedSchemaCache != nil || (s.referenceResolutionCache != nil && s.referenceResolutionCache.Object != nil) || s.circularErrorFound
 }
 
+// IsReference returns true if the JSONSchema is a reference, false otherwise
 func (j *JSONSchema[Referenceable]) IsReference() bool {
 	if j == nil || j.IsRight() {
 		return false
@@ -35,6 +36,18 @@ func (j *JSONSchema[Referenceable]) IsReference() bool {
 	return j.GetLeft().IsReference()
 }
 
+// GetReference returns the reference of the JSONSchema if present, otherwise an empty string
+// This method is identical to GetRef() but was added to support the Resolvable interface
+func (j *JSONSchema[Referenceable]) GetReference() references.Reference {
+	if j == nil {
+		return ""
+	}
+
+	return j.GetRef()
+}
+
+// GetRef returns the reference of the JSONSchema if present, otherwise an empty string
+// This method is identical to GetReference() but was kept for backwards compatibility
 func (j *JSONSchema[Referenceable]) GetRef() references.Reference {
 	if j == nil || j.IsRight() {
 		return ""
@@ -43,6 +56,7 @@ func (j *JSONSchema[Referenceable]) GetRef() references.Reference {
 	return j.GetLeft().GetRef()
 }
 
+// GetAbsRef returns the absolute reference of the JSONSchema if present, otherwise an empty string
 func (j *JSONSchema[Referenceable]) GetAbsRef() references.Reference {
 	if !j.IsReference() {
 		return ""

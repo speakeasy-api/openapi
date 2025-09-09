@@ -14,6 +14,7 @@ tags:
 paths:
   /users:
     get:
+      operationId: getUsers
       summary: Get users
       responses:
         '200':

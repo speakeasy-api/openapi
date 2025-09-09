@@ -105,7 +105,7 @@ func (r *Responses) Validate(ctx context.Context, opts ...validation.Option) []e
 		errs = append(errs, r.Default.Validate(ctx, opts...)...)
 	}
 
-	if r.Len() == 0 {
+	if r.Len() == 0 && r.Default == nil {
 		errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("responses must have at least one response code"), core.RootNode))
 	}
 

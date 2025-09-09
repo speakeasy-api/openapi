@@ -11,6 +11,7 @@ security:
 paths:
   /orders:
     get:
+      operationId: getUsers # This conflicts with main.yaml getUsers operationId
       summary: Get orders
       responses:
         '200':
@@ -18,7 +19,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Order'
+                $ref: "#/components/schemas/Order"
+  /health:
+    # This should be deduplicated with main.yaml /health path (identical operation)
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
 components:
   schemas:
     Order:

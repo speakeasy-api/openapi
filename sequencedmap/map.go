@@ -10,7 +10,7 @@ import (
 	"iter"
 	"reflect"
 	"slices"
-	"sort"
+	"strings"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/yml"
@@ -442,8 +442,8 @@ func (m *Map[K, V]) AllOrdered(order OrderType) iter.Seq2[K, V] {
 			// Sort by key in ascending order
 			sortedElements := make([]*Element[K, V], len(snapshot))
 			copy(sortedElements, snapshot)
-			sort.Slice(sortedElements, func(i, j int) bool {
-				return compareKeys(sortedElements[i].Key, sortedElements[j].Key) < 0
+			slices.SortFunc(sortedElements, func(a, b *Element[K, V]) int {
+				return compareKeys(a.Key, b.Key)
 			})
 			for _, element := range sortedElements {
 				// Check if element still exists in the map (it might have been deleted during iteration)
@@ -458,8 +458,8 @@ func (m *Map[K, V]) AllOrdered(order OrderType) iter.Seq2[K, V] {
 			// Sort by key in descending order
 			sortedElements := make([]*Element[K, V], len(snapshot))
 			copy(sortedElements, snapshot)
-			sort.Slice(sortedElements, func(i, j int) bool {
-				return compareKeys(sortedElements[i].Key, sortedElements[j].Key) > 0
+			slices.SortFunc(sortedElements, func(a, b *Element[K, V]) int {
+				return -compareKeys(a.Key, b.Key)
 			})
 			for _, element := range sortedElements {
 				// Check if element still exists in the map (it might have been deleted during iteration)
@@ -692,17 +692,12 @@ func (m *Map[K, V]) MarshalYAML() (interface{}, error) {
 }
 
 // compareKeys provides a generic comparison function for keys
-func compareKeys[K comparable](a, b K) int {
+func compareKeys[K any](a, b K) int {
 	// Convert to strings for comparison
 	aStr := fmt.Sprintf("%v", a)
 	bStr := fmt.Sprintf("%v", b)
 
-	if aStr < bStr {
-		return -1
-	} else if aStr > bStr {
-		return 1
-	}
-	return 0
+	return strings.Compare(aStr, bStr)
 }
 
 // IsEqual compares two Map instances for equality.
