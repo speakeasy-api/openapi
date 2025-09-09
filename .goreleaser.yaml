@@ -75,7 +75,7 @@ release:
     name: openapi
   draft: false
   prerelease: auto
-  mode: replace
+  mode: append
   header: |
     ## OpenAPI CLI {{ .Tag }}
 
