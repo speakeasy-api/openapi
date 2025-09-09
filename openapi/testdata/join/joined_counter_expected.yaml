@@ -16,6 +16,7 @@ tags:
 paths:
   /users:
     get:
+      operationId: getUsers
       summary: Get users
       responses:
         '200':
@@ -24,6 +25,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
+    post:
+      operationId: createUser
+      summary: Create user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User_1'
+      responses:
+        "201":
+          description: Created
   /health:
     get:
       summary: Health check
@@ -40,19 +52,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Product'
-  /users#second:
-    post:
-      summary: Create user
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/User_1'
+  /health#second:
+    get:
+      summary: Different health check
+      description: A different health check implementation
       responses:
-        "201":
-          description: Created
+        "200":
+          description: Different OK response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
   /orders:
     get:
+      operationId: getUsers#third
       summary: Get orders
       responses:
         "200":

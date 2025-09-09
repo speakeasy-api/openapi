@@ -415,7 +415,7 @@ additionalProperties: "invalid"
 `,
 			wantErrs: []string{
 				"schema field additionalProperties got string, want boolean or object",
-				"schema expected object, got scalar",
+				"schema.additionalProperties expected object, got scalar",
 			},
 		},
 		{
@@ -442,7 +442,7 @@ items: "invalid"
 `,
 			wantErrs: []string{
 				"schema field items got string, want boolean or object",
-				"schema expected object, got scalar",
+				"schema.items expected object, got scalar",
 			},
 		},
 		{

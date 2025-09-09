@@ -255,6 +255,20 @@ default:
 x-test: some-value
 `,
 		},
+		{
+			name: "valid responses with only default",
+			yml: `
+default:
+  description: Default response for all status codes
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          message:
+            type: string
+`,
+		},
 	}
 
 	for _, tt := range tests {

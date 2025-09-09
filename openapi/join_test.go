@@ -257,11 +257,19 @@ func TestJoin_NoFilePath_Success(t *testing.T) {
 	err = openapi.Join(ctx, mainDoc, documents, opts)
 	require.NoError(t, err)
 
-	// Verify original /users path exists
+	// Verify original /users path exists and contains both operations
 	assert.True(t, mainDoc.Paths.Has("/users"))
+	usersPath, exists := mainDoc.Paths.Get("/users")
+	require.True(t, exists, "Users path should exist")
+	require.NotNil(t, usersPath)
+	require.NotNil(t, usersPath.Object)
 
-	// Verify conflicting path uses fallback name
-	assert.True(t, mainDoc.Paths.Has("/users#document_0"))
+	// Should have both GET (from main) and POST (from second)
+	assert.NotNil(t, usersPath.Object.Get, "Should have GET operation from main document")
+	assert.NotNil(t, usersPath.Object.Post, "Should have POST operation from second document")
+
+	// Should NOT have a duplicated path since methods are different
+	assert.False(t, mainDoc.Paths.Has("/users#document_0"), "Should not create duplicate path for different methods")
 }
 
 func TestJoin_ServersSecurityConflicts_Success(t *testing.T) {

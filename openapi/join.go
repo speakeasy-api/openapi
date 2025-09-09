@@ -206,6 +206,12 @@ func joinSingleDocument(ctx context.Context, result, doc *OpenAPI, docPath strin
 		return fmt.Errorf("failed to update references in document: %w", err)
 	}
 
+	// Collect existing operationIds to detect conflicts
+	usedOperationIds := collectOperationIds(result)
+
+	// Resolve operationId conflicts in the source document
+	resolveOperationIdConflicts(doc, usedOperationIds, docPath)
+
 	// Join paths with conflict resolution
 	joinPaths(result, doc, docPath, usedPathNames)
 
@@ -232,19 +238,94 @@ func joinPaths(result, src *OpenAPI, srcPath string, usedPathNames map[string]bo
 		result.Paths = NewPaths()
 	}
 
-	for path, pathItem := range src.Paths.All() {
+	for path, srcPathItem := range src.Paths.All() {
 		if !usedPathNames[path] {
 			// No conflict, add directly
-			result.Paths.Set(path, pathItem)
+			result.Paths.Set(path, srcPathItem)
 			usedPathNames[path] = true
 		} else {
-			// Conflict detected, create new path with fragment
-			newPath := generateConflictPath(path, srcPath)
-			result.Paths.Set(newPath, pathItem)
-			usedPathNames[newPath] = true
+			// Path exists, need to check for operation conflicts
+			existingPathItem, exists := result.Paths.Get(path)
+			if !exists || existingPathItem == nil || existingPathItem.Object == nil || srcPathItem == nil || srcPathItem.Object == nil {
+				// Safety check - if we can't access the operations, create conflict path
+				newPath := generateConflictPath(path, srcPath)
+				result.Paths.Set(newPath, srcPathItem)
+				usedPathNames[newPath] = true
+				continue
+			}
+
+			// Try to merge operations from source into existing path
+			conflictingOperations := mergePathItemOperations(existingPathItem.Object, srcPathItem.Object)
+
+			if len(conflictingOperations) == 0 {
+				// No conflicts, all operations merged successfully - existing path already updated
+				continue
+			} else {
+				// Some operations had conflicts, create new path for conflicting operations only
+				conflictPathItem := createPathItemWithOperations(conflictingOperations)
+
+				newPath := generateConflictPath(path, srcPath)
+				result.Paths.Set(newPath, &ReferencedPathItem{Object: conflictPathItem})
+				usedPathNames[newPath] = true
+			}
+		}
+	}
+}
+
+// ConflictingOperation represents an operation that conflicts with an existing one
+type ConflictingOperation struct {
+	Method    HTTPMethod
+	Operation *Operation
+}
+
+// mergePathItemOperations attempts to merge operations from srcPathItem into existingPathItem
+// Returns conflicting operations that couldn't be merged
+func mergePathItemOperations(existingPathItem, srcPathItem *PathItem) []ConflictingOperation {
+	conflictingOperations := []ConflictingOperation{}
+
+	// Iterate through all operations in the source PathItem
+	for method, srcOp := range srcPathItem.All() {
+		if srcOp == nil {
+			continue
+		}
+
+		// Check if existing PathItem has this method
+		existingOp := existingPathItem.GetOperation(method)
+
+		if existingOp == nil {
+			// No conflict, add the operation to existing PathItem
+			existingPathItem.Set(method, srcOp)
+		} else {
+			// Both have this method, check if operations are identical
+			srcHash := hashing.Hash(srcOp)
+			existingHash := hashing.Hash(existingOp)
+
+			if srcHash == existingHash {
+				// Identical operations, keep existing (deduplicate)
+				continue
+			} else {
+				// Different operations, this is a conflict
+				conflictingOperations = append(conflictingOperations, ConflictingOperation{
+					Method:    method,
+					Operation: srcOp,
+				})
+			}
 		}
 	}
 
+	return conflictingOperations
+}
+
+// createPathItemWithOperations creates a new PathItem containing only the specified conflicting operations
+func createPathItemWithOperations(conflictingOps []ConflictingOperation) *PathItem {
+	pathItem := NewPathItem()
+
+	// Add each conflicting operation with its original method
+	for _, conflictOp := range conflictingOps {
+		pathItem.Set(conflictOp.Method, conflictOp.Operation)
+	}
+
+	return pathItem
 }
 
 // generateConflictPath creates a new path with a fragment containing the file name
@@ -736,6 +817,110 @@ func joinTags(result, src *OpenAPI) {
 			existingTagNames[tag.Name] = true
 		}
 	}
+}
+
+// collectOperationIds collects all operationIds from the given OpenAPI document
+func collectOperationIds(doc *OpenAPI) map[string]bool {
+	usedOperationIds := make(map[string]bool)
+
+	if doc.Paths != nil {
+		for _, pathItem := range doc.Paths.All() {
+			if pathItem == nil || pathItem.Object == nil {
+				continue
+			}
+
+			// Check all operations in the path item
+			for _, operation := range pathItem.Object.All() {
+				if operation != nil && operation.OperationID != nil && *operation.OperationID != "" {
+					usedOperationIds[*operation.OperationID] = true
+				}
+			}
+		}
+	}
+
+	// Also check webhooks
+	if doc.Webhooks != nil {
+		for _, webhook := range doc.Webhooks.All() {
+			if webhook == nil || webhook.Object == nil {
+				continue
+			}
+
+			for _, operation := range webhook.Object.All() {
+				if operation != nil && operation.OperationID != nil && *operation.OperationID != "" {
+					usedOperationIds[*operation.OperationID] = true
+				}
+			}
+		}
+	}
+
+	return usedOperationIds
+}
+
+// resolveOperationIdConflicts resolves operationId conflicts by adding #docname suffix
+func resolveOperationIdConflicts(doc *OpenAPI, usedOperationIds map[string]bool, docPath string) {
+	// Extract document name from path for suffix
+	docName := generateDocumentName(docPath)
+
+	if doc.Paths != nil {
+		for _, pathItem := range doc.Paths.All() {
+			if pathItem == nil || pathItem.Object == nil {
+				continue
+			}
+
+			// Check all operations in the path item
+			for _, operation := range pathItem.Object.All() {
+				if operation != nil && operation.OperationID != nil && *operation.OperationID != "" {
+					originalId := *operation.OperationID
+					if usedOperationIds[originalId] {
+						// Conflict detected, add suffix
+						newId := originalId + "#" + docName
+						operation.OperationID = &newId
+					} else {
+						// No conflict, mark as used
+						usedOperationIds[originalId] = true
+					}
+				}
+			}
+		}
+	}
+
+	// Also handle webhooks
+	if doc.Webhooks != nil {
+		for _, webhook := range doc.Webhooks.All() {
+			if webhook == nil || webhook.Object == nil {
+				continue
+			}
+
+			for _, operation := range webhook.Object.All() {
+				if operation != nil && operation.OperationID != nil && *operation.OperationID != "" {
+					originalId := *operation.OperationID
+					if usedOperationIds[originalId] {
+						// Conflict detected, add suffix
+						newId := originalId + "#" + docName
+						operation.OperationID = &newId
+					} else {
+						// No conflict, mark as used
+						usedOperationIds[originalId] = true
+					}
+				}
+			}
+		}
+	}
+}
+
+// generateDocumentName extracts a clean document name from the file path
+func generateDocumentName(filePath string) string {
+	// Extract filename without extension
+	baseName := filepath.Base(filePath)
+	ext := filepath.Ext(baseName)
+	if ext != "" {
+		baseName = baseName[:len(baseName)-len(ext)]
+	}
+
+	// Clean the filename to make it safe
+	safeFileName := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(baseName, "_")
+
+	return safeFileName
 }
 
 // joinServersAndSecurity handles smart conflict resolution for servers and security

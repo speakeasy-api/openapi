@@ -23,9 +23,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/Product'
   /users:
-    # This conflicts with main.yaml /users path
+    # This should merge with main.yaml /users path (different method)
     post:
       summary: Create user
+      operationId: createUser
       requestBody:
         content:
           application/json:
@@ -34,6 +35,23 @@ paths:
       responses:
         '201':
           description: Created
+  /health:
+    # This should conflict with main.yaml /health path (same method, different operation)
+    get:
+      summary: Different health check
+      description: A different health check implementation
+      responses:
+        '200':
+          description: Different OK response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
 webhooks:
   productUpdated:
     post:

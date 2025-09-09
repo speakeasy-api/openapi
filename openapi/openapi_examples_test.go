@@ -214,7 +214,7 @@ func Example_validating() {
 		fmt.Println("Document is valid!")
 	}
 	// Output: Validation error: [3:3] info field version is missing
-	// Validation error: [18:30] response expected object, got scalar
+	// Validation error: [18:30] response.content expected object, got scalar
 	// Validation error: [31:25] schema field properties.name.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
 	// Validation error: [31:25] schema field properties.name.type got string, want array
 	// Additional validation error: [31:25] schema field properties.name.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'

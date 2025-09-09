@@ -383,7 +383,7 @@ func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 				fieldVal := out.Field(fieldIndex)
 
 				if implementsInterface(fieldVal, nodeMutatorType) {
-					fieldValidationErrs, err := unmarshalNode(ctx, modelTag, keyNode, valueNode, cachedField.Name, fieldVal)
+					fieldValidationErrs, err := unmarshalNode(ctx, modelTag+"."+key, keyNode, valueNode, cachedField.Name, fieldVal)
 					if err != nil {
 						return err
 					}
