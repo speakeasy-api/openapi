@@ -165,7 +165,7 @@ boolField: true
 intField: 42
 float64Field: 3.14
 `,
-			wantErrs: []string{"[2:14] testPrimitiveModel expected scalar, got sequence"},
+			wantErrs: []string{"[2:14] testPrimitiveModel.stringField expected scalar, got sequence"},
 		},
 		{
 			name: "type mismatch - bool field gets string",
@@ -175,7 +175,7 @@ boolField: "not a bool"
 intField: 42
 float64Field: 3.14
 `,
-			wantErrs: []string{"[3:12] testPrimitiveModel yaml: unmarshal errors:"},
+			wantErrs: []string{"[3:12] testPrimitiveModel.boolField yaml: unmarshal errors:"},
 		},
 		{
 			name: "type mismatch - int field gets string",
@@ -185,7 +185,7 @@ boolField: true
 intField: "not an int"
 float64Field: 3.14
 `,
-			wantErrs: []string{"[4:11] testPrimitiveModel yaml: unmarshal errors:"},
+			wantErrs: []string{"[4:11] testPrimitiveModel.intField yaml: unmarshal errors:"},
 		},
 		{
 			name: "type mismatch - float field gets string",
@@ -195,7 +195,7 @@ boolField: true
 intField: 42
 float64Field: "not a float"
 `,
-			wantErrs: []string{"[5:15] testPrimitiveModel yaml: unmarshal errors:"},
+			wantErrs: []string{"[5:15] testPrimitiveModel.float64Field yaml: unmarshal errors:"},
 		},
 		{
 			name: "multiple validation errors",
@@ -206,7 +206,7 @@ intField: "not an int"
 			wantErrs: []string{
 				"[2:1] testPrimitiveModel field stringField is missing",
 				"[2:1] testPrimitiveModel field float64Field is missing",
-				"[2:12] testPrimitiveModel yaml: unmarshal errors:",
+				"[2:12] testPrimitiveModel.boolField yaml: unmarshal errors:",
 			},
 		},
 	}
@@ -379,7 +379,7 @@ nestedModelValue:
 nestedModel:
   - "this should be an object"
 `,
-			wantErrs: []string{"[8:3] testComplexModel expected object, got sequence"},
+			wantErrs: []string{"[8:3] testComplexModel.nestedModel expected object, got sequence"},
 		},
 		{
 			name: "type mismatch - array field gets object",
@@ -392,7 +392,7 @@ nestedModelValue:
 arrayField:
   key: "this should be an array"
 `,
-			wantErrs: []string{"[8:3] testComplexModel expected sequence, got object"},
+			wantErrs: []string{"[8:3] testComplexModel.arrayField expected sequence, got object"},
 		},
 		{
 			name: "deeply nested validation error",
