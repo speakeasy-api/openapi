@@ -51,6 +51,13 @@ func TestUpgrade_Success(t *testing.T) {
 			options:      []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeSamePatchVersion()},
 			description:  "3.1.0 should upgrade with WithUpgradeSamePatchVersion option",
 		},
+		{
+			name:         "upgrade_nullable_schema",
+			inputFile:    "testdata/upgrade/minimal_nullable.json",
+			expectedFile: "testdata/upgrade/expected_minimal_nullable_upgraded.json",
+			options:      nil,
+			description:  "nullable schema should upgrade to oneOf without panic",
+		},
 	}
 
 	for _, tt := range tests {

@@ -135,7 +135,7 @@ func upgradeNullableSchema(schema *oas3.Schema) {
 		nullSchema := createNullSchema()
 		clone := *schema
 		newSchema := oas3.Schema{}
-		newSchema.OneOf = []*oas3.JSONSchema[oas3.Referenceable]{nullSchema, oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&clone)}
+		newSchema.OneOf = []*oas3.JSONSchema[oas3.Referenceable]{oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&clone), nullSchema}
 		*schema = newSchema
 	}
 }

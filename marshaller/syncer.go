@@ -249,6 +249,16 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 		}
 	}
 
+	// Ensure we have a valid YAML node even for empty structs
+	if valueNode == nil {
+		// Create an empty mapping node for empty structs
+		valueNode = &yaml.Node{
+			Kind:  yaml.MappingNode,
+			Tag:   "!!map",
+			Style: yaml.FlowStyle,
+		}
+	}
+
 	// Populate the RootNode of the target with the result
 	if coreModel, ok := t.Addr().Interface().(CoreModeler); ok {
 		coreModel.SetRootNode(valueNode)
