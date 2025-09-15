@@ -1,0 +1,25 @@
+Address:
+  type: object
+  required:
+    - line1
+    - city
+    - country
+  properties:
+    line1:
+      type: string
+      description: Address line 1
+    line2:
+      type: string
+      description: Address line 2 (optional)
+    city:
+      type: string
+      description: City name
+    state:
+      type: string
+      description: State or province
+    country:
+      type: string
+      description: Country name
+    zipCode:
+      type: string
+      description: ZIP or postal code

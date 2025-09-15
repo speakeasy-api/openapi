@@ -1,0 +1,18 @@
+components:
+    schemas:
+        ApiInfo:
+            type: object
+            required:
+                - version
+                - name
+            properties:
+                version:
+                    type: string
+                    description: API version
+                name:
+                    type: string
+                    description: API name
+                status:
+                    type: string
+                    enum: [active, deprecated, beta]
+                    description: API status

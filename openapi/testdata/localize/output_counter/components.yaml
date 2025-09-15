@@ -1,0 +1,39 @@
+components:
+    schemas:
+        User:
+            type: object
+            required:
+                - id
+                - name
+            properties:
+                id:
+                    type: string
+                    description: User ID
+                name:
+                    type: string
+                    description: User name
+                email:
+                    type: string
+                    format: email
+                    description: User email address
+                address:
+                    $ref: "address.yaml#/Address"
+        Product:
+            type: object
+            required:
+                - id
+                - name
+                - price
+            properties:
+                id:
+                    type: string
+                    description: Product ID
+                name:
+                    type: string
+                    description: Product name
+                price:
+                    type: number
+                    format: float
+                    description: Product price
+                category:
+                    $ref: "category.yaml#/Category"

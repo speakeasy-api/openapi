@@ -17,6 +17,7 @@ OpenAPI specifications define REST APIs in a standard format. These commands hel
   - [`join`](#join)
   - [`optimize`](#optimize)
   - [`bootstrap`](#bootstrap)
+  - [`localize`](#localize)
 - [Common Options](#common-options)
 - [Output Formats](#output-formats)
 - [Examples](#examples)
@@ -455,6 +456,111 @@ What bootstrap creates:
 - Comprehensive schema examples with validation rules
 
 The generated document serves as both a template for new APIs and a learning resource for OpenAPI best practices.
+
+### `localize`
+
+Localize an OpenAPI specification by copying all external reference files to a target directory and creating a new version of the document with references rewritten to point to the localized files.
+
+```bash
+# Localize to a target directory with path-based naming (default)
+openapi spec localize ./spec.yaml ./localized/
+
+# Localize with counter-based naming for conflicts
+openapi spec localize --naming counter ./spec.yaml ./localized/
+
+# Localize with explicit path-based naming
+openapi spec localize --naming path ./spec.yaml ./localized/
+```
+
+**Naming Strategies:**
+
+- `path` (default): Uses file path-based naming like `schemas-address.yaml` for conflicts
+- `counter`: Uses counter-based suffixes like `address_1.yaml` for conflicts
+
+What localization does:
+
+- Copies all external reference files to the target directory
+- Creates a new version of the main document with updated references
+- Leaves the original document and files completely untouched
+- Creates a portable, self-contained document bundle
+- Handles circular references and naming conflicts intelligently
+- Supports both file-based and URL-based external references
+
+**Before localization:**
+
+```yaml
+# main.yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: "./components.yaml#/components/schemas/User"
+
+# components.yaml
+components:
+  schemas:
+    User:
+      properties:
+        address:
+          $ref: "./schemas/address.yaml#/Address"
+
+# schemas/address.yaml
+Address:
+  type: object
+  properties:
+    street: {type: string}
+```
+
+**After localization (in target directory):**
+
+```yaml
+# localized/main.yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: "components.yaml#/components/schemas/User"
+
+# localized/components.yaml
+components:
+  schemas:
+    User:
+      properties:
+        address:
+          $ref: "schemas-address.yaml#/Address"
+
+# localized/schemas-address.yaml
+Address:
+  type: object
+  properties:
+    street: {type: string}
+```
+
+**Benefits of localization:**
+
+- Creates portable document bundles for easy distribution
+- Simplifies deployment by packaging all dependencies together
+- Enables offline development without external file dependencies
+- Improves version control by keeping all related files together
+- Ensures all dependencies are available in CI/CD pipelines
+- Facilitates documentation generation with complete file sets
+
+**Use Localize when:**
+
+- You need to package an API specification for distribution
+- You want to create a self-contained bundle for deployment
+- You're preparing specifications for offline use or air-gapped environments
+- You need to ensure all dependencies are available in build pipelines
+- You want to simplify file management for complex multi-file specifications
+- You're creating documentation packages that include all referenced files
 
 ## Common Options
 

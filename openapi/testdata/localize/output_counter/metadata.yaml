@@ -1,0 +1,19 @@
+Metadata:
+    type: object
+    properties:
+        createdAt:
+            type: string
+            format: date-time
+            description: Creation timestamp
+        updatedAt:
+            type: string
+            format: date-time
+            description: Last update timestamp
+        version:
+            type: integer
+            description: Version number
+        tags:
+            type: array
+            items:
+                type: string
+            description: Associated tags

@@ -12,4 +12,5 @@ func Apply(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(joinCmd)
 	rootCmd.AddCommand(bootstrapCmd)
 	rootCmd.AddCommand(optimizeCmd)
+	rootCmd.AddCommand(localizeCmd)
 }

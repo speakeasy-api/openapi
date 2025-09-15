@@ -1,0 +1,13 @@
+UserProfile:
+    type: object
+    required:
+        - userId
+        - preferences
+    properties:
+        userId:
+            type: string
+            description: User identifier
+        preferences:
+            $ref: "user-preferences.yaml#/UserPreferences"
+        metadata:
+            $ref: "./metadata.yaml#/Metadata"
