@@ -803,6 +803,11 @@ func handleReference(ref references.Reference, parentLocation, targetLocation st
 		return "", nil // Invalid reference, skip
 	}
 
+	// For URLs, don't do any path manipulation - return as-is
+	if classification.Type == utils.ReferenceTypeURL {
+		return r, classification
+	}
+
 	if parentLocation != "" {
 		relPath, err := filepath.Rel(filepath.Dir(parentLocation), targetLocation)
 		if err == nil {

@@ -1,0 +1,78 @@
+openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+  description: A test API for integration testing
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /users:
+    get:
+      summary: List users
+      operationId: getUsers
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "components.yaml#/components/schemas/User"
+  /products:
+    get:
+      summary: List products
+      operationId: getProducts
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "components.yaml#/components/schemas/Product"
+  /api-info:
+    get:
+      summary: Get API information
+      operationId: getApiInfo
+      responses:
+        "200":
+          description: API information
+          content:
+            application/json:
+              schema:
+                $ref: "components_1.yaml#/components/schemas/ApiInfo"
+  /billing-address:
+    get:
+      summary: Get billing address format
+      operationId: getBillingAddress
+      responses:
+        "200":
+          description: Billing address format
+          content:
+            application/json:
+              schema:
+                $ref: "address_1.yaml#/Address"
+  /user-profile:
+    get:
+      summary: Get user profile
+      operationId: getUserProfile
+      responses:
+        "200":
+          description: User profile information
+          content:
+            application/json:
+              schema:
+                $ref: "user-profile.yaml#/UserProfile"
+  /preferences:
+    get:
+      summary: Get user preferences
+      operationId: getUserPreferences
+      responses:
+        "200":
+          description: User preferences
+          content:
+            application/json:
+              schema:
+                $ref: "user-preferences.yaml#/UserPreferences"

@@ -1,0 +1,25 @@
+Address:
+    type: object
+    required:
+        - street
+        - city
+        - country
+    properties:
+        street:
+            type: string
+            description: Street address
+        city:
+            type: string
+            description: City name
+        state:
+            type: string
+            description: State or province
+        country:
+            type: string
+            description: Country code
+        postalCode:
+            type: string
+            description: Postal or ZIP code
+        geoLocation:
+            $ref: "./geo.yaml#/GeoLocation"
+            description: Geographic coordinates of the address

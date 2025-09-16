@@ -1,0 +1,15 @@
+Category:
+  type: object
+  required:
+    - id
+    - name
+  properties:
+    id:
+      type: string
+      description: Category ID
+    name:
+      type: string
+      description: Category name
+    parentCategory:
+      $ref: "#/Category"
+      description: Parent category for hierarchical categorization

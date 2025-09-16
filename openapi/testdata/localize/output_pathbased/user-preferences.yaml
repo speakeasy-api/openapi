@@ -1,0 +1,19 @@
+UserPreferences:
+    type: object
+    required:
+        - theme
+        - language
+    properties:
+        theme:
+            type: string
+            enum: [light, dark, auto]
+            description: UI theme preference
+        language:
+            type: string
+            description: Preferred language code
+        notifications:
+            type: boolean
+            description: Enable notifications
+        timezone:
+            type: string
+            description: User timezone
