@@ -148,6 +148,7 @@ func init() {
 	rootCmd.AddCommand(openapiCmds)
 	rootCmd.AddCommand(arazzoCmds)
 	rootCmd.AddCommand(overlayCmds)
+	rootCmd.AddCommand(viewCmd)
 
 	// Global flags
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
