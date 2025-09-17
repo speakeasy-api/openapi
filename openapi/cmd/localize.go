@@ -150,13 +150,10 @@ func localizeOpenAPI(ctx context.Context, inputFile, targetDirectory string) err
 
 	// Set up localize options
 	opts := openapi.LocalizeOptions{
-		ResolveOptions: openapi.ResolveOptions{
-			TargetLocation: cleanInputFile,
-			VirtualFS:      &system.FileSystem{},
-		},
-		TargetDirectory: cleanTargetDir,
-		VirtualFS:       &system.FileSystem{},
-		NamingStrategy:  namingStrategy,
+		DocumentLocation: cleanInputFile,
+		TargetDirectory:  cleanTargetDir,
+		VirtualFS:        &system.FileSystem{},
+		NamingStrategy:   namingStrategy,
 	}
 
 	// Perform localization (this modifies the doc in memory but doesn't affect the original file)

@@ -232,7 +232,7 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 		result, validationErrs, err = s.resolveDefsReference(ctx, ref, opts)
 	} else {
 		// Resolve as JSONSchema to handle both Schema and boolean cases
-		result, validationErrs, err = references.Resolve(ctx, ref, unmarshaller, opts)
+		result, validationErrs, err = references.Resolve(ctx, ref, unmarshaler, opts)
 	}
 	if err != nil {
 		return nil, validationErrs, err
@@ -328,7 +328,7 @@ func (s *JSONSchema[Referenceable]) resolveDefsReference(ctx context.Context, re
 
 	// First, try to resolve using the standard references.Resolve with the target document
 	// This handles external $defs, caching, and all standard resolution features
-	result, validationErrs, err := references.Resolve(ctx, ref, unmarshaller, opts)
+	result, validationErrs, err := references.Resolve(ctx, ref, unmarshaler, opts)
 	if err == nil {
 		return result, validationErrs, nil
 	}
@@ -339,7 +339,7 @@ func (s *JSONSchema[Referenceable]) resolveDefsReference(ctx context.Context, re
 		parentOpts.TargetDocument = parent
 		parentOpts.TargetLocation = opts.TargetLocation // Keep the same location for caching
 
-		result, validationErrs, err := references.Resolve(ctx, ref, unmarshaller, parentOpts)
+		result, validationErrs, err := references.Resolve(ctx, ref, unmarshaler, parentOpts)
 		if err == nil {
 			return result, validationErrs, nil
 		}
@@ -392,7 +392,7 @@ func (s *JSONSchema[Referenceable]) tryResolveDefsUsingJSONPointerNavigation(ctx
 			parentOpts.TargetDocument = parentTarget
 			parentOpts.TargetLocation = opts.TargetLocation // Keep the same location for caching
 
-			result, validationErrs, err := references.Resolve(ctx, ref, unmarshaller, parentOpts)
+			result, validationErrs, err := references.Resolve(ctx, ref, unmarshaler, parentOpts)
 			if err == nil {
 				return result, validationErrs, nil
 			}
@@ -422,7 +422,7 @@ func getParentJSONPointer(jsonPtr string) string {
 	return jsonPtr[:lastSlash]
 }
 
-func unmarshaller(ctx context.Context, node *yaml.Node, skipValidation bool) (*JSONSchema[Referenceable], []error, error) {
+func unmarshaler(ctx context.Context, node *yaml.Node, skipValidation bool) (*JSONSchema[Referenceable], []error, error) {
 	jsonSchema := &JSONSchema[Referenceable]{}
 	validationErrs, err := marshaller.UnmarshalNode(ctx, "", node, jsonSchema)
 	if skipValidation {

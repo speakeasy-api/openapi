@@ -212,7 +212,7 @@ var _ interfaces.Model[core.Reference[*core.Info]] = (*Reference[Info, *Info, *c
 // ResolveOptions represent the options available when resolving a reference.
 type ResolveOptions = references.ResolveOptions
 
-// Resolve will fully resolve the reference and return the object referenced. This will recursively resolve any intermediate references as well. Will return errors if there is a circular reference issue.
+// Resolve will fully resolve the reference. This will recursively resolve any intermediate references as well. Will return errors if there is a circular reference issue.
 // Validation errors can be skipped by setting the skipValidation flag to true. This will skip the missing field errors that occur during unmarshaling.
 // Resolution doesn't run the Validate function on the resolved object. So if you want to fully validate the object after resolution, you need to call the Validate function manually.
 func (r *Reference[T, V, C]) Resolve(ctx context.Context, opts ResolveOptions) ([]error, error) {
@@ -525,7 +525,7 @@ func (r *Reference[T, V, C]) resolve(ctx context.Context, opts references.Resolv
 	if !ok {
 		return nil, nil, nil, fmt.Errorf("root document must be *OpenAPI, got %T", opts.RootDocument)
 	}
-	result, validationErrs, err := references.Resolve(ctx, *r.Reference, unmarshaller[T, V, C](rootDoc), opts)
+	result, validationErrs, err := references.Resolve(ctx, *r.Reference, unmarshaler[T, V, C](rootDoc), opts)
 	if err != nil {
 		return nil, nil, validationErrs, err
 	}
@@ -633,7 +633,7 @@ func joinReferenceChain(chain []string) string {
 	return result
 }
 
-func unmarshaller[T any, V interfaces.Validator[T], C marshaller.CoreModeler](o *OpenAPI) func(context.Context, *yaml.Node, bool) (*Reference[T, V, C], []error, error) {
+func unmarshaler[T any, V interfaces.Validator[T], C marshaller.CoreModeler](o *OpenAPI) func(context.Context, *yaml.Node, bool) (*Reference[T, V, C], []error, error) {
 	return func(ctx context.Context, node *yaml.Node, skipValidation bool) (*Reference[T, V, C], []error, error) {
 		var ref Reference[T, V, C]
 		validationErrs, err := marshaller.UnmarshalNode(ctx, "reference", node, &ref)

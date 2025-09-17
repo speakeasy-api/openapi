@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/openapi"
-	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +29,7 @@ func TestWalk_CollectOperations_Success(t *testing.T) {
 		err := item.Match(openapi.Matcher{
 			Operation: func(op *openapi.Operation) error {
 				// Extract method and path from location context
-				method, path := extractMethodAndPath(item.Location)
+				method, path := openapi.ExtractMethodAndPath(item.Location)
 
 				if method == "" || path == "" {
 					return nil
@@ -105,48 +104,4 @@ func TestWalk_CollectOperations_Success(t *testing.T) {
 
 	// Assert we found all expected operations
 	assert.ElementsMatch(t, expectedOperations, collectedOperations, "should find all expected operations with correct details")
-}
-
-// extractMethodAndPath extracts HTTP method and path from location context
-func extractMethodAndPath(locations openapi.Locations) (string, string) {
-	if len(locations) == 0 {
-		return "", ""
-	}
-
-	var method, path string
-
-	for i := len(locations) - 1; i >= 0; i-- {
-		switch getParentType(locations[i]) {
-		case "Paths":
-			path = pointer.Value(locations[i].ParentKey)
-		case "PathItem":
-			method = pointer.Value(locations[i].ParentKey)
-		case "OpenAPI":
-		default:
-			// Matched something unexpected so not likely an operation in paths
-			return "", ""
-		}
-	}
-
-	return method, path
-}
-
-func getParentType(location openapi.LocationContext) string {
-	parentType := ""
-	_ = location.ParentMatchFunc(openapi.Matcher{
-		Any: func(a any) error {
-			switch a.(type) {
-			case *openapi.Paths:
-				parentType = "Paths"
-			case *openapi.ReferencedPathItem:
-				parentType = "PathItem"
-			case *openapi.OpenAPI:
-				parentType = "OpenAPI"
-			default:
-				parentType = "Unknown"
-			}
-			return nil
-		},
-	})
-	return parentType
 }

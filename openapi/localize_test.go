@@ -41,15 +41,11 @@ func TestLocalize_Success(t *testing.T) {
 
 	// Configure localization options
 	opts := openapi.LocalizeOptions{
-		ResolveOptions: openapi.ResolveOptions{
-			RootDocument:   inputDoc,
-			TargetLocation: "testdata/localize/input/spec.yaml",
-			VirtualFS:      &system.FileSystem{},
-			HTTPClient:     httpClient,
-		},
-		TargetDirectory: tempDir,
-		VirtualFS:       &system.FileSystem{},
-		NamingStrategy:  openapi.LocalizeNamingPathBased,
+		DocumentLocation: "testdata/localize/input/spec.yaml",
+		TargetDirectory:  tempDir,
+		VirtualFS:        &system.FileSystem{},
+		HTTPClient:       httpClient,
+		NamingStrategy:   openapi.LocalizeNamingPathBased,
 	}
 
 	// Localize all external references
@@ -128,15 +124,11 @@ func TestLocalize_CounterBased_Success(t *testing.T) {
 
 	// Configure localization options with counter-based naming
 	opts := openapi.LocalizeOptions{
-		ResolveOptions: openapi.ResolveOptions{
-			RootDocument:   inputDoc,
-			TargetLocation: "testdata/localize/input/spec.yaml",
-			VirtualFS:      &system.FileSystem{},
-			HTTPClient:     httpClient,
-		},
-		TargetDirectory: tempDir,
-		VirtualFS:       &system.FileSystem{},
-		NamingStrategy:  openapi.LocalizeNamingCounter,
+		DocumentLocation: "testdata/localize/input/spec.yaml",
+		TargetDirectory:  tempDir,
+		VirtualFS:        &system.FileSystem{},
+		HTTPClient:       httpClient,
+		NamingStrategy:   openapi.LocalizeNamingCounter,
 	}
 
 	// Localize all external references

@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"path/filepath"
 	"strings"
 
@@ -31,12 +29,14 @@ const (
 
 // LocalizeOptions represents the options available when localizing an OpenAPI document.
 type LocalizeOptions struct {
-	// ResolveOptions are the options to use when resolving references during localization.
-	ResolveOptions ResolveOptions
+	// DocumentLocation is the location of the document being localized.
+	DocumentLocation string
 	// TargetDirectory is the directory where localized files will be written.
 	TargetDirectory string
 	// VirtualFS is the file system interface used for reading and writing files.
 	VirtualFS system.WritableVirtualFS
+	// HTTPClient is the HTTP client to use for fetching remote references.
+	HTTPClient system.Client
 	// NamingStrategy determines how external reference files are named when localized.
 	NamingStrategy LocalizeNamingStrategy
 }
@@ -132,7 +132,13 @@ func Localize(ctx context.Context, doc *OpenAPI, opts LocalizeOptions) error {
 	}
 
 	// Phase 1: Discover and collect all external references
-	if err := discoverExternalReferences(ctx, doc, opts.ResolveOptions, localizeStorage); err != nil {
+	if err := discoverExternalReferences(ctx, doc, ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: opts.DocumentLocation,
+		VirtualFS:      opts.VirtualFS,
+		HTTPClient:     opts.HTTPClient,
+	}, localizeStorage); err != nil {
 		return fmt.Errorf("failed to discover external references: %w", err)
 	}
 
@@ -224,29 +230,25 @@ func discoverSchemaReference(ctx context.Context, schema *oas3.JSONSchema[oas3.R
 		normalizedFilePath = normalizeFilePath(filePath)
 	}
 
-	// Always resolve the schema to enable recursive discovery
-	resolveOpts := oas3.ResolveOptions{
-		RootDocument:   opts.RootDocument,
-		TargetDocument: opts.TargetDocument,
-		TargetLocation: opts.TargetLocation,
-		VirtualFS:      opts.VirtualFS,
-		HTTPClient:     opts.HTTPClient,
-	}
-
-	if _, err := schema.Resolve(ctx, resolveOpts); err != nil {
+	if _, err := schema.Resolve(ctx, opts); err != nil {
 		return fmt.Errorf("failed to resolve external schema reference %s: %w", ref, err)
 	}
 
 	// Only store the file content if we haven't processed this file before
 	if !storage.externalRefs.Has(normalizedFilePath) {
-		// Get the file content for this reference
-		content, err := getFileContentForReference(ctx, normalizedFilePath, opts)
-		if err != nil {
-			return fmt.Errorf("failed to get content for reference %s: %w", normalizedFilePath, err)
-		}
+		// Get the cached reference document content that was loaded during resolution
+		resolutionInfo := schema.GetReferenceResolutionInfo()
+		if resolutionInfo != nil {
+			storage.externalRefs.Set(normalizedFilePath, "") // Will be filled in filename generation phase
 
-		storage.externalRefs.Set(normalizedFilePath, "") // Will be filled in filename generation phase
-		storage.resolvedContent[normalizedFilePath] = content
+			if data, found := opts.RootDocument.GetCachedReferenceDocument(resolutionInfo.AbsoluteReference); found {
+				storage.resolvedContent[normalizedFilePath] = data
+			} else {
+				return fmt.Errorf("failed to get cached content for reference %s", normalizedFilePath)
+			}
+		} else {
+			return fmt.Errorf("failed to get resolution info for reference %s", normalizedFilePath)
+		}
 	}
 
 	// Get the resolved schema and recursively discover references within it
@@ -313,112 +315,65 @@ func discoverGenericReference[T any, V interfaces.Validator[T], C marshaller.Cor
 		return fmt.Errorf("failed to resolve external reference %s: %w", refStr, err)
 	}
 
-	// Get the file content for this reference
-	content, err := getFileContentForReference(ctx, normalizedFilePath, opts)
-	if err != nil {
-		return fmt.Errorf("failed to get content for reference %s: %w", normalizedFilePath, err)
-	}
+	// Get the cached reference document content that was loaded during resolution
+	resolutionInfo := ref.GetReferenceResolutionInfo()
+	if resolutionInfo != nil {
+		storage.externalRefs.Set(normalizedFilePath, "") // Will be filled in filename generation phase
 
-	storage.externalRefs.Set(normalizedFilePath, "") // Will be filled in filename generation phase
-	storage.resolvedContent[normalizedFilePath] = content
+		if data, found := opts.RootDocument.GetCachedReferenceDocument(resolutionInfo.AbsoluteReference); found {
+			storage.resolvedContent[normalizedFilePath] = data
+		} else {
+			return fmt.Errorf("failed to get cached content for reference %s", normalizedFilePath)
+		}
+	} else {
+		return fmt.Errorf("failed to get resolution info for reference %s", normalizedFilePath)
+	}
 
 	// Get the resolved object and recursively discover references within it
 	resolvedValue := ref.GetObject()
 	if resolvedValue != nil {
 		targetDocInfo := ref.GetReferenceResolutionInfo()
 
+		resolveOpts := ResolveOptions{
+			RootDocument:   opts.RootDocument,
+			TargetDocument: targetDocInfo.ResolvedDocument,
+			TargetLocation: targetDocInfo.AbsoluteReference,
+			VirtualFS:      opts.VirtualFS,
+			HTTPClient:     opts.HTTPClient,
+		}
+
 		// Recursively discover references within the resolved object using Walk
 		for item := range Walk(ctx, resolvedValue) {
 			err := item.Match(Matcher{
 				Schema: func(s *oas3.JSONSchema[oas3.Referenceable]) error {
-					return discoverSchemaReference(ctx, s, ResolveOptions{
-						RootDocument:   opts.RootDocument,
-						TargetDocument: targetDocInfo.ResolvedDocument,
-						TargetLocation: targetDocInfo.AbsoluteReference,
-						VirtualFS:      opts.VirtualFS,
-						HTTPClient:     opts.HTTPClient,
-					}, storage)
+					return discoverSchemaReference(ctx, s, resolveOpts, storage)
 				},
 				ReferencedPathItem: func(r *ReferencedPathItem) error {
-					return discoverGenericReference(ctx, r, ResolveOptions{
-						RootDocument:   opts.RootDocument,
-						TargetDocument: targetDocInfo.ResolvedDocument,
-						TargetLocation: targetDocInfo.AbsoluteReference,
-						VirtualFS:      opts.VirtualFS,
-						HTTPClient:     opts.HTTPClient,
-					}, storage)
+					return discoverGenericReference(ctx, r, resolveOpts, storage)
 				},
 				ReferencedParameter: func(r *ReferencedParameter) error {
-					return discoverGenericReference(ctx, r, ResolveOptions{
-						RootDocument:   opts.RootDocument,
-						TargetDocument: targetDocInfo.ResolvedDocument,
-						TargetLocation: targetDocInfo.AbsoluteReference,
-						VirtualFS:      opts.VirtualFS,
-						HTTPClient:     opts.HTTPClient,
-					}, storage)
+					return discoverGenericReference(ctx, r, resolveOpts, storage)
 				},
 				ReferencedExample: func(r *ReferencedExample) error {
-					return discoverGenericReference(ctx, r, ResolveOptions{
-						RootDocument:   opts.RootDocument,
-						TargetDocument: targetDocInfo.ResolvedDocument,
-						TargetLocation: targetDocInfo.AbsoluteReference,
-						VirtualFS:      opts.VirtualFS,
-						HTTPClient:     opts.HTTPClient,
-					}, storage)
+					return discoverGenericReference(ctx, r, resolveOpts, storage)
 				},
 				ReferencedRequestBody: func(r *ReferencedRequestBody) error {
-					return discoverGenericReference(ctx, r, ResolveOptions{
-						RootDocument:   opts.RootDocument,
-						TargetDocument: targetDocInfo.ResolvedDocument,
-						TargetLocation: targetDocInfo.AbsoluteReference,
-						VirtualFS:      opts.VirtualFS,
-						HTTPClient:     opts.HTTPClient,
-					}, storage)
+					return discoverGenericReference(ctx, r, resolveOpts, storage)
 				},
 				ReferencedResponse: func(r *ReferencedResponse) error {
-					return discoverGenericReference(ctx, r, ResolveOptions{
-						RootDocument:   opts.RootDocument,
-						TargetDocument: targetDocInfo.ResolvedDocument,
-						TargetLocation: targetDocInfo.AbsoluteReference,
-						VirtualFS:      opts.VirtualFS,
-						HTTPClient:     opts.HTTPClient,
-					}, storage)
+					return discoverGenericReference(ctx, r, resolveOpts, storage)
 				},
 				ReferencedHeader: func(r *ReferencedHeader) error {
-					return discoverGenericReference(ctx, r, ResolveOptions{
-						RootDocument:   opts.RootDocument,
-						TargetDocument: targetDocInfo.ResolvedDocument,
-						TargetLocation: targetDocInfo.AbsoluteReference,
-						VirtualFS:      opts.VirtualFS,
-						HTTPClient:     opts.HTTPClient,
-					}, storage)
+					return discoverGenericReference(ctx, r, resolveOpts, storage)
 				},
 				ReferencedCallback: func(r *ReferencedCallback) error {
-					return discoverGenericReference(ctx, r, ResolveOptions{
-						RootDocument:   opts.RootDocument,
-						TargetDocument: targetDocInfo.ResolvedDocument,
-						TargetLocation: targetDocInfo.AbsoluteReference,
-						VirtualFS:      opts.VirtualFS,
-						HTTPClient:     opts.HTTPClient,
-					}, storage)
+					return discoverGenericReference(ctx, r, resolveOpts, storage)
 				},
 				ReferencedLink: func(r *ReferencedLink) error {
-					return discoverGenericReference(ctx, r, ResolveOptions{
-						RootDocument:   opts.RootDocument,
-						TargetDocument: targetDocInfo.ResolvedDocument,
-						TargetLocation: targetDocInfo.AbsoluteReference,
-						VirtualFS:      opts.VirtualFS,
-						HTTPClient:     opts.HTTPClient,
-					}, storage)
+					return discoverGenericReference(ctx, r, resolveOpts, storage)
 				},
 				ReferencedSecurityScheme: func(r *ReferencedSecurityScheme) error {
-					return discoverGenericReference(ctx, r, ResolveOptions{
-						RootDocument:   opts.RootDocument,
-						TargetDocument: targetDocInfo.ResolvedDocument,
-						TargetLocation: targetDocInfo.AbsoluteReference,
-						VirtualFS:      opts.VirtualFS,
-						HTTPClient:     opts.HTTPClient,
-					}, storage)
+					return discoverGenericReference(ctx, r, resolveOpts, storage)
 				},
 			})
 			if err != nil {
@@ -428,90 +383,6 @@ func discoverGenericReference[T any, V interfaces.Validator[T], C marshaller.Cor
 	}
 
 	return nil
-}
-
-// getFileContentForReference retrieves the content of a file referenced by the given file path
-func getFileContentForReference(ctx context.Context, filePath string, opts ResolveOptions) ([]byte, error) {
-	// First check if this is a URL or file path
-	classification, err := utils.ClassifyReference(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to classify reference %s: %w", filePath, err)
-	}
-
-	var resolvedPath string
-	if classification.Type == utils.ReferenceTypeURL {
-		// For URLs, use the path as-is
-		resolvedPath = filePath
-	} else {
-		// For file paths, check if we need to resolve relative to a URL target location
-		resolvedPath = filePath
-		if !filepath.IsAbs(filePath) && opts.TargetLocation != "" {
-			// Check if target location is a URL
-			if targetClassification, targetErr := utils.ClassifyReference(opts.TargetLocation); targetErr == nil && targetClassification.Type == utils.ReferenceTypeURL {
-				// Resolve relative file path against URL target location
-				resolved := resolveRelativeReference(filePath, opts.TargetLocation)
-				// Re-classify the resolved reference
-				if resolvedClassification, resolvedErr := utils.ClassifyReference(resolved); resolvedErr == nil {
-					classification = resolvedClassification
-					resolvedPath = resolved
-				}
-			} else {
-				// Resolve relative to the target location directory (file path)
-				targetDir := filepath.Dir(opts.TargetLocation)
-				resolvedPath = filepath.Join(targetDir, filePath)
-			}
-		}
-	}
-
-	switch classification.Type {
-	case utils.ReferenceTypeFilePath:
-		// Read from file system
-		file, err := opts.VirtualFS.Open(resolvedPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open file %s: %w", resolvedPath, err)
-		}
-		defer file.Close()
-
-		content, err := io.ReadAll(file)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read file %s: %w", resolvedPath, err)
-		}
-
-		return content, nil
-
-	case utils.ReferenceTypeURL:
-		// Fetch content via HTTP
-		httpClient := opts.HTTPClient
-		if httpClient == nil {
-			httpClient = http.DefaultClient
-		}
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, resolvedPath, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create HTTP request for %s: %w", resolvedPath, err)
-		}
-
-		resp, err := httpClient.Do(req)
-		if err != nil || resp == nil {
-			return nil, fmt.Errorf("failed to fetch URL %s: %w", resolvedPath, err)
-		}
-		defer resp.Body.Close()
-
-		// Check if the response was successful
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return nil, fmt.Errorf("HTTP request failed with status %d for URL %s", resp.StatusCode, resolvedPath)
-		}
-
-		content, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read response body from %s: %w", resolvedPath, err)
-		}
-
-		return content, nil
-
-	default:
-		return nil, fmt.Errorf("unsupported reference type for localization: %s", resolvedPath)
-	}
 }
 
 // generateLocalizedFilenames creates conflict-free filenames for all external references
