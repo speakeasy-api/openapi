@@ -284,8 +284,8 @@ paths:
       tags: [external]
       summary: Test external parameter with complex reference chain
       parameters:
-        - $ref: '#/components/parameters/ComplexFilterParam'
-        - $ref: '#/components/parameters/PaginationParam'
+        - $ref: "#/components/parameters/ComplexFilterParam"
+        - $ref: "#/components/parameters/PaginationParam"
       responses:
         "200":
           description: Filtered results
@@ -305,6 +305,54 @@ paths:
                         type: integer
                       page:
                         type: integer
+  # Test parent directory reference to another testdata folder - this should reproduce issue #50
+  /parent-dir-test:
+    get:
+      tags: [external]
+      summary: Test parent directory reference to clean folder (should reproduce issue #50)
+      responses:
+        "200":
+          description: Success with parent directory reference (conflicts with existing User)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/testdata_clean_clean_input_yaml~components_schemas_User"
+        "400":
+          description: Error from parent directory (conflicts with existing Error)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/testdata_clean_clean_input_yaml~components_schemas_Error"
+        "404":
+          description: Non-conflicting schema from parent directory
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnusedSchema"
+  # Test complex conflict resolution with parent directory references
+  /product-conflict-test:
+    get:
+      tags: [external]
+      summary: Test complex conflict resolution with parent directory references
+      requestBody:
+        description: Product creation data
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Product"
+      responses:
+        "200":
+          description: Product from root testdata (should conflict and get counter)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/testdata_test_openapi_yaml~components_schemas_Product"
+        "201":
+          description: Product from intermediate testdata (should conflict and get counter)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/testdata_test_openapi_yaml~components_schemas_Product_1"
 components:
   parameters:
     LimitParam:
@@ -469,6 +517,28 @@ components:
           type: object
           additionalProperties: true
           description: Additional error details
+    Product:
+      type: object
+      description: Product information from inline directory
+      required:
+        - id
+        - name
+        - sku
+      properties:
+        id:
+          type: integer
+          description: Product identifier (integer format)
+        name:
+          type: string
+          maxLength: 100
+          description: Product name
+        sku:
+          type: string
+          description: Product SKU
+        active:
+          type: boolean
+          default: true
+          description: Product status
     external_conflicting_user_yaml~User:
       type: object
       properties:
@@ -712,6 +782,73 @@ components:
       properties: {}
       title: Abstract Body
       description: An abstract schema used to define other request and response body model schemas.
+    testdata_clean_clean_input_yaml~components_schemas_User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+    testdata_clean_clean_input_yaml~components_schemas_Error:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: integer
+    UnusedSchema:
+      type: string
+      description: This schema is not referenced anywhere
+    testdata_test_openapi_yaml~components_schemas_Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Product identifier
+        name:
+          type: string
+          maxLength: 200
+          description: Product name
+        price:
+          type: number
+          minimum: 0
+          format: double
+          description: Product price
+        category:
+          type: string
+          description: Product category
+      required:
+        - id
+        - name
+        - price
+      description: Product information from root testdata
+      x-test: some-value
+    testdata_test_openapi_yaml~components_schemas_Product_1:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Product identifier (UUID format)
+        name:
+          type: string
+          maxLength: 150
+          description: Product name
+        description:
+          type: string
+          maxLength: 1000
+          description: Product description
+        tags:
+          type: array
+          items:
+            type: string
+          description: Product tags
+      required:
+        - id
+        - name
+        - description
+      description: Product information from inline/testdata directory
   requestBodies:
     CreateUserRequest:
       description: Request body for creating a user

@@ -1,0 +1,35 @@
+openapi: 3.1.0
+info:
+  title: Intermediate Test API
+  version: 1.0.0
+  description: Intermediate test file to create conflict chain
+
+paths: {}
+
+components:
+  schemas:
+    Product:
+      type: object
+      description: Product information from inline/testdata directory
+      required:
+        - id
+        - name
+        - description
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Product identifier (UUID format)
+        name:
+          type: string
+          maxLength: 150
+          description: Product name
+        description:
+          type: string
+          maxLength: 1000
+          description: Product description
+        tags:
+          type: array
+          items:
+            type: string
+          description: Product tags

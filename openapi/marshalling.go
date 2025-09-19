@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/openapi/core"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -57,7 +58,7 @@ func Marshal(ctx context.Context, openapi *OpenAPI, w io.Writer) error {
 
 // Sync will sync the high-level model to the core model.
 // This is useful when creating or mutating a high-level model and wanting access to the yaml nodes that back it.
-func Sync(ctx context.Context, model marshaller.Marshallable[OpenAPI]) error {
+func Sync(ctx context.Context, model marshaller.Marshallable[core.OpenAPI]) error {
 	_, err := marshaller.SyncValue(ctx, model, model.GetCore(), model.GetRootNode(), false)
 	return err
 }
