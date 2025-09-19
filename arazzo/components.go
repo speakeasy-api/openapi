@@ -47,7 +47,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field inputs key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Inputs, key))
 		}
 
-		input.Validate(ctx, opts...)
+		errs = append(errs, input.Validate(ctx, opts...)...)
 	}
 
 	for key, parameter := range c.Parameters.All() {
