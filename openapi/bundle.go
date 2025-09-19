@@ -594,7 +594,9 @@ func normalizePathForComponentName(path, targetLocation string) (string, error) 
 	}
 
 	// Split the original relative path to find where the real path starts (after all the ../)
-	pathParts := strings.Split(path, "/")
+	// Handle both Unix and Windows path separators
+	normalizedPath := strings.ReplaceAll(path, "\\", "/")
+	pathParts := strings.Split(normalizedPath, "/")
 
 	// Count parent directory navigations and find the start of the real path
 	parentCount := 0
@@ -650,7 +652,8 @@ func normalizePathForComponentName(path, targetLocation string) (string, error) 
 		// Take the landing directory (the directory we end up in after going up)
 		landingDirIndex := len(absParts) - len(realPathParts) - 1
 		if landingDirIndex >= 0 && landingDirIndex < len(absParts) {
-			resultParts = append(resultParts, absParts[landingDirIndex])
+			landingDir := absParts[landingDirIndex]
+			resultParts = append(resultParts, landingDir)
 		}
 	}
 
