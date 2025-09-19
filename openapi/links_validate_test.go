@@ -7,6 +7,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
+	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/require"
 )
@@ -24,13 +25,13 @@ func TestLink_Validate_Success(t *testing.T) {
 
 	// Add GET operation with getUserById
 	operation1 := &openapi.Operation{
-		OperationID: stringPtr("getUserById"),
+		OperationID: pointer.From("getUserById"),
 	}
 	pathItem.Set("get", operation1)
 
 	// Add PUT operation with updateUser to the same path
 	operation2 := &openapi.Operation{
-		OperationID: stringPtr("updateUser"),
+		OperationID: pointer.From("updateUser"),
 	}
 	pathItem.Set("put", operation2)
 
@@ -141,13 +142,13 @@ func TestLink_Validate_Error(t *testing.T) {
 
 	// Add GET operation with getUserById
 	operation1 := &openapi.Operation{
-		OperationID: stringPtr("getUserById"),
+		OperationID: pointer.From("getUserById"),
 	}
 	pathItem.Set("get", operation1)
 
 	// Add PUT operation with updateUser to the same path
 	operation2 := &openapi.Operation{
-		OperationID: stringPtr("updateUser"),
+		OperationID: pointer.From("updateUser"),
 	}
 	pathItem.Set("put", operation2)
 
@@ -250,13 +251,13 @@ func TestLink_Validate_OperationID_NotFound(t *testing.T) {
 	// Add a path with an operation
 	pathItem := openapi.NewPathItem()
 	operation := &openapi.Operation{
-		OperationID: stringPtr("existingOperation"),
+		OperationID: pointer.From("existingOperation"),
 	}
 	pathItem.Set("get", operation)
 	openAPIDoc.Paths.Set("/users/{id}", &openapi.ReferencedPathItem{Object: pathItem})
 
 	link := &openapi.Link{
-		OperationID: stringPtr("nonExistentOperation"),
+		OperationID: pointer.From("nonExistentOperation"),
 	}
 
 	errs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
@@ -275,13 +276,13 @@ func TestLink_Validate_OperationID_Found(t *testing.T) {
 	// Add a path with an operation
 	pathItem := openapi.NewPathItem()
 	operation := &openapi.Operation{
-		OperationID: stringPtr("getUserById"),
+		OperationID: pointer.From("getUserById"),
 	}
 	pathItem.Set("get", operation)
 	openAPIDoc.Paths.Set("/users/{id}", &openapi.ReferencedPathItem{Object: pathItem})
 
 	link := &openapi.Link{
-		OperationID: stringPtr("getUserById"),
+		OperationID: pointer.From("getUserById"),
 	}
 
 	errs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
@@ -292,7 +293,7 @@ func TestLink_Validate_OperationID_WithoutOpenAPIContext_Panics(t *testing.T) {
 	t.Parallel()
 
 	link := &openapi.Link{
-		OperationID: stringPtr("getUserById"),
+		OperationID: pointer.From("getUserById"),
 	}
 
 	require.Panics(t, func() {
@@ -313,13 +314,13 @@ func TestLink_Validate_ComplexExpressions(t *testing.T) {
 
 	// Add GET operation with getUserById
 	operation1 := &openapi.Operation{
-		OperationID: stringPtr("getUserById"),
+		OperationID: pointer.From("getUserById"),
 	}
 	pathItem.Set("get", operation1)
 
 	// Add PUT operation with updateUser to the same path
 	operation2 := &openapi.Operation{
-		OperationID: stringPtr("updateUser"),
+		OperationID: pointer.From("updateUser"),
 	}
 	pathItem.Set("put", operation2)
 
@@ -390,13 +391,13 @@ func TestLink_Validate_NilParameters(t *testing.T) {
 	// Add a path with an operation
 	pathItem := openapi.NewPathItem()
 	operation := &openapi.Operation{
-		OperationID: stringPtr("getUserById"),
+		OperationID: pointer.From("getUserById"),
 	}
 	pathItem.Set("get", operation)
 	openAPIDoc.Paths.Set("/users/{id}", &openapi.ReferencedPathItem{Object: pathItem})
 
 	link := &openapi.Link{
-		OperationID: stringPtr("getUserById"),
+		OperationID: pointer.From("getUserById"),
 		Parameters:  nil, // Explicitly nil
 		RequestBody: nil, // Explicitly nil
 		Server:      nil, // Explicitly nil
@@ -417,7 +418,7 @@ func TestLink_Validate_EmptyParameters(t *testing.T) {
 	// Add a path with an operation
 	pathItem := openapi.NewPathItem()
 	operation := &openapi.Operation{
-		OperationID: stringPtr("getUserById"),
+		OperationID: pointer.From("getUserById"),
 	}
 	pathItem.Set("get", operation)
 	openAPIDoc.Paths.Set("/users/{id}", &openapi.ReferencedPathItem{Object: pathItem})
@@ -435,9 +436,4 @@ description: Empty parameters map
 
 	errs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 	require.Empty(t, errs, "Expected no validation errors for empty parameters")
-}
-
-// Helper function to create string pointers
-func stringPtr(s string) *string {
-	return &s
 }

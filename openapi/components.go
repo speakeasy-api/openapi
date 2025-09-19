@@ -138,9 +138,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	if c.Schemas != nil {
 		for _, schema := range c.Schemas.All() {
-			if schema.IsLeft() {
-				errs = append(errs, schema.Left.Validate(ctx, opts...)...)
-			}
+			errs = append(errs, schema.Validate(ctx, opts...)...)
 		}
 	}
 

@@ -47,12 +47,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field inputs key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Inputs, key))
 		}
 
-		if input.IsLeft() {
-			jsOpts := opts
-			jsOpts = append(jsOpts, validation.WithContextObject(&componentKey{name: key}))
-
-			errs = append(errs, input.Left.Validate(ctx, jsOpts...)...)
-		}
+		errs = append(errs, input.Validate(ctx, opts...)...)
 	}
 
 	for key, parameter := range c.Parameters.All() {

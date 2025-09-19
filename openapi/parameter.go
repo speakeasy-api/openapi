@@ -252,7 +252,7 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	}
 
 	if core.Schema.Present {
-		errs = append(errs, oas3.Validate(ctx, p.Schema)...)
+		errs = append(errs, p.Schema.Validate(ctx, opts...)...)
 	}
 
 	for _, obj := range p.Content.All() {

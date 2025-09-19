@@ -67,7 +67,7 @@ func (m *MediaType) Validate(ctx context.Context, opts ...validation.Option) []e
 	errs := []error{}
 
 	if core.Schema.Present {
-		errs = append(errs, oas3.Validate(ctx, m.Schema)...)
+		errs = append(errs, m.Schema.Validate(ctx, opts...)...)
 	}
 
 	for _, obj := range m.Examples.All() {
