@@ -646,7 +646,7 @@ func normalizePathForComponentName(path, targetLocation string) (string, error) 
 		requiredParts := 1 + len(realPathParts) // 1 for landing directory + real path parts
 
 		if len(absParts) < requiredParts {
-			return "", errors.New("not enough path components in resolved absolute path")
+			return "", fmt.Errorf("not enough path components in resolved absolute path: got %d, need at least %d", len(absParts), requiredParts)
 		}
 
 		// Take the landing directory (the directory we end up in after going up)
