@@ -12,7 +12,9 @@ import (
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/internal/utils"
+	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/validation"
 )
 
@@ -98,6 +100,7 @@ func (a *Arazzo) Sync(ctx context.Context) error {
 // Validate will validate the Arazzo document against the Arazzo Specification.
 func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []error {
 	opts = append(opts, validation.WithContextObject(a))
+	opts = append(opts, validation.WithContextObject(&oas3.ParentDocumentVersion{Arazzo: pointer.From(a.Arazzo)}))
 
 	core := a.GetCore()
 	errs := []error{}

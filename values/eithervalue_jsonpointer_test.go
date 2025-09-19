@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/jsonpointer"
+	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -103,7 +104,7 @@ func TestEitherValue_JSONPointer_UnsupportedType(t *testing.T) {
 
 	// Test with Left value that doesn't support key navigation
 	eitherValue := &EitherValue[string, string, string, string]{
-		Left: stringPtr("simple string"),
+		Left: pointer.From("simple string"),
 	}
 
 	// Try to navigate with key (should fail because string doesn't support navigation)
@@ -222,9 +223,4 @@ func TestEitherValue_JSONPointer_BothNavigationTypes(t *testing.T) {
 	result, err = jsonpointer.GetTarget(eitherValue, jsonpointer.JSONPointer("/0"))
 	require.NoError(t, err)
 	assert.Equal(t, "slicevalue", result)
-}
-
-// Helper function to create string pointer
-func stringPtr(s string) *string {
-	return &s
 }

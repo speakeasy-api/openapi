@@ -11,6 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi/core"
+	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
 )
@@ -158,6 +159,7 @@ func (o *OpenAPI) Validate(ctx context.Context, opts ...validation.Option) []err
 	errs := []error{}
 
 	opts = append(opts, validation.WithContextObject(o))
+	opts = append(opts, validation.WithContextObject(&oas3.ParentDocumentVersion{OpenAPI: pointer.From(o.OpenAPI)}))
 
 	openAPIMajor, openAPIMinor, openAPIPatch, err := utils.ParseVersion(o.OpenAPI)
 	if err != nil {

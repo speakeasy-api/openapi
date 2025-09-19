@@ -136,7 +136,7 @@ func (h *Header) Validate(ctx context.Context, opts ...validation.Option) []erro
 	}
 
 	if core.Schema.Present {
-		errs = append(errs, oas3.Validate(ctx, h.Schema)...)
+		errs = append(errs, h.Schema.Validate(ctx, opts...)...)
 	}
 
 	for _, obj := range h.Content.All() {

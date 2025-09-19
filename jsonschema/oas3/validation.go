@@ -27,8 +27,21 @@ var schema31JSON string
 //go:embed schema31.base.json
 var schema31BaseJSON string
 
-var oasSchemaValidator *jsValidator.Schema
+//go:embed schema30.json
+var schema30JSON string
+
+var oasSchemaValidator = make(map[string]*jsValidator.Schema)
 var defaultPrinter = message.NewPrinter(language.English)
+
+const (
+	JSONSchema31SchemaID = "https://spec.openapis.org/oas/3.1/dialect/base"
+	JSONSchema30SchemaID = "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+)
+
+type ParentDocumentVersion struct {
+	OpenAPI *string
+	Arazzo  *string
+}
 
 func Validate[T Referenceable | Concrete](ctx context.Context, schema *JSONSchema[T], opts ...validation.Option) []error {
 	if schema == nil {
@@ -43,7 +56,42 @@ func Validate[T Referenceable | Concrete](ctx context.Context, schema *JSONSchem
 }
 
 func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []error {
-	initValidation()
+	o := validation.NewOptions(opts...)
+
+	dv := validation.GetContextObject[ParentDocumentVersion](o)
+
+	var schema string
+	if js.Schema != nil {
+		switch *js.Schema {
+		case JSONSchema31SchemaID:
+			schema = *js.Schema
+		case JSONSchema30SchemaID:
+			schema = *js.Schema
+		default:
+			// Currently not supported
+		}
+	}
+	if schema == "" && dv != nil {
+		switch {
+		case dv.OpenAPI != nil:
+			switch {
+			case strings.HasPrefix(*dv.OpenAPI, "3.1"):
+				schema = JSONSchema31SchemaID
+			case strings.HasPrefix(*dv.OpenAPI, "3.0"):
+				schema = JSONSchema30SchemaID
+			default:
+				// Currently not supported
+			}
+		case dv.Arazzo != nil:
+			// Currently not supported for Arazzo documents
+		}
+	}
+	if schema == "" {
+		// Default to OpenAPI 3.1 schema TODO: consider maybe defaulting to draft-2020-12 instead
+		schema = JSONSchema31SchemaID
+	}
+
+	oasSchemaValidator := initValidation(schema)
 
 	buf := bytes.NewBuffer([]byte{})
 	core := js.GetCore()
@@ -84,7 +132,16 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 
 	for _, cause := range err.Causes {
 		if len(cause.Causes) == 0 {
-			errJP := jsonpointer.PartsToJSONPointer(cause.InstanceLocation)
+			var errJP jsonpointer.JSONPointer
+			switch {
+			case len(cause.InstanceLocation) > 0:
+				errJP = jsonpointer.PartsToJSONPointer(cause.InstanceLocation)
+			case cause.ErrorKind != nil:
+				errJP = jsonpointer.PartsToJSONPointer(cause.ErrorKind.KeywordPath())
+			default:
+				errJP = jsonpointer.JSONPointer("/")
+			}
+
 			t, err := jsonpointer.GetTarget(js, errJP, jsonpointer.WithStructTags("key"))
 			if err != nil {
 				// TODO need to potentially handle this in another way
@@ -123,33 +180,49 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 	return errs
 }
 
-var validationInitialized bool
+var validationInitialized = make(map[string]bool)
 var initMutex sync.Mutex
 
-func initValidation() {
+func initValidation(schema string) *jsValidator.Schema {
 	initMutex.Lock()
 	defer initMutex.Unlock()
-	if validationInitialized {
-		return
+	if validationInitialized[schema] {
+		return oasSchemaValidator[schema]
 	}
 
-	oasSchema, err := jsValidator.UnmarshalJSON(bytes.NewReader([]byte(schema31JSON)))
-	if err != nil {
-		panic(err)
-	}
-
-	oasSchemaBase, err := jsValidator.UnmarshalJSON(bytes.NewReader([]byte(schema31BaseJSON)))
-	if err != nil {
-		panic(err)
-	}
+	var schemaResource any
 
 	c := jsValidator.NewCompiler()
-	if err := c.AddResource("https://spec.openapis.org/oas/3.1/meta/base", oasSchemaBase); err != nil {
+
+	switch schema {
+	case JSONSchema31SchemaID:
+		oasSchemaBase, err := jsValidator.UnmarshalJSON(bytes.NewBufferString(schema31BaseJSON))
+		if err != nil {
+			panic(err)
+		}
+		if err := c.AddResource("https://spec.openapis.org/oas/3.1/meta/base", oasSchemaBase); err != nil {
+			panic(err)
+		}
+
+		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema31JSON))
+		if err != nil {
+			panic(err)
+		}
+	case JSONSchema30SchemaID:
+		var err error
+		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema30JSON))
+		if err != nil {
+			panic(err)
+		}
+	default:
+		panic("unsupported schema")
+	}
+
+	if err := c.AddResource("schema.json", schemaResource); err != nil {
 		panic(err)
 	}
-	if err := c.AddResource("schema.json", oasSchema); err != nil {
-		panic(err)
-	}
-	oasSchemaValidator = c.MustCompile("schema.json")
-	validationInitialized = true
+	oasSchemaValidator[schema] = c.MustCompile("schema.json")
+	validationInitialized[schema] = true
+
+	return oasSchemaValidator[schema]
 }
