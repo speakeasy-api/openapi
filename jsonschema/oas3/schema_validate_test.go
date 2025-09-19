@@ -336,6 +336,14 @@ properties:
 required: ["user"]
 `,
 		},
+		{
+			name: "valid schema with $ref and additional properties (OpenAPI 3.1)",
+			yml: `
+$ref: "#/components/schemas/User"
+required: ["name", "email"]
+description: "User schema with additional validation requirements"
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -473,6 +481,15 @@ anyOf: "invalid"
 oneOf: "invalid"
 `,
 			wantErrs: []string{"schema field oneOf got string, want array"},
+		},
+		{
+			name: "$ref with additional properties not allowed in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: "#/components/schemas/User"
+required: ["name", "email"]
+`,
+			wantErrs: []string{"additional properties '$ref' not allowed"},
 		},
 	}
 
