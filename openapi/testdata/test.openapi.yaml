@@ -325,6 +325,31 @@ components:
               message:
                 type: string
       x-test: some-value
+    Product:
+      type: object
+      description: Product information from root testdata
+      required:
+        - id
+        - name
+        - price
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Product identifier
+        name:
+          type: string
+          maxLength: 200
+          description: Product name
+        price:
+          type: number
+          format: double
+          minimum: 0
+          description: Product price
+        category:
+          type: string
+          description: Product category
+      x-test: some-value
   responses:
     BadRequest:
       description: Bad request

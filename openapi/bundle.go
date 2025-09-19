@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -253,7 +254,10 @@ func bundleSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceabl
 	resolvedHash := hashing.Hash(resolvedRefSchema)
 
 	// Generate component name with smart conflict resolution
-	componentName := generateComponentNameWithHashConflictResolution(ref, namingStrategy, componentStorage.componentNames, componentStorage.schemaHashes, resolvedHash)
+	componentName, err := generateComponentNameWithHashConflictResolution(ref, namingStrategy, componentStorage.componentNames, componentStorage.schemaHashes, resolvedHash, opts.TargetLocation)
+	if err != nil {
+		return fmt.Errorf("failed to generate component name for %s: %w", ref, err)
+	}
 
 	// Store the mapping
 	componentStorage.externalRefs[ref] = componentName
@@ -366,7 +370,10 @@ func bundleGenericReference[T any, V interfaces.Validator[T], C marshaller.CoreM
 	}
 
 	// Generate component name
-	componentName := generateComponentName(refStr, namingStrategy, componentStorage.componentNames)
+	componentName, err := generateComponentName(refStr, namingStrategy, componentStorage.componentNames, opts.TargetLocation)
+	if err != nil {
+		return fmt.Errorf("failed to generate component name for %s: %w", refStr, err)
+	}
 	componentStorage.componentNames[componentName] = true
 
 	// Store the mapping
@@ -405,19 +412,19 @@ func bundleGenericReference[T any, V interfaces.Validator[T], C marshaller.CoreM
 }
 
 // generateComponentName creates a new component name based on the reference and naming strategy
-func generateComponentName(ref string, strategy BundleNamingStrategy, usedNames map[string]bool) string {
+func generateComponentName(ref string, strategy BundleNamingStrategy, usedNames map[string]bool, targetLocation string) (string, error) {
 	switch strategy {
 	case BundleNamingFilePath:
-		return generateFilePathBasedNameWithConflictResolution(ref, usedNames)
+		return generateFilePathBasedNameWithConflictResolution(ref, usedNames, targetLocation)
 	case BundleNamingCounter:
-		return generateCounterBasedName(ref, usedNames)
+		return generateCounterBasedName(ref, usedNames), nil
 	default:
-		return generateCounterBasedName(ref, usedNames)
+		return generateCounterBasedName(ref, usedNames), nil
 	}
 }
 
 // generateComponentNameWithHashConflictResolution creates a component name with smart conflict resolution based on content hashes
-func generateComponentNameWithHashConflictResolution(ref string, strategy BundleNamingStrategy, usedNames map[string]bool, schemaHashes map[string]string, resolvedHash string) string {
+func generateComponentNameWithHashConflictResolution(ref string, strategy BundleNamingStrategy, usedNames map[string]bool, schemaHashes map[string]string, resolvedHash string, targetLocation string) (string, error) {
 	// Parse the reference to extract the simple name
 	parts := strings.Split(ref, "#")
 	if len(parts) == 0 {
@@ -454,24 +461,24 @@ func generateComponentNameWithHashConflictResolution(ref string, strategy Bundle
 	if existingHash, exists := schemaHashes[simpleName]; exists {
 		if existingHash == resolvedHash {
 			// Same content, reuse existing schema
-			return simpleName
+			return simpleName, nil
 		}
 		// Different content with same name - need conflict resolution
 		// Fall back to the configured naming strategy for conflict resolution
-		return generateComponentName(ref, strategy, usedNames)
+		return generateComponentName(ref, strategy, usedNames, targetLocation)
 	}
 
 	// No conflict, use simple name
-	return simpleName
+	return simpleName, nil
 }
 
 // generateFilePathBasedNameWithConflictResolution tries to use simple names first, falling back to file-path-based names for conflicts
-func generateFilePathBasedNameWithConflictResolution(ref string, usedNames map[string]bool) string {
+func generateFilePathBasedNameWithConflictResolution(ref string, usedNames map[string]bool, targetLocation string) (string, error) {
 	// Parse the reference to extract file path and fragment
 	parts := strings.Split(ref, "#")
 	if len(parts) == 0 {
 		// This should never happen as strings.Split never returns nil or empty slice
-		return "unknown"
+		return "unknown", nil
 	}
 	fragment := ""
 	if len(parts) > 1 {
@@ -502,20 +509,20 @@ func generateFilePathBasedNameWithConflictResolution(ref string, usedNames map[s
 
 	// Try simple name first
 	if !usedNames[simpleName] {
-		return simpleName
+		return simpleName, nil
 	}
 
 	// If there's a conflict, fall back to file-path-based naming
-	return generateFilePathBasedName(ref, usedNames)
+	return generateFilePathBasedName(ref, usedNames, targetLocation)
 }
 
 // generateFilePathBasedName creates names like "some_path_external_yaml~User" or "some_path_external_yaml" for top-level refs
-func generateFilePathBasedName(ref string, usedNames map[string]bool) string {
+func generateFilePathBasedName(ref string, usedNames map[string]bool, targetLocation string) (string, error) {
 	// Parse the reference to extract file path and fragment
 	parts := strings.Split(ref, "#")
 	if len(parts) == 0 {
 		// This should never happen as strings.Split never returns nil or empty slice
-		return "unknown"
+		return "unknown", nil
 	}
 	filePath := parts[0]
 	fragment := ""
@@ -529,6 +536,14 @@ func generateFilePathBasedName(ref string, usedNames map[string]bool) string {
 
 	// Remove leading "./" if present
 	cleanPath = strings.TrimPrefix(cleanPath, "./")
+
+	// Handle parent directory references more elegantly
+	// Instead of converting "../" to "___", we'll normalize the path
+	normalizedPath, err := normalizePathForComponentName(cleanPath, targetLocation)
+	if err != nil {
+		return "", fmt.Errorf("failed to normalize path %s: %w", cleanPath, err)
+	}
+	cleanPath = normalizedPath
 
 	// Replace extension dot with underscore to keep it but make it safe
 	ext := filepath.Ext(cleanPath)
@@ -559,7 +574,99 @@ func generateFilePathBasedName(ref string, usedNames map[string]bool) string {
 		counter++
 	}
 
-	return componentName
+	return componentName, nil
+}
+
+// normalizePathForComponentName normalizes a file path to create a more readable component name
+// by resolving relative paths to their actual directory names using absolute path resolution
+func normalizePathForComponentName(path, targetLocation string) (string, error) {
+	if targetLocation == "" {
+		return "", errors.New("target location cannot be empty for path normalization")
+	}
+
+	// Get the directory of the target location
+	targetDir := filepath.Dir(targetLocation)
+
+	// Resolve the relative path against the target directory to get absolute path
+	resolvedAbsPath, err := filepath.Abs(filepath.Join(targetDir, path))
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve relative path: %w", err)
+	}
+
+	// Split the original relative path to find where the real path starts (after all the ../)
+	// Handle both Unix and Windows path separators
+	normalizedPath := strings.ReplaceAll(path, "\\", "/")
+	pathParts := strings.Split(normalizedPath, "/")
+
+	// Count parent directory navigations and find the start of the real path
+	parentCount := 0
+	realPathStart := len(pathParts) // Default to end if no real path found
+	foundRealPath := false
+
+	for i, part := range pathParts {
+		if foundRealPath {
+			break
+		}
+
+		switch part {
+		case "..":
+			parentCount++
+		case ".":
+			// Skip current directory references
+			continue
+		case "":
+			// Skip empty parts
+			continue
+		default:
+			// Found the start of the real path
+			realPathStart = i
+			foundRealPath = true
+		}
+	}
+
+	// Get the real path parts (everything after the ../ navigation)
+	var realPathParts []string
+	if realPathStart < len(pathParts) {
+		realPathParts = pathParts[realPathStart:]
+	}
+
+	// Use the absolute path to get the meaningful directory structure
+	// Split the absolute path and take the last meaningful parts
+	absParts := strings.Split(strings.ReplaceAll(resolvedAbsPath, "\\", "/"), "/")
+
+	// We want to include the directory we land on after navigation plus the real path
+	// For "../../../other/api.yaml" from "openapi/a/b/c/spec.yaml", we want "openapi/other/api.yaml"
+	// So we need: landing directory (openapi) + real path parts (other/api.yaml)
+
+	var resultParts []string
+
+	if parentCount > 0 {
+		// Find the landing directory after going up parentCount levels
+		// We need at least parentCount + len(realPathParts) parts in the absolute path
+		requiredParts := 1 + len(realPathParts) // 1 for landing directory + real path parts
+
+		if len(absParts) < requiredParts {
+			return "", fmt.Errorf("not enough path components in resolved absolute path: got %d, need at least %d", len(absParts), requiredParts)
+		}
+
+		// Take the landing directory (the directory we end up in after going up)
+		landingDirIndex := len(absParts) - len(realPathParts) - 1
+		if landingDirIndex >= 0 && landingDirIndex < len(absParts) {
+			landingDir := absParts[landingDirIndex]
+			resultParts = append(resultParts, landingDir)
+		}
+	}
+
+	// Add the real path parts
+	resultParts = append(resultParts, realPathParts...)
+
+	// Join and clean up the result
+	result := strings.Join(resultParts, "/")
+
+	// Remove leading "./" if present
+	result = strings.TrimPrefix(result, "./")
+
+	return result, nil
 }
 
 // generateCounterBasedName creates names like "User_1", "User_2" for conflicts

@@ -299,8 +299,8 @@ paths:
       tags: [external]
       summary: Test external parameter with complex reference chain
       parameters:
-        - $ref: 'external/parameters.yaml#/components/parameters/ComplexFilterParam'
-        - $ref: 'external/parameters.yaml#/components/parameters/PaginationParam'
+        - $ref: "external/parameters.yaml#/components/parameters/ComplexFilterParam"
+        - $ref: "external/parameters.yaml#/components/parameters/PaginationParam"
       responses:
         "200":
           description: Filtered results
@@ -320,6 +320,56 @@ paths:
                         type: integer
                       page:
                         type: integer
+
+  # Test parent directory reference to another testdata folder - this should reproduce issue #50
+  /parent-dir-test:
+    get:
+      tags: [external]
+      summary: Test parent directory reference to clean folder (should reproduce issue #50)
+      responses:
+        "200":
+          description: Success with parent directory reference (conflicts with existing User)
+          content:
+            application/json:
+              schema:
+                $ref: "../clean/clean_input.yaml#/components/schemas/User"
+        "400":
+          description: Error from parent directory (conflicts with existing Error)
+          content:
+            application/json:
+              schema:
+                $ref: "../clean/clean_input.yaml#/components/schemas/Error"
+        "404":
+          description: Non-conflicting schema from parent directory
+          content:
+            application/json:
+              schema:
+                $ref: "../clean/clean_input.yaml#/components/schemas/UnusedSchema"
+
+  # Test complex conflict resolution with parent directory references
+  /product-conflict-test:
+    get:
+      tags: [external]
+      summary: Test complex conflict resolution with parent directory references
+      requestBody:
+        description: Product creation data
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Product"
+      responses:
+        "200":
+          description: Product from root testdata (should conflict and get counter)
+          content:
+            application/json:
+              schema:
+                $ref: "../test.openapi.yaml#/components/schemas/Product"
+        "201":
+          description: Product from intermediate testdata (should conflict and get counter)
+          content:
+            application/json:
+              schema:
+                $ref: "./testdata/test.openapi.yaml#/components/schemas/Product"
 
 components:
   parameters:
@@ -481,6 +531,29 @@ components:
           type: object
           additionalProperties: true
           description: Additional error details
+
+    Product:
+      type: object
+      description: Product information from inline directory
+      required:
+        - id
+        - name
+        - sku
+      properties:
+        id:
+          type: integer
+          description: Product identifier (integer format)
+        name:
+          type: string
+          maxLength: 100
+          description: Product name
+        sku:
+          type: string
+          description: Product SKU
+        active:
+          type: boolean
+          default: true
+          description: Product status
 
   requestBodies:
     CreateUserRequest:

@@ -98,6 +98,10 @@ func (m *Model[T]) GetRootNode() *yaml.Node {
 }
 
 func (m *Model[T]) GetRootNodeLine() int {
+	if m == nil {
+		return -1
+	}
+
 	if rootNode := m.GetRootNode(); rootNode != nil {
 		return rootNode.Line
 	}
@@ -105,6 +109,10 @@ func (m *Model[T]) GetRootNodeLine() int {
 }
 
 func (m *Model[T]) GetRootNodeColumn() int {
+	if m == nil {
+		return -1
+	}
+
 	if rootNode := m.GetRootNode(); rootNode != nil {
 		return rootNode.Column
 	}
@@ -161,7 +169,7 @@ func (m *Model[T]) SetCoreAny(core any) {
 }
 
 func (m *Model[T]) GetCachedReferencedObject(key string) (any, bool) {
-	if m.objectCache == nil {
+	if m == nil || m.objectCache == nil {
 		return nil, false
 	}
 	return m.objectCache.Load(key)
@@ -172,7 +180,7 @@ func (m *Model[T]) StoreReferencedObjectInCache(key string, obj any) {
 }
 
 func (m *Model[T]) GetCachedReferenceDocument(key string) ([]byte, bool) {
-	if m.documentCache == nil {
+	if m == nil || m.documentCache == nil {
 		return nil, false
 	}
 	value, ok := m.documentCache.Load(key)
