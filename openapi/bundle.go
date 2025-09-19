@@ -581,7 +581,7 @@ func generateFilePathBasedName(ref string, usedNames map[string]bool, targetLoca
 // by resolving relative paths to their actual directory names using absolute path resolution
 func normalizePathForComponentName(path, targetLocation string) (string, error) {
 	if targetLocation == "" {
-		return "", errors.New("target location is required for path normalization")
+		return "", errors.New("target location cannot be empty for path normalization")
 	}
 
 	// Get the directory of the target location
