@@ -37,19 +37,19 @@ func (e Error) GetColumnNumber() int {
 	return e.Node.Column
 }
 
-type valueNodeGetter interface {
+type ValueNodeGetter interface {
 	GetValueNodeOrRoot(root *yaml.Node) *yaml.Node
 }
 
-type sliceNodeGetter interface {
+type SliceNodeGetter interface {
 	GetSliceValueNodeOrRoot(index int, root *yaml.Node) *yaml.Node
 }
 
-type mapKeyNodeGetter interface {
+type MapKeyNodeGetter interface {
 	GetMapKeyNodeOrRoot(key string, root *yaml.Node) *yaml.Node
 }
 
-type mapValueNodeGetter interface {
+type MapValueNodeGetter interface {
 	GetMapValueNodeOrRoot(key string, root *yaml.Node) *yaml.Node
 }
 
@@ -64,7 +64,7 @@ type CoreModeler interface {
 	GetRootNode() *yaml.Node
 }
 
-func NewValueError(err error, core CoreModeler, node valueNodeGetter) error {
+func NewValueError(err error, core CoreModeler, node ValueNodeGetter) error {
 	rootNode := core.GetRootNode()
 
 	if rootNode == nil {
@@ -82,7 +82,7 @@ func NewValueError(err error, core CoreModeler, node valueNodeGetter) error {
 	}
 }
 
-func NewSliceError(err error, core CoreModeler, node sliceNodeGetter, index int) error {
+func NewSliceError(err error, core CoreModeler, node SliceNodeGetter, index int) error {
 	rootNode := core.GetRootNode()
 
 	if rootNode == nil {
@@ -100,7 +100,7 @@ func NewSliceError(err error, core CoreModeler, node sliceNodeGetter, index int)
 	}
 }
 
-func NewMapKeyError(err error, core CoreModeler, node mapKeyNodeGetter, key string) error {
+func NewMapKeyError(err error, core CoreModeler, node MapKeyNodeGetter, key string) error {
 	rootNode := core.GetRootNode()
 
 	if rootNode == nil {
@@ -118,7 +118,7 @@ func NewMapKeyError(err error, core CoreModeler, node mapKeyNodeGetter, key stri
 	}
 }
 
-func NewMapValueError(err error, core CoreModeler, node mapValueNodeGetter, key string) error {
+func NewMapValueError(err error, core CoreModeler, node MapValueNodeGetter, key string) error {
 	rootNode := core.GetRootNode()
 
 	if rootNode == nil {
