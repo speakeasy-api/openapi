@@ -2,6 +2,7 @@ package openapi_test
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -185,7 +186,7 @@ info:
   version: 1.0.0
 paths: {}
 `,
-			wantErrs: []string{"only OpenAPI version 3.1.1 and below is supported"},
+			wantErrs: []string{fmt.Sprintf("openapi field only OpenAPI versions between %s and %s are supported", openapi.MinimumSupportedVersion(), openapi.MaximumSupportedVersion())},
 		},
 		{
 			name: "invalid_info_missing_title",

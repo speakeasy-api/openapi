@@ -2,22 +2,30 @@ package openapi
 
 import (
 	"context"
+	"fmt"
 	"slices"
-	"strings"
 
+	"github.com/speakeasy-api/openapi/internal/version"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"gopkg.in/yaml.v3"
 )
 
 type UpgradeOptions struct {
-	upgradeSamePatchVersion bool
+	upgradeSameMinorVersion bool
+	targetVersion           string
 }
 
-// WithUpgradeSamePatchVersion will upgrade the same patch version of the OpenAPI document. For example 3.1.0 to 3.1.1.
-func WithUpgradeSamePatchVersion() Option[UpgradeOptions] {
+// WithUpgradeSameMinorVersion will upgrade the same minor version of the OpenAPI document. For example 3.1.0 to 3.1.1.
+func WithUpgradeSameMinorVersion() Option[UpgradeOptions] {
 	return func(uo *UpgradeOptions) {
-		uo.upgradeSamePatchVersion = true
+		uo.upgradeSameMinorVersion = true
+	}
+}
+
+func WithUpgradeTargetVersion(version string) Option[UpgradeOptions] {
+	return func(uo *UpgradeOptions) {
+		uo.targetVersion = version
 	}
 }
 
@@ -28,54 +36,113 @@ func Upgrade(ctx context.Context, doc *OpenAPI, opts ...Option[UpgradeOptions]) 
 		return false, nil
 	}
 
-	o := UpgradeOptions{}
+	options := UpgradeOptions{}
 	for _, opt := range opts {
-		opt(&o)
+		opt(&options)
+	}
+	if options.targetVersion == "" {
+		options.targetVersion = Version
 	}
 
-	// Only upgrade if:
-	// 1. Document is 3.0.x (always upgrade these)
-	// 2. Document is 3.1.x and upgradeSamePatchVersion is true (upgrade to 3.1.1)
-	switch {
-	case strings.HasPrefix(doc.OpenAPI, "3.0"):
-		// Always upgrade 3.0.x versions
-	case strings.HasPrefix(doc.OpenAPI, "3.1") && o.upgradeSamePatchVersion && doc.OpenAPI != Version:
-		// Upgrade 3.1.x versions to 3.1.1 if option is set and not already 3.1.1
-	default:
-		// Don't upgrade other versions
+	currentVersion, err := version.ParseVersion(doc.OpenAPI)
+	if err != nil {
+		return false, err
+	}
+
+	targetVersion, err := version.ParseVersion(options.targetVersion)
+	if err != nil {
+		return false, err
+	}
+
+	invalidVersion := targetVersion.LessThan(*currentVersion)
+	if invalidVersion {
+		return false, fmt.Errorf("cannot downgrade OpenAPI document version from %s to %s", currentVersion, targetVersion)
+	}
+
+	if currentVersion.Major < 3 {
+		return false, fmt.Errorf("cannot upgrade OpenAPI document version from %s to %s: only OpenAPI 3.x.x is supported", currentVersion, targetVersion)
+	}
+
+	if targetVersion.Equal(*currentVersion) {
 		return false, nil
 	}
 
+	// Skip patch-only upgrades if 'upgradeSameMinorVersion' is not set
+	if targetVersion.Major == currentVersion.Major && targetVersion.Minor == currentVersion.Minor && !options.upgradeSameMinorVersion {
+		return false, nil
+	}
+
+	// We're passing current and target version to each upgrade function in case we want to
+	// add logic to skip certain upgrades in certain situations in the future
+	upgradeFrom30To31(ctx, doc, currentVersion, targetVersion)
+	upgradeFrom310To312(ctx, doc, currentVersion, targetVersion)
+	upgradeFrom31To32(ctx, doc, currentVersion, targetVersion)
+
+	_, err = marshaller.Sync(ctx, doc)
+	return true, err
+}
+
+func upgradeFrom30To31(ctx context.Context, doc *OpenAPI, _ *version.Version, _ *version.Version) {
+	// Always run the upgrade logic, because 3.1 is backwards compatible, but we want to migrate if we can
+
 	for item := range Walk(ctx, doc) {
 		_ = item.Match(Matcher{
-			OpenAPI: func(o *OpenAPI) error {
-				o.OpenAPI = Version
-				return nil
-			},
 			Schema: func(js *oas3.JSONSchema[oas3.Referenceable]) error {
-				upgradeSchema(js)
+				upgradeSchema30to31(js)
 				return nil
 			},
 		})
 	}
-
-	_, err := marshaller.Sync(ctx, doc)
-	return true, err
+	doc.OpenAPI = "3.1.0"
 }
 
-func upgradeSchema(js *oas3.JSONSchema[oas3.Referenceable]) {
+func upgradeFrom310To312(_ context.Context, doc *OpenAPI, currentVersion *version.Version, targetVersion *version.Version) {
+	if !targetVersion.GreaterThan(*currentVersion) {
+		return
+	}
+
+	// Currently no breaking changes between 3.1.0 and 3.1.2 that need to be handled
+	maxVersion, err := version.ParseVersion("3.1.2")
+	if err != nil {
+		panic("failed to parse hardcoded version 3.1.2")
+	}
+	if targetVersion.LessThan(*maxVersion) {
+		maxVersion = targetVersion
+	}
+	doc.OpenAPI = maxVersion.String()
+}
+
+func upgradeFrom31To32(_ context.Context, doc *OpenAPI, currentVersion *version.Version, targetVersion *version.Version) {
+	if !targetVersion.GreaterThan(*currentVersion) {
+		return
+	}
+
+	// TODO: Upgrade path additionalOperations for non-standard HTTP methods
+
+	// Currently no breaking changes between 3.1.x and 3.2.x that need to be handled
+	maxVersion, err := version.ParseVersion("3.2.0")
+	if err != nil {
+		panic("failed to parse hardcoded version 3.2.0")
+	}
+	if targetVersion.LessThan(*maxVersion) {
+		maxVersion = targetVersion
+	}
+	doc.OpenAPI = maxVersion.String()
+}
+
+func upgradeSchema30to31(js *oas3.JSONSchema[oas3.Referenceable]) {
 	if js == nil || js.IsReference() || js.IsRight() {
 		return
 	}
 
 	schema := js.GetResolvedSchema().GetLeft()
 
-	upgradeExample(schema)
-	upgradeExclusiveMinMax(schema)
-	upgradeNullableSchema(schema)
+	upgradeExample30to31(schema)
+	upgradeExclusiveMinMax30to31(schema)
+	upgradeNullableSchema30to31(schema)
 }
 
-func upgradeExample(schema *oas3.Schema) {
+func upgradeExample30to31(schema *oas3.Schema) {
 	if schema == nil || schema.Example == nil {
 		return
 	}
@@ -88,7 +155,7 @@ func upgradeExample(schema *oas3.Schema) {
 	schema.Example = nil
 }
 
-func upgradeExclusiveMinMax(schema *oas3.Schema) {
+func upgradeExclusiveMinMax30to31(schema *oas3.Schema) {
 	if schema.ExclusiveMaximum != nil && schema.ExclusiveMaximum.IsLeft() {
 		if schema.Maximum == nil || !*schema.ExclusiveMaximum.GetLeft() {
 			schema.ExclusiveMaximum = nil
@@ -108,7 +175,7 @@ func upgradeExclusiveMinMax(schema *oas3.Schema) {
 	}
 }
 
-func upgradeNullableSchema(schema *oas3.Schema) {
+func upgradeNullableSchema30to31(schema *oas3.Schema) {
 	if schema == nil {
 		return
 	}

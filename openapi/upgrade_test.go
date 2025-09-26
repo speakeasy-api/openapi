@@ -17,39 +17,39 @@ func TestUpgrade_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name         string
-		inputFile    string
-		expectedFile string
-		options      []openapi.Option[openapi.UpgradeOptions]
-		description  string
+		name          string
+		inputFile     string
+		expectedFile  string
+		options       []openapi.Option[openapi.UpgradeOptions]
+		description   string
+		targetVersion string
 	}{
 		{
 			name:         "upgrade_3_0_0_yaml",
 			inputFile:    "testdata/upgrade/3_0_0.yaml",
 			expectedFile: "testdata/upgrade/expected_3_0_0_upgraded.yaml",
-			options:      nil,
 			description:  "3.0.0 should upgrade without options",
 		},
 		{
 			name:         "upgrade_3_0_2_json",
 			inputFile:    "testdata/upgrade/3_0_2.json",
 			expectedFile: "testdata/upgrade/expected_3_0_2_upgraded.json",
-			options:      nil,
+			options:      []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeTargetVersion("3.1.2")},
 			description:  "3.0.2 should upgrade without options",
 		},
 		{
 			name:         "upgrade_3_0_3_yaml",
 			inputFile:    "testdata/upgrade/3_0_3.yaml",
 			expectedFile: "testdata/upgrade/expected_3_0_3_upgraded.yaml",
-			options:      nil,
+			options:      []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeTargetVersion("3.1.2")},
 			description:  "3.0.3 should upgrade without options",
 		},
 		{
 			name:         "upgrade_3_1_0_yaml_with_option",
 			inputFile:    "testdata/upgrade/3_1_0.yaml",
 			expectedFile: "testdata/upgrade/expected_3_1_0_upgraded.yaml",
-			options:      []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeSamePatchVersion()},
-			description:  "3.1.0 should upgrade with WithUpgradeSamePatchVersion option",
+			options:      []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeSameMinorVersion(), openapi.WithUpgradeTargetVersion("3.1.2")},
+			description:  "3.1.0 should upgrade with WithUpgradeSameMinorVersion option",
 		},
 		{
 			name:         "upgrade_nullable_schema",
@@ -101,6 +101,47 @@ func TestUpgrade_Success(t *testing.T) {
 	}
 }
 
+func TestUpgrade_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		version  string
+		options  []openapi.Option[openapi.UpgradeOptions]
+		wantErrs string
+	}{
+		{
+			name:     "2_0_0_with_upgrade_same_minor_no_upgrade",
+			version:  "2.0.0",
+			options:  []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeSameMinorVersion()},
+			wantErrs: "cannot upgrade OpenAPI document version from 2.0.0 to 3.2.0: only OpenAPI 3.x.x is supported",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := t.Context()
+
+			// Create a simple document with the specified version
+			doc := &openapi.OpenAPI{
+				OpenAPI: tt.version,
+				Info: openapi.Info{
+					Title:   "Test API",
+					Version: "1.0.0",
+				},
+				Paths: openapi.NewPaths(),
+			}
+
+			// Perform upgrade with options
+			_, err := openapi.Upgrade(ctx, doc, tt.options...)
+			require.Error(t, err, "upgrade should fail")
+			assert.Contains(t, err.Error(), tt.wantErrs)
+		})
+	}
+}
+
 func TestUpgrade_NoUpgradeNeeded(t *testing.T) {
 	t.Parallel()
 
@@ -112,46 +153,25 @@ func TestUpgrade_NoUpgradeNeeded(t *testing.T) {
 		expectedVersion string
 	}{
 		{
-			name:            "already_3_1_0_no_options",
+			name:            "already_3_2_0_no_options",
+			version:         "3.2.0",
+			options:         nil,
+			shouldUpgrade:   false,
+			expectedVersion: "3.2.0",
+		},
+		{
+			name:            "3_1_0_with_upgrade_same_minor",
 			version:         "3.1.0",
-			options:         nil,
-			shouldUpgrade:   false,
-			expectedVersion: "3.1.0",
-		},
-		{
-			name:            "already_3_1_1_no_options",
-			version:         "3.1.1",
-			options:         nil,
-			shouldUpgrade:   false,
-			expectedVersion: "3.1.1",
-		},
-		{
-			name:            "not_3_0_x_no_options",
-			version:         "2.0.0",
-			options:         nil,
-			shouldUpgrade:   false,
-			expectedVersion: "2.0.0",
-		},
-		{
-			name:            "3_1_0_with_upgrade_same_patch",
-			version:         "3.1.0",
-			options:         []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeSamePatchVersion()},
+			options:         []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeSameMinorVersion()},
 			shouldUpgrade:   true,
 			expectedVersion: openapi.Version,
 		},
 		{
-			name:            "3_1_1_with_upgrade_same_patch_no_upgrade",
-			version:         "3.1.1",
-			options:         []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeSamePatchVersion()},
+			name:            "current_version_with_upgrade_same_minor_no_upgrade",
+			version:         openapi.Version,
+			options:         []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeSameMinorVersion()},
 			shouldUpgrade:   false,
-			expectedVersion: "3.1.1",
-		},
-		{
-			name:            "2_0_0_with_upgrade_same_patch_no_upgrade",
-			version:         "2.0.0",
-			options:         []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeSamePatchVersion()},
-			shouldUpgrade:   false,
-			expectedVersion: "2.0.0",
+			expectedVersion: openapi.Version,
 		},
 	}
 

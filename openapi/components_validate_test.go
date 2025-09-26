@@ -220,13 +220,10 @@ securitySchemes:
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			// Create a minimal OpenAPI document for operationId validation
-			var opts []validation.Option
+			openAPIDoc := openapi.NewOpenAPI()
 			if tt.name == "valid_components_with_links" {
 				// Create OpenAPI document with the required operationId for link validation
-				openAPIDoc := &openapi.OpenAPI{
-					Paths: openapi.NewPaths(),
-				}
+				openAPIDoc.Paths = openapi.NewPaths()
 
 				// Add path with operation that matches the operationId in the test
 				pathItem := openapi.NewPathItem()
@@ -235,11 +232,9 @@ securitySchemes:
 				}
 				pathItem.Set("get", operation)
 				openAPIDoc.Paths.Set("/users/{username}/repos", &openapi.ReferencedPathItem{Object: pathItem})
-
-				opts = append(opts, validation.WithContextObject(openAPIDoc))
 			}
 
-			errs := components.Validate(t.Context(), opts...)
+			errs := components.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
