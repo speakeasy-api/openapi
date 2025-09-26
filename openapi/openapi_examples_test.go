@@ -46,7 +46,7 @@ func Example_reading() {
 	fmt.Printf("OpenAPI Version: %s\n", doc.OpenAPI)
 	fmt.Printf("API Title: %s\n", doc.Info.Title)
 	fmt.Printf("API Version: %s\n", doc.Info.Version)
-	// Output: OpenAPI Version: 3.1.1
+	// Output: OpenAPI Version: 3.2.0
 	// API Title: Test OpenAPI Document
 	// API Version: 1.0.0
 }
@@ -131,7 +131,7 @@ func Example_marshaling() {
 	}
 
 	fmt.Printf("%s", buf.String())
-	// Output: openapi: 3.1.1
+	// Output: openapi: 3.2.0
 	// info:
 	//   title: Example API
 	//   version: 1.0.0
@@ -576,7 +576,7 @@ func Example_creating() {
 	}
 
 	fmt.Printf("%s", buf.String())
-	// Output: openapi: 3.1.1
+	// Output: openapi: 3.2.0
 	// info:
 	//   title: My API
 	//   version: 1.0.0
@@ -700,7 +700,7 @@ func Example_workingWithComponents() {
 	// Output: Found schema component: User
 	//   Type: object
 	// Document with components:
-	// openapi: 3.1.1
+	// openapi: 3.2.0
 	// info:
 	//   title: API with Components
 	//   version: 1.0.0
@@ -944,10 +944,10 @@ components:
 		panic(err)
 	}
 	fmt.Printf("%s", buf.String())
-	// Output: Upgraded OpenAPI Version: 3.1.1
+	// Output: Upgraded OpenAPI Version: 3.2.0
 	//
 	// After upgrade:
-	// openapi: 3.1.1
+	// openapi: 3.2.0
 	// info:
 	//   title: Legacy API
 	//   version: 1.0.0

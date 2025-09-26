@@ -7,6 +7,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,7 +93,7 @@ x-timeout: 30
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := callback.Validate(t.Context())
+			errs := callback.Validate(t.Context(), validation.WithContextObject(openapi.NewOpenAPI()))
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -267,7 +268,7 @@ func TestCallback_Validate_Error(t *testing.T) {
 			var allErrors []error
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := callback.Validate(t.Context())
+			validateErrs := callback.Validate(t.Context(), validation.WithContextObject(openapi.NewOpenAPI()))
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "expected validation errors")
@@ -411,7 +412,7 @@ func TestCallback_Validate_ComplexExpressions(t *testing.T) {
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := callback.Validate(t.Context())
+			errs := callback.Validate(t.Context(), validation.WithContextObject(openapi.NewOpenAPI()))
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -508,7 +509,7 @@ x-rate-limit: 100
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := callback.Validate(t.Context())
+			errs := callback.Validate(t.Context(), validation.WithContextObject(openapi.NewOpenAPI()))
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}

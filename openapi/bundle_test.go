@@ -103,7 +103,7 @@ func TestBundle_EmptyDocument(t *testing.T) {
 
 	// Test with minimal document
 	doc := &openapi.OpenAPI{
-		OpenAPI: "3.1.0",
+		OpenAPI: openapi.Version,
 		Info: openapi.Info{
 			Title:   "Empty API",
 			Version: "1.0.0",
@@ -122,7 +122,7 @@ func TestBundle_EmptyDocument(t *testing.T) {
 	require.NoError(t, err)
 
 	// Document should remain unchanged
-	assert.Equal(t, "3.1.0", doc.OpenAPI)
+	assert.Equal(t, openapi.Version, doc.OpenAPI)
 	assert.Equal(t, "Empty API", doc.Info.Title)
 	assert.Equal(t, "1.0.0", doc.Info.Version)
 

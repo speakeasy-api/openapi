@@ -304,7 +304,7 @@ sourceDescriptions:
 		underlyingError error
 	}{
 		{line: 1, column: 1, underlyingError: validation.NewMissingFieldError("arazzo field workflows is missing")},
-		{line: 1, column: 9, underlyingError: validation.NewValueValidationError("arazzo field version only 1.0.1 and below is supported")},
+		{line: 1, column: 9, underlyingError: validation.NewValueValidationError("arazzo field version only Arazzo versions between 1.0.0 and 1.0.1 are supported")},
 		{line: 4, column: 3, underlyingError: validation.NewMissingFieldError("info field version is missing")},
 		{line: 6, column: 5, underlyingError: validation.NewMissingFieldError("sourceDescription field url is missing")},
 		{line: 7, column: 11, underlyingError: validation.NewValueValidationError("sourceDescription field type must be one of [openapi, arazzo]")},
