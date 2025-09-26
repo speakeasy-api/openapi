@@ -1,9 +1,13 @@
 package core
 
 import (
+	"context"
+
 	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
+	"github.com/speakeasy-api/openapi/yml"
+	"gopkg.in/yaml.v3"
 )
 
 type Paths struct {
@@ -29,6 +33,8 @@ type PathItem struct {
 	Servers    marshaller.Node[[]*Server]                `key:"servers"`
 	Parameters marshaller.Node[[]*Reference[*Parameter]] `key:"parameters"`
 
+	AdditionalOperations marshaller.Node[*sequencedmap.Map[string, marshaller.Node[*Operation]]] `key:"additionalOperations"`
+
 	Extensions core.Extensions `key:"extensions"`
 }
 
@@ -36,4 +42,11 @@ func NewPathItem() *PathItem {
 	return &PathItem{
 		Map: *sequencedmap.New[string, *Operation](),
 	}
+}
+func (n PathItem) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Node) *yaml.Node {
+	keyNode, _, found := yml.GetMapElementNodes(context.Background(), n.RootNode, key)
+	if found {
+		return keyNode
+	}
+	return rootNode
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/utils"
+	"github.com/speakeasy-api/openapi/internal/version"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
@@ -20,11 +20,30 @@ import (
 
 // Version is the version of the Arazzo Specification that this package conforms to.
 const (
-	Version      = "1.0.1"
-	VersionMajor = 1
-	VersionMinor = 0
-	VersionPatch = 1
+	Version = "1.0.1"
 )
+
+func MinimumSupportedVersion() version.Version {
+	v, err := version.ParseVersion("1.0.0")
+	if err != nil {
+		panic("failed to parse minimum supported Arazzo version: " + err.Error())
+	}
+	if v == nil {
+		panic("minimum supported Arazzo version is nil")
+	}
+	return *v
+}
+
+func MaximumSupportedVersion() version.Version {
+	v, err := version.ParseVersion(Version)
+	if err != nil {
+		panic("failed to parse maximum supported Arazzo version: " + err.Error())
+	}
+	if v == nil {
+		panic("maximum supported Arazzo version is nil")
+	}
+	return *v
+}
 
 // Arazzo is the root object for an Arazzo document.
 type Arazzo struct {
@@ -105,13 +124,14 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 	core := a.GetCore()
 	errs := []error{}
 
-	arazzoMajor, arazzoMinor, arazzoPatch, err := utils.ParseVersion(a.Arazzo)
+	arazzoVersion, err := version.ParseVersion(a.Arazzo)
 	if err != nil {
 		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("arazzo field version is invalid %s: %s", a.Arazzo, err.Error()), core, core.Arazzo))
 	}
-
-	if arazzoMajor != VersionMajor || arazzoMinor != VersionMinor || arazzoPatch > VersionPatch {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("arazzo field version only %s and below is supported", Version), core, core.Arazzo))
+	if arazzoVersion != nil {
+		if arazzoVersion.GreaterThan(MaximumSupportedVersion()) {
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("arazzo field version only Arazzo versions between %s and %s are supported", MinimumSupportedVersion(), MaximumSupportedVersion()), core, core.Arazzo))
+		}
 	}
 
 	errs = append(errs, a.Info.Validate(ctx, opts...)...)

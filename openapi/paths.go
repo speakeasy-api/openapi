@@ -2,10 +2,12 @@ package openapi
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/internal/version"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi/core"
 	"github.com/speakeasy-api/openapi/sequencedmap"
@@ -72,10 +74,28 @@ const (
 	HTTPMethodPatch HTTPMethod = "patch"
 	// HTTPMethodTrace represents the HTTP TRACE method.
 	HTTPMethodTrace HTTPMethod = "trace"
+	// HTTPMethodQuery represents the HTTP QUERY method.
+	HTTPMethodQuery HTTPMethod = "query"
 )
+
+var standardHttpMethods = []HTTPMethod{
+	HTTPMethodGet,
+	HTTPMethodPut,
+	HTTPMethodPost,
+	HTTPMethodDelete,
+	HTTPMethodOptions,
+	HTTPMethodHead,
+	HTTPMethodPatch,
+	HTTPMethodTrace,
+	HTTPMethodQuery,
+}
 
 func (m HTTPMethod) Is(method string) bool {
 	return strings.EqualFold(string(m), method)
+}
+
+func IsStandardMethod(s string) bool {
+	return slices.Contains(standardHttpMethods, HTTPMethod(s))
 }
 
 // PathItem represents the available operations for a specific endpoint path.
@@ -93,6 +113,9 @@ type PathItem struct {
 	Servers []*Server
 	// Parameters are a list of parameters that can be used by the operations represented by this path.
 	Parameters []*ReferencedParameter
+
+	// AdditionalOperations contains HTTP operations not covered by standard fixed fields (GET, POST, etc.).
+	AdditionalOperations *sequencedmap.Map[string, *Operation]
 
 	// Extensions provides a list of extensions to the PathItem object.
 	Extensions *extensions.Extensions
@@ -121,44 +144,84 @@ func (p *PathItem) GetOperation(method HTTPMethod) *Operation {
 	return op
 }
 
-// Get returns the GET operation for this path item.
+// Get returns the GET operation for this path item. Returns nil if not set.
 func (p *PathItem) Get() *Operation {
+	if p == nil {
+		return nil
+	}
 	return p.GetOperation(HTTPMethodGet)
 }
 
-// Put returns the PUT operation for this path item.
+// Put returns the PUT operation for this path item. Returns nil if not set.
 func (p *PathItem) Put() *Operation {
+	if p == nil {
+		return nil
+	}
 	return p.GetOperation(HTTPMethodPut)
 }
 
-// Post returns the POST operation for this path item.
+// Post returns the POST operation for this path item. Returns nil if not set.
 func (p *PathItem) Post() *Operation {
+	if p == nil {
+		return nil
+	}
 	return p.GetOperation(HTTPMethodPost)
 }
 
-// Delete returns the DELETE operation for this path item.
+// Delete returns the DELETE operation for this path item. Returns nil if not set.
 func (p *PathItem) Delete() *Operation {
+	if p == nil {
+		return nil
+	}
 	return p.GetOperation(HTTPMethodDelete)
 }
 
-// Options returns the OPTIONS operation for this path item.
+// Options returns the OPTIONS operation for this path item. Returns nil if not set.
 func (p *PathItem) Options() *Operation {
+	if p == nil {
+		return nil
+	}
 	return p.GetOperation(HTTPMethodOptions)
 }
 
-// Head returns the HEAD operation for this path item.
+// Head returns the HEAD operation for this path item. Returns nil if not set.
 func (p *PathItem) Head() *Operation {
+	if p == nil {
+		return nil
+	}
 	return p.GetOperation(HTTPMethodHead)
 }
 
-// Patch returns the PATCH operation for this path item.
+// Patch returns the PATCH operation for this path item. Returns nil if not set.
 func (p *PathItem) Patch() *Operation {
+	if p == nil {
+		return nil
+	}
 	return p.GetOperation(HTTPMethodPatch)
 }
 
-// Trace returns the TRACE operation for this path item.
+// Trace returns the TRACE operation for this path item. Returns nil if not set.
 func (p *PathItem) Trace() *Operation {
+	if p == nil {
+		return nil
+	}
 	return p.GetOperation(HTTPMethodTrace)
+}
+
+// Query returns the QUERY operation for this path item. Returns nil if not set.
+func (p *PathItem) Query() *Operation {
+	if p == nil {
+		return nil
+	}
+	return p.GetOperation(HTTPMethodQuery)
+}
+
+// GetAdditionalOperations returns the value of the AdditionalOperations field. Returns nil if not set.
+func (p *PathItem) GetAdditionalOperations() *sequencedmap.Map[string, *Operation] {
+	if p == nil {
+		return nil
+	}
+	return p.AdditionalOperations
 }
 
 // GetSummary returns the value of the Summary field. Returns empty string if not set.
@@ -206,6 +269,13 @@ func (p *PathItem) Validate(ctx context.Context, opts ...validation.Option) []er
 	core := p.GetCore()
 	errs := []error{}
 
+	o := validation.NewOptions(opts...)
+
+	openapi := validation.GetContextObject[OpenAPI](o)
+	if openapi == nil {
+		panic("OpenAPI is required")
+	}
+
 	for _, op := range p.All() {
 		errs = append(errs, op.Validate(ctx, opts...)...)
 	}
@@ -216,6 +286,33 @@ func (p *PathItem) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	for _, parameter := range p.Parameters {
 		errs = append(errs, parameter.Validate(ctx, opts...)...)
+	}
+
+	supportsAdditionalOperations, err := version.IsVersionGreaterOrEqual(openapi.OpenAPI, "3.2.0")
+	switch {
+	case err != nil:
+		errs = append(errs, err)
+
+	case supportsAdditionalOperations:
+		if p.AdditionalOperations != nil {
+			for methodName, op := range p.AdditionalOperations.All() {
+				errs = append(errs, op.Validate(ctx, opts...)...)
+				if IsStandardMethod(strings.ToLower(methodName)) {
+					errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("method [%s] is a standard HTTP method and must be defined in its own field", methodName), core, core.AdditionalOperations, methodName))
+				}
+			}
+		}
+
+		for methodName := range p.Keys() {
+			if !IsStandardMethod(strings.ToLower(string(methodName))) {
+				errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("method [%s] is not a standard HTTP method and must be defined in the additionalOperations field", methodName), core, core, string(methodName)))
+			}
+		}
+
+	case !supportsAdditionalOperations:
+		if core.AdditionalOperations.Present {
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("additionalOperations is not supported in OpenAPI version %s", openapi.OpenAPI), core, core.AdditionalOperations))
+		}
 	}
 
 	p.Valid = len(errs) == 0 && core.GetValid()

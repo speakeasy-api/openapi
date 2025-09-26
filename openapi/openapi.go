@@ -3,11 +3,10 @@ package openapi
 import (
 	"context"
 	"net/url"
-	"slices"
 
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/utils"
+	"github.com/speakeasy-api/openapi/internal/version"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi/core"
@@ -18,14 +17,30 @@ import (
 
 // Version is the version of the OpenAPI Specification that this package conforms to.
 const (
-	Version      = "3.1.1"
-	VersionMajor = 3
-	VersionMinor = 1
-	VersionPatch = 1
-
-	Version30XMaxPatch = 4
-	Version31XMaxPatch = 1
+	Version = "3.2.0"
 )
+
+func MinimumSupportedVersion() version.Version {
+	v, err := version.ParseVersion("3.0.0")
+	if err != nil {
+		panic("failed to parse minimum supported OpenAPI version: " + err.Error())
+	}
+	if v == nil {
+		panic("minimum supported OpenAPI version is nil")
+	}
+	return *v
+}
+
+func MaximumSupportedVersion() version.Version {
+	v, err := version.ParseVersion(Version)
+	if err != nil {
+		panic("failed to parse maximum supported OpenAPI version: " + err.Error())
+	}
+	if v == nil {
+		panic("maximum supported OpenAPI version is nil")
+	}
+	return *v
+}
 
 // OpenAPI represents an OpenAPI document compatible with the OpenAPI Specification 3.0.X and 3.1.X.
 // Where the specification differs between versions the
@@ -60,6 +75,13 @@ type OpenAPI struct {
 }
 
 var _ interfaces.Model[core.OpenAPI] = (*OpenAPI)(nil)
+
+// NewOpenAPI creates a new OpenAPI object with version set
+func NewOpenAPI() *OpenAPI {
+	return &OpenAPI{
+		OpenAPI: Version,
+	}
+}
 
 // GetOpenAPI returns the value of the OpenAPI field. Returns empty string if not set.
 func (o *OpenAPI) GetOpenAPI() string {
@@ -161,23 +183,14 @@ func (o *OpenAPI) Validate(ctx context.Context, opts ...validation.Option) []err
 	opts = append(opts, validation.WithContextObject(o))
 	opts = append(opts, validation.WithContextObject(&oas3.ParentDocumentVersion{OpenAPI: pointer.From(o.OpenAPI)}))
 
-	openAPIMajor, openAPIMinor, openAPIPatch, err := utils.ParseVersion(o.OpenAPI)
+	docVersion, err := version.ParseVersion(o.OpenAPI)
 	if err != nil {
 		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi field openapi invalid OpenAPI version %s: %s", o.OpenAPI, err.Error()), core, core.OpenAPI))
 	}
-
-	minorVersionSupported := slices.Contains([]int{0, 1}, openAPIMinor)
-	patchVersionSupported := false
-
-	switch openAPIMinor {
-	case 0:
-		patchVersionSupported = openAPIPatch <= Version30XMaxPatch
-	case 1:
-		patchVersionSupported = openAPIPatch <= Version31XMaxPatch
-	}
-
-	if openAPIMajor != VersionMajor || !minorVersionSupported || !patchVersionSupported {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi field openapi only OpenAPI version %s and below is supported", Version), core, core.OpenAPI))
+	if docVersion != nil {
+		if docVersion.LessThan(MinimumSupportedVersion()) || docVersion.GreaterThan(MaximumSupportedVersion()) {
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi field only OpenAPI versions between %s and %s are supported", MinimumSupportedVersion(), MaximumSupportedVersion()), core, core.OpenAPI))
+		}
 	}
 
 	errs = append(errs, o.Info.Validate(ctx, opts...)...)

@@ -54,7 +54,7 @@ func TestOptimize_EmptyDocument_Success(t *testing.T) {
 
 	// Test with minimal document (no components)
 	doc := &openapi.OpenAPI{
-		OpenAPI: "3.1.0",
+		OpenAPI: openapi.Version,
 		Info: openapi.Info{
 			Title:   "Empty API",
 			Version: "1.0.0",

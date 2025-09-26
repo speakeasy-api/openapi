@@ -47,6 +47,9 @@ func init() {
 	marshaller.RegisterType(func() *Reference[PathItem, *PathItem, *core.PathItem] {
 		return &Reference[PathItem, *PathItem, *core.PathItem]{}
 	})
+	marshaller.RegisterType(func() *sequencedmap.Map[string, *Operation] {
+		return &sequencedmap.Map[string, *Operation]{}
+	})
 	marshaller.RegisterType(func() *Reference[Example, *Example, *core.Example] {
 		return &Reference[Example, *Example, *core.Example]{}
 	})

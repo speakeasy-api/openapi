@@ -59,13 +59,13 @@ func runUpgrade(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	if err := upgradeOpenAPI(ctx, processor, minorOnly); err != nil {
+	if err := upgradeOpenAPI(ctx, processor, !minorOnly); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func upgradeOpenAPI(ctx context.Context, processor *OpenAPIProcessor, minorOnly bool) error {
+func upgradeOpenAPI(ctx context.Context, processor *OpenAPIProcessor, upgradeSameMinorVersion bool) error {
 	// Load the OpenAPI document
 	doc, validationErrors, err := processor.LoadDocument(ctx)
 	if err != nil {
@@ -80,11 +80,11 @@ func upgradeOpenAPI(ctx context.Context, processor *OpenAPIProcessor, minorOnly 
 
 	// Prepare upgrade options
 	var opts []openapi.Option[openapi.UpgradeOptions]
-	if !minorOnly {
+	if upgradeSameMinorVersion {
 		// By default, upgrade all versions including patch versions (3.1.x to 3.1.1)
-		opts = append(opts, openapi.WithUpgradeSamePatchVersion())
+		opts = append(opts, openapi.WithUpgradeSameMinorVersion())
 	}
-	// When minorOnly is true, only 3.0.x versions will be upgraded to 3.1.1
+	// When skipPatchOnly is true, only 3.0.x versions will be upgraded to 3.1.1
 	// 3.1.x versions will be skipped unless they need minor version upgrade
 
 	// Perform the upgrade
