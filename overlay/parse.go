@@ -16,21 +16,18 @@ func Parse(path string) (*Overlay, error) {
 		return nil, fmt.Errorf("failed to get absolute path for %q: %w", path, err)
 	}
 
-	ro, err := os.Open(filePath) //nolint:gosec
+	data, err := os.ReadFile(filePath) //nolint:gosec
 	if err != nil {
-		return nil, fmt.Errorf("failed to open overlay file at path %q: %w", path, err)
+		return nil, fmt.Errorf("failed to read overlay file at path %q: %w", path, err)
 	}
-	defer ro.Close()
 
 	var overlay Overlay
-	dec := yaml.NewDecoder(ro)
-
-	err = dec.Decode(&overlay)
+	err = yaml.Unmarshal(data, &overlay)
 	if err != nil {
 		return nil, err
 	}
 
-	return &overlay, err
+	return &overlay, nil
 }
 
 // Format will validate reformat the given file
