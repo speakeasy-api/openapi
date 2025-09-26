@@ -41,7 +41,6 @@ func TestUpgrade_Success(t *testing.T) {
 			name:         "upgrade_3_0_3_yaml",
 			inputFile:    "testdata/upgrade/3_0_3.yaml",
 			expectedFile: "testdata/upgrade/expected_3_0_3_upgraded.yaml",
-			options:      []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeTargetVersion("3.1.2")},
 			description:  "3.0.3 should upgrade without options",
 		},
 		{
