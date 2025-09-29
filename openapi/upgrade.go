@@ -118,6 +118,7 @@ func upgradeFrom31To32(_ context.Context, doc *OpenAPI, currentVersion *version.
 	}
 
 	// TODO: Upgrade path additionalOperations for non-standard HTTP methods
+	// TODO: Upgrade tags such as x-displayName to summary, and x-tagGroups with parents, etc.
 
 	// Currently no breaking changes between 3.1.x and 3.2.x that need to be handled
 	maxVersion, err := version.ParseVersion("3.2.0")
