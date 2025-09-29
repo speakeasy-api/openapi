@@ -172,3 +172,77 @@ func TestBundle_SiblingDirectories_Success(t *testing.T) {
 	// Compare the actual output with expected output
 	assert.Equal(t, string(expectedBytes), string(actualYAML), "Bundled document should match expected output")
 }
+
+func TestBundle_AdditionalOperations_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Load the input document with additionalOperations
+	inputFile, err := os.Open("testdata/inline/additionaloperations_input.yaml")
+	require.NoError(t, err)
+	defer inputFile.Close()
+
+	inputDoc, validationErrs, err := openapi.Unmarshal(ctx, inputFile)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs, "Input document should be valid")
+
+	// Configure bundling options
+	opts := openapi.BundleOptions{
+		ResolveOptions: openapi.ResolveOptions{
+			RootDocument:   inputDoc,
+			TargetLocation: "testdata/inline/additionaloperations_input.yaml",
+		},
+		NamingStrategy: openapi.BundleNamingFilePath,
+	}
+
+	// Bundle all external references
+	err = openapi.Bundle(ctx, inputDoc, opts)
+	require.NoError(t, err)
+
+	// Marshal the bundled document to YAML
+	var buf bytes.Buffer
+	err = openapi.Marshal(ctx, inputDoc, &buf)
+	require.NoError(t, err)
+	actualYAML := buf.String()
+
+	// Verify that external references in additionalOperations were bundled
+	assert.Contains(t, actualYAML, "components:", "Components section should be created")
+	assert.Contains(t, actualYAML, "additionalOperations:", "additionalOperations should be preserved")
+
+	// Verify external schemas were bundled into components
+	assert.Contains(t, actualYAML, "ResourceMetadata:", "External ResourceMetadata schema should be bundled")
+	assert.Contains(t, actualYAML, "SyncConfig:", "External SyncConfig schema should be bundled")
+	assert.Contains(t, actualYAML, "BatchConfig:", "External BatchConfig schema should be bundled")
+
+	// Verify external parameters were bundled
+	assert.Contains(t, actualYAML, "DestinationParam:", "External DestinationParam should be bundled")
+	assert.Contains(t, actualYAML, "ConfirmationParam:", "External ConfirmationParam should be bundled")
+
+	// Verify external responses were bundled
+	assert.Contains(t, actualYAML, "CopyResponse:", "External CopyResponse should be bundled")
+	assert.Contains(t, actualYAML, "ValidationErrorResponse:", "External ValidationErrorResponse should be bundled")
+
+	// Verify external request bodies were bundled
+	assert.Contains(t, actualYAML, "CopyRequest:", "External CopyRequest should be bundled")
+
+	// Verify references in additionalOperations now point to components
+	assert.Contains(t, actualYAML, "$ref: \"#/components/parameters/DestinationParam\"", "COPY operation should reference bundled parameter")
+	assert.Contains(t, actualYAML, "$ref: \"#/components/requestBodies/CopyRequest\"", "COPY operation should reference bundled request body")
+	assert.Contains(t, actualYAML, "$ref: \"#/components/responses/CopyResponse\"", "COPY operation should reference bundled response")
+
+	// Verify references in PURGE operation
+	assert.Contains(t, actualYAML, "$ref: \"#/components/parameters/ConfirmationParam\"", "PURGE operation should reference bundled parameter")
+	assert.Contains(t, actualYAML, "$ref: \"#/components/responses/ValidationErrorResponse\"", "PURGE operation should reference bundled response")
+
+	// Verify references in SYNC operation
+	assert.Contains(t, actualYAML, "$ref: \"#/components/schemas/SyncConfig\"", "SYNC operation should reference bundled schema")
+	assert.Contains(t, actualYAML, "$ref: \"#/components/schemas/SyncResult\"", "SYNC operation should reference bundled schema")
+
+	// Verify references in BATCH operation
+	assert.Contains(t, actualYAML, "$ref: \"#/components/schemas/BatchConfig\"", "BATCH operation should reference bundled schema")
+	assert.Contains(t, actualYAML, "$ref: \"#/components/schemas/BatchResult\"", "BATCH operation should reference bundled schema")
+
+	// Verify no external file references remain in additionalOperations
+	assert.NotContains(t, actualYAML, "external_custom_operations.yaml#/", "No external file references should remain")
+}

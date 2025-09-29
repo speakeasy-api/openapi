@@ -1,0 +1,333 @@
+openapi: 3.2.0
+info:
+  title: External Custom Operations API
+  version: 1.0.0
+  description: External components for custom operations
+
+components:
+  schemas:
+    ResourceMetadata:
+      type: object
+      properties:
+        size:
+          type: integer
+          description: File size in bytes
+        mime_type:
+          type: string
+          description: MIME type of the resource
+        checksum:
+          type: string
+          description: Resource checksum
+        tags:
+          type: array
+          items:
+            type: string
+        custom_properties:
+          type: object
+          additionalProperties: true
+
+    SyncConfig:
+      type: object
+      required:
+        - source
+        - destination
+      properties:
+        source:
+          type: string
+          format: uri
+          description: Source location for sync
+        destination:
+          type: string
+          format: uri
+          description: Destination location for sync
+        mode:
+          type: string
+          enum: [full, incremental, differential]
+          default: incremental
+        preserve_metadata:
+          type: boolean
+          default: true
+        compression:
+          $ref: "#/components/schemas/CompressionConfig"
+
+    CompressionConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: false
+        algorithm:
+          type: string
+          enum: [gzip, bzip2, lz4, zstd]
+          default: gzip
+        level:
+          type: integer
+          minimum: 1
+          maximum: 9
+          default: 6
+
+    SyncResult:
+      type: object
+      required:
+        - sync_id
+        - status
+      properties:
+        sync_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [completed, failed, partial]
+        files_synced:
+          type: integer
+          minimum: 0
+        bytes_transferred:
+          type: integer
+          minimum: 0
+        duration_seconds:
+          type: number
+          format: float
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncError"
+
+    SyncError:
+      type: object
+      properties:
+        file_path:
+          type: string
+        error_code:
+          type: string
+        error_message:
+          type: string
+
+    BatchConfig:
+      type: object
+      properties:
+        parallel_execution:
+          type: boolean
+          default: false
+        max_concurrent_operations:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 3
+        timeout_seconds:
+          type: integer
+          minimum: 30
+          default: 300
+        retry_policy:
+          $ref: "#/components/schemas/RetryPolicy"
+
+    RetryPolicy:
+      type: object
+      properties:
+        max_attempts:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+        backoff_strategy:
+          type: string
+          enum: [fixed, exponential, linear]
+          default: exponential
+        initial_delay_seconds:
+          type: integer
+          minimum: 1
+          default: 5
+
+    BatchResult:
+      type: object
+      required:
+        - batch_id
+        - total_operations
+        - completed_operations
+      properties:
+        batch_id:
+          type: string
+          format: uuid
+        total_operations:
+          type: integer
+          minimum: 0
+        completed_operations:
+          type: integer
+          minimum: 0
+        failed_operations:
+          type: integer
+          minimum: 0
+        execution_time_seconds:
+          type: number
+          format: float
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperationResult"
+
+    OperationResult:
+      type: object
+      properties:
+        operation_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [success, failure, skipped]
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+    OperationConfig:
+      type: object
+      properties:
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+          default: normal
+        notification_settings:
+          $ref: "#/components/schemas/NotificationSettings"
+        resource_limits:
+          type: object
+          properties:
+            max_memory_mb:
+              type: integer
+              minimum: 128
+              default: 512
+            max_cpu_percent:
+              type: integer
+              minimum: 10
+              maximum: 100
+              default: 50
+
+    NotificationSettings:
+      type: object
+      properties:
+        on_completion:
+          type: boolean
+          default: true
+        on_failure:
+          type: boolean
+          default: true
+        webhook_url:
+          type: string
+          format: uri
+        email_recipients:
+          type: array
+          items:
+            type: string
+            format: email
+
+    ValidationError:
+      type: object
+      required:
+        - field
+        - message
+      properties:
+        field:
+          type: string
+          description: Field that failed validation
+        message:
+          type: string
+          description: Validation error message
+        code:
+          type: string
+          description: Validation error code
+
+  parameters:
+    DestinationParam:
+      name: destination
+      in: header
+      description: Destination for copy operation
+      required: true
+      schema:
+        type: string
+        format: uri
+      example: "https://backup.example.com/resources/"
+
+    ConfirmationParam:
+      name: X-Confirm-Purge
+      in: header
+      description: Confirmation token for purge operation
+      required: true
+      schema:
+        type: string
+        pattern: "^CONFIRM-[A-Z0-9]{8}$"
+      example: "CONFIRM-ABC12345"
+
+  requestBodies:
+    CopyRequest:
+      description: Copy operation request
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - source_path
+              - destination_path
+            properties:
+              source_path:
+                type: string
+                description: Source resource path
+              destination_path:
+                type: string
+                description: Destination resource path
+              options:
+                type: object
+                properties:
+                  preserve_metadata:
+                    type: boolean
+                    default: true
+                  overwrite_existing:
+                    type: boolean
+                    default: false
+                  compression:
+                    $ref: "#/components/schemas/CompressionConfig"
+
+  responses:
+    CopyResponse:
+      description: Copy operation result
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - copy_id
+              - status
+            properties:
+              copy_id:
+                type: string
+                format: uuid
+                description: Unique copy operation identifier
+              status:
+                type: string
+                enum: [queued, processing, completed]
+              source_path:
+                type: string
+              destination_path:
+                type: string
+              metadata:
+                $ref: "#/components/schemas/ResourceMetadata"
+              created_at:
+                type: string
+                format: date-time
+
+    ValidationErrorResponse:
+      description: Validation error response
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - message
+              - errors
+            properties:
+              message:
+                type: string
+                description: General error message
+              errors:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ValidationError"
