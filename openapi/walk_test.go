@@ -1084,3 +1084,67 @@ func TestWalk_Terminate_Success(t *testing.T) {
 
 	assert.Equal(t, 1, visits, "expected only one visit before terminating")
 }
+
+func TestWalkAdditionalOperations_Success(t *testing.T) {
+	t.Parallel()
+
+	// Load OpenAPI document with additionalOperations
+	f, err := os.Open("testdata/walk.additionaloperations.openapi.yaml")
+	require.NoError(t, err)
+	defer f.Close()
+
+	openAPIDoc, validationErrs, err := openapi.Unmarshal(t.Context(), f)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs, "Document should be valid")
+
+	matchedLocations := []string{}
+	expectedAssertions := map[string]func(*openapi.Operation){
+		"/paths/~1custom~1{id}/get": func(op *openapi.Operation) {
+			assert.Equal(t, "getCustomResource", op.GetOperationID())
+			assert.Equal(t, "Get custom resource", op.GetSummary())
+		},
+		"/paths/~1custom~1{id}/additionalOperations/COPY": func(op *openapi.Operation) {
+			assert.Equal(t, "copyCustomResource", op.GetOperationID())
+			assert.Equal(t, "Copy custom resource", op.GetSummary())
+			assert.Equal(t, "Custom COPY operation to duplicate a resource", op.GetDescription())
+			assert.Contains(t, op.GetTags(), "custom")
+		},
+		"/paths/~1custom~1{id}/additionalOperations/PURGE": func(op *openapi.Operation) {
+			assert.Equal(t, "purgeCustomResource", op.GetOperationID())
+			assert.Equal(t, "Purge custom resource", op.GetSummary())
+			assert.Equal(t, "Custom PURGE operation to completely remove a resource", op.GetDescription())
+			assert.Contains(t, op.GetTags(), "custom")
+		},
+		"/paths/~1standard/get": func(op *openapi.Operation) {
+			assert.Equal(t, "getStandardResource", op.GetOperationID())
+			assert.Equal(t, "Get standard resource", op.GetSummary())
+		},
+	}
+
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
+		err := item.Match(openapi.Matcher{
+			Operation: func(op *openapi.Operation) error {
+				operationLoc := string(item.Location.ToJSONPointer())
+				matchedLocations = append(matchedLocations, operationLoc)
+
+				if assertFunc, exists := expectedAssertions[operationLoc]; exists {
+					assertFunc(op)
+				}
+
+				return nil
+			},
+		})
+		require.NoError(t, err)
+	}
+
+	// Verify all expected operations were visited
+	for expectedLoc := range expectedAssertions {
+		assert.Contains(t, matchedLocations, expectedLoc, "Should visit operation at location: %s", expectedLoc)
+	}
+
+	// Verify we found both standard and additional operations
+	assert.Contains(t, matchedLocations, "/paths/~1custom~1{id}/get", "Should visit standard GET operation")
+	assert.Contains(t, matchedLocations, "/paths/~1custom~1{id}/additionalOperations/COPY", "Should visit additional COPY operation")
+	assert.Contains(t, matchedLocations, "/paths/~1custom~1{id}/additionalOperations/PURGE", "Should visit additional PURGE operation")
+	assert.Contains(t, matchedLocations, "/paths/~1standard/get", "Should visit standard operation on path without additionalOperations")
+}
