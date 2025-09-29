@@ -275,6 +275,15 @@ func walkPathItem(ctx context.Context, pathItem *PathItem, parent MatchFunc, loc
 		}
 	}
 
+	// Walk through additional operations (OpenAPI 3.2+)
+	if pathItem.AdditionalOperations != nil {
+		for method, operation := range pathItem.AdditionalOperations.All() {
+			if !walkOperation(ctx, operation, append(loc, LocationContext{ParentMatchFunc: parent, ParentField: "additionalOperations", ParentKey: pointer.From(method)}), openAPI, yield) {
+				return false
+			}
+		}
+	}
+
 	// Visit PathItem Extensions
 	return yield(WalkItem{Match: getMatchFunc(pathItem.Extensions), Location: append(loc, LocationContext{ParentMatchFunc: parent, ParentField: ""}), OpenAPI: openAPI})
 }
