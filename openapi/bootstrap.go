@@ -65,11 +65,26 @@ func createBootstrapTags() []*Tag {
 	return []*Tag{
 		{
 			Name:        "users",
+			Summary:     pointer.From("Users"),
 			Description: pointer.From("User management operations"),
+			Kind:        pointer.From("nav"),
 			ExternalDocs: &oas3.ExternalDocumentation{
 				Description: pointer.From("User API documentation"),
 				URL:         "https://docs.example.com/users",
 			},
+		},
+		{
+			Name:        "admin",
+			Summary:     pointer.From("Admin"),
+			Description: pointer.From("Administrative operations"),
+			Parent:      pointer.From("users"),
+			Kind:        pointer.From("nav"),
+		},
+		{
+			Name:        "beta-features",
+			Summary:     pointer.From("Beta"),
+			Description: pointer.From("Experimental features"),
+			Kind:        pointer.From("badge"),
 		},
 	}
 }

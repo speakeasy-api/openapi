@@ -13,10 +13,21 @@ info:
     url: "https://opensource.org/licenses/MIT"
 tags:
   - name: "users"
+    summary: "Users"
     description: "User management operations"
     externalDocs:
       description: "User API documentation"
       url: "https://docs.example.com/users"
+    kind: "nav"
+  - name: "admin"
+    summary: "Admin"
+    description: "Administrative operations"
+    parent: "users"
+    kind: "nav"
+  - name: "beta-features"
+    summary: "Beta"
+    description: "Experimental features"
+    kind: "badge"
 servers:
   - url: "https://api.example.com/v1"
     description: "Production server"
