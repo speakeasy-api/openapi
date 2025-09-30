@@ -11,6 +11,16 @@ paths:
           in: path
           required: true
           # Missing schema definition
+        - name: invalidSchema
+          in: query
+          schema:
+            $ref: "#/components/schemas/InvalidSchema"
+        - name: invalidNullSchema
+          in: query
+          schema:
+            type:
+              - null
+              - string
       responses:
         "200":
           description: User found
@@ -29,3 +39,17 @@ paths:
               properties:
                 name:
                   type: invalid_type # Invalid schema type
+                required: # at wrong level
+                  - name
+components:
+  schemas:
+    InvalidSchema:
+      type: object
+      properties:
+        # Incorrectly defined properties
+        name: string
+        example: "John Doe"
+      examples:
+        # non-sequence based examples
+        Example 1:
+          syncId: 1ad0695c-4566-4715-918c-adbb03eac81e

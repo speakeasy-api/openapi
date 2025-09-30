@@ -101,14 +101,17 @@ func TestEitherValue_BothTypesFailValidation(t *testing.T) {
 	assert.False(t, target.IsRight, "Should not have set Right as successful")
 
 	// Validation errors should contain type mismatch information for both types
-	foundScalarError := false
+	foundTypeMismatchError := false
 	for _, validationErr := range validationErrs {
-		if strings.Contains(validationErr.Error(), "expected scalar") {
-			foundScalarError = true
+		errStr := validationErr.Error()
+		// Check for type mismatch patterns like "expected X, got Y"
+		if (strings.Contains(errStr, "expected string") || strings.Contains(errStr, "expected bool")) &&
+			strings.Contains(errStr, "got sequence") {
+			foundTypeMismatchError = true
 			break
 		}
 	}
-	assert.True(t, foundScalarError, "Should contain type mismatch error for scalar types")
+	assert.True(t, foundTypeMismatchError, "Should contain type mismatch error for string/bool types")
 }
 
 func TestEitherValue_GetNavigableNode_Success(t *testing.T) {

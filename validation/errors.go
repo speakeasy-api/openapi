@@ -144,7 +144,7 @@ var _ error = (*TypeMismatchError)(nil)
 
 func NewTypeMismatchError(msg string, args ...any) *TypeMismatchError {
 	if len(args) > 0 {
-		msg = fmt.Sprintf(msg, args...)
+		msg = fmt.Errorf(msg, args...).Error()
 	}
 
 	return &TypeMismatchError{

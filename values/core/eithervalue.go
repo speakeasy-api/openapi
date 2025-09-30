@@ -9,6 +9,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/validation"
 	"gopkg.in/yaml.v3"
 )
 
@@ -33,7 +34,7 @@ func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, parentName string, no
 	// Try Left type without strict mode
 	leftValidationErrs, leftUnmarshalErr = marshaller.UnmarshalCore(ctx, parentName, node, &v.Left)
 	if leftUnmarshalErr == nil && !hasTypeMismatchErrors(leftValidationErrs) {
-		// No unmarshalling error and no type mismatch validation errors - this is successful
+		// No unmarshaling error and no type mismatch validation errors - this is successful
 		v.IsLeft = true
 		v.SetRootNode(node)
 		return leftValidationErrs, nil
@@ -42,22 +43,35 @@ func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, parentName string, no
 	// Try Right type without strict mode
 	rightValidationErrs, rightUnmarshalErr = marshaller.UnmarshalCore(ctx, parentName, node, &v.Right)
 	if rightUnmarshalErr == nil && !hasTypeMismatchErrors(rightValidationErrs) {
-		// No unmarshalling error and no type mismatch validation errors - this is successful
+		// No unmarshaling error and no type mismatch validation errors - this is successful
 		v.IsRight = true
 		v.SetRootNode(node)
 		return rightValidationErrs, nil
 	}
 
-	// Both types failed - determine if we should return validation errors or unmarshalling errors
+	leftType := reflect.TypeOf((*L)(nil)).Elem().Name()
+	rightType := reflect.TypeOf((*R)(nil)).Elem().Name()
+
+	// Both types failed - determine if we should return validation errors or unmarshaling errors
+	// Both failed with validation errors only (no real unmarshaling errors)
 	if leftUnmarshalErr == nil && rightUnmarshalErr == nil {
-		// Both failed with validation errors only (no real unmarshalling errors)
 		// Combine the validation errors and return them instead of an error
 		allValidationErrs := leftValidationErrs
 		allValidationErrs = append(allValidationErrs, rightValidationErrs...)
-		return allValidationErrs, nil
+
+		msg := fmt.Errorf("%s failed to validate either %s or %s: %w", parentName, leftType, rightType, errors.Join(allValidationErrs...)).Error()
+
+		var validationError error
+		if hasTypeMismatchErrors(allValidationErrs) {
+			validationError = validation.NewTypeMismatchError(msg)
+		} else {
+			validationError = validation.NewValueValidationError(msg)
+		}
+
+		return []error{validation.NewValidationError(validationError, node)}, nil
 	}
 
-	// At least one had a real unmarshalling error - return as unmarshalling failure
+	// At least one had a real unmarshaling error - return as unmarshaling failure
 	errs := []error{}
 	if leftUnmarshalErr != nil {
 		errs = append(errs, leftUnmarshalErr)
@@ -71,19 +85,27 @@ func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, parentName string, no
 		errs = append(errs, fmt.Errorf("right type validation failed: %v", rightValidationErrs))
 	}
 
-	return nil, fmt.Errorf("unable to marshal into either %s or %s: %w", reflect.TypeOf((*L)(nil)).Elem().Name(), reflect.TypeOf((*R)(nil)).Elem().Name(), errors.Join(errs...))
+	return nil, fmt.Errorf("unable to marshal into either %s or %s: %w", leftType, rightType, errors.Join(errs...))
 }
 
 // hasTypeMismatchErrors checks if the validation errors contain type mismatch errors
-// indicating that the type couldn't be unmarshalled successfully
+// indicating that the type couldn't be unmarshaled successfully.
+// It ignores type mismatch errors from nested either values to avoid cascading failures.
 func hasTypeMismatchErrors(validationErrs []error) bool {
 	if len(validationErrs) == 0 {
 		return false
 	}
 
 	for _, err := range validationErrs {
-		// Check if this is a type mismatch error by looking for common patterns
 		errStr := err.Error()
+
+		// Skip errors from nested either values - these are child validation failures
+		// that shouldn't cause the parent either value to fail
+		if strings.Contains(errStr, "failed to validate either") {
+			continue
+		}
+
+		// Check if this is a type mismatch error by looking for common patterns
 		if strings.Contains(errStr, "expected") && (strings.Contains(errStr, "got") || strings.Contains(errStr, "but received")) {
 			return true
 		}

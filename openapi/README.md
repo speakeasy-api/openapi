@@ -185,7 +185,9 @@ Shows both automatic validation during unmarshaling and explicit validation.
 ```go
 ctx := context.Background()
 
-f, err := os.Open("testdata/invalid.openapi.yaml")
+path := "testdata/invalid.openapi.yaml"
+
+f, err := os.Open(path)
 if err != nil {
 	panic(err)
 }

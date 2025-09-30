@@ -165,7 +165,7 @@ boolField: true
 intField: 42
 float64Field: 3.14
 `,
-			wantErrs: []string{"[2:14] testPrimitiveModel.stringField expected scalar, got sequence"},
+			wantErrs: []string{"[2:14] testPrimitiveModel.stringField expected string, got sequence"},
 		},
 		{
 			name: "type mismatch - bool field gets string",
