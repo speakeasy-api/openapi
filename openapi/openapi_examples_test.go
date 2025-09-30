@@ -187,7 +187,9 @@ func Example_marshalingJSONSchema() {
 func Example_validating() {
 	ctx := context.Background()
 
-	f, err := os.Open("testdata/invalid.openapi.yaml")
+	path := "testdata/invalid.openapi.yaml"
+
+	f, err := os.Open(path)
 	if err != nil {
 		panic(err)
 	}
@@ -214,11 +216,21 @@ func Example_validating() {
 		fmt.Println("Document is valid!")
 	}
 	// Output: Validation error: [3:3] info field version is missing
-	// Validation error: [18:30] response.content expected object, got scalar
-	// Validation error: [31:25] schema field properties.name.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
-	// Validation error: [31:25] schema field properties.name.type got string, want array
-	// Additional validation error: [31:25] schema field properties.name.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
-	// Additional validation error: [31:25] schema field properties.name.type got string, want array
+	// Validation error: [22:15] schema field type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
+	// Validation error: [22:17] schema field type.0 value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
+	// Validation error: [28:30] response.content expected object, got scalar
+	// Validation error: [43:19] schema.properties failed to validate either Schema or bool: [43:19] schema.properties expected object, got sequence
+	// [43:19] schema.properties expected bool, got sequence
+	// Validation error: [47:7] components.schemas failed to validate either Schema or bool: [50:15] schema.properties failed to validate either Schema or bool: [50:15] schema.properties expected object, got scalar
+	// [50:15] schema.properties yaml: unmarshal errors:
+	//   line 50: cannot unmarshal !!str `string` into bool
+	// [51:18] schema.properties failed to validate either Schema or bool: [51:18] schema.properties expected object, got scalar
+	// [51:18] schema.properties yaml: unmarshal errors:
+	//   line 51: cannot unmarshal !!str `John Doe` into bool
+	// [54:9] schema.examples expected sequence, got object
+	// [47:7] components.schemas expected bool, got object
+	// Additional validation error: [22:15] schema field type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
+	// Additional validation error: [22:17] schema field type.0 value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
 }
 
 // Example_mutating demonstrates how to read and modify an OpenAPI document.

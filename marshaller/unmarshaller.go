@@ -199,28 +199,28 @@ func unmarshal(ctx context.Context, parentName string, node *yaml.Node, out refl
 	switch {
 	case isStructType(out):
 		// Target expects a struct/object
-		if err := validateNodeKind(resolvedNode, yaml.MappingNode, parentName); err != nil {
+		if err := validateNodeKind(resolvedNode, yaml.MappingNode, parentName, "object"); err != nil {
 			return []error{err}, nil //nolint:nilerr
 		}
 		return unmarshalMapping(ctx, parentName, node, out)
 
 	case isSliceType(out):
 		// Target expects a slice/array
-		if err := validateNodeKind(resolvedNode, yaml.SequenceNode, parentName); err != nil {
+		if err := validateNodeKind(resolvedNode, yaml.SequenceNode, parentName, "sequence"); err != nil {
 			return []error{err}, nil //nolint:nilerr
 		}
 		return unmarshalSequence(ctx, parentName, node, out)
 
 	case isMapType(out):
 		// Target expects a map
-		if err := validateNodeKind(resolvedNode, yaml.MappingNode, parentName); err != nil {
+		if err := validateNodeKind(resolvedNode, yaml.MappingNode, parentName, "object"); err != nil {
 			return []error{err}, nil //nolint:nilerr
 		}
 		return unmarshalMapping(ctx, parentName, node, out)
 
 	default:
 		// Target expects a scalar value (string, int, bool, etc.)
-		if err := validateNodeKind(resolvedNode, yaml.ScalarNode, parentName); err != nil {
+		if err := validateNodeKind(resolvedNode, yaml.ScalarNode, parentName, out.Type().String()); err != nil {
 			return []error{err}, nil //nolint:nilerr
 		}
 		return decodeNode(ctx, parentName, resolvedNode, out.Addr().Interface())
@@ -602,16 +602,15 @@ func isMapType(out reflect.Value) bool {
 }
 
 // validateNodeKind checks if the node kind matches the expected kind and returns appropriate error
-func validateNodeKind(resolvedNode *yaml.Node, expectedKind yaml.Kind, parentName string) error {
+func validateNodeKind(resolvedNode *yaml.Node, expectedKind yaml.Kind, parentName, expectedType string) error {
 	if resolvedNode == nil {
 		return validation.NewValidationError(validation.NewTypeMismatchError("%sexpected %s, got nil", getOptionalParentName(parentName), yml.NodeKindToString(expectedKind)), nil)
 	}
 
 	if resolvedNode.Kind != expectedKind {
-		expectedKindStr := yml.NodeKindToString(expectedKind)
 		actualKindStr := yml.NodeKindToString(resolvedNode.Kind)
 
-		return validation.NewValidationError(validation.NewTypeMismatchError("%sexpected %s, got %s", getOptionalParentName(parentName), expectedKindStr, actualKindStr), resolvedNode)
+		return validation.NewValidationError(validation.NewTypeMismatchError("%sexpected %s, got %s", getOptionalParentName(parentName), expectedType, actualKindStr), resolvedNode)
 	}
 	return nil
 }
