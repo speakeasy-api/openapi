@@ -17,10 +17,16 @@ type Tag struct {
 
 	// The name of the tag.
 	Name string
+	// A short summary of the tag, used for display purposes.
+	Summary *string
 	// A description for the tag. May contain CommonMark syntax.
 	Description *string
 	// External documentation for this tag.
 	ExternalDocs *oas3.ExternalDocumentation
+	// The name of a tag that this tag is nested under. The named tag must exist in the API description.
+	Parent *string
+	// A machine-readable string to categorize what sort of tag it is.
+	Kind *string
 
 	// Extensions provides a list of extensions to the Tag object.
 	Extensions *extensions.Extensions
@@ -52,6 +58,30 @@ func (t *Tag) GetExternalDocs() *oas3.ExternalDocumentation {
 	return t.ExternalDocs
 }
 
+// GetSummary returns the value of the Summary field. Returns empty string if not set.
+func (t *Tag) GetSummary() string {
+	if t == nil || t.Summary == nil {
+		return ""
+	}
+	return *t.Summary
+}
+
+// GetParent returns the value of the Parent field. Returns empty string if not set.
+func (t *Tag) GetParent() string {
+	if t == nil || t.Parent == nil {
+		return ""
+	}
+	return *t.Parent
+}
+
+// GetKind returns the value of the Kind field. Returns empty string if not set.
+func (t *Tag) GetKind() string {
+	if t == nil || t.Kind == nil {
+		return ""
+	}
+	return *t.Kind
+}
+
 // GetExtensions returns the value of the Extensions field. Returns an empty extensions map if not set.
 func (t *Tag) GetExtensions() *extensions.Extensions {
 	if t == nil || t.Extensions == nil {
@@ -76,4 +106,62 @@ func (t *Tag) Validate(ctx context.Context, opts ...validation.Option) []error {
 	t.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
+}
+
+// ValidateWithTags validates the Tag object in the context of all tags to check for parent relationships.
+// This should be called during document-level validation where all tags are available.
+func (t *Tag) ValidateWithTags(ctx context.Context, allTags []*Tag, opts ...validation.Option) []error {
+	errs := t.Validate(ctx, opts...)
+
+	if t.Parent != nil && *t.Parent != "" {
+		// Check if parent tag exists
+		parentExists := false
+		for _, tag := range allTags {
+			if tag != nil && tag.Name == *t.Parent {
+				parentExists = true
+				break
+			}
+		}
+
+		if !parentExists {
+			core := t.GetCore()
+			errs = append(errs, validation.NewValueError(
+				validation.NewMissingValueError("parent tag '%s' does not exist", *t.Parent),
+				core, core.Parent))
+		}
+
+		// Check for circular references
+		if t.hasCircularParentReference(allTags, make(map[string]bool)) {
+			core := t.GetCore()
+			errs = append(errs, validation.NewValueError(
+				validation.NewValueValidationError("circular parent reference detected for tag '%s'", t.Name),
+				core, core.Parent))
+		}
+	}
+
+	return errs
+}
+
+// hasCircularParentReference checks if this tag has a circular parent reference
+func (t *Tag) hasCircularParentReference(allTags []*Tag, visited map[string]bool) bool {
+	if t == nil || t.Parent == nil || *t.Parent == "" {
+		return false
+	}
+
+	// If we've already visited this tag, we have a circular reference
+	if visited[t.Name] {
+		return true
+	}
+
+	// Mark this tag as visited
+	visited[t.Name] = true
+
+	// Find the parent tag and recursively check
+	for _, tag := range allTags {
+		if tag != nil && tag.Name == *t.Parent {
+			return tag.hasCircularParentReference(allTags, visited)
+		}
+	}
+
+	return false
 }

@@ -1,6 +1,7 @@
 package openapi_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -133,7 +134,7 @@ info:
   title: Test API
   version: 1.0.0
 paths: {}`,
-			expectedError: "only OpenAPI version 3.1.1 and below is supported",
+			expectedError: fmt.Sprintf("openapi field only OpenAPI versions between %s and %s are supported", openapi.MinimumSupportedVersion(), openapi.MaximumSupportedVersion()),
 		},
 	}
 

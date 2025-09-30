@@ -1,0 +1,231 @@
+openapi: 3.2.0
+info:
+  title: AdditionalOperations Test API
+  version: 1.0.0
+  description: Test document for additionalOperations bundling and inlining
+
+paths:
+  /resources/{id}:
+    summary: Custom operations with references
+    description: Path with additionalOperations that use external references
+    parameters:
+      - name: id
+        in: path
+        description: Resource ID
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getResource
+      summary: Get resource
+      description: Standard GET operation
+      responses:
+        "200":
+          $ref: "#/components/responses/ResourceResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+    additionalOperations:
+      COPY:
+        operationId: copyResource
+        summary: Copy resource
+        description: Custom COPY operation with external references
+        tags:
+          - custom
+        parameters:
+          - $ref: "external_custom_operations.yaml#/components/parameters/DestinationParam"
+        requestBody:
+          $ref: "external_custom_operations.yaml#/components/requestBodies/CopyRequest"
+        responses:
+          "201":
+            $ref: "external_custom_operations.yaml#/components/responses/CopyResponse"
+          "400":
+            $ref: "#/components/responses/ErrorResponse"
+        x-custom-extension: copy-operation
+      PURGE:
+        operationId: purgeResource
+        summary: Purge resource
+        description: Custom PURGE operation with mixed references
+        tags:
+          - custom
+          - maintenance
+        parameters:
+          - name: force
+            in: query
+            description: Force purge operation
+            schema:
+              type: boolean
+              default: false
+          - $ref: "external_custom_operations.yaml#/components/parameters/ConfirmationParam"
+        responses:
+          "204":
+            description: Resource purged successfully
+          "404":
+            $ref: "#/components/responses/ErrorResponse"
+          "422":
+            $ref: "external_custom_operations.yaml#/components/responses/ValidationErrorResponse"
+        x-custom-extension: purge-operation
+      SYNC:
+        operationId: syncResource
+        summary: Sync resource
+        description: Custom SYNC operation with complex references
+        tags:
+          - custom
+          - sync
+        requestBody:
+          description: Sync configuration
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "external_custom_operations.yaml#/components/schemas/SyncConfig"
+        responses:
+          "200":
+            description: Sync completed
+            content:
+              application/json:
+                schema:
+                  $ref: "external_custom_operations.yaml#/components/schemas/SyncResult"
+          "400":
+            $ref: "#/components/responses/ErrorResponse"
+        x-custom-extension: sync-operation
+    x-custom-path-extension: additional-operations-path
+
+  /bulk-operations:
+    get:
+      operationId: listBulkOperations
+      summary: List bulk operations
+      description: Standard operation in path with additionalOperations
+      responses:
+        "200":
+          description: List of bulk operations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BulkOperation"
+    additionalOperations:
+      BATCH:
+        operationId: batchProcess
+        summary: Batch process resources
+        description: Custom BATCH operation with circular references
+        requestBody:
+          description: Batch operation data
+          required: true
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  operations:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BulkOperation"
+                  config:
+                    $ref: "external_custom_operations.yaml#/components/schemas/BatchConfig"
+        responses:
+          "202":
+            description: Batch operation accepted
+            content:
+              application/json:
+                schema:
+                  $ref: "external_custom_operations.yaml#/components/schemas/BatchResult"
+          "400":
+            $ref: "#/components/responses/ErrorResponse"
+
+components:
+  schemas:
+    Resource:
+      type: object
+      required:
+        - id
+        - name
+        - type
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Resource identifier
+        name:
+          type: string
+          description: Resource name
+          maxLength: 100
+        type:
+          type: string
+          enum: [document, image, video, archive]
+        metadata:
+          $ref: "external_custom_operations.yaml#/components/schemas/ResourceMetadata"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    BulkOperation:
+      type: object
+      required:
+        - id
+        - operation_type
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        operation_type:
+          type: string
+          enum: [copy, move, delete, sync]
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        resource_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        config:
+          $ref: "external_custom_operations.yaml#/components/schemas/OperationConfig"
+        created_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Error message
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    ResourceResponse:
+      description: Single resource response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Resource"
+
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  parameters:
+    ResourceIdParam:
+      name: id
+      in: path
+      required: true
+      description: Resource ID
+      schema:
+        type: string
+        format: uuid
