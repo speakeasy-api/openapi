@@ -2,11 +2,11 @@ package openapi_test
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -127,7 +127,10 @@ schema:
   type: invalid-type
 description: Header with invalid schema
 `,
-			wantErrs: []string{"schema field type value must be one of"},
+			wantErrs: []string{
+				"[3:9] schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"[3:9] schema.type expected array, got string",
+			},
 		},
 	}
 
@@ -150,16 +153,7 @@ description: Header with invalid schema
 				errMessages = append(errMessages, err.Error())
 			}
 
-			for _, expectedErr := range tt.wantErrs {
-				found := false
-				for _, errMsg := range errMessages {
-					if strings.Contains(errMsg, expectedErr) {
-						found = true
-						break
-					}
-				}
-				require.True(t, found, "expected error message '%s' not found in: %v", expectedErr, errMessages)
-			}
+			assert.Equal(t, tt.wantErrs, errMessages)
 		})
 	}
 }

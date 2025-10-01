@@ -18,7 +18,7 @@ type Operation struct {
 	Security     marshaller.Node[[]*SecurityRequirement]                           `key:"security"`
 	Parameters   marshaller.Node[[]*Reference[*Parameter]]                         `key:"parameters"`
 	RequestBody  marshaller.Node[*Reference[*RequestBody]]                         `key:"requestBody"`
-	Responses    marshaller.Node[*Responses]                                       `key:"responses"`
+	Responses    marshaller.Node[Responses]                                        `key:"responses"`
 	Callbacks    marshaller.Node[*sequencedmap.Map[string, *Reference[*Callback]]] `key:"callbacks"`
 	Deprecated   marshaller.Node[*bool]                                            `key:"deprecated"`
 	ExternalDocs marshaller.Node[*oas3core.ExternalDocumentation]                  `key:"externalDocs"`

@@ -14,6 +14,7 @@ import (
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/references"
 	"github.com/speakeasy-api/openapi/sequencedmap"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/walk"
 	"github.com/speakeasy-api/openapi/yml"
 )
@@ -182,8 +183,8 @@ func Example_marshalingJSONSchema() {
 	//   - name
 }
 
-// Example_validating demonstrates how to validate an OpenAPI document.
-// Shows both automatic validation during unmarshaling and explicit validation.
+// Example_validating demonstrates how to validate an OpenAPI document and fix validation errors.
+// Shows automatic validation during unmarshaling, fixing errors programmatically, and re-validating.
 func Example_validating() {
 	ctx := context.Background()
 
@@ -201,36 +202,90 @@ func Example_validating() {
 		panic(err)
 	}
 
-	// Print any validation errors
+	fmt.Printf("Initial validation errors: %d\n", len(validationErrs))
 	for _, err := range validationErrs {
-		fmt.Printf("Validation error: %s\n", err.Error())
+		fmt.Printf("  %s\n", err.Error())
 	}
 
-	// You can also validate explicitly after making changes
-	additionalErrs := doc.Validate(ctx)
-	for _, err := range additionalErrs {
-		fmt.Printf("Additional validation error: %s\n", err.Error())
+	// Fix some of the validation errors programmatically
+	fmt.Println("\nFixing validation errors...")
+
+	// Fix 1: Add missing info.version
+	doc.Info.Version = "1.0.0"
+	fmt.Println("  ✓ Added missing info.version")
+
+	// Fix 2: Add missing responses to the POST /users operation
+	if doc.Paths != nil {
+		if pathItem, ok := doc.Paths.Get("/users/{id}"); ok && pathItem.GetObject() != nil {
+			if post := pathItem.GetObject().Post(); post != nil {
+				post.Responses.Set("200", &openapi.ReferencedResponse{
+					Object: &openapi.Response{
+						Description: "Success",
+					},
+				})
+				fmt.Println("  ✓ Added missing response to POST /users/{id}")
+			}
+		}
 	}
 
-	if len(validationErrs) == 0 && len(additionalErrs) == 0 {
-		fmt.Println("Document is valid!")
+	// Fix 3: Add missing responses to the POST /invalid operation
+	if doc.Paths != nil {
+		if pathItem, ok := doc.Paths.Get("/invalid"); ok && pathItem.GetObject() != nil {
+			if post := pathItem.GetObject().Post(); post != nil {
+				post.Responses = openapi.NewResponses()
+				post.Responses.Set("200", &openapi.ReferencedResponse{
+					Object: &openapi.Response{
+						Description: "Success",
+					},
+				})
+				fmt.Println("  ✓ Added missing responses to POST /invalid")
+			}
+		}
 	}
-	// Output: Validation error: [3:3] info field version is missing
-	// Validation error: [22:15] schema field type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
-	// Validation error: [22:17] schema field type.0 value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
-	// Validation error: [28:30] response.content expected object, got scalar
-	// Validation error: [43:19] schema.properties failed to validate either Schema or bool: [43:19] schema.properties expected object, got sequence
-	// [43:19] schema.properties expected bool, got sequence
-	// Validation error: [47:7] components.schemas failed to validate either Schema or bool: [50:15] schema.properties failed to validate either Schema or bool: [50:15] schema.properties expected object, got scalar
-	// [50:15] schema.properties yaml: unmarshal errors:
-	//   line 50: cannot unmarshal !!str `string` into bool
-	// [51:18] schema.properties failed to validate either Schema or bool: [51:18] schema.properties expected object, got scalar
-	// [51:18] schema.properties yaml: unmarshal errors:
-	//   line 51: cannot unmarshal !!str `John Doe` into bool
-	// [54:9] schema.examples expected sequence, got object
-	// [47:7] components.schemas expected bool, got object
-	// Additional validation error: [22:15] schema field type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
-	// Additional validation error: [22:17] schema field type.0 value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
+
+	// Re-validate after fixes
+	newValidationErrs := doc.Validate(ctx)
+	validation.SortValidationErrors(newValidationErrs)
+
+	fmt.Printf("\nValidation errors after fixes: %d\n", len(newValidationErrs))
+	for _, err := range newValidationErrs {
+		fmt.Printf("  %s\n", err.Error())
+	}
+
+	fmt.Printf("\nReduced validation errors from %d to %d\n", len(validationErrs), len(newValidationErrs))
+	// Output: Initial validation errors: 16
+	//   [3:3] info.version is missing
+	//   [22:17] schema.type.0 expected string, got null
+	//   [28:30] response.content.application/json expected object, got ``
+	//   [31:18] responses must have at least one response code
+	//   [34:7] operation.responses is missing
+	//   [43:17] schema.properties.required failed to validate either Schema [schema.properties.required expected object, got sequence] or bool [schema.properties.required expected bool, got sequence]
+	//   [51:25] schema.properties.name.type expected array, got string
+	//   [51:25] schema.properties.name.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
+	//   [56:7] schema.examples expected array, got object
+	//   [59:15] schema.properties.name expected one of [boolean, object], got string
+	//   [59:15] schema.properties.name expected one of [boolean, object], got string
+	//   [59:15] schema.properties.name failed to validate either Schema [schema.properties.name expected object, got `string`] or bool [schema.properties.name line 59: cannot unmarshal !!str `string` into bool]
+	//   [60:18] schema.properties.example expected one of [boolean, object], got string
+	//   [60:18] schema.properties.example expected one of [boolean, object], got string
+	//   [60:18] schema.properties.example failed to validate either Schema [schema.properties.example expected object, got `John Doe`] or bool [schema.properties.example line 60: cannot unmarshal !!str `John Doe` into bool]
+	//   [63:9] schema.examples expected sequence, got object
+	//
+	// Fixing validation errors...
+	//   ✓ Added missing info.version
+	//   ✓ Added missing response to POST /users/{id}
+	//   ✓ Added missing responses to POST /invalid
+	//
+	// Validation errors after fixes: 7
+	//   [51:25] schema.properties.name.type expected array, got string
+	//   [51:25] schema.properties.name.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
+	//   [56:7] schema.examples expected array, got object
+	//   [59:15] schema.properties.name expected one of [boolean, object], got string
+	//   [59:15] schema.properties.name expected one of [boolean, object], got string
+	//   [60:18] schema.properties.example expected one of [boolean, object], got string
+	//   [60:18] schema.properties.example expected one of [boolean, object], got string
+	//
+	// Reduced validation errors from 16 to 7
 }
 
 // Example_mutating demonstrates how to read and modify an OpenAPI document.
@@ -503,18 +558,16 @@ func Example_resolvingReferencesAsYouGo() {
 				}
 
 				// Check responses
-				if operation.Responses != nil {
-					for statusCode, response := range operation.Responses.All() {
-						if response.IsReference() && !response.IsResolved() {
-							fmt.Printf("    Resolving response reference [%s]: %s\n", statusCode, response.GetReference())
-							_, err := response.Resolve(ctx, resolveOpts)
-							if err != nil {
-								fmt.Printf("    Failed to resolve response: %v\n", err)
-								continue
-							}
-							if respObj := response.GetObject(); respObj != nil {
-								fmt.Printf("    Response resolved: %s\n", respObj.Description)
-							}
+				for statusCode, response := range operation.Responses.All() {
+					if response.IsReference() && !response.IsResolved() {
+						fmt.Printf("    Resolving response reference [%s]: %s\n", statusCode, response.GetReference())
+						_, err := response.Resolve(ctx, resolveOpts)
+						if err != nil {
+							fmt.Printf("    Failed to resolve response: %v\n", err)
+							continue
+						}
+						if respObj := response.GetObject(); respObj != nil {
+							fmt.Printf("    Response resolved: %s\n", respObj.Description)
 						}
 					}
 				}

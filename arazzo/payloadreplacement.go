@@ -32,23 +32,23 @@ func (p *PayloadReplacement) Validate(ctx context.Context, opts ...validation.Op
 	errs := []error{}
 
 	if core.Target.Present && p.Target == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("payloadReplacement field target is required"), core, core.Target))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("payloadReplacement.target is required"), core, core.Target))
 	}
 
 	if err := p.Target.Validate(); err != nil {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("payloadReplacement field target is invalid: "+err.Error()), core, core.Target))
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("payloadReplacement.target is invalid: "+err.Error()), core, core.Target))
 	}
 
 	if core.Value.Present && p.Value == nil {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("payloadReplacement field value is required"), core, core.Value))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("payloadReplacement.value is required"), core, core.Value))
 	} else if p.Value != nil {
 		_, expression, err := expression.GetValueOrExpressionValue(p.Value)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("payloadReplacement field value is invalid: "+err.Error()), core, core.Value))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("payloadReplacement.value is invalid: "+err.Error()), core, core.Value))
 		}
 		if expression != nil {
 			if err := expression.Validate(); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("payloadReplacement field value is invalid: "+err.Error()), core, core.Value))
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("payloadReplacement.value is invalid: "+err.Error()), core, core.Value))
 			}
 		}
 	}

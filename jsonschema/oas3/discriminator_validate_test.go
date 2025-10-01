@@ -2,11 +2,11 @@ package oas3_test
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -91,7 +91,7 @@ func TestDiscriminator_Validate_Error(t *testing.T) {
 mapping:
   dog: "#/components/schemas/Dog"
 `,
-			wantErrs: []string{"[2:1] discriminator field propertyName is missing"},
+			wantErrs: []string{"[2:1] discriminator.propertyName is missing"},
 		},
 		{
 			name: "empty property name",
@@ -100,7 +100,7 @@ propertyName: ""
 mapping:
   dog: "#/components/schemas/Dog"
 `,
-			wantErrs: []string{"[2:15] discriminator field propertyName is required"},
+			wantErrs: []string{"[2:15] discriminator.propertyName is required"},
 		},
 	}
 
@@ -129,16 +129,7 @@ mapping:
 				}
 			}
 
-			for _, expectedErr := range tt.wantErrs {
-				found := false
-				for _, errMsg := range errMessages {
-					if strings.Contains(errMsg, expectedErr) {
-						found = true
-						break
-					}
-				}
-				require.True(t, found, "expected error message '%s' not found in: %v", expectedErr, errMessages)
-			}
+			assert.Equal(t, tt.wantErrs, errMessages)
 		})
 	}
 }

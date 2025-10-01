@@ -101,7 +101,7 @@ func UnmarshalCore(ctx context.Context, parentName string, node *yaml.Node, out 
 }
 
 func UnmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]error, error) {
-	return unmarshalModel(ctx, node, structPtr)
+	return unmarshalModel(ctx, "", node, structPtr)
 }
 
 func UnmarshalKeyValuePair(ctx context.Context, parentName string, keyNode, valueNode *yaml.Node, outValue any) ([]error, error) {
@@ -199,28 +199,33 @@ func unmarshal(ctx context.Context, parentName string, node *yaml.Node, out refl
 	switch {
 	case isStructType(out):
 		// Target expects a struct/object
-		if err := validateNodeKind(resolvedNode, yaml.MappingNode, parentName, "object"); err != nil {
+		if err := validateNodeKind(resolvedNode, yaml.MappingNode, parentName, nil, "object"); err != nil {
 			return []error{err}, nil //nolint:nilerr
 		}
 		return unmarshalMapping(ctx, parentName, node, out)
 
 	case isSliceType(out):
 		// Target expects a slice/array
-		if err := validateNodeKind(resolvedNode, yaml.SequenceNode, parentName, "sequence"); err != nil {
+		if err := validateNodeKind(resolvedNode, yaml.SequenceNode, parentName, nil, "sequence"); err != nil {
 			return []error{err}, nil //nolint:nilerr
 		}
 		return unmarshalSequence(ctx, parentName, node, out)
 
 	case isMapType(out):
 		// Target expects a map
-		if err := validateNodeKind(resolvedNode, yaml.MappingNode, parentName, "object"); err != nil {
+		if err := validateNodeKind(resolvedNode, yaml.MappingNode, parentName, nil, "object"); err != nil {
 			return []error{err}, nil //nolint:nilerr
 		}
 		return unmarshalMapping(ctx, parentName, node, out)
 
 	default:
 		// Target expects a scalar value (string, int, bool, etc.)
-		if err := validateNodeKind(resolvedNode, yaml.ScalarNode, parentName, out.Type().String()); err != nil {
+		outType := out.Type()
+		if outType.Kind() == reflect.Ptr {
+			outType = outType.Elem()
+		}
+
+		if err := validateNodeKind(resolvedNode, yaml.ScalarNode, parentName, out.Type(), outType.String()); err != nil {
 			return []error{err}, nil //nolint:nilerr
 		}
 		return decodeNode(ctx, parentName, resolvedNode, out.Addr().Interface())
@@ -241,7 +246,7 @@ func unmarshalMapping(ctx context.Context, parentName string, node *yaml.Node, o
 	switch {
 	case out.Kind() == reflect.Struct:
 		if implementsInterface(out, coreModelerType) {
-			return unmarshalModel(ctx, node, out.Addr().Interface())
+			return unmarshalModel(ctx, parentName, node, out.Addr().Interface())
 		} else {
 			return unmarshalStruct(ctx, parentName, node, out.Addr().Interface())
 		}
@@ -252,7 +257,7 @@ func unmarshalMapping(ctx context.Context, parentName string, node *yaml.Node, o
 	}
 }
 
-func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]error, error) {
+func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, structPtr any) ([]error, error) {
 	resolvedNode := yml.ResolveAlias(node)
 	if resolvedNode == nil {
 		return nil, nil
@@ -285,7 +290,7 @@ func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 
 	if resolvedNode.Kind != yaml.MappingNode {
 		return []error{
-			validation.NewValidationError(validation.NewTypeMismatchError("%s expected object, got %s", modelTag, yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+			validation.NewValidationError(validation.NewTypeMismatchError(parentName, "expected object, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
 		}, nil
 	}
 
@@ -420,7 +425,7 @@ func unmarshalModel(ctx context.Context, node *yaml.Node, structPtr any) ([]erro
 	// Check for missing required fields using cached required field info
 	for tag := range fieldMap.RequiredFields {
 		if _, ok := foundRequiredFields.Load(tag); !ok {
-			validationErrs = append(validationErrs, validation.NewValidationError(validation.NewMissingFieldError("%s field %s is missing", modelTag, tag), resolvedNode))
+			validationErrs = append(validationErrs, validation.NewValidationError(validation.NewMissingFieldError("%s.%s is missing", modelTag, tag), resolvedNode))
 		}
 	}
 
@@ -456,10 +461,10 @@ func decodeNode(_ context.Context, parentName string, node *yaml.Node, out any) 
 	}
 
 	// Check if this is a type mismatch error
-	if isTypeMismatchError(err) {
+	if yamlTypeErr := asTypeMismatchError(err); yamlTypeErr != nil {
 		// Convert type mismatch to validation error
-		validationErr := validation.NewValidationError(validation.NewTypeMismatchError(fmt.Sprintf("%s%s", getOptionalParentName(parentName), err.Error())), resolvedNode)
-		return []error{validationErr}, nil
+		validationErr := validation.NewValidationError(validation.NewTypeMismatchError(parentName, strings.Join(yamlTypeErr.Errors, ", ")), resolvedNode)
+		return []error{validationErr}, nil //nolint:nilerr
 	}
 
 	// For all other errors (syntax, etc.), return as standard error
@@ -488,7 +493,7 @@ func unmarshalSequence(ctx context.Context, parentName string, node *yaml.Node, 
 		g.Go(func() error {
 			valueNode := resolvedNode.Content[i]
 
-			elementValidationErrs, err := unmarshal(ctx, parentName, valueNode, out.Index(i))
+			elementValidationErrs, err := unmarshal(ctx, fmt.Sprintf("%s.%d", parentName, i), valueNode, out.Index(i))
 			if err != nil {
 				return err
 			}
@@ -602,29 +607,61 @@ func isMapType(out reflect.Value) bool {
 }
 
 // validateNodeKind checks if the node kind matches the expected kind and returns appropriate error
-func validateNodeKind(resolvedNode *yaml.Node, expectedKind yaml.Kind, parentName, expectedType string) error {
+func validateNodeKind(resolvedNode *yaml.Node, expectedKind yaml.Kind, parentName string, reflectType reflect.Type, expectedType string) error {
 	if resolvedNode == nil {
-		return validation.NewValidationError(validation.NewTypeMismatchError("%sexpected %s, got nil", getOptionalParentName(parentName), yml.NodeKindToString(expectedKind)), nil)
+		return validation.NewValidationError(validation.NewTypeMismatchError(parentName, "expected %s, got nil", yml.NodeKindToString(expectedKind)), nil)
 	}
 
-	if resolvedNode.Kind != expectedKind {
+	// Check if the node kind matches
+	isSameKind := resolvedNode.Kind == expectedKind
+	tagMatches := true
+
+	// Get acceptable tags based on whether we have a reflect.Type or just a string
+	var acceptableTags []string
+	if reflectType != nil {
+		acceptableTags = yml.TypeToYamlTags(reflectType)
+	} else {
+		switch expectedType {
+		case "object":
+			acceptableTags = []string{"!!map"}
+		case "sequence":
+			acceptableTags = []string{"!!seq"}
+		}
+	}
+
+	if len(acceptableTags) > 0 {
+		tagMatches = false
+		for _, acceptableTag := range acceptableTags {
+			if acceptableTag == resolvedNode.Tag {
+				tagMatches = true
+				break
+			}
+		}
+	}
+
+	if !isSameKind {
 		actualKindStr := yml.NodeKindToString(resolvedNode.Kind)
 
-		return validation.NewValidationError(validation.NewTypeMismatchError("%sexpected %s, got %s", getOptionalParentName(parentName), expectedType, actualKindStr), resolvedNode)
+		if actualKindStr == "scalar" {
+			actualKindStr = fmt.Sprintf("`%s`", resolvedNode.Value)
+		}
+
+		return validation.NewValidationError(validation.NewTypeMismatchError(parentName, "expected %s, got %s", expectedType, actualKindStr), resolvedNode)
+	}
+
+	if !tagMatches {
+		return validation.NewValidationError(validation.NewTypeMismatchError(parentName, "expected %s, got %s", expectedType, yml.NodeTagToString(resolvedNode.Tag)), resolvedNode)
 	}
 	return nil
 }
 
-// isTypeMismatchError checks if the error is a YAML type mismatch error
-// using proper type checking instead of string matching
-func isTypeMismatchError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	// Check using errors.As for wrapped errors
+// asTypeMismatchError returns the underlying yaml.TypeError if the error is a type mismatch error
+func asTypeMismatchError(err error) *yaml.TypeError {
 	var yamlTypeErr *yaml.TypeError
-	return errors.As(err, &yamlTypeErr)
+	if errors.As(err, &yamlTypeErr) {
+		return yamlTypeErr
+	}
+	return nil
 }
 
 // initializeEmbeddedSequencedMap handles initialization of embedded sequenced maps
@@ -653,12 +690,4 @@ func initializeEmbeddedSequencedMap(fieldVal reflect.Value) interfaces.Sequenced
 		}
 	}
 	return nil
-}
-
-func getOptionalParentName(parentName string) string {
-	if parentName != "" {
-		parentName += " "
-	}
-
-	return parentName
 }

@@ -135,36 +135,36 @@ func (l *Link) Validate(ctx context.Context, opts ...validation.Option) []error 
 		}
 
 		if !foundOp {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("link field operationId value %s does not exist in document", *l.OperationID), core, core.OperationID))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("link.operationId value %s does not exist in document", *l.OperationID), core, core.OperationID))
 		}
 	}
 
 	// TODO should we validate the reference resolves here? Or as part of the resolution operation? Or make it optional?
 	if l.OperationRef != nil {
 		if _, err := url.Parse(*l.OperationRef); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("link field operationRef is not a valid uri: %s", err), core, core.OperationRef))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("link.operationRef is not a valid uri: %s", err), core, core.OperationRef))
 		}
 	}
 
 	for key, exp := range l.GetParameters().All() {
 		_, expression, err := expression.GetValueOrExpressionValue(exp)
 		if err != nil {
-			errs = append(errs, validation.NewMapValueError(validation.NewValueValidationError("link field parameters expression is invalid: %s", err.Error()), core, core.Parameters, key))
+			errs = append(errs, validation.NewMapValueError(validation.NewValueValidationError("link.parameters expression is invalid: %s", err.Error()), core, core.Parameters, key))
 		}
 		if expression != nil {
 			if err := expression.Validate(); err != nil {
-				errs = append(errs, validation.NewMapValueError(validation.NewValueValidationError("link field parameters expression is invalid: %s", err.Error()), core, core.Parameters, key))
+				errs = append(errs, validation.NewMapValueError(validation.NewValueValidationError("link.parameters expression is invalid: %s", err.Error()), core, core.Parameters, key))
 			}
 		}
 	}
 
 	_, rbe, err := expression.GetValueOrExpressionValue(l.RequestBody)
 	if err != nil {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("link field requestBody expression is invalid: %s", err.Error()), core, core.RequestBody))
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("link.requestBody expression is invalid: %s", err.Error()), core, core.RequestBody))
 	}
 	if rbe != nil {
 		if err := rbe.Validate(); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("link field requestBody expression is invalid: %s", err.Error()), core, core.RequestBody))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("link.requestBody expression is invalid: %s", err.Error()), core, core.RequestBody))
 		}
 	}
 

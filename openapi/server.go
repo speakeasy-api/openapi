@@ -77,16 +77,16 @@ func (s *Server) Validate(ctx context.Context, opts ...validation.Option) []erro
 	if core.URL.Present {
 		switch {
 		case s.URL == "":
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("server field url is required"), core, core.URL))
+			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("server.url is required"), core, core.URL))
 		case !strings.Contains(s.URL, "{"):
 			if _, err := url.Parse(s.URL); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("server field url is not a valid uri: %s", err), core, core.URL))
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("server.url is not a valid uri: %s", err), core, core.URL))
 			}
 		default:
 			if resolvedURL, err := resolveServerVariables(s.URL, s.Variables); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("server field url is not a valid uri: %s", err), core, core.URL))
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("server.url is not a valid uri: %s", err), core, core.URL))
 			} else if _, err := url.Parse(resolvedURL); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("server field url is not a valid uri: %s", err), core, core.URL))
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("server.url is not a valid uri: %s", err), core, core.URL))
 			}
 		}
 	}
@@ -147,12 +147,12 @@ func (v *ServerVariable) Validate(ctx context.Context, opts ...validation.Option
 	errs := []error{}
 
 	if core.Default.Present && v.Default == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("serverVariable field default is required"), core, core.Default))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("serverVariable.default is required"), core, core.Default))
 	}
 
 	if core.Enum.Present {
 		if !slices.Contains(v.Enum, v.Default) {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("serverVariable field default must be one of [%s]", strings.Join(v.Enum, ", ")), core, core.Enum))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("serverVariable.default must be one of [%s]", strings.Join(v.Enum, ", ")), core, core.Enum))
 		}
 	}
 

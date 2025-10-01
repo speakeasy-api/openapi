@@ -26,8 +26,8 @@ type Responses struct {
 var _ interfaces.Model[core.Responses] = (*Responses)(nil)
 
 // NewResponses creates a new Responses instance with an initialized map.
-func NewResponses(elements ...*sequencedmap.Element[string, *ReferencedResponse]) *Responses {
-	return &Responses{
+func NewResponses(elements ...*sequencedmap.Element[string, *ReferencedResponse]) Responses {
+	return Responses{
 		Map: *sequencedmap.New(elements...),
 	}
 }
@@ -183,7 +183,7 @@ func (r *Response) Validate(ctx context.Context, opts ...validation.Option) []er
 	errs := []error{}
 
 	if core.Description.Present && r.Description == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("response field description is required"), core, core.Description))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("response.description is required"), core, core.Description))
 	}
 
 	for _, header := range r.GetHeaders().All() {

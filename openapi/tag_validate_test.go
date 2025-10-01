@@ -90,7 +90,7 @@ func TestTag_Validate_Error(t *testing.T) {
 			yml: `
 description: A tag without name
 `,
-			wantErrs: []string{"[2:1] tag field name is missing"},
+			wantErrs: []string{"[2:1] tag.name is missing"},
 		},
 		{
 			name: "empty name",
@@ -98,7 +98,7 @@ description: A tag without name
 name: ""
 description: A tag with empty name
 `,
-			wantErrs: []string{"[2:7] tag field name is required"},
+			wantErrs: []string{"[2:7] tag.name is required"},
 		},
 		{
 			name: "invalid external docs URL",
@@ -107,7 +107,7 @@ name: test
 externalDocs:
   url: ":invalid"
 `,
-			wantErrs: []string{"[4:8] externalDocumentation field url is not a valid uri: parse \":invalid\": missing protocol scheme"},
+			wantErrs: []string{"[4:8] externalDocumentation.url is not a valid uri: parse \":invalid\": missing protocol scheme"},
 		},
 		{
 			name: "external docs without URL",
@@ -116,7 +116,7 @@ name: test
 externalDocs:
   description: Documentation without URL
 `,
-			wantErrs: []string{"[4:3] externalDocumentation field url is missing"},
+			wantErrs: []string{"[4:3] externalDocumentation.url is missing"},
 		},
 		{
 			name: "multiple validation errors",
@@ -126,8 +126,8 @@ externalDocs:
   url: ":invalid"
 `,
 			wantErrs: []string{
-				"[2:7] tag field name is required",
-				"[4:8] externalDocumentation field url is not a valid uri: parse \":invalid\": missing protocol scheme",
+				"[2:7] tag.name is required",
+				"[4:8] externalDocumentation.url is not a valid uri: parse \":invalid\": missing protocol scheme",
 			},
 		},
 	}

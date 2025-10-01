@@ -312,7 +312,7 @@ func walkOperation(ctx context.Context, operation *Operation, loc []LocationCont
 	}
 
 	// Walk through responses
-	if !walkResponses(ctx, operation.Responses, append(loc, LocationContext{ParentMatchFunc: operationMatchFunc, ParentField: "responses"}), openAPI, yield) {
+	if !walkResponses(ctx, &operation.Responses, append(loc, LocationContext{ParentMatchFunc: operationMatchFunc, ParentField: "responses"}), openAPI, yield) {
 		return false
 	}
 

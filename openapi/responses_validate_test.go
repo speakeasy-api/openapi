@@ -9,6 +9,7 @@ import (
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/validation"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -147,7 +148,7 @@ content:
     schema:
       type: object
 `,
-			wantErrs: []string{"[2:1] response field description is missing"},
+			wantErrs: []string{"[2:1] response.description is missing"},
 		},
 		{
 			name: "empty description",
@@ -158,7 +159,7 @@ content:
     schema:
       type: object
 `,
-			wantErrs: []string{"[2:14] response field description is required"},
+			wantErrs: []string{"[2:14] response.description is required"},
 		},
 		{
 			name: "invalid schema in content",
@@ -169,7 +170,10 @@ content:
     schema:
       type: invalid-type
 `,
-			wantErrs: []string{"schema field type value must be one of"},
+			wantErrs: []string{
+				"[6:13] schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"[6:13] schema.type expected array, got string",
+			},
 		},
 	}
 
@@ -198,16 +202,7 @@ content:
 				}
 			}
 
-			for _, expectedErr := range tt.wantErrs {
-				found := false
-				for _, errMsg := range errMessages {
-					if strings.Contains(errMsg, expectedErr) {
-						found = true
-						break
-					}
-				}
-				require.True(t, found, "expected error message '%s' not found in: %v", expectedErr, errMessages)
-			}
+			assert.Equal(t, tt.wantErrs, errMessages)
 		})
 	}
 }

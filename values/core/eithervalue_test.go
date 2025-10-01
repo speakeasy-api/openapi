@@ -8,6 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -346,39 +347,31 @@ func TestHasTypeMismatchErrors_Success(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "contains expected/got pattern",
+			name: "contains type mismatch error",
 			errors: []error{
-				assert.AnError,
-				errors.New("expected string but got number"),
+				validation.NewValidationError(validation.NewTypeMismatchError("", "expected string but got number"), nil),
 			},
 			expected: true,
 		},
 		{
-			name: "contains expected/received pattern",
+			name: "contains type mismatch error with parent name",
 			errors: []error{
-				errors.New("expected object but received array"),
+				validation.NewValidationError(validation.NewTypeMismatchError("", "expected object but received array"), nil),
 			},
 			expected: true,
 		},
 		{
-			name: "contains type mismatch",
+			name: "no type mismatch errors",
 			errors: []error{
-				errors.New("type mismatch error"),
+				validation.NewValidationError(validation.NewValueValidationError("some other validation error"), nil),
+				validation.NewValidationError(validation.NewMissingFieldError("missing required field"), nil),
 			},
-			expected: true,
+			expected: false,
 		},
 		{
-			name: "contains cannot unmarshal",
+			name: "plain errors without validation wrapper",
 			errors: []error{
-				errors.New("cannot unmarshal array into string"),
-			},
-			expected: true,
-		},
-		{
-			name: "no type mismatch patterns",
-			errors: []error{
-				errors.New("some other validation error"),
-				errors.New("missing required field"),
+				errors.New("some error"),
 			},
 			expected: false,
 		},
@@ -387,7 +380,7 @@ func TestHasTypeMismatchErrors_Success(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := hasTypeMismatchErrors(tt.errors)
+			result := hasTypeMismatchErrors("", tt.errors)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

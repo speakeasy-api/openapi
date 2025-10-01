@@ -303,11 +303,11 @@ sourceDescriptions:
 		column          int
 		underlyingError error
 	}{
-		{line: 1, column: 1, underlyingError: validation.NewMissingFieldError("arazzo field workflows is missing")},
-		{line: 1, column: 9, underlyingError: validation.NewValueValidationError("arazzo field version only 1.0.1 and below is supported")},
-		{line: 4, column: 3, underlyingError: validation.NewMissingFieldError("info field version is missing")},
-		{line: 6, column: 5, underlyingError: validation.NewMissingFieldError("sourceDescription field url is missing")},
-		{line: 7, column: 11, underlyingError: validation.NewValueValidationError("sourceDescription field type must be one of [openapi, arazzo]")},
+		{line: 1, column: 1, underlyingError: validation.NewMissingFieldError("arazzo.workflows is missing")},
+		{line: 1, column: 9, underlyingError: validation.NewValueValidationError("arazzo.version only 1.0.1 and below is supported")},
+		{line: 4, column: 3, underlyingError: validation.NewMissingFieldError("info.version is missing")},
+		{line: 6, column: 5, underlyingError: validation.NewMissingFieldError("sourceDescription.url is missing")},
+		{line: 7, column: 11, underlyingError: validation.NewValueValidationError("sourceDescription.type must be one of [openapi, arazzo]")},
 	}
 
 	require.Len(t, validationErrs, len(expectedErrors), "number of validation errors should match")
@@ -635,7 +635,7 @@ var stressTests = []struct {
 		args: args{
 			location: "https://raw.githubusercontent.com/frankkilcommins/simple-spectral-arazzo-GA/4ec8856f1cf21c0f77597c715c150ef3e2772a89/apis/OnlineStore.arazzo.yaml",
 			validationIgnores: []string{
-				"field title is missing", // legit issue
+				"info.title is missing", // legit issue
 				"operationId must be a valid expression if there are multiple OpenAPI source descriptions", // legit issue
 				"$responses.body.menuItems[0].subcategories[0].id",                                         // legit issue
 			},

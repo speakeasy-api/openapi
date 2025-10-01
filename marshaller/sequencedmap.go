@@ -29,8 +29,8 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 
 	// Check if the node is actually a mapping node
 	if resolvedNode.Kind != yaml.MappingNode {
-		validationErr := validation.NewTypeMismatchError("%sexpected mapping node for sequenced map, got %v", getOptionalParentName(parentName), resolvedNode.Kind)
-		return []error{validationErr}, nil
+		validationErr := validation.NewTypeMismatchError(parentName, "expected mapping node for sequenced map, got %v", resolvedNode.Kind)
+		return []error{validation.NewValidationError(validationErr, resolvedNode)}, nil
 	}
 
 	target.Init()
@@ -71,7 +71,7 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 			}
 
 			// Unmarshal into the concrete value
-			validationErrs, err := UnmarshalKeyValuePair(ctx, parentName, keyNode, valueNode, concreteValue)
+			validationErrs, err := UnmarshalKeyValuePair(ctx, parentName+"."+key, keyNode, valueNode, concreteValue)
 			if err != nil {
 				return err
 			}

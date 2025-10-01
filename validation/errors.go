@@ -137,23 +137,30 @@ func NewMapValueError(err error, core CoreModeler, node mapValueNodeGetter, key 
 }
 
 type TypeMismatchError struct {
-	Msg string
+	Msg        string
+	ParentName string
 }
 
 var _ error = (*TypeMismatchError)(nil)
 
-func NewTypeMismatchError(msg string, args ...any) *TypeMismatchError {
+func NewTypeMismatchError(parentName, msg string, args ...any) *TypeMismatchError {
 	if len(args) > 0 {
 		msg = fmt.Errorf(msg, args...).Error()
 	}
 
 	return &TypeMismatchError{
-		Msg: msg,
+		Msg:        msg,
+		ParentName: parentName,
 	}
 }
 
 func (e TypeMismatchError) Error() string {
-	return e.Msg
+	name := e.ParentName
+	if name != "" {
+		name += " "
+	}
+
+	return fmt.Sprintf("%s%s", name, e.Msg)
 }
 
 type MissingFieldError struct {

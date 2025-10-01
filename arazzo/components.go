@@ -44,7 +44,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	for key, input := range c.Inputs.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field inputs key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Inputs, key))
+			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components.inputs key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Inputs, key))
 		}
 
 		errs = append(errs, input.Validate(ctx, opts...)...)
@@ -52,7 +52,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	for key, parameter := range c.Parameters.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field parameters key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Parameters, key))
+			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components.parameters key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.Parameters, key))
 		}
 
 		paramOps := opts
@@ -63,7 +63,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	for key, successAction := range c.SuccessActions.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field successActions key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.SuccessActions, key))
+			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components.successActions key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.SuccessActions, key))
 		}
 
 		successActionOps := opts
@@ -74,7 +74,7 @@ func (c *Components) Validate(ctx context.Context, opts ...validation.Option) []
 
 	for key, failureAction := range c.FailureActions.All() {
 		if !componentNameRegex.MatchString(key) {
-			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components field failureActions key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.FailureActions, key))
+			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("components.failureActions key must be a valid key [%s]: %s", componentNameRegex.String(), key), core, core.FailureActions, key))
 		}
 
 		failureActionOps := opts

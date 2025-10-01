@@ -107,11 +107,11 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 
 	arazzoMajor, arazzoMinor, arazzoPatch, err := utils.ParseVersion(a.Arazzo)
 	if err != nil {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("arazzo field version is invalid %s: %s", a.Arazzo, err.Error()), core, core.Arazzo))
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("arazzo.version is invalid %s: %s", a.Arazzo, err.Error()), core, core.Arazzo))
 	}
 
 	if arazzoMajor != VersionMajor || arazzoMinor != VersionMinor || arazzoPatch > VersionPatch {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("arazzo field version only %s and below is supported", Version), core, core.Arazzo))
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("arazzo.version only %s and below is supported", Version), core, core.Arazzo))
 	}
 
 	errs = append(errs, a.Info.Validate(ctx, opts...)...)
@@ -122,7 +122,7 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, sourceDescription.Validate(ctx, opts...)...)
 
 		if _, ok := sourceDescriptionNames[sourceDescription.Name]; ok {
-			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("sourceDescription field name %s is not unique", sourceDescription.Name), core, core.SourceDescriptions, i))
+			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("sourceDescription.name %s is not unique", sourceDescription.Name), core, core.SourceDescriptions, i))
 		}
 
 		sourceDescriptionNames[sourceDescription.Name] = true
@@ -134,7 +134,7 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, workflow.Validate(ctx, opts...)...)
 
 		if _, ok := workflowIds[workflow.WorkflowID]; ok {
-			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow field workflowId %s is not unique", workflow.WorkflowID), core, core.Workflows, i))
+			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow.workflowId %s is not unique", workflow.WorkflowID), core, core.Workflows, i))
 		}
 
 		workflowIds[workflow.WorkflowID] = true

@@ -260,7 +260,7 @@ securitySchemes:
   InvalidScheme:
     description: Some scheme
 `,
-			wantErrs: []string{"field type is missing"},
+			wantErrs: []string{"[4:5] securityScheme.type is missing"},
 		},
 	}
 

@@ -31,44 +31,59 @@ func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, parentName string, no
 	var rightUnmarshalErr error
 	var rightValidationErrs []error
 
+	v.SetRootNode(node)
+
 	// Try Left type without strict mode
 	leftValidationErrs, leftUnmarshalErr = marshaller.UnmarshalCore(ctx, parentName, node, &v.Left)
-	if leftUnmarshalErr == nil && !hasTypeMismatchErrors(leftValidationErrs) {
+	if leftUnmarshalErr == nil && !hasTypeMismatchErrors(parentName, leftValidationErrs) {
 		// No unmarshaling error and no type mismatch validation errors - this is successful
 		v.IsLeft = true
-		v.SetRootNode(node)
 		return leftValidationErrs, nil
 	}
 
 	// Try Right type without strict mode
 	rightValidationErrs, rightUnmarshalErr = marshaller.UnmarshalCore(ctx, parentName, node, &v.Right)
-	if rightUnmarshalErr == nil && !hasTypeMismatchErrors(rightValidationErrs) {
+	if rightUnmarshalErr == nil && !hasTypeMismatchErrors(parentName, rightValidationErrs) {
 		// No unmarshaling error and no type mismatch validation errors - this is successful
 		v.IsRight = true
-		v.SetRootNode(node)
 		return rightValidationErrs, nil
 	}
 
-	leftType := reflect.TypeOf((*L)(nil)).Elem().Name()
-	rightType := reflect.TypeOf((*R)(nil)).Elem().Name()
+	leftType := typeToName[L]()
+	rightType := typeToName[R]()
 
 	// Both types failed - determine if we should return validation errors or unmarshaling errors
 	// Both failed with validation errors only (no real unmarshaling errors)
 	if leftUnmarshalErr == nil && rightUnmarshalErr == nil {
-		// Combine the validation errors and return them instead of an error
-		allValidationErrs := leftValidationErrs
-		allValidationErrs = append(allValidationErrs, rightValidationErrs...)
+		// Filter out child errors from both left and right validation errors
+		leftParentErrs, leftChildErrs := filterChildErrors(parentName, leftValidationErrs)
+		rightParentErrs, rightChildErrs := filterChildErrors(parentName, rightValidationErrs)
 
-		msg := fmt.Errorf("%s failed to validate either %s or %s: %w", parentName, leftType, rightType, errors.Join(allValidationErrs...)).Error()
+		// Combine parent-level validation errors for the error message
+		allParentErrs := make([]error, 0, len(leftParentErrs)+len(rightParentErrs))
+		allParentErrs = append(allParentErrs, leftParentErrs...)
+		allParentErrs = append(allParentErrs, rightParentErrs...)
+
+		msg := fmt.Sprintf("failed to validate either %s [%s] or %s [%s]", leftType, getUnwrappedErrors(leftParentErrs), rightType, getUnwrappedErrors(rightParentErrs))
 
 		var validationError error
-		if hasTypeMismatchErrors(allValidationErrs) {
-			validationError = validation.NewTypeMismatchError(msg)
+		if hasTypeMismatchErrors(parentName, allParentErrs) {
+			validationError = validation.NewTypeMismatchError(parentName, msg)
 		} else {
-			validationError = validation.NewValueValidationError(msg)
+			name := parentName
+			if name != "" {
+				name += " "
+			}
+
+			validationError = validation.NewValueValidationError(fmt.Sprintf("%s%s", name, msg))
 		}
 
-		return []error{validation.NewValidationError(validationError, node)}, nil
+		// Return the validation error along with all child errors separately
+		result := []error{validation.NewValidationError(validationError, node)}
+		result = append(result, leftChildErrs...)
+		result = append(result, rightChildErrs...)
+
+		return result, nil
 	}
 
 	// At least one had a real unmarshaling error - return as unmarshaling failure
@@ -88,33 +103,48 @@ func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, parentName string, no
 	return nil, fmt.Errorf("unable to marshal into either %s or %s: %w", leftType, rightType, errors.Join(errs...))
 }
 
-// hasTypeMismatchErrors checks if the validation errors contain type mismatch errors
-// indicating that the type couldn't be unmarshaled successfully.
-// It ignores type mismatch errors from nested either values to avoid cascading failures.
-func hasTypeMismatchErrors(validationErrs []error) bool {
-	if len(validationErrs) == 0 {
-		return false
+// isParentError checks if an error belongs to the current parentName level
+func isParentError(parentName string, err error) bool {
+	var typeMismatchErr *validation.TypeMismatchError
+	if !errors.As(err, &typeMismatchErr) {
+		return true // Non-type-mismatch errors are considered parent errors
 	}
 
-	for _, err := range validationErrs {
-		errStr := err.Error()
+	return typeMismatchErr.ParentName == parentName
+}
 
-		// Skip errors from nested either values - these are child validation failures
-		// that shouldn't cause the parent either value to fail
-		if strings.Contains(errStr, "failed to validate either") {
+// hasTypeMismatchErrors checks if the validation errors contain type mismatch errors
+// indicating that the type couldn't be unmarshaled successfully.
+// It ignores type mismatch errors from child properties to avoid cascading failures.
+func hasTypeMismatchErrors(parentName string, validationErrs []error) bool {
+	for _, err := range validationErrs {
+		// Check if it's a TypeMismatchError (isParentError returns true for non-TypeMismatchErrors)
+		var typeMismatchErr *validation.TypeMismatchError
+		if !errors.As(err, &typeMismatchErr) {
 			continue
 		}
 
-		// Check if this is a type mismatch error by looking for common patterns
-		if strings.Contains(errStr, "expected") && (strings.Contains(errStr, "got") || strings.Contains(errStr, "but received")) {
-			return true
+		// Check if it's at the parent level
+		if !isParentError(parentName, err) {
+			continue
 		}
-		if strings.Contains(errStr, "type mismatch") || strings.Contains(errStr, "cannot unmarshal") {
-			return true
-		}
+
+		return true
 	}
 
 	return false
+}
+
+// filterChildErrors separates child errors from parent errors based on parentName
+func filterChildErrors(parentName string, validationErrs []error) (parentErrs []error, childErrs []error) {
+	for _, err := range validationErrs {
+		if isParentError(parentName, err) {
+			parentErrs = append(parentErrs, err)
+		} else {
+			childErrs = append(childErrs, err)
+		}
+	}
+	return parentErrs, childErrs
 }
 
 func (v *EitherValue[L, R]) SyncChanges(ctx context.Context, model any, valueNode *yaml.Node) (*yaml.Node, error) {
@@ -193,4 +223,32 @@ func (v *EitherValue[L, R]) GetNavigableNode() (any, error) {
 		return v.Left, nil
 	}
 	return v.Right, nil
+}
+
+func getUnwrappedErrors(errs []error) string {
+	var unwrappedErrs []string
+	for _, err := range errs {
+		unwrapped := errors.Unwrap(err)
+		if unwrapped == nil {
+			unwrapped = err
+		}
+
+		unwrappedErrs = append(unwrappedErrs, unwrapped.Error())
+	}
+	return strings.Join(unwrappedErrs, ", ")
+}
+
+func typeToName[T any]() string {
+	typ := reflect.TypeOf((*T)(nil)).Elem()
+	name := typ.Name()
+	if name == "" {
+		switch typ.Kind() {
+		case reflect.Slice, reflect.Array:
+			name = "sequence"
+		case reflect.Map, reflect.Struct:
+			name = "object"
+		}
+	}
+
+	return name
 }

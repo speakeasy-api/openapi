@@ -83,7 +83,7 @@ func TestExternalDoc_Validate_Error(t *testing.T) {
 			yml: `
 description: Some documentation
 `,
-			wantErrs: []string{"[2:1] externalDocumentation field url is missing"},
+			wantErrs: []string{"[2:1] externalDocumentation.url is missing"},
 		},
 		{
 			name: "empty URL",
@@ -91,7 +91,7 @@ description: Some documentation
 description: Some documentation
 url: ""
 `,
-			wantErrs: []string{"[3:6] externalDocumentation field url is required"},
+			wantErrs: []string{"[3:6] externalDocumentation.url is required"},
 		},
 		{
 			name: "invalid URL format",
@@ -99,7 +99,7 @@ url: ""
 description: Some documentation
 url: ":invalid"
 `,
-			wantErrs: []string{" externalDocumentation field url is not a valid uri"},
+			wantErrs: []string{" externalDocumentation.url is not a valid uri"},
 		},
 		{
 			name: "invalid URL with spaces",
@@ -107,7 +107,7 @@ url: ":invalid"
 description: Some documentation
 url: ":invalid url"
 `,
-			wantErrs: []string{" externalDocumentation field url is not a valid uri"},
+			wantErrs: []string{" externalDocumentation.url is not a valid uri"},
 		},
 	}
 

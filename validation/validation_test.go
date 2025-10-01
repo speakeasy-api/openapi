@@ -464,7 +464,7 @@ func TestTypeMismatchError_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := NewTypeMismatchError(tt.msg, tt.args...)
+			err := NewTypeMismatchError("", tt.msg, tt.args...)
 			assert.Equal(t, tt.expected, err.Error())
 			assert.Equal(t, tt.expected, err.Msg)
 		})
