@@ -8,6 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/internal/version"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/sequencedmap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -112,12 +113,14 @@ func upgradeFrom310To312(_ context.Context, doc *OpenAPI, currentVersion *versio
 	doc.OpenAPI = maxVersion.String()
 }
 
-func upgradeFrom31To32(_ context.Context, doc *OpenAPI, currentVersion *version.Version, targetVersion *version.Version) {
+func upgradeFrom31To32(ctx context.Context, doc *OpenAPI, currentVersion *version.Version, targetVersion *version.Version) {
 	if !targetVersion.GreaterThan(*currentVersion) {
 		return
 	}
 
-	// TODO: Upgrade path additionalOperations for non-standard HTTP methods
+	// Upgrade path additionalOperations for non-standard HTTP methods
+	migrateAdditionalOperations31to32(ctx, doc)
+
 	// TODO: Upgrade tags such as x-displayName to summary, and x-tagGroups with parents, etc.
 
 	// Currently no breaking changes between 3.1.x and 3.2.x that need to be handled
@@ -129,6 +132,46 @@ func upgradeFrom31To32(_ context.Context, doc *OpenAPI, currentVersion *version.
 		maxVersion = targetVersion
 	}
 	doc.OpenAPI = maxVersion.String()
+}
+
+// migrateAdditionalOperations31to32 migrates non-standard HTTP methods from the main operations map
+// to the additionalOperations field in PathItem objects for OpenAPI 3.2.0+ compatibility.
+func migrateAdditionalOperations31to32(_ context.Context, doc *OpenAPI) {
+	if doc.Paths == nil {
+		return
+	}
+
+	for _, referencedPathItem := range doc.Paths.All() {
+		if referencedPathItem == nil || referencedPathItem.Object == nil {
+			continue
+		}
+
+		pathItem := referencedPathItem.Object
+		nonStandardMethods := sequencedmap.New[string, *Operation]()
+
+		// Find non-standard HTTP methods in the main operations map
+		for method, operation := range pathItem.All() {
+			if !IsStandardMethod(string(method)) {
+				nonStandardMethods.Set(string(method), operation)
+			}
+		}
+
+		// If we found non-standard methods, migrate them to additionalOperations
+		if nonStandardMethods.Len() > 0 {
+			// Initialize additionalOperations if it doesn't exist
+			if pathItem.AdditionalOperations == nil {
+				pathItem.AdditionalOperations = sequencedmap.New[string, *Operation]()
+			}
+
+			// Move each non-standard operation to additionalOperations
+			for method, operation := range nonStandardMethods.All() {
+				pathItem.AdditionalOperations.Set(method, operation)
+
+				// Remove from the main operations map
+				pathItem.Map.Delete(HTTPMethod(method))
+			}
+		}
+	}
 }
 
 func upgradeSchema30to31(js *oas3.JSONSchema[oas3.Referenceable]) {

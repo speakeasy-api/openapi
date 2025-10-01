@@ -57,6 +57,14 @@ func TestUpgrade_Success(t *testing.T) {
 			options:      nil,
 			description:  "nullable schema should upgrade to oneOf without panic",
 		},
+		{
+			name:          "upgrade_3_1_0_with_custom_methods",
+			inputFile:     "testdata/upgrade/3_1_0_with_custom_methods.yaml",
+			expectedFile:  "testdata/upgrade/expected_3_1_0_with_custom_methods_upgraded.yaml",
+			options:       []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeTargetVersion("3.2.0")},
+			description:   "3.1.0 with custom HTTP methods should migrate to additionalOperations",
+			targetVersion: "3.2.0",
+		},
 	}
 
 	for _, tt := range tests {
@@ -310,4 +318,76 @@ components:
 	simpleExample := simpleExampleProp.GetLeft()
 	assert.Nil(t, simpleExample.Example, "example should be nil")
 	assert.NotEmpty(t, simpleExample.Examples, "examples should not be empty")
+}
+
+func TestUpgradeAdditionalOperations(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Create a document with non-standard HTTP methods
+	doc := &openapi.OpenAPI{
+		OpenAPI: "3.1.0",
+		Info: openapi.Info{
+			Title:   "Test API",
+			Version: "1.0.0",
+		},
+		Paths: openapi.NewPaths(),
+	}
+
+	// Add a path with both standard and non-standard methods
+	pathItem := openapi.NewPathItem()
+
+	// Standard method
+	pathItem.Set(openapi.HTTPMethodGet, &openapi.Operation{
+		Summary:   &[]string{"Get operation"}[0],
+		Responses: openapi.NewResponses(),
+	})
+
+	// Non-standard methods
+	pathItem.Set(openapi.HTTPMethod("copy"), &openapi.Operation{
+		Summary:   &[]string{"Copy operation"}[0],
+		Responses: openapi.NewResponses(),
+	})
+
+	pathItem.Set(openapi.HTTPMethod("purge"), &openapi.Operation{
+		Summary:   &[]string{"Purge operation"}[0],
+		Responses: openapi.NewResponses(),
+	})
+
+	doc.Paths.Set("/test", &openapi.ReferencedPathItem{Object: pathItem})
+
+	// Verify initial state
+	assert.Equal(t, 3, pathItem.Len(), "should have 3 operations initially")
+	assert.Nil(t, pathItem.AdditionalOperations, "additionalOperations should be nil initially")
+	assert.NotNil(t, pathItem.GetOperation(openapi.HTTPMethod("copy")), "copy operation should exist in main map")
+	assert.NotNil(t, pathItem.GetOperation(openapi.HTTPMethod("purge")), "purge operation should exist in main map")
+
+	// Perform upgrade to 3.2.0
+	upgraded, err := openapi.Upgrade(ctx, doc, openapi.WithUpgradeTargetVersion("3.2.0"))
+	require.NoError(t, err, "upgrade should not fail")
+	assert.True(t, upgraded, "upgrade should have been performed")
+	assert.Equal(t, "3.2.0", doc.OpenAPI, "version should be 3.2.0")
+
+	// Verify migration results
+	assert.Equal(t, 1, pathItem.Len(), "should have only 1 operation in main map after migration")
+	assert.NotNil(t, pathItem.AdditionalOperations, "additionalOperations should be initialized")
+	assert.Equal(t, 2, pathItem.AdditionalOperations.Len(), "should have 2 operations in additionalOperations")
+
+	// Verify standard method remains in main map
+	assert.NotNil(t, pathItem.GetOperation(openapi.HTTPMethodGet), "get operation should remain in main map")
+
+	// Verify non-standard methods are moved to additionalOperations
+	assert.Nil(t, pathItem.GetOperation(openapi.HTTPMethod("copy")), "copy operation should be removed from main map")
+	assert.Nil(t, pathItem.GetOperation(openapi.HTTPMethod("purge")), "purge operation should be removed from main map")
+
+	copyOp, exists := pathItem.AdditionalOperations.Get("copy")
+	assert.True(t, exists, "copy operation should exist in additionalOperations")
+	assert.NotNil(t, copyOp, "copy operation should not be nil")
+	assert.Equal(t, "Copy operation", *copyOp.Summary, "copy operation summary should be preserved")
+
+	purgeOp, exists := pathItem.AdditionalOperations.Get("purge")
+	assert.True(t, exists, "purge operation should exist in additionalOperations")
+	assert.NotNil(t, purgeOp, "purge operation should not be nil")
+	assert.Equal(t, "Purge operation", *purgeOp.Summary, "purge operation summary should be preserved")
 }
