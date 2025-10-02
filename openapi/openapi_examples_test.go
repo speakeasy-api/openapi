@@ -359,6 +359,7 @@ func Example_walking() {
 	// Found Info: Test OpenAPI Document (version 1.0.0)
 	// Found Schema of type: string
 	// Found Operation: test
+	// Found Operation: copyTest
 	// Found Schema of type: integer
 	// Found Operation: updateUser
 	// Walk terminated early

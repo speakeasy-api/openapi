@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/version"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -77,7 +78,9 @@ func Upgrade(ctx context.Context, doc *OpenAPI, opts ...Option[UpgradeOptions]) 
 	// add logic to skip certain upgrades in certain situations in the future
 	upgradeFrom30To31(ctx, doc, currentVersion, targetVersion)
 	upgradeFrom310To312(ctx, doc, currentVersion, targetVersion)
-	upgradeFrom31To32(ctx, doc, currentVersion, targetVersion)
+	if err := upgradeFrom31To32(ctx, doc, currentVersion, targetVersion); err != nil {
+		return false, err
+	}
 
 	_, err = marshaller.Sync(ctx, doc)
 	return true, err
@@ -113,25 +116,30 @@ func upgradeFrom310To312(_ context.Context, doc *OpenAPI, currentVersion *versio
 	doc.OpenAPI = maxVersion.String()
 }
 
-func upgradeFrom31To32(ctx context.Context, doc *OpenAPI, currentVersion *version.Version, targetVersion *version.Version) {
+func upgradeFrom31To32(ctx context.Context, doc *OpenAPI, currentVersion *version.Version, targetVersion *version.Version) error {
 	if !targetVersion.GreaterThan(*currentVersion) {
-		return
+		return nil
 	}
 
 	// Upgrade path additionalOperations for non-standard HTTP methods
 	migrateAdditionalOperations31to32(ctx, doc)
 
-	// TODO: Upgrade tags such as x-displayName to summary, and x-tagGroups with parents, etc.
+	// Upgrade tags from extensions to new 3.2 fields
+	if err := migrateTags31to32(ctx, doc); err != nil {
+		return err
+	}
 
 	// Currently no breaking changes between 3.1.x and 3.2.x that need to be handled
 	maxVersion, err := version.ParseVersion("3.2.0")
 	if err != nil {
-		panic("failed to parse hardcoded version 3.2.0")
+		return err
 	}
 	if targetVersion.LessThan(*maxVersion) {
 		maxVersion = targetVersion
 	}
 	doc.OpenAPI = maxVersion.String()
+
+	return nil
 }
 
 // migrateAdditionalOperations31to32 migrates non-standard HTTP methods from the main operations map
@@ -172,6 +180,180 @@ func migrateAdditionalOperations31to32(_ context.Context, doc *OpenAPI) {
 			}
 		}
 	}
+}
+
+// migrateTags31to32 migrates tag extensions to new OpenAPI 3.2 tag fields
+func migrateTags31to32(_ context.Context, doc *OpenAPI) error {
+	if doc == nil {
+		return nil
+	}
+
+	// First, migrate x-displayName to summary for individual tags
+	if doc.Tags != nil {
+		for _, tag := range doc.Tags {
+			if err := migrateTagDisplayName(tag); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Second, migrate x-tagGroups to parent relationships
+	// This should always run to process extensions, even if no tags exist yet
+	if err := migrateTagGroups(doc); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// migrateTagDisplayName migrates x-displayName extension to summary field
+func migrateTagDisplayName(tag *Tag) error {
+	if tag == nil || tag.Extensions == nil {
+		return nil
+	}
+
+	// Check if x-displayName extension exists and summary is not already set
+	if displayNameExt, exists := tag.Extensions.Get("x-displayName"); exists {
+		if tag.Summary != nil {
+			// Error out if we can't migrate as summary is already set
+			return fmt.Errorf("cannot migrate x-displayName to summary for tag %q as summary is already set", tag.Name)
+		}
+		// The extension value is stored as a string
+		if displayNameExt.Value != "" {
+			displayName := displayNameExt.Value
+			tag.Summary = &displayName
+			// Remove the extension after migration
+			tag.Extensions.Delete("x-displayName")
+		}
+	}
+	return nil
+}
+
+// TagGroup represents a single tag group from x-tagGroups extension
+type TagGroup struct {
+	Name string   `yaml:"name"`
+	Tags []string `yaml:"tags"`
+}
+
+// migrateTagGroups migrates x-tagGroups extension to parent field relationships
+func migrateTagGroups(doc *OpenAPI) error {
+	if doc.Extensions == nil {
+		return nil
+	}
+
+	// Check if x-tagGroups extension exists first
+	_, exists := doc.Extensions.Get("x-tagGroups")
+	if !exists {
+		return nil // No x-tagGroups extension found
+	}
+
+	// Parse x-tagGroups extension
+	tagGroups, err := extensions.GetExtensionValue[[]TagGroup](doc.Extensions, "x-tagGroups")
+	if err != nil {
+		return fmt.Errorf("failed to parse x-tagGroups extension: %w", err)
+	}
+
+	// Always remove the extension, even if empty or invalid
+	defer doc.Extensions.Delete("x-tagGroups")
+
+	if tagGroups == nil || len(*tagGroups) == 0 {
+		return nil // Nothing to migrate
+	}
+
+	// Initialize tags slice if it doesn't exist
+	if doc.Tags == nil {
+		doc.Tags = []*Tag{}
+	}
+
+	// Create a map for quick tag lookup
+	tagMap := make(map[string]*Tag)
+	for _, tag := range doc.Tags {
+		if tag != nil {
+			tagMap[tag.Name] = tag
+		}
+	}
+
+	// Process each tag group
+	for _, group := range *tagGroups {
+		if group.Name == "" {
+			continue // Skip groups without names
+		}
+
+		// Ensure parent tag exists for this group
+		parentTag := ensureParentTagExists(doc, tagMap, group.Name)
+		if parentTag == nil {
+			return fmt.Errorf("failed to create parent tag for group: %s", group.Name)
+		}
+
+		// Set parent relationships for all child tags in this group
+		for _, childTagName := range group.Tags {
+			if childTagName == "" {
+				continue // Skip empty tag names
+			}
+
+			if err := setTagParent(doc, tagMap, childTagName, group.Name); err != nil {
+				return fmt.Errorf("failed to set parent for tag %s in group %s: %w", childTagName, group.Name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// ensureParentTagExists creates a parent tag if it doesn't already exist
+func ensureParentTagExists(doc *OpenAPI, tagMap map[string]*Tag, groupName string) *Tag {
+	// Check if parent tag already exists
+	if existingTag, exists := tagMap[groupName]; exists {
+		// Set kind to "nav" if not already set (common pattern for navigation groups)
+		if existingTag.Kind == nil {
+			kind := "nav"
+			existingTag.Kind = &kind
+		}
+		return existingTag
+	}
+
+	// Create new parent tag
+	kind := "nav"
+	parentTag := &Tag{
+		Name:    groupName,
+		Summary: &groupName, // Use group name as summary for display
+		Kind:    &kind,
+	}
+
+	// Add to document and map
+	doc.Tags = append(doc.Tags, parentTag)
+	tagMap[groupName] = parentTag
+
+	return parentTag
+}
+
+// setTagParent sets the parent field for a child tag, creating the child tag if it doesn't exist
+func setTagParent(doc *OpenAPI, tagMap map[string]*Tag, childTagName, parentTagName string) error {
+	// Prevent self-referencing (tag can't be its own parent)
+	if childTagName == parentTagName {
+		return fmt.Errorf("tag cannot be its own parent: %s", childTagName)
+	}
+
+	// Check if child tag exists
+	childTag, exists := tagMap[childTagName]
+	if !exists {
+		// Create child tag if it doesn't exist
+		childTag = &Tag{
+			Name: childTagName,
+		}
+		doc.Tags = append(doc.Tags, childTag)
+		tagMap[childTagName] = childTag
+	}
+
+	// Check if child tag already has a different parent
+	if childTag.Parent != nil && *childTag.Parent != parentTagName {
+		return fmt.Errorf("tag %s already has parent %s, cannot assign new parent %s", childTagName, *childTag.Parent, parentTagName)
+	}
+
+	// Set the parent relationship
+	childTag.Parent = &parentTagName
+
+	return nil
 }
 
 func upgradeSchema30to31(js *oas3.JSONSchema[oas3.Referenceable]) {

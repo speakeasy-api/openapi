@@ -7,10 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestUpgrade_Success(t *testing.T) {
@@ -390,4 +392,355 @@ func TestUpgradeAdditionalOperations(t *testing.T) {
 	assert.True(t, exists, "purge operation should exist in additionalOperations")
 	assert.NotNil(t, purgeOp, "purge operation should not be nil")
 	assert.Equal(t, "Purge operation", *purgeOp.Summary, "purge operation summary should be preserved")
+}
+
+func TestUpgradeTagGroups(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		setupDoc    func() *openapi.OpenAPI
+		validate    func(t *testing.T, doc *openapi.OpenAPI)
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name: "basic_x_tagGroups_migration",
+			setupDoc: func() *openapi.OpenAPI {
+				doc := createTestDocWithVersion("3.1.0")
+
+				// Add existing child tags
+				doc.Tags = []*openapi.Tag{
+					{Name: "books"},
+					{Name: "cds"},
+					{Name: "giftcards"},
+				}
+
+				// Add x-tagGroups extension
+				doc.Extensions = createXTagGroupsExtension([]map[string]interface{}{
+					{
+						"name": "Products",
+						"tags": []interface{}{"books", "cds", "giftcards"},
+					},
+				})
+
+				return doc
+			},
+			validate: func(t *testing.T, doc *openapi.OpenAPI) {
+				// Should have 4 tags total (3 existing + 1 new parent)
+				assert.Len(t, doc.Tags, 4, "should have 4 tags after migration")
+
+				// Find parent tag
+				var parentTag *openapi.Tag
+				for _, tag := range doc.Tags {
+					if tag.Name == "Products" {
+						parentTag = tag
+						break
+					}
+				}
+				require.NotNil(t, parentTag, "parent tag should exist")
+				assert.Equal(t, "Products", *parentTag.Summary, "parent summary should be set")
+				assert.Equal(t, "nav", *parentTag.Kind, "parent kind should be nav")
+
+				// Verify child tag parent assignments
+				childNames := []string{"books", "cds", "giftcards"}
+				for _, childName := range childNames {
+					var childTag *openapi.Tag
+					for _, tag := range doc.Tags {
+						if tag.Name == childName {
+							childTag = tag
+							break
+						}
+					}
+					require.NotNil(t, childTag, "child tag %s should exist", childName)
+					require.NotNil(t, childTag.Parent, "child tag %s should have parent", childName)
+					assert.Equal(t, "Products", *childTag.Parent, "child tag %s should have correct parent", childName)
+				}
+
+				// x-tagGroups extension should be removed
+				_, exists := doc.Extensions.Get("x-tagGroups")
+				assert.False(t, exists, "x-tagGroups extension should be removed")
+			},
+		},
+		{
+			name: "existing_parent_tag",
+			setupDoc: func() *openapi.OpenAPI {
+				doc := createTestDocWithVersion("3.1.0")
+
+				// Add existing parent tag with different kind
+				existingKind := "category"
+				doc.Tags = []*openapi.Tag{
+					{Name: "Products", Kind: &existingKind},
+					{Name: "books"},
+				}
+
+				doc.Extensions = createXTagGroupsExtension([]map[string]interface{}{
+					{
+						"name": "Products",
+						"tags": []interface{}{"books"},
+					},
+				})
+
+				return doc
+			},
+			validate: func(t *testing.T, doc *openapi.OpenAPI) {
+				// Find parent tag
+				var parentTag *openapi.Tag
+				for _, tag := range doc.Tags {
+					if tag.Name == "Products" {
+						parentTag = tag
+						break
+					}
+				}
+				require.NotNil(t, parentTag, "parent tag should exist")
+				// Kind should remain unchanged when parent already exists
+				assert.Equal(t, "category", *parentTag.Kind, "existing parent kind should be preserved")
+
+				// Child should have parent set
+				var childTag *openapi.Tag
+				for _, tag := range doc.Tags {
+					if tag.Name == "books" {
+						childTag = tag
+						break
+					}
+				}
+				require.NotNil(t, childTag, "child tag should exist")
+				require.NotNil(t, childTag.Parent, "child tag should have parent")
+				assert.Equal(t, "Products", *childTag.Parent, "child should have correct parent")
+			},
+		},
+		{
+			name: "missing_child_tags_created",
+			setupDoc: func() *openapi.OpenAPI {
+				doc := createTestDocWithVersion("3.1.0")
+
+				// No existing tags
+				doc.Tags = []*openapi.Tag{}
+
+				doc.Extensions = createXTagGroupsExtension([]map[string]interface{}{
+					{
+						"name": "Products",
+						"tags": []interface{}{"books", "electronics"},
+					},
+				})
+
+				return doc
+			},
+			validate: func(t *testing.T, doc *openapi.OpenAPI) {
+				// Should have 3 tags (1 parent + 2 children)
+				assert.Len(t, doc.Tags, 3, "should have 3 tags after migration")
+
+				// All tags should exist
+				tagNames := []string{"Products", "books", "electronics"}
+				for _, name := range tagNames {
+					found := false
+					for _, tag := range doc.Tags {
+						if tag.Name == name {
+							found = true
+							break
+						}
+					}
+					assert.True(t, found, "tag %s should exist", name)
+				}
+			},
+		},
+		{
+			name: "multiple_groups",
+			setupDoc: func() *openapi.OpenAPI {
+				doc := createTestDocWithVersion("3.1.0")
+				doc.Tags = []*openapi.Tag{}
+
+				doc.Extensions = createXTagGroupsExtension([]map[string]interface{}{
+					{
+						"name": "Products",
+						"tags": []interface{}{"books", "cds"},
+					},
+					{
+						"name": "Support",
+						"tags": []interface{}{"help", "contact"},
+					},
+				})
+
+				return doc
+			},
+			validate: func(t *testing.T, doc *openapi.OpenAPI) {
+				// Should have 6 tags (2 parents + 4 children)
+				assert.Len(t, doc.Tags, 6, "should have 6 tags after migration")
+
+				// Verify both parent tags exist
+				parentNames := []string{"Products", "Support"}
+				for _, parentName := range parentNames {
+					var parentTag *openapi.Tag
+					for _, tag := range doc.Tags {
+						if tag.Name == parentName {
+							parentTag = tag
+							break
+						}
+					}
+					require.NotNil(t, parentTag, "parent tag %s should exist", parentName)
+					assert.Equal(t, "nav", *parentTag.Kind, "parent %s should have nav kind", parentName)
+				}
+
+				// Verify child relationships
+				childParentMap := map[string]string{
+					"books":   "Products",
+					"cds":     "Products",
+					"help":    "Support",
+					"contact": "Support",
+				}
+
+				for childName, expectedParent := range childParentMap {
+					var childTag *openapi.Tag
+					for _, tag := range doc.Tags {
+						if tag.Name == childName {
+							childTag = tag
+							break
+						}
+					}
+					require.NotNil(t, childTag, "child tag %s should exist", childName)
+					require.NotNil(t, childTag.Parent, "child tag %s should have parent", childName)
+					assert.Equal(t, expectedParent, *childTag.Parent, "child %s should have correct parent", childName)
+				}
+			},
+		},
+		{
+			name: "no_x_tagGroups_extension",
+			setupDoc: func() *openapi.OpenAPI {
+				doc := createTestDocWithVersion("3.1.0")
+				doc.Tags = []*openapi.Tag{
+					{Name: "existing"},
+				}
+				// No x-tagGroups extension
+				return doc
+			},
+			validate: func(t *testing.T, doc *openapi.OpenAPI) {
+				// Should remain unchanged
+				assert.Len(t, doc.Tags, 1, "should have 1 tag")
+				assert.Equal(t, "existing", doc.Tags[0].Name, "existing tag should remain")
+				assert.Nil(t, doc.Tags[0].Parent, "existing tag should have no parent")
+			},
+		},
+		{
+			name: "empty_x_tagGroups",
+			setupDoc: func() *openapi.OpenAPI {
+				doc := createTestDocWithVersion("3.1.0")
+				doc.Extensions = createXTagGroupsExtension([]map[string]interface{}{})
+				return doc
+			},
+			validate: func(t *testing.T, doc *openapi.OpenAPI) {
+				// Should remove empty extension
+				_, exists := doc.Extensions.Get("x-tagGroups")
+				assert.False(t, exists, "empty x-tagGroups should be removed")
+			},
+		},
+		{
+			name: "conflicting_parent_assignment",
+			setupDoc: func() *openapi.OpenAPI {
+				doc := createTestDocWithVersion("3.1.0")
+
+				// Add tag with existing parent
+				existingParent := "ExistingParent"
+				doc.Tags = []*openapi.Tag{
+					{Name: "ExistingParent"},
+					{Name: "books", Parent: &existingParent},
+				}
+
+				// Try to assign different parent
+				doc.Extensions = createXTagGroupsExtension([]map[string]interface{}{
+					{
+						"name": "Products",
+						"tags": []interface{}{"books"},
+					},
+				})
+
+				return doc
+			},
+			wantErr:     true,
+			errContains: "already has parent",
+		},
+		{
+			name: "self_referencing_prevention",
+			setupDoc: func() *openapi.OpenAPI {
+				doc := createTestDocWithVersion("3.1.0")
+
+				doc.Extensions = createXTagGroupsExtension([]map[string]interface{}{
+					{
+						"name": "SelfRef",
+						"tags": []interface{}{"SelfRef"},
+					},
+				})
+
+				return doc
+			},
+			wantErr:     true,
+			errContains: "cannot be its own parent",
+		},
+		{
+			name: "invalid_x_tagGroups_format",
+			setupDoc: func() *openapi.OpenAPI {
+				doc := createTestDocWithVersion("3.1.0")
+
+				// Create malformed extension
+				doc.Extensions = extensions.New()
+				// This will create an invalid structure that can't be parsed as []TagGroup
+				doc.Extensions.Set("x-tagGroups", createYAMLNode("invalid string"))
+
+				return doc
+			},
+			wantErr:     true,
+			errContains: "failed to parse x-tagGroups extension",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := t.Context()
+			doc := tt.setupDoc()
+
+			// Perform upgrade to 3.2.0
+			_, err := openapi.Upgrade(ctx, doc, openapi.WithUpgradeTargetVersion("3.2.0"))
+
+			if tt.wantErr {
+				require.Error(t, err, "should have error")
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains, "error should contain expected text")
+				}
+				return
+			}
+
+			require.NoError(t, err, "upgrade should not fail")
+			if tt.validate != nil {
+				tt.validate(t, doc)
+			}
+		})
+	}
+}
+
+// Helper functions for test setup
+
+func createTestDocWithVersion(version string) *openapi.OpenAPI {
+	return &openapi.OpenAPI{
+		OpenAPI: version,
+		Info: openapi.Info{
+			Title:   "Test API",
+			Version: "1.0.0",
+		},
+		Paths: openapi.NewPaths(),
+	}
+}
+
+func createXTagGroupsExtension(groups []map[string]interface{}) *extensions.Extensions {
+	exts := extensions.New()
+	exts.Set("x-tagGroups", createYAMLNode(groups))
+	return exts
+}
+
+func createYAMLNode(value interface{}) *yaml.Node {
+	var node yaml.Node
+	if err := node.Encode(value); err != nil {
+		panic(err)
+	}
+	return &node
 }
