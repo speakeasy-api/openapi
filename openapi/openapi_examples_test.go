@@ -330,8 +330,8 @@ func Example_walking() {
 					fmt.Printf("Found Operation: %s\n", *op.OperationID)
 				}
 				operationCount++
-				// Terminate after finding 2 operations
-				if operationCount >= 2 {
+				// Terminate after finding 3 operations
+				if operationCount >= 3 {
 					return walk.ErrTerminate
 				}
 				return nil
