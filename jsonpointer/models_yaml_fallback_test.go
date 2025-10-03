@@ -195,3 +195,50 @@ func getTypeName(v interface{}) string {
 	}
 	return reflect.TypeOf(v).String()
 }
+
+// TestNavigateModel_YAMLFallback_KeyBasedStruct tests we can access the RootNode from Key based structs like our core models
+// This validates the fix where GetTarget can navigate from a core model to additional YAML properties
+func TestNavigateModel_YAMLFallback_KeyBasedStruct(t *testing.T) {
+	t.Parallel()
+
+	yamlContent := `
+knownField: "test"
+definitions:
+  attachments:
+    title: Attachments
+    description: "Array of attachments"
+    type: array
+    items:
+      type: object
+`
+
+	// Parse YAML content
+	var rootNode yaml.Node
+	err := yaml.Unmarshal([]byte(yamlContent), &rootNode)
+	require.NoError(t, err, "failed to parse YAML")
+
+	// Create test model with YAML node
+	model := &TestModel{}
+	model.GetCore().SetRootNode(&rootNode)
+
+	// Test navigation from the CORE MODEL (this was the bug - GetTarget couldn't find YAML properties from core model)
+	coreModel := model.GetCore()
+
+	// Test navigation to definitions key (not in core model)
+	result, err := GetTarget(coreModel, "/definitions")
+	require.NoError(t, err, "should find definitions in YAML from core model")
+	require.NotNil(t, result, "result should not be nil")
+
+	yamlNode, ok := result.(*yaml.Node)
+	require.True(t, ok, "should return yaml.Node for definitions")
+	assert.Equal(t, yaml.MappingNode, yamlNode.Kind, "definitions should be a mapping node")
+
+	// Test navigation deeper into definitions structure from core model
+	result, err = GetTarget(coreModel, "/definitions/attachments/title")
+	require.NoError(t, err, "should navigate through YAML structure from core model")
+	require.NotNil(t, result, "result should not be nil")
+
+	yamlNode, ok = result.(*yaml.Node)
+	require.True(t, ok, "should return yaml.Node")
+	assert.Equal(t, "Attachments", yamlNode.Value, "title value should match")
+}

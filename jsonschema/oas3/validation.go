@@ -145,8 +145,7 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 
 			t, err := jsonpointer.GetTarget(js, errJP, jsonpointer.WithStructTags("key"))
 			if err != nil {
-				// TODO need to potentially handle this in another way
-				errs = append(errs, err)
+				errs = append(errs, validation.NewValidationError(err, js.GetRootNode()))
 				continue
 			}
 
