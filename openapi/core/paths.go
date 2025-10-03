@@ -8,20 +8,20 @@ import (
 
 type Paths struct {
 	marshaller.CoreModel `model:"paths"`
-	sequencedmap.Map[string, *Reference[*PathItem]]
+	*sequencedmap.Map[string, *Reference[*PathItem]]
 
 	Extensions core.Extensions `key:"extensions"`
 }
 
 func NewPaths() *Paths {
 	return &Paths{
-		Map: *sequencedmap.New[string, *Reference[*PathItem]](),
+		Map: sequencedmap.New[string, *Reference[*PathItem]](),
 	}
 }
 
 type PathItem struct {
 	marshaller.CoreModel `model:"pathItem"`
-	sequencedmap.Map[string, *Operation]
+	*sequencedmap.Map[string, *Operation]
 
 	Summary     marshaller.Node[*string] `key:"summary"`
 	Description marshaller.Node[*string] `key:"description"`
@@ -34,6 +34,6 @@ type PathItem struct {
 
 func NewPathItem() *PathItem {
 	return &PathItem{
-		Map: *sequencedmap.New[string, *Operation](),
+		Map: sequencedmap.New[string, *Operation](),
 	}
 }

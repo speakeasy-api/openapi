@@ -17,7 +17,7 @@ import (
 // Callback embeds sequencedmap.Map[string, *ReferencedPathItem] so all map operations are supported.
 type Callback struct {
 	marshaller.Model[core.Callback]
-	sequencedmap.Map[expression.Expression, *ReferencedPathItem]
+	*sequencedmap.Map[expression.Expression, *ReferencedPathItem]
 
 	// Extensions provides a list of extensions to the Callback object.
 	Extensions *extensions.Extensions
@@ -28,8 +28,16 @@ var _ interfaces.Model[core.Callback] = (*Callback)(nil)
 // NewCallback creates a new Callback object with the embedded map initialized.
 func NewCallback() *Callback {
 	return &Callback{
-		Map: *sequencedmap.New[expression.Expression, *ReferencedPathItem](),
+		Map: sequencedmap.New[expression.Expression, *ReferencedPathItem](),
 	}
+}
+
+// Len returns the number of elements in the callback map. nil safe.
+func (c *Callback) Len() int {
+	if c == nil || c.Map == nil {
+		return 0
+	}
+	return c.Map.Len()
 }
 
 // GetExtensions returns the value of the Extensions field. Returns an empty extensions map if not set.

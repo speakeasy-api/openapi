@@ -16,7 +16,7 @@ import (
 // Paths embeds sequencedmap.Map[string, *ReferencedPathItem] so all map operations are supported.
 type Paths struct {
 	marshaller.Model[core.Paths]
-	sequencedmap.Map[string, *ReferencedPathItem]
+	*sequencedmap.Map[string, *ReferencedPathItem]
 
 	// Extensions provides a list of extensions to the Paths object.
 	Extensions *extensions.Extensions
@@ -27,8 +27,16 @@ var _ interfaces.Model[core.Paths] = (*Paths)(nil)
 // NewPaths creates a new Paths object with the embedded map initialized.
 func NewPaths() *Paths {
 	return &Paths{
-		Map: *sequencedmap.New[string, *ReferencedPathItem](),
+		Map: sequencedmap.New[string, *ReferencedPathItem](),
 	}
+}
+
+// Len returns the number of elements in the paths map. nil safe.
+func (p *Paths) Len() int {
+	if p == nil || p.Map == nil {
+		return 0
+	}
+	return p.Map.Len()
 }
 
 // GetExtensions returns the value of the Extensions field. Returns an empty extensions map if not set.
@@ -82,7 +90,7 @@ func (m HTTPMethod) Is(method string) bool {
 // PathItem embeds sequencedmap.Map[HTTPMethod, *Operation] so all map operations are supported for working with HTTP methods.
 type PathItem struct {
 	marshaller.Model[core.PathItem]
-	sequencedmap.Map[HTTPMethod, *Operation]
+	*sequencedmap.Map[HTTPMethod, *Operation]
 
 	// Summary is a short summary of the path and its operations.
 	Summary *string
@@ -103,8 +111,16 @@ var _ interfaces.Model[core.PathItem] = (*PathItem)(nil)
 // NewPathItem creates a new PathItem object with the embedded map initialized.
 func NewPathItem() *PathItem {
 	return &PathItem{
-		Map: *sequencedmap.New[HTTPMethod, *Operation](),
+		Map: sequencedmap.New[HTTPMethod, *Operation](),
 	}
+}
+
+// Len returns the number of operations in the path item. nil safe.
+func (p *PathItem) Len() int {
+	if p == nil || p.Map == nil {
+		return 0
+	}
+	return p.Map.Len()
 }
 
 // GetOperation returns the operation for the specified HTTP method.

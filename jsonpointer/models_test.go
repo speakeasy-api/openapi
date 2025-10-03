@@ -169,7 +169,7 @@ func TestNavigateModel_EmbeddedMap(t *testing.T) {
 		t.Parallel()
 		// Create a simple embedded map model
 		embeddedMap := &tests.TestEmbeddedMapHighModel{}
-		embeddedMap.Map = *sequencedmap.New[string, string]()
+		embeddedMap.Map = sequencedmap.New[string, string]()
 		embeddedMap.Set("key1", "value1")
 		embeddedMap.Set("key2", "value2")
 
@@ -199,7 +199,7 @@ func TestNavigateModel_EmbeddedMap(t *testing.T) {
 		embeddedMapWithFields := &tests.TestEmbeddedMapWithFieldsHighModel{
 			NameField: "test name",
 		}
-		embeddedMapWithFields.Map = *sequencedmap.New[string, *tests.TestPrimitiveHighModel]()
+		embeddedMapWithFields.Map = sequencedmap.New[string, *tests.TestPrimitiveHighModel]()
 		embeddedMapWithFields.Set("model1", nestedModel1)
 		embeddedMapWithFields.Set("model2", nestedModel2)
 
@@ -230,7 +230,7 @@ func TestNavigateModel_EmbeddedMap(t *testing.T) {
 	t.Run("EmbeddedMapNotFound", func(t *testing.T) {
 		t.Parallel()
 		embeddedMap := &tests.TestEmbeddedMapHighModel{}
-		embeddedMap.Map = *sequencedmap.New[string, string]()
+		embeddedMap.Map = sequencedmap.New[string, string]()
 		embeddedMap.Set("existing", "value")
 
 		// Test navigating to non-existent key in embedded map
@@ -248,7 +248,7 @@ func TestNavigateModel_EmbeddedMapEscapedKeys(t *testing.T) {
 		// Create a test that mimics OpenAPI paths structure
 		// This reproduces the issue with escaped JSON pointer paths like /paths/~1users~1{userId}
 		embeddedMap := &tests.TestEmbeddedMapHighModel{}
-		embeddedMap.Map = *sequencedmap.New[string, string]()
+		embeddedMap.Map = sequencedmap.New[string, string]()
 
 		// Set keys that contain special characters like OpenAPI paths
 		embeddedMap.Set("/users/{userId}", "path-item-1")
@@ -298,7 +298,7 @@ func TestNavigateModel_EmbeddedMapComparison_PointerVsValue(t *testing.T) {
 		t.Parallel()
 		// Create a model with value embedded map
 		model := &tests.TestEmbeddedMapHighModel{}
-		model.Map = *sequencedmap.New[string, string]()
+		model.Map = sequencedmap.New[string, string]()
 		model.Set("valKey1", "value value1")
 		model.Set("valKey2", "value value2")
 
@@ -320,7 +320,7 @@ func TestNavigateModel_EmbeddedMapComparison_PointerVsValue(t *testing.T) {
 		ptrModel.Set("sharedKey", "shared value")
 
 		valueModel := &tests.TestEmbeddedMapHighModel{}
-		valueModel.Map = *sequencedmap.New[string, string]()
+		valueModel.Map = sequencedmap.New[string, string]()
 		valueModel.Set("sharedKey", "shared value")
 
 		// Both should navigate to the same result
@@ -353,7 +353,7 @@ func TestNavigateModel_EmbeddedMapComparison_PointerVsValue(t *testing.T) {
 		valueModel := &tests.TestEmbeddedMapWithFieldsHighModel{
 			NameField: "value test name",
 		}
-		valueModel.Map = *sequencedmap.New[string, *tests.TestPrimitiveHighModel]()
+		valueModel.Map = sequencedmap.New[string, *tests.TestPrimitiveHighModel]()
 		valueModel.Set("nested", nestedModel)
 
 		// Test navigating to regular fields

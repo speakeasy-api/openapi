@@ -56,6 +56,15 @@ func (e *Extensions) Init() {
 	e.Map = sequencedmap.New[string, Extension]()
 }
 
+// Len returns the number of elements in the extensions map. nil safe.
+func (e *Extensions) Len() int {
+	if e == nil || e.Map == nil {
+		return 0
+	}
+
+	return e.Map.Len()
+}
+
 func (e *Extensions) SetCore(core any) {
 	c, ok := core.(*sequencedmap.Map[string, marshaller.Node[*yaml.Node]])
 	if !ok {

@@ -59,13 +59,13 @@ type TestComplexModel struct {
 type TestEmbeddedMapModel struct {
 	marshaller.CoreModel `model:"testEmbeddedMapModel"`
 
-	sequencedmap.Map[string, marshaller.Node[string]]
+	*sequencedmap.Map[string, marshaller.Node[string]]
 }
 
 // TestEmbeddedMapWithFieldsModel covers embedded sequenced map with additional fields
 type TestEmbeddedMapWithFieldsModel struct {
 	marshaller.CoreModel `model:"testEmbeddedMapWithFieldsModel"`
-	sequencedmap.Map[string, marshaller.Node[*TestPrimitiveModel]]
+	*sequencedmap.Map[string, marshaller.Node[*TestPrimitiveModel]]
 
 	NameField  marshaller.Node[string] `key:"name"`
 	Extensions core.Extensions         `key:"extensions"`
@@ -74,7 +74,7 @@ type TestEmbeddedMapWithFieldsModel struct {
 // TestEmbeddedMapWithExtensionsModel covers embedded sequenced map with extensions only
 type TestEmbeddedMapWithExtensionsModel struct {
 	marshaller.CoreModel `model:"testEmbeddedMapWithExtensionsModel"`
-	sequencedmap.Map[string, marshaller.Node[string]]
+	*sequencedmap.Map[string, marshaller.Node[string]]
 
 	Extensions core.Extensions `key:"extensions"`
 }
@@ -179,7 +179,7 @@ type TestRequiredNilableModel struct {
 type TestTypeConversionCoreModel struct {
 	marshaller.CoreModel `model:"testTypeConversionCoreModel"`
 
-	sequencedmap.Map[string, marshaller.Node[*TestPrimitiveModel]]
+	*sequencedmap.Map[string, marshaller.Node[*TestPrimitiveModel]]
 	HTTPMethodField marshaller.Node[*string] `key:"httpMethodField"`
 	Extensions      core.Extensions          `key:"extensions"`
 }

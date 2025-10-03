@@ -175,7 +175,7 @@ func TestSetAtLocation_Success(t *testing.T) {
 		{
 			name: "set value in embedded sequencedmap model",
 			parent: &tests.TestEmbeddedMapHighModel{
-				Map: *sequencedmap.New(sequencedmap.NewElem("existing", "value")),
+				Map: sequencedmap.New(sequencedmap.NewElem("existing", "value")),
 			},
 			location: walk.LocationContext[string]{
 				ParentKey: pointer.From("newKey"),
@@ -196,7 +196,7 @@ func TestSetAtLocation_Success(t *testing.T) {
 		{
 			name: "set field in embedded sequencedmap model with fields",
 			parent: &tests.TestEmbeddedMapWithFieldsHighModel{
-				Map:       *sequencedmap.New[string, *tests.TestPrimitiveHighModel](),
+				Map:       sequencedmap.New[string, *tests.TestPrimitiveHighModel](),
 				NameField: "original",
 			},
 			location: walk.LocationContext[string]{
@@ -212,7 +212,7 @@ func TestSetAtLocation_Success(t *testing.T) {
 		{
 			name: "set map entry in embedded sequencedmap model with fields",
 			parent: &tests.TestEmbeddedMapWithFieldsHighModel{
-				Map:       *sequencedmap.New[string, *tests.TestPrimitiveHighModel](),
+				Map:       sequencedmap.New[string, *tests.TestPrimitiveHighModel](),
 				NameField: "test",
 			},
 			location: walk.LocationContext[string]{
@@ -339,7 +339,7 @@ func TestSetAtLocation_Error(t *testing.T) {
 		{
 			name: "sequenced map with nil parent key",
 			parent: &tests.TestEmbeddedMapHighModel{
-				Map: *sequencedmap.New[string, string](),
+				Map: sequencedmap.New[string, string](),
 			},
 			location: walk.LocationContext[string]{
 				ParentField: "someField", // This will trigger "field not found" since it's not found

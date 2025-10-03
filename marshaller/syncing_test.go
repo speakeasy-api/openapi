@@ -327,7 +327,7 @@ func TestSync_EmbeddedMapWithFields_Success(t *testing.T) {
 	}
 
 	// Initialize the embedded map
-	highModel.Map = *sequencedmap.New[string, *tests.TestPrimitiveHighModel]()
+	highModel.Map = sequencedmap.New[string, *tests.TestPrimitiveHighModel]()
 	highModel.Set("syncKey1", dynamicVal1)
 	highModel.Set("syncKey2", dynamicVal2)
 
@@ -389,7 +389,7 @@ func TestSync_EmbeddedMap_Success(t *testing.T) {
 	highModel := tests.TestEmbeddedMapHighModel{}
 
 	// Initialize the embedded map
-	highModel.Map = *sequencedmap.New[string, string]()
+	highModel.Map = sequencedmap.New[string, string]()
 	highModel.Set("syncKey1", "synced value1")
 	highModel.Set("syncKey2", "synced value2")
 	highModel.Set("syncKey3", "synced value3")
@@ -704,7 +704,7 @@ func TestSync_TypeConversionModel_Success(t *testing.T) {
 	}
 
 	// Initialize the embedded map with HTTPMethod keys
-	highModel.Map = *sequencedmap.New[tests.HTTPMethod, *tests.TestPrimitiveHighModel]()
+	highModel.Map = sequencedmap.New[tests.HTTPMethod, *tests.TestPrimitiveHighModel]()
 	highModel.Set(tests.HTTPMethodPost, postOp)
 	highModel.Set(tests.HTTPMethodGet, getOp)
 	highModel.Set(tests.HTTPMethodPut, putOp)
@@ -1097,7 +1097,7 @@ func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
 		t.Parallel()
 		// Test value embedded map
 		valueModel := tests.TestEmbeddedMapHighModel{}
-		valueModel.Map = *sequencedmap.New[string, string]()
+		valueModel.Map = sequencedmap.New[string, string]()
 		valueModel.Set("key1", "val_value1")
 		valueModel.Set("key2", "val_value2")
 
@@ -1122,7 +1122,7 @@ func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
 		ptrModel.Set("shared_key", "shared_value")
 
 		valueModel := tests.TestEmbeddedMapHighModel{}
-		valueModel.Map = *sequencedmap.New[string, string]()
+		valueModel.Map = sequencedmap.New[string, string]()
 		valueModel.Set("shared_key", "shared_value")
 
 		// Sync both models
