@@ -12,6 +12,7 @@ run = [
 
 [hooks]
 postinstall = [
+  "ln -sf ./AGENTS.md ./CLAUDE.md",
   "mise run setup-vscode-symlinks",
   "go install go.uber.org/nilaway/cmd/nilaway@8ad05f0",
 ]

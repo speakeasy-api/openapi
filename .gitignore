@@ -7,3 +7,6 @@ coverage.html
 !.vscode/settings.example.json
 # Added by goreleaser init:
 dist/
+
+# Symlinked from AGENTS.md by mise install
+CLAUDE.md
