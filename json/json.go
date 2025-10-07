@@ -26,6 +26,17 @@ func YAMLToJSON(node *yaml.Node, indentation int, buffer io.Writer) error {
 	return e.Encode(v)
 }
 
+// YAMLToJSONCompatibleGoType will convert the provided YAML node to a compatible Go type ready for json marshalling in a stable way not reordering keys.
+// Provided to allow a custom JSON marshalling implementation to be used.
+func YAMLToJSONCompatibleGoType(node *yaml.Node) (any, error) {
+	v, err := handleYAMLNode(node)
+	if err != nil {
+		return nil, err
+	}
+
+	return v, nil
+}
+
 func handleYAMLNode(node *yaml.Node) (any, error) {
 	if node == nil {
 		return nil, nil
@@ -67,12 +78,33 @@ func handleMappingNode(node *yaml.Node) (any, error) {
 			kv = string(keyData)
 		}
 
+		keyStr := fmt.Sprintf("%v", kv)
+
+		// Handle YAML merge key (<<)
+		if keyStr == "<<" {
+			vv, err := handleYAMLNode(n)
+			if err != nil {
+				return nil, err
+			}
+
+			// Merge the values from the referenced map
+			if mergeMap, ok := vv.(*sequencedmap.Map[string, any]); ok {
+				for mergeKey, mergeValue := range mergeMap.All() {
+					// Only set if the key doesn't already exist (merge keys have lower priority)
+					if !v.Has(mergeKey) {
+						v.Set(mergeKey, mergeValue)
+					}
+				}
+			}
+			continue
+		}
+
 		vv, err := handleYAMLNode(n)
 		if err != nil {
 			return nil, err
 		}
 
-		v.Set(fmt.Sprintf("%v", kv), vv)
+		v.Set(keyStr, vv)
 	}
 
 	return v, nil
