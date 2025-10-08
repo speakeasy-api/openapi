@@ -37,9 +37,13 @@ func (s *SecurityRequirement) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Nod
 		return rootNode
 	}
 
-	for i := 0; i < len(rootNode.Content); i += 2 {
-		if rootNode.Content[i].Value == key {
-			return rootNode.Content[i]
+	if s.RootNode == nil {
+		return rootNode
+	}
+
+	for i := 0; i < len(s.RootNode.Content); i += 2 {
+		if s.RootNode.Content[i].Value == key {
+			return s.RootNode.Content[i]
 		}
 	}
 

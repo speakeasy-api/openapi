@@ -25,9 +25,13 @@ func (c *Callback) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Node) *yaml.No
 		return rootNode
 	}
 
-	for i := 0; i < len(rootNode.Content); i += 2 {
-		if rootNode.Content[i].Value == key {
-			return rootNode.Content[i]
+	if c.RootNode == nil {
+		return rootNode
+	}
+
+	for i := 0; i < len(c.RootNode.Content); i += 2 {
+		if c.RootNode.Content[i].Value == key {
+			return c.RootNode.Content[i]
 		}
 	}
 

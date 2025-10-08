@@ -25,9 +25,13 @@ func (p *Paths) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Node) *yaml.Node 
 		return rootNode
 	}
 
-	for i := 0; i < len(rootNode.Content); i += 2 {
-		if rootNode.Content[i].Value == key {
-			return rootNode.Content[i]
+	if p.RootNode == nil {
+		return rootNode
+	}
+
+	for i := 0; i < len(p.RootNode.Content); i += 2 {
+		if p.RootNode.Content[i].Value == key {
+			return p.RootNode.Content[i]
 		}
 	}
 
@@ -66,9 +70,13 @@ func (p *PathItem) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Node) *yaml.No
 		return rootNode
 	}
 
-	for i := 0; i < len(rootNode.Content); i += 2 {
-		if rootNode.Content[i].Value == key {
-			return rootNode.Content[i]
+	if p.RootNode == nil {
+		return rootNode
+	}
+
+	for i := 0; i < len(p.RootNode.Content); i += 2 {
+		if p.RootNode.Content[i].Value == key {
+			return p.RootNode.Content[i]
 		}
 	}
 
