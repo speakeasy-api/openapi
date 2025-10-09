@@ -79,8 +79,8 @@ func NewReferencedScheme(ctx context.Context, ref references.Reference, resolved
 		referenceResolution = &references.ResolveResult[JSONSchema[Referenceable]]{
 			Object: &JSONSchema[Referenceable]{
 				EitherValue: values.EitherValue[Schema, core.Schema, bool, bool]{
-					Left:  resolvedSchema.GetLeft(),
-					Right: resolvedSchema.GetRight(),
+					Left:  resolvedSchema.GetSchema(),
+					Right: resolvedSchema.GetBool(),
 				},
 			},
 		}
@@ -105,12 +105,53 @@ func NewReferencedScheme(ctx context.Context, ref references.Reference, resolved
 	return js
 }
 
+// IsSchema returns true if the JSONSchema is a schema object.
+// Returns false if the JSONSchema is a boolean value.
+// A convenience method equivalent to calling IsSchema().
+func (j *JSONSchema[T]) IsSchema() bool {
+	if j == nil {
+		return false
+	}
+	return j.IsLeft()
+}
+
+// GetSchema returns the schema object if the JSONSchema is a schema object.
+// Returns nil if the JSONSchema is a boolean value.
+// A convenience method equivalent to calling GetSchema().
+func (j *JSONSchema[T]) GetSchema() *Schema {
+	if j == nil {
+		return nil
+	}
+	return j.GetLeft()
+}
+
+// IsBool returns true if the JSONSchema is a boolean value.
+// Returns false if the JSONSchema is a schema object.
+// A convenience method equivalent to calling IsBool().
+func (j *JSONSchema[T]) IsBool() bool {
+	if j == nil {
+		return false
+	}
+	return j.IsRight()
+}
+
+// GetBool returns the boolean value if the JSONSchema is a boolean value.
+// Returns nil if the JSONSchema is a schema object.
+// A convenience method equivalent to calling GetBool().
+func (j *JSONSchema[T]) GetBool() *bool {
+	if j == nil {
+		return nil
+	}
+	return j.GetRight()
+}
+
+// GetExtensions returns the extensions object if the JSONSchema is a schema object or an empty extensions object if the JSONSchema is a boolean value.
 func (j *JSONSchema[Concrete]) GetExtensions() *extensions.Extensions {
-	if j == nil || j.IsRight() {
+	if j == nil || j.IsBool() {
 		return extensions.New()
 	}
 
-	return j.GetLeft().GetExtensions()
+	return j.GetSchema().GetExtensions()
 }
 
 // GetParent returns the immediate parent reference if this schema was resolved via a reference chain.
@@ -186,20 +227,20 @@ func (j *JSONSchema[T]) IsEqual(other *JSONSchema[T]) bool {
 }
 
 // Validate validates the JSONSchema against the JSON Schema specification.
-// This is a wrapper around calling GetLeft().Validate() for schema objects.
+// This is a wrapper around calling GetSchema().Validate() for schema objects.
 func (j *JSONSchema[T]) Validate(ctx context.Context, opts ...validation.Option) []error {
 	if j == nil {
 		return []error{}
 	}
 
 	// If it's a boolean schema, no validation needed
-	if j.IsRight() {
+	if j.IsBool() {
 		return []error{}
 	}
 
 	// If it's a schema object, validate it
-	if j.IsLeft() {
-		schema := j.GetLeft()
+	if j.IsSchema() {
+		schema := j.GetSchema()
 		if schema != nil {
 			// Convert opts to the expected validation options type
 			// For now, we'll call without options since the Schema.Validate method
@@ -243,11 +284,11 @@ func (j *JSONSchema[T]) ShallowCopy() *JSONSchema[T] {
 	}
 
 	// Shallow copy the EitherValue contents
-	if j.IsLeft() && j.GetLeft() != nil {
-		result.Left = j.GetLeft().ShallowCopy()
+	if j.IsSchema() && j.GetSchema() != nil {
+		result.Left = j.GetSchema().ShallowCopy()
 	}
-	if j.IsRight() && j.GetRight() != nil {
-		rightVal := *j.GetRight()
+	if j.IsBool() && j.GetBool() != nil {
+		rightVal := *j.GetBool()
 		result.Right = &rightVal
 	}
 

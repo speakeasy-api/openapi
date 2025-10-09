@@ -27,9 +27,9 @@ func TestSchema_Defs_Success(t *testing.T) {
 
 		// Navigate to the user property which references #/$defs/User
 		rootSchema := root.MustGetResolvedSchema()
-		require.True(t, rootSchema.IsLeft())
+		require.True(t, rootSchema.IsSchema())
 
-		properties := rootSchema.GetLeft().GetProperties()
+		properties := rootSchema.GetSchema().GetProperties()
 		require.NotNil(t, properties)
 
 		userProperty, exists := properties.Get("user")
@@ -44,10 +44,10 @@ func TestSchema_Defs_Success(t *testing.T) {
 		// Get the resolved schema
 		result := userProperty.GetResolvedSchema()
 		require.NotNil(t, result)
-		assert.True(t, result.IsLeft())
+		assert.True(t, result.IsSchema())
 
 		// Verify it's the User schema
-		resolvedSchema := result.GetLeft()
+		resolvedSchema := result.GetSchema()
 		assert.Equal(t, []SchemaType{SchemaTypeObject}, resolvedSchema.GetType())
 
 		// Verify it has the expected properties
@@ -56,13 +56,13 @@ func TestSchema_Defs_Success(t *testing.T) {
 
 		nameProperty, exists := resolvedProperties.Get("name")
 		require.True(t, exists)
-		assert.True(t, nameProperty.IsLeft())
-		assert.Equal(t, []SchemaType{SchemaTypeString}, nameProperty.GetLeft().GetType())
+		assert.True(t, nameProperty.IsSchema())
+		assert.Equal(t, []SchemaType{SchemaTypeString}, nameProperty.GetSchema().GetType())
 
 		ageProperty, exists := resolvedProperties.Get("age")
 		require.True(t, exists)
-		assert.True(t, ageProperty.IsLeft())
-		assert.Equal(t, []SchemaType{SchemaTypeInteger}, ageProperty.GetLeft().GetType())
+		assert.True(t, ageProperty.IsSchema())
+		assert.Equal(t, []SchemaType{SchemaTypeInteger}, ageProperty.GetSchema().GetType())
 	})
 
 	t.Run("resolve chained references through $defs", func(t *testing.T) {
@@ -78,9 +78,9 @@ func TestSchema_Defs_Success(t *testing.T) {
 
 		// Navigate to the user property which references User, which itself references Address
 		rootSchema := root.MustGetResolvedSchema()
-		require.True(t, rootSchema.IsLeft())
+		require.True(t, rootSchema.IsSchema())
 
-		properties := rootSchema.GetLeft().GetProperties()
+		properties := rootSchema.GetSchema().GetProperties()
 		require.NotNil(t, properties)
 
 		userProperty, exists := properties.Get("user")
@@ -95,10 +95,10 @@ func TestSchema_Defs_Success(t *testing.T) {
 		// Get the resolved User schema
 		userResult := userProperty.GetResolvedSchema()
 		require.NotNil(t, userResult)
-		assert.True(t, userResult.IsLeft())
+		assert.True(t, userResult.IsSchema())
 
 		// Verify the User schema has an address property that references Address
-		userSchema := userResult.GetLeft()
+		userSchema := userResult.GetSchema()
 		userProperties := userSchema.GetProperties()
 		require.NotNil(t, userProperties)
 
@@ -123,9 +123,9 @@ func TestSchema_Defs_Success(t *testing.T) {
 
 		// Navigate to the chainedRef property which references ChainedRef -> ChainedTarget
 		rootSchema := root.MustGetResolvedSchema()
-		require.True(t, rootSchema.IsLeft())
+		require.True(t, rootSchema.IsSchema())
 
-		properties := rootSchema.GetLeft().GetProperties()
+		properties := rootSchema.GetSchema().GetProperties()
 		require.NotNil(t, properties)
 
 		chainedProperty, exists := properties.Get("chainedRef")
@@ -140,10 +140,10 @@ func TestSchema_Defs_Success(t *testing.T) {
 		// Get the resolved schema - should be the final ChainedTarget
 		result := chainedProperty.GetResolvedSchema()
 		require.NotNil(t, result)
-		assert.True(t, result.IsLeft())
+		assert.True(t, result.IsSchema())
 
 		// Verify it's the ChainedTarget schema
-		resolvedSchema := result.GetLeft()
+		resolvedSchema := result.GetSchema()
 		assert.Equal(t, []SchemaType{SchemaTypeObject}, resolvedSchema.GetType())
 
 		// Verify it has the expected properties
@@ -152,13 +152,13 @@ func TestSchema_Defs_Success(t *testing.T) {
 
 		valueProperty, exists := resolvedProperties.Get("value")
 		require.True(t, exists)
-		assert.True(t, valueProperty.IsLeft())
-		assert.Equal(t, []SchemaType{SchemaTypeString}, valueProperty.GetLeft().GetType())
+		assert.True(t, valueProperty.IsSchema())
+		assert.Equal(t, []SchemaType{SchemaTypeString}, valueProperty.GetSchema().GetType())
 
 		descProperty, exists := resolvedProperties.Get("description")
 		require.True(t, exists)
-		assert.True(t, descProperty.IsLeft())
-		assert.Equal(t, []SchemaType{SchemaTypeString}, descProperty.GetLeft().GetType())
+		assert.True(t, descProperty.IsSchema())
+		assert.Equal(t, []SchemaType{SchemaTypeString}, descProperty.GetSchema().GetType())
 	})
 
 	t.Run("resolve reference from within nested schema with local $defs", func(t *testing.T) {
@@ -174,16 +174,16 @@ func TestSchema_Defs_Success(t *testing.T) {
 
 		// Navigate to the NestedSchema which has its own $defs
 		rootSchema := root.MustGetResolvedSchema()
-		require.True(t, rootSchema.IsLeft())
+		require.True(t, rootSchema.IsSchema())
 
-		nestedSchema, ok := rootSchema.GetLeft().GetDefs().Get("NestedSchema")
+		nestedSchema, ok := rootSchema.GetSchema().GetDefs().Get("NestedSchema")
 		require.True(t, ok)
 
 		nestedSchemaResolved := nestedSchema.MustGetResolvedSchema()
-		require.True(t, nestedSchemaResolved.IsLeft())
+		require.True(t, nestedSchemaResolved.IsSchema())
 
 		// Get the localRef property which should reference the local $defs/LocalDef
-		properties := nestedSchemaResolved.GetLeft().GetProperties()
+		properties := nestedSchemaResolved.GetSchema().GetProperties()
 		require.NotNil(t, properties)
 
 		localRef, exists := properties.Get("localRef")
@@ -199,10 +199,10 @@ func TestSchema_Defs_Success(t *testing.T) {
 		// Get the resolved localRef schema
 		localRefResolved := localRef.GetResolvedSchema()
 		require.NotNil(t, localRefResolved)
-		require.True(t, localRefResolved.IsLeft())
+		require.True(t, localRefResolved.IsSchema())
 
 		// Verify it's the LocalDef schema
-		resolvedSchema := localRefResolved.GetLeft()
+		resolvedSchema := localRefResolved.GetSchema()
 		assert.Equal(t, []SchemaType{SchemaTypeObject}, resolvedSchema.GetType())
 
 		// Verify it has the expected properties
@@ -211,8 +211,8 @@ func TestSchema_Defs_Success(t *testing.T) {
 
 		localValueProperty, exists := resolvedProperties.Get("localValue")
 		require.True(t, exists)
-		assert.True(t, localValueProperty.IsLeft())
-		assert.Equal(t, []SchemaType{SchemaTypeString}, localValueProperty.GetLeft().GetType())
+		assert.True(t, localValueProperty.IsSchema())
+		assert.Equal(t, []SchemaType{SchemaTypeString}, localValueProperty.GetSchema().GetType())
 	})
 
 	t.Run("$defs getter method works correctly", func(t *testing.T) {
@@ -222,26 +222,26 @@ func TestSchema_Defs_Success(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get the $defs from the root schema
-		require.True(t, root.IsLeft())
-		schema := root.GetLeft()
+		require.True(t, root.IsSchema())
+		schema := root.GetSchema()
 		defs := schema.GetDefs()
 		require.NotNil(t, defs)
 
 		// Verify we have the expected definitions
 		userDef, exists := defs.Get("User")
 		require.True(t, exists)
-		assert.True(t, userDef.IsLeft())
-		assert.Equal(t, []SchemaType{SchemaTypeObject}, userDef.GetLeft().GetType())
+		assert.True(t, userDef.IsSchema())
+		assert.Equal(t, []SchemaType{SchemaTypeObject}, userDef.GetSchema().GetType())
 
 		addressDef, exists := defs.Get("Address")
 		require.True(t, exists)
-		assert.True(t, addressDef.IsLeft())
-		assert.Equal(t, []SchemaType{SchemaTypeObject}, addressDef.GetLeft().GetType())
+		assert.True(t, addressDef.IsSchema())
+		assert.Equal(t, []SchemaType{SchemaTypeObject}, addressDef.GetSchema().GetType())
 
 		nestedDef, exists := defs.Get("NestedSchema")
 		require.True(t, exists)
-		assert.True(t, nestedDef.IsLeft())
-		assert.Equal(t, []SchemaType{SchemaTypeObject}, nestedDef.GetLeft().GetType())
+		assert.True(t, nestedDef.IsSchema())
+		assert.Equal(t, []SchemaType{SchemaTypeObject}, nestedDef.GetSchema().GetType())
 	})
 }
 
@@ -261,9 +261,9 @@ func TestSchema_Defs_Error(t *testing.T) {
 
 		// Navigate to the nonExistentRef property which references a non-existent definition
 		rootSchema := root.MustGetResolvedSchema()
-		require.True(t, rootSchema.IsLeft())
+		require.True(t, rootSchema.IsSchema())
 
-		properties := rootSchema.GetLeft().GetProperties()
+		properties := rootSchema.GetSchema().GetProperties()
 		require.NotNil(t, properties)
 
 		nonExistentProperty, exists := properties.Get("nonExistentRef")
@@ -358,9 +358,9 @@ func TestSchema_ExternalDefs_Success(t *testing.T) {
 
 		// Navigate to the externalUser property which references external $defs
 		rootSchema := testSchema.MustGetResolvedSchema()
-		require.True(t, rootSchema.IsLeft())
+		require.True(t, rootSchema.IsSchema())
 
-		properties := rootSchema.GetLeft().GetProperties()
+		properties := rootSchema.GetSchema().GetProperties()
 		require.NotNil(t, properties)
 
 		externalUserProperty, exists := properties.Get("externalUser")
@@ -375,10 +375,10 @@ func TestSchema_ExternalDefs_Success(t *testing.T) {
 		// Get the resolved schema
 		result := externalUserProperty.GetResolvedSchema()
 		require.NotNil(t, result, "resolved schema should not be nil")
-		assert.True(t, result.IsLeft(), "resolved schema should be a schema, not a reference")
+		assert.True(t, result.IsSchema(), "resolved schema should be a schema, not a reference")
 
 		// Verify the resolved schema has the expected structure
-		resolvedSchema := result.GetLeft()
+		resolvedSchema := result.GetSchema()
 		assert.Equal(t, []SchemaType{SchemaTypeObject}, resolvedSchema.GetType(), "resolved schema should be object type")
 
 		resolvedProperties := resolvedSchema.GetProperties()
@@ -387,13 +387,13 @@ func TestSchema_ExternalDefs_Success(t *testing.T) {
 		// Verify ExternalUser properties
 		idProperty, exists := resolvedProperties.Get("id")
 		require.True(t, exists, "resolved schema should have id property")
-		assert.True(t, idProperty.IsLeft(), "id property should be a schema")
-		assert.Equal(t, []SchemaType{SchemaTypeInteger}, idProperty.GetLeft().GetType(), "id should be integer type")
+		assert.True(t, idProperty.IsSchema(), "id property should be a schema")
+		assert.Equal(t, []SchemaType{SchemaTypeInteger}, idProperty.GetSchema().GetType(), "id should be integer type")
 
 		nameProperty, exists := resolvedProperties.Get("name")
 		require.True(t, exists, "resolved schema should have name property")
-		assert.True(t, nameProperty.IsLeft(), "name property should be a schema")
-		assert.Equal(t, []SchemaType{SchemaTypeString}, nameProperty.GetLeft().GetType(), "name should be string type")
+		assert.True(t, nameProperty.IsSchema(), "name property should be a schema")
+		assert.Equal(t, []SchemaType{SchemaTypeString}, nameProperty.GetSchema().GetType(), "name should be string type")
 	})
 
 	t.Run("resolve reference to non-existent external $defs", func(t *testing.T) {
@@ -422,9 +422,9 @@ func TestSchema_ExternalDefs_Success(t *testing.T) {
 
 		// Navigate to the nonExistentUser property which references non-existent external $defs
 		rootSchema := testSchema.MustGetResolvedSchema()
-		require.True(t, rootSchema.IsLeft())
+		require.True(t, rootSchema.IsSchema())
 
-		properties := rootSchema.GetLeft().GetProperties()
+		properties := rootSchema.GetSchema().GetProperties()
 		require.NotNil(t, properties)
 
 		nonExistentProperty, exists := properties.Get("nonExistentUser")

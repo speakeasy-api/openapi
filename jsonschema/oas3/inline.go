@@ -293,7 +293,7 @@ func analyzeReferences(ctx context.Context, schema *JSONSchema[Referenceable], o
 		return analyzeReferences(ctx, ConcreteToReferenceable(resolved), opts, refTracker, visited, counter)
 	}
 
-	if resolved.IsRight() {
+	if resolved.IsBool() {
 		return nil // Boolean schemas don't have references to analyze
 	}
 
@@ -302,7 +302,7 @@ func analyzeReferences(ctx context.Context, schema *JSONSchema[Referenceable], o
 		currentFrame = visited[len(visited)-1]
 	}
 
-	js := resolved.GetLeft()
+	js := resolved.GetSchema()
 
 	// Analyze all nested schemas
 	for _, schema := range js.AllOf {
@@ -445,7 +445,7 @@ func inlineRecursive(ctx context.Context, schema *JSONSchema[Referenceable], opt
 				// This is the second+ occurrence of a circular reference
 				// Rewrite the reference if needed, then don't recurse
 				if info.rewrittenRef != "" {
-					schema.GetLeft().Ref = pointer.From(references.Reference(info.rewrittenRef))
+					schema.GetSchema().Ref = pointer.From(references.Reference(info.rewrittenRef))
 					rewrittenAbsRef := references.Reference(opts.ResolveOptions.TargetLocation + info.rewrittenRef)
 					// Add reverse lookup for the rewritten reference
 					if !refTracker.Has(rewrittenAbsRef.String()) {
@@ -459,12 +459,12 @@ func inlineRecursive(ctx context.Context, schema *JSONSchema[Referenceable], opt
 		}
 		// If not preserve, this reference should be inlined - we'll process its content below
 	}
-	if resolved.IsRight() {
+	if resolved.IsBool() {
 		inlineSchemaInPlace(schema, resolved)
 		return schema, nil
 	}
 
-	js := resolved.GetLeft()
+	js := resolved.GetSchema()
 
 	// Walk through allOf schemas
 	for i, s := range js.AllOf {
@@ -613,7 +613,7 @@ func inlineRecursive(ctx context.Context, schema *JSONSchema[Referenceable], opt
 			inlineSchemaInPlace(schema, resolved)
 		} else if info.rewrittenRef != "" {
 			// This is a preserved reference - rewrite it to point to the new $defs location
-			schema.GetLeft().Ref = pointer.From(references.Reference(info.rewrittenRef))
+			schema.GetSchema().Ref = pointer.From(references.Reference(info.rewrittenRef))
 			rewrittenAbsRef := references.Reference(opts.ResolveOptions.TargetLocation + info.rewrittenRef)
 			// Add reverse lookup for the rewritten reference
 			if !refTracker.Has(rewrittenAbsRef.String()) {
@@ -662,11 +662,11 @@ func inlineSchemaInPlace(schema *JSONSchema[Referenceable], resolved *JSONSchema
 
 // removeUnusedDefs removes $defs that are no longer referenced after inlining
 func removeUnusedDefs(_ context.Context, schema *JSONSchema[Referenceable], refTracker *sequencedmap.Map[string, *refInfo]) {
-	if schema == nil || !schema.IsLeft() {
+	if schema == nil || !schema.IsSchema() {
 		return
 	}
 
-	schemaObj := schema.GetLeft()
+	schemaObj := schema.GetSchema()
 	if schemaObj == nil || schemaObj.Defs == nil || schemaObj.Defs.Len() == 0 {
 		return
 	}
@@ -802,11 +802,11 @@ func consolidateDefinitions(schema *JSONSchema[Referenceable], refTracker *seque
 	}
 
 	// Ensure we have a schema object (not a boolean schema)
-	if schema.IsRight() {
+	if schema.IsBool() {
 		return errors.New("cannot add definitions to a boolean schema")
 	}
 
-	js := schema.GetLeft()
+	js := schema.GetSchema()
 	if js == nil {
 		return errors.New("schema object is nil")
 	}

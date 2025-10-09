@@ -265,8 +265,8 @@ func TestJSONSchema_Resolve_RootDocument(t *testing.T) {
 		require.NotNil(t, result)
 		// Should return the JSONSchema wrapping the original schema
 		// We can't do direct equality comparison due to cache side effects, so check the content
-		assert.True(t, result.IsLeft())
-		assert.NotNil(t, result.GetLeft())
+		assert.True(t, result.IsSchema())
+		assert.NotNil(t, result.GetSchema())
 	})
 
 	t.Run("resolve JSON pointer against root document", func(t *testing.T) {
@@ -290,10 +290,10 @@ func TestJSONSchema_Resolve_RootDocument(t *testing.T) {
 		result := schema.GetResolvedSchema()
 		require.NotNil(t, result)
 		// Should contain the resolved JSONSchema - check if it has a Schema on the Left
-		assert.True(t, result.IsLeft())
+		assert.True(t, result.IsSchema())
 		assert.NotNil(t, result.Left)
 		// The resolved schema should be a string type property
-		schemaTypes := result.GetLeft().GetType()
+		schemaTypes := result.GetSchema().GetType()
 		require.NotEmpty(t, schemaTypes)
 		assert.Equal(t, SchemaTypeString, schemaTypes[0])
 	})
@@ -320,8 +320,8 @@ func TestJSONSchema_Resolve_RootDocument(t *testing.T) {
 		// Should return the JSONSchema wrapping the original schema
 		// We can't do direct equality comparison due to cache side effects, so check the content
 		require.NotNil(t, result)
-		assert.True(t, result.IsLeft())
-		assert.NotNil(t, result.GetLeft())
+		assert.True(t, result.IsSchema())
+		assert.NotNil(t, result.GetSchema())
 	})
 }
 
@@ -361,9 +361,9 @@ properties:
 		result := schema.GetResolvedSchema()
 		require.NotNil(t, result)
 		// Should contain the resolved JSONSchema - check if it has a Schema on the Left
-		assert.True(t, result.IsLeft())
+		assert.True(t, result.IsSchema())
 		assert.NotNil(t, result.Left)
-		assert.NotNil(t, result.GetLeft().Type)
+		assert.NotNil(t, result.GetSchema().Type)
 	})
 
 	t.Run("resolve with JSON pointer in file path", func(t *testing.T) {
@@ -575,9 +575,9 @@ func TestJSONSchema_Resolve(t *testing.T) {
 		require.NotNil(t, result)
 
 		// ResolveSchema returns a JSONSchema (EitherValue), so check if it has the expected schema on the left
-		assert.True(t, result.IsLeft())
-		resolvedSchema := result.GetLeft()
-		originalSchema := schema.GetLeft()
+		assert.True(t, result.IsSchema())
+		resolvedSchema := result.GetSchema()
+		originalSchema := schema.GetSchema()
 		assert.Equal(t, originalSchema.Type, resolvedSchema.Type)
 	})
 
@@ -977,8 +977,8 @@ func TestResolveSchema_ChainedReference_Success(t *testing.T) {
 	// Verify the schema has the expected description from the final LocalChainedSchema
 	// This tests that the local reference #/components/schemas/LocalChainedSchema
 	// was resolved correctly within chained.yaml (not against main.yaml)
-	if resolved.IsLeft() {
-		schema := resolved.GetLeft()
+	if resolved.IsSchema() {
+		schema := resolved.GetSchema()
 		assert.Equal(t, "Local chained schema", schema.GetDescription())
 
 		// Verify the schema has properties
@@ -991,8 +991,8 @@ func TestResolveSchema_ChainedReference_Success(t *testing.T) {
 		require.NotNil(t, nestedValue)
 
 		// Verify the nested property structure (it should be a JSONSchema)
-		if nestedValue.IsLeft() {
-			nestedSchema := nestedValue.GetLeft()
+		if nestedValue.IsSchema() {
+			nestedSchema := nestedValue.GetSchema()
 			assert.Equal(t, "A nested value in the chained schema", nestedSchema.GetDescription())
 		}
 	}
