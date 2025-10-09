@@ -30,7 +30,7 @@ func TestJSONSchema_ShallowCopy_Success(t *testing.T) {
 	assert.True(t, original.IsEqual(copied), "original and copy should be equal initially")
 
 	// Modify the copy by adding a new property
-	copied.GetLeft().Properties.Set("email", oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{
+	copied.GetSchema().Properties.Set("email", oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{
 		Type: oas3.NewTypeFromString("string"),
 	}))
 

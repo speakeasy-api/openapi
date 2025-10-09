@@ -49,8 +49,8 @@ func Validate[T Referenceable | Concrete](ctx context.Context, schema *JSONSchem
 		return nil
 	}
 
-	if schema.IsLeft() {
-		return schema.GetLeft().Validate(ctx, opts...)
+	if schema.IsSchema() {
+		return schema.GetSchema().Validate(ctx, opts...)
 	}
 
 	return nil
