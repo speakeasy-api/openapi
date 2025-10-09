@@ -109,8 +109,8 @@ if len(validationErrs) > 0 {
 	}
 }
 
-if schema.IsLeft() {
-	schemaObj := schema.GetLeft()
+if schema.IsSchema() {
+	schemaObj := schema.GetSchema()
 	fmt.Println("Schema Types:")
 	for _, t := range schemaObj.GetType() {
 		fmt.Printf("  %s\n", t)
@@ -329,8 +329,8 @@ for item := range openapi.Walk(ctx, doc) {
 			return nil
 		},
 		Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
-			if schema.IsLeft() && schema.GetLeft().Type != nil {
-				types := schema.GetLeft().GetType()
+			if schema.IsSchema() && schema.GetSchema().Type != nil {
+				types := schema.GetSchema().GetType()
 				if len(types) > 0 {
 					fmt.Printf("Found Schema of type: %s\n", types[0])
 				}
@@ -637,8 +637,8 @@ doc := &openapi.OpenAPI{
 if doc.Components != nil && doc.Components.Schemas != nil {
 	for name, schema := range doc.Components.Schemas.All() {
 		fmt.Printf("Found schema component: %s\n", name)
-		if schema.IsLeft() && schema.GetLeft().Type != nil {
-			types := schema.GetLeft().GetType()
+		if schema.IsSchema() && schema.GetSchema().Type != nil {
+			types := schema.GetSchema().GetType()
 			if len(types) > 0 {
 				fmt.Printf("  Type: %s\n", types[0])
 			}
