@@ -107,7 +107,7 @@ func NewReferencedScheme(ctx context.Context, ref references.Reference, resolved
 
 // IsSchema returns true if the JSONSchema is a schema object.
 // Returns false if the JSONSchema is a boolean value.
-// A convenience method equivalent to calling IsSchema().
+// A convenience method equivalent to calling IsLeft().
 func (j *JSONSchema[T]) IsSchema() bool {
 	if j == nil {
 		return false
@@ -117,7 +117,7 @@ func (j *JSONSchema[T]) IsSchema() bool {
 
 // GetSchema returns the schema object if the JSONSchema is a schema object.
 // Returns nil if the JSONSchema is a boolean value.
-// A convenience method equivalent to calling GetSchema().
+// A convenience method equivalent to calling GetLeft().
 func (j *JSONSchema[T]) GetSchema() *Schema {
 	if j == nil {
 		return nil
@@ -127,7 +127,7 @@ func (j *JSONSchema[T]) GetSchema() *Schema {
 
 // IsBool returns true if the JSONSchema is a boolean value.
 // Returns false if the JSONSchema is a schema object.
-// A convenience method equivalent to calling IsBool().
+// A convenience method equivalent to calling IsRight().
 func (j *JSONSchema[T]) IsBool() bool {
 	if j == nil {
 		return false
@@ -137,7 +137,7 @@ func (j *JSONSchema[T]) IsBool() bool {
 
 // GetBool returns the boolean value if the JSONSchema is a boolean value.
 // Returns nil if the JSONSchema is a schema object.
-// A convenience method equivalent to calling GetBool().
+// A convenience method equivalent to calling GetRight().
 func (j *JSONSchema[T]) GetBool() *bool {
 	if j == nil {
 		return nil
