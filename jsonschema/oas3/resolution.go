@@ -29,11 +29,11 @@ func (s *JSONSchema[Referenceable]) IsResolved() bool {
 
 // IsReference returns true if the JSONSchema is a reference, false otherwise
 func (j *JSONSchema[Referenceable]) IsReference() bool {
-	if j == nil || j.IsRight() {
+	if j == nil || j.IsBool() {
 		return false
 	}
 
-	return j.GetLeft().IsReference()
+	return j.GetSchema().IsReference()
 }
 
 // GetReference returns the reference of the JSONSchema if present, otherwise an empty string
@@ -49,11 +49,11 @@ func (j *JSONSchema[Referenceable]) GetReference() references.Reference {
 // GetRef returns the reference of the JSONSchema if present, otherwise an empty string
 // This method is identical to GetReference() but was kept for backwards compatibility
 func (j *JSONSchema[Referenceable]) GetRef() references.Reference {
-	if j == nil || j.IsRight() {
+	if j == nil || j.IsBool() {
 		return ""
 	}
 
-	return j.GetLeft().GetRef()
+	return j.GetSchema().GetRef()
 }
 
 // GetAbsRef returns the absolute reference of the JSONSchema if present, otherwise an empty string
@@ -292,7 +292,7 @@ func resolveJSONSchemaWithTracking(ctx context.Context, schema *JSONSchema[Refer
 		return validationErrs, fmt.Errorf("unable to resolve reference: %s", schema.GetRef())
 	}
 
-	if obj.IsRight() {
+	if obj.IsBool() {
 		return validationErrs, nil
 	}
 

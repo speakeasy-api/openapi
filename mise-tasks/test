@@ -8,10 +8,17 @@ if [ ! -d "jsonschema/oas3/tests/testsuite/tests/draft2020-12" ] || [ -z "$(ls -
     echo ""
 fi
 
-echo "🧪 Running tests with gotestsum..."
-gotestsum --format testname -- -race ./...
+# If arguments are provided, use them as the package path(s)
+# Otherwise, run all tests
+if [ $# -gt 0 ]; then
+    echo "🧪 Running tests for specified packages with gotestsum..."
+    gotestsum --format testname -- -race "$@"
+else
+    echo "🧪 Running tests with gotestsum..."
+    gotestsum --format testname -- -race ./...
 
-echo "🧪 Running tests in separate modules..."
-(cd jsonschema/oas3/tests && gotestsum --format testname -- -race ./...)
+    echo "🧪 Running tests in separate modules..."
+    (cd jsonschema/oas3/tests && gotestsum --format testname -- -race ./...)
+fi
 
 echo "✅ All tests passed!"

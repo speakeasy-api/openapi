@@ -4,6 +4,7 @@ import (
 	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
+	"gopkg.in/yaml.v3"
 )
 
 type Responses struct {
@@ -12,6 +13,38 @@ type Responses struct {
 
 	Default    marshaller.Node[*Reference[*Response]] `key:"default"`
 	Extensions core.Extensions                        `key:"extensions"`
+}
+
+func NewResponses() *Responses {
+	return &Responses{
+		Map: sequencedmap.New[string, *Reference[*Response]](),
+	}
+}
+
+func (r *Responses) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Node) *yaml.Node {
+	if !r.IsInitialized() {
+		return rootNode
+	}
+
+	if r.RootNode == nil {
+		return rootNode
+	}
+
+	for i := 0; i < len(r.RootNode.Content); i += 2 {
+		if r.RootNode.Content[i].Value == key {
+			return r.RootNode.Content[i]
+		}
+	}
+
+	return rootNode
+}
+
+func (r *Responses) GetMapKeyNodeOrRootLine(key string, rootNode *yaml.Node) int {
+	node := r.GetMapKeyNodeOrRoot(key, rootNode)
+	if node == nil {
+		return -1
+	}
+	return node.Line
 }
 
 type Response struct {
