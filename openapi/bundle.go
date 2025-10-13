@@ -960,18 +960,6 @@ func handleReference(ref references.Reference, targetLocation string) (string, *
 	return r, classification
 }
 
-// convertToPathStyle converts a path to the specified style (windows/unix)
-func convertToPathStyle(path, style string) string {
-	switch style {
-	case "windows":
-		return strings.ReplaceAll(path, "/", "\\")
-	case "unix":
-		return strings.ReplaceAll(path, "\\", "/")
-	default:
-		return path
-	}
-}
-
 // makeReferenceRelativeForNaming converts an absolute reference path back to a relative path
 // suitable for component naming, relative to the root document location (assumed to be absolute)
 func makeReferenceRelativeForNaming(ref string, rootLocation string) string {

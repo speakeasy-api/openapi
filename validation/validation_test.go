@@ -230,7 +230,7 @@ func TestNewValueError_Success(t *testing.T) {
 	tests := []struct {
 		name         string
 		core         CoreModeler
-		nodeGetter   valueNodeGetter
+		nodeGetter   ValueNodeGetter
 		expectedNode *yaml.Node
 	}{
 		{
@@ -287,7 +287,7 @@ func TestNewSliceError_Success(t *testing.T) {
 	tests := []struct {
 		name         string
 		core         CoreModeler
-		nodeGetter   sliceNodeGetter
+		nodeGetter   SliceNodeGetter
 		index        int
 		expectedNode *yaml.Node
 	}{
@@ -337,7 +337,7 @@ func TestNewMapKeyError_Success(t *testing.T) {
 	tests := []struct {
 		name         string
 		core         CoreModeler
-		nodeGetter   mapKeyNodeGetter
+		nodeGetter   MapKeyNodeGetter
 		key          string
 		expectedNode *yaml.Node
 	}{
@@ -387,7 +387,7 @@ func TestNewMapValueError_Success(t *testing.T) {
 	tests := []struct {
 		name         string
 		core         CoreModeler
-		nodeGetter   mapValueNodeGetter
+		nodeGetter   MapValueNodeGetter
 		key          string
 		expectedNode *yaml.Node
 	}{
