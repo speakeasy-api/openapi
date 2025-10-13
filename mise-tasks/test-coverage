@@ -7,6 +7,14 @@ if ! gotestsum --format testname -- -race -coverprofile=coverage.out -covermode=
     exit 1
 fi
 
+# Filter out cmd and tests folders from coverage report
+if [ -f coverage.out ]; then
+    echo "🔧 Filtering cmd and tests folders from coverage report..."
+    grep -v -E '/cmd/|/tests/' coverage.out > coverage.filtered.out || true
+    # Keep original for reference, use filtered for reporting
+    mv coverage.filtered.out coverage.out
+fi
+
 echo ""
 echo "## 📊 Test Coverage Report"
 echo ""
