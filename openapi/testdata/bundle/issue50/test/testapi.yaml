@@ -1,0 +1,129 @@
+openapi: 3.1.0
+info:
+  title: test API
+  version: "0.1"
+  description: test
+  license:
+    name: apache 2
+    url: "https://apache.org/licenses/LICENSE-2.0"
+servers:
+  - url: "https://localhost:8086"
+    description: local dev server
+security:
+  - bearerAuth: []
+paths:
+  "/v3/entities":
+    post:
+      summary: create a entity
+      operationId: post-v3-entities
+      tags:
+        - entities
+      x-permissions:
+        - "entity:create"
+      requestBody:
+        $ref: "#/components/requestBodies/create-entity"
+      responses:
+        "201":
+          $ref: "#/components/responses/entity-response"
+        "500":
+          $ref: "../common.yaml#/components/responses/internal-server-error"
+      parameters:
+        - $ref: "../common.yaml#/components/parameters/X-Idempotency-Key"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    CreateEntity:
+      description: Create a entity
+      oneOf:
+        - $ref: "#/components/schemas/CreateEntityIndividual"
+        - $ref: "#/components/schemas/CreateEntityCorporate"
+      discriminator:
+        propertyName: entity_type
+        mapping:
+          individual: "#/components/schemas/CreateEntityIndividual"
+          corporate: "#/components/schemas/CreateEntityCorporate"
+    CreateEntityIndividual:
+      title: CreateEntityIndividual
+      description: Create a entity individual
+      type: object
+      required:
+        - entity_type
+        - name
+      properties:
+        entity_type:
+          type: string
+          enum:
+            - individual
+        email:
+          $ref: "../common.yaml#/components/schemas/Email"
+        name:
+          type: string
+          example: John
+          maxLength: 100
+          pattern: "^[A-Za-z\\s\\-\\.']+"
+        street:
+          type: string
+          example: 1 rue de la bourse
+          maxLength: 255
+          pattern: "^[\\p{L}\\p{N}\\s\\.,\\-#'\"/()]+$"
+        city:
+          $ref: "../common.yaml#/components/schemas/PermissiveString"
+        country:
+          $ref: "../country.yaml#/components/schemas/CountryCode2"
+        birth_date:
+          $ref: "../common.yaml#/components/schemas/Date"
+    CreateEntityCorporate:
+      title: CreateEntityCorporate
+      description: Create a entity corporate
+      type: object
+      required:
+        - entity_type
+        - company_name
+      properties:
+        entity_type:
+          type: string
+          enum:
+            - corporate
+        email:
+          $ref: "../common.yaml#/components/schemas/Email"
+        country:
+          $ref: "../country.yaml#/components/schemas/CountryCode2"
+        company_name:
+          type: string
+          example: Wisoky - Berge
+          maxLength: 100
+          pattern: '^[a-zA-Z0-9\s\-&,\.]+$'
+        incorporation_date:
+          $ref: "../common.yaml#/components/schemas/Date"
+  responses:
+    entity-response:
+      description: Entity details
+      headers:
+        X-RateLimit-Limit:
+          $ref: "../common.yaml#/components/headers/X-RateLimit-Limit"
+        X-RateLimit-Remaining:
+          $ref: "../common.yaml#/components/headers/X-RateLimit-Remaining"
+        X-RateLimit-Reset:
+          $ref: "../common.yaml#/components/headers/X-RateLimit-Reset"
+        Retry-After:
+          $ref: "../common.yaml#/components/headers/Retry-After"
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "../common.yaml#/components/schemas/IndividualEntity"
+              - $ref: "../common.yaml#/components/schemas/CorporateEntity"
+
+  requestBodies:
+    create-entity:
+      description: Entity creation payload
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/CreateEntity"
+tags:
+  - name: entities
+    description: Operations related to entity management

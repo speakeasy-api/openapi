@@ -738,7 +738,7 @@ components:
         posts:
           type: array
           items:
-            $ref: external_post.yaml
+            $ref: '#/components/schemas/external_post'
           description: Posts created by this user
       required:
         - id

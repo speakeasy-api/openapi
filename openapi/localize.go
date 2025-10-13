@@ -213,7 +213,7 @@ func discoverSchemaReference(ctx context.Context, schema *oas3.JSONSchema[oas3.R
 		return nil
 	}
 
-	ref, classification := handleReference(schema.GetRef(), "", opts.TargetLocation)
+	ref, classification := handleLocalizeReference(schema.GetRef(), "", opts.TargetLocation)
 	if classification == nil || classification.IsFragment {
 		return nil // Skip internal references
 	}
@@ -287,7 +287,7 @@ func discoverGenericReference[T any, V interfaces.Validator[T], C marshaller.Cor
 		return nil
 	}
 
-	refStr, classification := handleReference(ref.GetReference(), "", opts.TargetLocation)
+	refStr, classification := handleLocalizeReference(ref.GetReference(), "", opts.TargetLocation)
 	if classification == nil || classification.IsFragment {
 		return nil // Skip internal references
 	}
@@ -832,4 +832,51 @@ func normalizeFilePath(filePath string) string {
 	cleanPath = strings.TrimPrefix(cleanPath, "./")
 
 	return cleanPath
+}
+
+func handleLocalizeReference(ref references.Reference, parentLocation, targetLocation string) (string, *utils.ReferenceClassification) {
+	r := ref.String()
+
+	// Check if this is an external reference using the utility function
+	classification, err := utils.ClassifyReference(r)
+	if err != nil {
+		return "", nil // Invalid reference, skip
+	}
+
+	// For URLs, don't do any path manipulation - return as-is
+	if classification.Type == utils.ReferenceTypeURL {
+		return r, classification
+	}
+
+	if parentLocation != "" {
+		relPath, err := filepath.Rel(filepath.Dir(parentLocation), targetLocation)
+		if err == nil {
+			if classification.IsFragment {
+				r = relPath + r
+			} else {
+				if ref.GetURI() != "" {
+					r = filepath.Join(filepath.Dir(relPath), r)
+				} else {
+					r = filepath.Join(relPath, r)
+				}
+			}
+		}
+
+		// convert paths back to original separators
+		// detect original separators from the original reference
+		pathStyle := detectPathStyle(ref.String())
+		switch pathStyle {
+		case "windows":
+			r = strings.ReplaceAll(r, "/", "\\")
+		default:
+			r = strings.ReplaceAll(r, "\\", "/")
+		}
+
+		cl, err := utils.ClassifyReference(r)
+		if err == nil {
+			classification = cl
+		}
+	}
+
+	return r, classification
 }
