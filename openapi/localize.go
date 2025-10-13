@@ -450,6 +450,7 @@ func generateLocalizedFilenameWithConflictDetection(ref string, strategy Localiz
 // generatePathBasedFilenameWithConflictDetection creates filenames with smart conflict resolution
 func generatePathBasedFilenameWithConflictDetection(filePath string, _ bool, usedFilenames map[string]bool) string {
 	// Check if this is a URL - if so, extract filename from URL path
+	// Error classifying reference is not fatal - we fall through to file path handling
 	if classification, err := utils.ClassifyReference(filePath); err == nil && classification.Type == utils.ReferenceTypeURL {
 		// For URLs, extract the filename from the URL path
 		if lastSlash := strings.LastIndex(filePath, "/"); lastSlash != -1 {
@@ -627,6 +628,7 @@ func rewriteReferenceValue(refValue, originalRef string, storage *localizeStorag
 
 	// For URLs, use the full reference as the key, for file paths normalize
 	var normalizedFilePath string
+	// Error classifying reference is not fatal - we fall through to file path handling
 	if classification, err := utils.ClassifyReference(resolvedRef); err == nil && classification.Type == utils.ReferenceTypeURL {
 		normalizedFilePath = resolvedRef // Use the full URL as the key
 	} else {
@@ -668,6 +670,7 @@ func resolveRelativeReference(ref, baseRef string) string {
 	refPath := refObj.GetURI()
 
 	// Check if the base reference is a URL
+	// Error classifying base reference is not fatal - we fall through to file path handling
 	if classification, err := utils.ClassifyReference(baseURI); err == nil && classification.Type == utils.ReferenceTypeURL {
 		// For URLs, use URL path joining instead of file path joining
 		var resolvedPath string
@@ -734,6 +737,7 @@ func rewriteReferencesToLocalized(ctx context.Context, doc *OpenAPI, storage *lo
 
 					// For URLs, use the full reference as the key, for file paths normalize
 					var normalizedFilePath string
+					// Error classifying reference is not fatal - we fall through to file path handling
 					if classification, err := utils.ClassifyReference(string(ref)); err == nil && classification.Type == utils.ReferenceTypeURL {
 						normalizedFilePath = string(ref) // Use the full URL as the key
 					} else {
@@ -799,6 +803,7 @@ func updateGenericReference[T any, V interfaces.Validator[T], C marshaller.CoreM
 
 	// For URLs, use the full reference as the key, for file paths normalize
 	var normalizedFilePath string
+	// Error classifying reference is not fatal - we fall through to file path handling
 	if classification, err := utils.ClassifyReference(string(refObj)); err == nil && classification.Type == utils.ReferenceTypeURL {
 		normalizedFilePath = string(refObj) // Use the full URL as the key
 	} else {
@@ -821,6 +826,7 @@ func updateGenericReference[T any, V interfaces.Validator[T], C marshaller.CoreM
 // normalizeFilePath normalizes a file path for consistent handling
 func normalizeFilePath(filePath string) string {
 	// Check if this is a URL - if so, don't apply file path normalization
+	// Error classifying reference is not fatal - we treat it as a file path
 	if classification, err := utils.ClassifyReference(filePath); err == nil && classification.Type == utils.ReferenceTypeURL {
 		return filePath // Return URLs as-is
 	}
@@ -834,6 +840,34 @@ func normalizeFilePath(filePath string) string {
 	return cleanPath
 }
 
+// handleLocalizeReference processes a reference for localization by preserving relative path structures.
+// This function represents the original reference handling behavior and is specifically designed
+// for the Localize operation, which needs to:
+//   - Preserve the original document structure and path relationships during file copying
+//   - Maintain the original path separators (Windows vs Unix) for generated files
+//   - Support relative path manipulation when copying nested referenced files
+//
+// This differs from handleReference (used in Bundle), which:
+//   - Normalizes all paths to absolute with forward slashes for use as unique map keys
+//   - Doesn't need to preserve original path structure since everything goes into components
+//   - Requires consistent path format for deduplication and reference rewriting
+//
+// Key behavioral differences:
+//  1. Path normalization: handleLocalizeReference preserves path style (Windows/Unix),
+//     while handleReference normalizes to forward slashes
+//  2. Path manipulation: handleLocalizeReference supports parentLocation for relative
+//     path calculations when processing nested references
+//  3. Return format: handleLocalizeReference may return relative paths based on context,
+//     while handleReference always returns absolute paths when targetLocation is provided
+//
+// Parameters:
+//   - ref: The reference to process
+//   - parentLocation: The location of the parent document (for relative path calculations)
+//   - targetLocation: The location of the current document containing this reference
+//
+// Returns:
+//   - string: The processed reference path (may be relative or absolute depending on context)
+//   - *utils.ReferenceClassification: Classification of the reference type, or nil if invalid
 func handleLocalizeReference(ref references.Reference, parentLocation, targetLocation string) (string, *utils.ReferenceClassification) {
 	r := ref.String()
 
@@ -861,6 +895,8 @@ func handleLocalizeReference(ref references.Reference, parentLocation, targetLoc
 				}
 			}
 		}
+		// Error getting relative path is not fatal - fall back to using the original reference
+		// This can happen when paths are on different drives (Windows) or other path incompatibilities
 
 		// convert paths back to original separators
 		// detect original separators from the original reference
@@ -876,6 +912,8 @@ func handleLocalizeReference(ref references.Reference, parentLocation, targetLoc
 		if err == nil {
 			classification = cl
 		}
+		// Error re-classifying is not fatal - we keep using the previous classification
+		// This maintains backward compatibility and allows processing to continue
 	}
 
 	return r, classification

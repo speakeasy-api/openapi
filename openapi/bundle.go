@@ -126,6 +126,8 @@ func Bundle(ctx context.Context, doc *OpenAPI, opts BundleOptions) error {
 			targetLocation = absTarget
 			opts.ResolveOptions.TargetLocation = absTarget
 		}
+		// Error getting absolute path is not fatal - we continue with the relative path
+		// This allows processing to proceed even if there are issues with path resolution
 	}
 
 	componentStorage := &componentStorage{
@@ -325,6 +327,12 @@ func rewriteRefsInSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Refer
 	sourceURI := references.Reference(sourceLocation).GetURI()
 	if sourceURI == "" {
 		sourceURI = sourceLocation // Fallback if no URI part
+	}
+
+	// On Windows, normalize sourceURI to backslashes before using with filepath operations
+	// This prevents malformed paths when joining with relative references
+	if filepath.Separator == '\\' && filepath.IsAbs(sourceURI) {
+		sourceURI = filepath.FromSlash(sourceURI)
 	}
 
 	// Walk through the schema and rewrite references
@@ -837,6 +845,22 @@ func addComponentsToDocument(doc *OpenAPI, componentStorage *componentStorage) {
 	}
 }
 
+// handleReference processes a reference for bundling by converting it to an absolute path.
+// This function is specifically designed for the Bundle operation, which needs to:
+//   - Track all external references using absolute paths as unique identifiers
+//   - Normalize paths to forward slashes for cross-platform consistency in the refs map
+//   - Handle both file-based and URL-based references uniformly
+//
+// This differs from handleLocalizeReference, which preserves relative paths and original
+// path separators to maintain the document structure during file copying operations.
+//
+// Parameters:
+//   - ref: The reference to process
+//   - targetLocation: The absolute path of the document containing this reference
+//
+// Returns:
+//   - string: The absolute reference path (normalized to forward slashes for file paths)
+//   - *utils.ReferenceClassification: Classification of the reference type, or nil if invalid
 func handleReference(ref references.Reference, targetLocation string) (string, *utils.ReferenceClassification) {
 	r := ref.String()
 
@@ -851,15 +875,13 @@ func handleReference(ref references.Reference, targetLocation string) (string, *
 		return r, classification
 	}
 
-	// Detect original path style for later conversion
-	pathStyle := detectPathStyle(ref.String())
-
 	// If we have a target location, make the reference absolute
 	if targetLocation != "" {
 		// Classify the target location to determine how to join
 		baseClassification, err := utils.ClassifyReference(targetLocation)
 		if err != nil {
-			return "", nil // Invalid base location
+			// Invalid base location - cannot proceed with reference classification
+			return "", nil
 		}
 
 		var absolutePath string
@@ -875,6 +897,8 @@ func handleReference(ref references.Reference, targetLocation string) (string, *
 				if err == nil {
 					absolutePath = joined
 				} else {
+					// Error joining URLs is not fatal - fall back to using the original reference
+					// This can happen with malformed URLs or incompatible URL structures
 					absolutePath = r
 				}
 			} else {
@@ -892,22 +916,45 @@ func handleReference(ref references.Reference, targetLocation string) (string, *
 				baseDir := filepath.Dir(targetLocation)
 				joinedPath := filepath.Join(baseDir, filePath)
 
-				// Clean the path
+				// Clean the path and immediately normalize to forward slashes
+				// This prevents issues with Windows path handling
 				absPath := filepath.Clean(joinedPath)
+				absPath = filepath.ToSlash(absPath)
+
 				absolutePath = absPath + fragment
 			}
 		}
 
 		r = absolutePath
 
-		// Convert paths back to original separators
-		r = convertToPathStyle(r, pathStyle)
+		// Normalize to forward slashes for cross-platform path consistency
+		// This ensures that C:\path and C:/path are treated the same
+		// Apply normalization to the full absolute path (including fragment)
+		refParsed := references.Reference(r)
+		uri := refParsed.GetURI()
 
-		// Re-classify after making absolute
+		// Always normalize absolute paths to forward slashes
+		if uri != "" {
+			// Check if it's an absolute path (works for both C:\path and C:/path)
+			isAbs := filepath.IsAbs(uri) || (len(uri) >= 3 && uri[1] == ':' && (uri[2] == '/' || uri[2] == '\\'))
+
+			if isAbs {
+				normalizedURI := filepath.ToSlash(uri)
+				if refParsed.HasJSONPointer() {
+					r = normalizedURI + "#" + string(refParsed.GetJSONPointer())
+				} else {
+					r = normalizedURI
+				}
+			}
+		}
+
+		// Re-classify after making absolute and normalizing
 		cl, err := utils.ClassifyReference(r)
 		if err == nil {
 			classification = cl
 		}
+		// Error re-classifying is not fatal - we keep using the previous classification
+		// This maintains backward compatibility and allows processing to continue
 	}
 
 	return r, classification
@@ -941,17 +988,31 @@ func makeReferenceRelativeForNaming(ref string, rootLocation string) string {
 		return ref
 	}
 
+	// On Windows, paths with forward slashes can be misclassified as URLs
+	// Normalize to native separators before classification to avoid this
+	normalizedURI := uri
+	if filepath.Separator == '\\' && len(uri) >= 3 && uri[1] == ':' && uri[2] == '/' {
+		// Windows path with forward slashes like C:/path - convert to backslashes
+		normalizedURI = filepath.FromSlash(uri)
+	}
+
 	// Check if this is a URL - if so, return as-is
-	classification, err := utils.ClassifyReference(uri)
+	// Error classifying reference is not fatal - we return the original ref unchanged
+	classification, err := utils.ClassifyReference(normalizedURI)
 	if err != nil || classification.IsURL {
 		return ref
 	}
 
 	// If the URI is absolute, make it relative to the root document's directory
 	// rootLocation is assumed to be absolute at this point
-	if filepath.IsAbs(uri) {
-		rootDir := filepath.Dir(rootLocation)
-		relPath, err := filepath.Rel(rootDir, uri)
+	if filepath.IsAbs(normalizedURI) {
+		// Normalize rootLocation as well for consistent comparison
+		normalizedRoot := rootLocation
+		if filepath.Separator == '\\' {
+			normalizedRoot = filepath.FromSlash(rootLocation)
+		}
+		rootDir := filepath.Dir(normalizedRoot)
+		relPath, err := filepath.Rel(rootDir, normalizedURI)
 		if err == nil {
 			// Reconstruct the reference with relative path
 			if reference.HasJSONPointer() {
@@ -959,6 +1020,8 @@ func makeReferenceRelativeForNaming(ref string, rootLocation string) string {
 			}
 			return relPath
 		}
+		// Error making path relative is not fatal - we fall through to return the original ref
+		// This can happen when paths are on different drives (Windows) or incompatible
 	}
 
 	// Return as-is if we couldn't make it relative
