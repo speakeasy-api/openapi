@@ -142,7 +142,7 @@ func LoadSanitizeConfig(r io.Reader) (*SanitizeOptions, error) {
 
 // LoadSanitizeConfigFromFile loads sanitize configuration from a YAML file.
 func LoadSanitizeConfigFromFile(path string) (*SanitizeOptions, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to open config file: %w", err)
 	}
@@ -183,8 +183,7 @@ func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) 
 				// Collect keys to remove
 				keysToRemove := []string{}
 				for key := range ext.All() {
-					shouldRemove := false
-
+					var shouldRemove bool
 					if removeAll {
 						// Remove all extensions
 						shouldRemove = true
@@ -222,12 +221,8 @@ func removeUnknownProperties(ctx context.Context, doc *OpenAPI) error {
 	// We need specific matchers for wrapped types (Referenced*, JSONSchema)
 	for item := range Walk(ctx, doc) {
 		err := item.Match(Matcher{
-			Any: func(model any) error {
-				return cleanUnknownPropertiesFromModel(model)
-			},
-			Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
-				return cleanUnknownPropertiesFromJSONSchema(schema)
-			},
+			Any:    cleanUnknownPropertiesFromModel,
+			Schema: cleanUnknownPropertiesFromJSONSchema,
 			// Handle all Referenced types by extracting their Object
 			ReferencedResponse: func(ref *ReferencedResponse) error {
 				if ref != nil && !ref.IsReference() && ref.Object != nil {

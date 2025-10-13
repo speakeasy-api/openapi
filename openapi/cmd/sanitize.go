@@ -139,7 +139,7 @@ func sanitizeOpenAPI(ctx context.Context, processor *OpenAPIProcessor) error {
 		if err != nil {
 			return fmt.Errorf("failed to load config file: %w", err)
 		}
-		processor.PrintInfo(fmt.Sprintf("Using configuration from %s", sanitizeConfigFile))
+		processor.PrintInfo("Using configuration from " + sanitizeConfigFile)
 	}
 
 	// Perform the sanitization

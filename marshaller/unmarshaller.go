@@ -367,7 +367,8 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 			// Direct field index lookup (eliminates map[string]Field allocation)
 			fieldIndex, ok := fieldMap.FieldIndexes[key]
 			if !ok {
-				if strings.HasPrefix(key, "x-") && extensionsField != nil {
+				switch {
+				case strings.HasPrefix(key, "x-") && extensionsField != nil:
 					// Lock access to extensionsField to prevent concurrent modification
 					extensionsMutex.Lock()
 					defer extensionsMutex.Unlock()
@@ -375,7 +376,7 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 					if err != nil {
 						return err
 					}
-				} else if embeddedMap != nil {
+				case embeddedMap != nil:
 					// Skip alias definitions - these are nodes where:
 					// 1. The value node has an anchor (e.g., &keyAlias)
 					// 2. The key is not an alias reference (doesn't start with *)
@@ -385,7 +386,7 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 						return nil
 					}
 					jobMapContent[i/2] = append(jobMapContent[i/2], keyNode, valueNode)
-				} else {
+				default:
 					// This is an unknown property (not a recognized field, not an extension, not in embedded map)
 					unknownPropertiesMutex.Lock()
 					unknownProperties = append(unknownProperties, key)
