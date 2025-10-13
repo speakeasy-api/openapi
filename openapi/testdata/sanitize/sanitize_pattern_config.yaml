@@ -1,0 +1,2 @@
+extensionPatterns:
+  - "x-go-*"

@@ -12,6 +12,7 @@ OpenAPI specifications define REST APIs in a standard format. These commands hel
   - [`upgrade`](#upgrade)
   - [`inline`](#inline)
   - [`clean`](#clean)
+  - [`sanitize`](#sanitize)
   - [`bundle`](#bundle)
     - [Bundle vs Inline](#bundle-vs-inline)
   - [`join`](#join)
@@ -216,6 +217,166 @@ components:
 - You're preparing a specification for publication or distribution
 - You want to reduce document size and complexity
 - You're maintaining a large specification with many components
+  
+### `sanitize`
+
+Remove unwanted elements from an OpenAPI specification to create clean, standards-compliant documents.
+
+```bash
+# Default sanitization (remove all extensions and unused components)
+openapi spec sanitize ./spec.yaml
+
+# Sanitize and write to new file
+openapi spec sanitize ./spec.yaml ./clean-spec.yaml
+
+# Sanitize in-place
+openapi spec sanitize -w ./spec.yaml
+
+# Use config file for selective sanitization
+openapi spec sanitize --config sanitize-config.yaml ./spec.yaml
+```
+
+**Default Behavior (no config):**
+
+By default, sanitize performs aggressive cleanup:
+
+- Removes ALL x-* vendor extensions throughout the document
+- Removes unused components (schemas, responses, parameters, etc.)
+- Removes unknown properties not defined in the OpenAPI specification
+
+**Configuration File Support:**
+
+Create a YAML configuration file to control sanitization behavior:
+
+```yaml
+# sanitize-config.yaml
+
+# Remove only specific extension patterns (if not set, removes ALL extensions)
+extensionPatterns:
+  - "x-go-*"
+  - "x-internal-*"
+
+# Keep unused components (default: false, removes them)
+keepUnusedComponents: true
+
+# Keep unknown properties (default: false, removes them)
+keepUnknownProperties: true
+```
+
+**What gets sanitized:**
+
+- **Extensions**: All x-* vendor extensions (info, paths, operations, schemas, etc.)
+- **Unused Components**: Schemas, responses, parameters, examples, request bodies, headers, security schemes, links, callbacks, and path items that aren't referenced
+- **Unknown Properties**: Properties not defined in the OpenAPI specification
+
+**Before sanitization:**
+
+```yaml
+openapi: 3.1.0
+info:
+  title: My API
+  version: 1.0.0
+  x-api-id: internal-123
+  x-go-package: myapi
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      x-go-name: ListUsers
+      x-rate-limit: 100
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      x-go-type: User
+      properties:
+        id:
+          type: string
+    UnusedSchema:
+      type: object
+      description: Not referenced anywhere
+```
+
+**After sanitization (default):**
+
+```yaml
+openapi: 3.1.0
+info:
+  title: My API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+```
+
+**After sanitization (with pattern config):**
+
+Using config with `extensionPatterns: ["x-go-*"]`:
+
+```yaml
+openapi: 3.1.0
+info:
+  title: My API
+  version: 1.0.0
+  x-api-id: internal-123  # kept (doesn't match x-go-*)
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      x-rate-limit: 100  # kept (doesn't match x-go-*)
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+```
+
+**Benefits of sanitization:**
+
+- **Standards compliance**: Remove vendor-specific extensions for clean, standard specs
+- **Clean distribution**: Prepare specifications for public sharing or publishing
+- **Reduced size**: Remove unnecessary extensions and unused components
+- **Selective cleanup**: Use patterns to target specific extension families
+- **Flexible control**: Config file allows fine-grained control over what to keep
+
+**Use Sanitize when:**
+
+- You want to remove all vendor extensions before publishing
+- You're preparing specifications for standards-compliant distribution
+- You need to clean up internal annotations before sharing externally
+- You want to remove specific extension families (e.g., x-go-*, x-internal-*)
+- You're combining extension removal with component cleanup in one operation
 
 ### `bundle`
 

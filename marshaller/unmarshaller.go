@@ -347,6 +347,10 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 
 	jobValidationErrs := make([][]error, numJobs)
 
+	// Track unknown properties (non-extension, non-field, non-embedded map properties)
+	var unknownPropertiesMutex sync.Mutex
+	var unknownProperties []string
+
 	// Mutex to protect concurrent access to extensionsField
 	var extensionsMutex sync.Mutex
 
@@ -381,6 +385,11 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 						return nil
 					}
 					jobMapContent[i/2] = append(jobMapContent[i/2], keyNode, valueNode)
+				} else {
+					// This is an unknown property (not a recognized field, not an extension, not in embedded map)
+					unknownPropertiesMutex.Lock()
+					unknownProperties = append(unknownProperties, key)
+					unknownPropertiesMutex.Unlock()
 				}
 			} else {
 				// Get field info from cache and field value directly
@@ -436,6 +445,11 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 			return nil, err
 		}
 		validationErrs = append(validationErrs, embeddedMapValidationErrs...)
+	}
+
+	// Store unknown properties in the core model if any were found
+	if len(unknownProperties) > 0 {
+		unmarshallable.SetUnknownProperties(unknownProperties)
 	}
 
 	// Use the errors to determine the validity of the model
