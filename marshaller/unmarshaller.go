@@ -349,7 +349,7 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 
 	// Track unknown properties (non-extension, non-field, non-embedded map properties)
 	var unknownPropertiesMutex sync.Mutex
-	var unknownProperties []string
+	unknownProperties := make([]string, 0, numJobs)
 
 	// Mutex to protect concurrent access to extensionsField
 	var extensionsMutex sync.Mutex

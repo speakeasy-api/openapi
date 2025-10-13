@@ -26,8 +26,9 @@ func TestSanitize_RemoveAllExtensions_Success(t *testing.T) {
 	require.Empty(t, validationErrs, "Input document should be valid")
 
 	// Sanitize with default options (remove all extensions and clean components)
-	err = openapi.Sanitize(ctx, inputDoc, nil)
+	result, err := openapi.Sanitize(ctx, inputDoc, nil)
 	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
 
 	// Marshal the sanitized document to YAML
 	var buf bytes.Buffer
@@ -63,8 +64,9 @@ func TestSanitize_PatternBased_Success(t *testing.T) {
 		KeepUnusedComponents:  true,
 		KeepUnknownProperties: true,
 	}
-	err = openapi.Sanitize(ctx, inputDoc, opts)
+	result, err := openapi.Sanitize(ctx, inputDoc, opts)
 	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
 
 	// Marshal the sanitized document to YAML
 	var buf bytes.Buffer
@@ -99,8 +101,9 @@ func TestSanitize_MultiplePatterns_Success(t *testing.T) {
 		ExtensionPatterns:    []string{"x-go-*", "x-internal-*"},
 		KeepUnusedComponents: true,
 	}
-	err = openapi.Sanitize(ctx, inputDoc, opts)
+	result, err := openapi.Sanitize(ctx, inputDoc, opts)
 	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
 
 	// Marshal the sanitized document to YAML
 	var buf bytes.Buffer
@@ -134,8 +137,9 @@ func TestSanitize_KeepComponents_Success(t *testing.T) {
 	opts := &openapi.SanitizeOptions{
 		KeepUnusedComponents: true,
 	}
-	err = openapi.Sanitize(ctx, inputDoc, opts)
+	result, err := openapi.Sanitize(ctx, inputDoc, opts)
 	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
 
 	// Marshal the sanitized document to YAML
 	var buf bytes.Buffer
@@ -157,8 +161,9 @@ func TestSanitize_EmptyDocument_Success(t *testing.T) {
 	ctx := t.Context()
 
 	// Test with nil document
-	err := openapi.Sanitize(ctx, nil, nil)
+	result, err := openapi.Sanitize(ctx, nil, nil)
 	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
 
 	// Test with minimal document (no components, no extensions)
 	doc := &openapi.OpenAPI{
@@ -169,8 +174,9 @@ func TestSanitize_EmptyDocument_Success(t *testing.T) {
 		},
 	}
 
-	err = openapi.Sanitize(ctx, doc, nil)
+	result, err = openapi.Sanitize(ctx, doc, nil)
 	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
 }
 
 func TestSanitize_NoExtensions_Success(t *testing.T) {
@@ -188,8 +194,9 @@ func TestSanitize_NoExtensions_Success(t *testing.T) {
 	require.Empty(t, validationErrs, "Input document should be valid")
 
 	// Sanitize (should be a no-op for extensions)
-	err = openapi.Sanitize(ctx, inputDoc, nil)
+	result, err := openapi.Sanitize(ctx, inputDoc, nil)
 	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
 
 	// Document should still be valid
 	assert.NotNil(t, inputDoc)
@@ -265,8 +272,9 @@ keepUnknownProperties: true
 	require.NoError(t, err)
 
 	// Sanitize using config
-	err = openapi.Sanitize(ctx, inputDoc, opts)
+	result, err := openapi.Sanitize(ctx, inputDoc, opts)
 	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
 
 	// Marshal the sanitized document to YAML
 	var buf bytes.Buffer
@@ -304,8 +312,9 @@ func TestSanitize_KeepExtensionsRemoveUnknownProperties_Success(t *testing.T) {
 		KeepUnusedComponents:  true,
 	}
 
-	err = openapi.Sanitize(ctx, inputDoc, opts)
+	result, err := openapi.Sanitize(ctx, inputDoc, opts)
 	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
 
 	// Marshal the sanitized document
 	var buf bytes.Buffer

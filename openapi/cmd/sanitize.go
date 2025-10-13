@@ -143,8 +143,14 @@ func sanitizeOpenAPI(ctx context.Context, processor *OpenAPIProcessor) error {
 	}
 
 	// Perform the sanitization
-	if err := openapi.Sanitize(ctx, doc, opts); err != nil {
+	result, err := openapi.Sanitize(ctx, doc, opts)
+	if err != nil {
 		return fmt.Errorf("failed to sanitize OpenAPI document: %w", err)
+	}
+
+	// Report any warnings
+	for _, warning := range result.Warnings {
+		processor.PrintWarning(warning)
 	}
 
 	// Report success

@@ -35,6 +35,13 @@ type SanitizeOptions struct {
 	KeepUnknownProperties bool `yaml:"keepUnknownProperties,omitempty"`
 }
 
+// SanitizeResult contains the results of a sanitization operation.
+type SanitizeResult struct {
+	// Warnings contains non-fatal issues encountered during sanitization.
+	// These typically include invalid glob patterns that were skipped.
+	Warnings []string
+}
+
 // Sanitize cleans an OpenAPI document by removing unwanted elements.
 // By default (nil options or zero values), it provides aggressive cleanup:
 //   - Removes all extensions (x-*)
@@ -64,9 +71,12 @@ type SanitizeOptions struct {
 // Example usage:
 //
 //	// Default sanitization: remove all extensions, unused components, and unknown properties
-//	err := Sanitize(ctx, doc, nil)
+//	result, err := Sanitize(ctx, doc, nil)
 //	if err != nil {
 //		return fmt.Errorf("failed to sanitize document: %w", err)
+//	}
+//	for _, warning := range result.Warnings {
+//		fmt.Fprintf(os.Stderr, "Warning: %s\n", warning)
 //	}
 //
 //	// Remove only x-go-* extensions, keep everything else
@@ -75,7 +85,7 @@ type SanitizeOptions struct {
 //		KeepUnusedComponents: true,
 //		KeepUnknownProperties: true,
 //	}
-//	err := Sanitize(ctx, doc, opts)
+//	result, err := Sanitize(ctx, doc, opts)
 //	if err != nil {
 //		return fmt.Errorf("failed to sanitize document: %w", err)
 //	}
@@ -84,7 +94,7 @@ type SanitizeOptions struct {
 //	opts := &SanitizeOptions{
 //		KeepUnusedComponents: true,
 //	}
-//	err := Sanitize(ctx, doc, opts)
+//	result, err := Sanitize(ctx, doc, opts)
 //
 // Parameters:
 //   - ctx: Context for the operation
@@ -92,10 +102,13 @@ type SanitizeOptions struct {
 //   - opts: Sanitization options (nil uses defaults: aggressive cleanup)
 //
 // Returns:
+//   - *SanitizeResult: Result containing any warnings from the operation
 //   - error: Any error that occurred during sanitization
-func Sanitize(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) error {
+func Sanitize(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) (*SanitizeResult, error) {
+	result := &SanitizeResult{}
+
 	if doc == nil {
-		return nil
+		return result, nil
 	}
 
 	// Use default options if nil
@@ -104,25 +117,27 @@ func Sanitize(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) error {
 	}
 
 	// Remove extensions based on configuration
-	if err := removeExtensions(ctx, doc, opts); err != nil {
-		return fmt.Errorf("failed to remove extensions: %w", err)
+	warnings, err := removeExtensions(ctx, doc, opts)
+	if err != nil {
+		return result, fmt.Errorf("failed to remove extensions: %w", err)
 	}
+	result.Warnings = append(result.Warnings, warnings...)
 
 	// Remove unknown properties if not keeping them
 	if !opts.KeepUnknownProperties {
 		if err := removeUnknownProperties(ctx, doc); err != nil {
-			return fmt.Errorf("failed to remove unknown properties: %w", err)
+			return result, fmt.Errorf("failed to remove unknown properties: %w", err)
 		}
 	}
 
 	// Clean unused components if not keeping them
 	if !opts.KeepUnusedComponents {
 		if err := Clean(ctx, doc); err != nil {
-			return fmt.Errorf("failed to clean unused components: %w", err)
+			return result, fmt.Errorf("failed to clean unused components: %w", err)
 		}
 	}
 
-	return nil
+	return result, nil
 }
 
 // LoadSanitizeConfig loads sanitize configuration from a YAML reader.
@@ -152,21 +167,23 @@ func LoadSanitizeConfigFromFile(path string) (*SanitizeOptions, error) {
 }
 
 // removeExtensions walks through the document and removes extensions based on options.
-func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) error {
+// Returns a slice of warnings for any invalid glob patterns encountered.
+func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) ([]string, error) {
 	// Determine removal strategy:
 	// - nil ExtensionPatterns: remove ALL extensions (default)
 	// - empty array []: keep ALL extensions (explicit no-op)
 	// - non-empty array: remove only matching patterns
 
-	if opts != nil && opts.ExtensionPatterns != nil && len(opts.ExtensionPatterns) == 0 {
-		// Empty array explicitly set = keep all extensions
-		return nil
-	}
-
 	var patterns []string
 	removeAll := true
+	var invalidPatterns []string
 
-	if opts != nil && opts.ExtensionPatterns != nil && len(opts.ExtensionPatterns) > 0 {
+	// Handle extension patterns if explicitly set
+	if opts != nil && opts.ExtensionPatterns != nil {
+		if len(opts.ExtensionPatterns) == 0 {
+			// Empty array explicitly set = keep all extensions
+			return nil, nil
+		}
 		// Use patterns for selective removal
 		patterns = opts.ExtensionPatterns
 		removeAll = false
@@ -189,7 +206,14 @@ func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) 
 						shouldRemove = true
 					} else {
 						// Check if extension matches any pattern
-						shouldRemove = matchesAnyPattern(key, patterns)
+						matched, invalid := matchesAnyPattern(key, patterns)
+						shouldRemove = matched
+						// Collect invalid patterns (only once per pattern)
+						for _, pattern := range invalid {
+							if !contains(invalidPatterns, pattern) {
+								invalidPatterns = append(invalidPatterns, pattern)
+							}
+						}
 					}
 
 					if shouldRemove {
@@ -206,11 +230,17 @@ func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) 
 			},
 		})
 		if err != nil {
-			return fmt.Errorf("failed to process extensions: %w", err)
+			return nil, fmt.Errorf("failed to process extensions: %w", err)
 		}
 	}
 
-	return nil
+	// Convert invalid patterns to warnings
+	var warnings []string
+	for _, pattern := range invalidPatterns {
+		warnings = append(warnings, fmt.Sprintf("invalid glob pattern '%s' was skipped", pattern))
+	}
+
+	return warnings, nil
 }
 
 // removeUnknownProperties removes properties that are not defined in the OpenAPI specification.
@@ -370,9 +400,9 @@ func removePropertiesFromNode(node *yaml.Node, keysToRemove []string) {
 	}
 
 	// Build a set of keys to remove for efficient lookup
-	removeSet := make(map[string]bool, len(keysToRemove))
+	removeSet := make(map[string]struct{}, len(keysToRemove))
 	for _, key := range keysToRemove {
-		removeSet[key] = true
+		removeSet[key] = struct{}{}
 	}
 
 	// Filter content to exclude keys in the remove set
@@ -385,9 +415,11 @@ func removePropertiesFromNode(node *yaml.Node, keysToRemove []string) {
 		keyNode := node.Content[i]
 		valueNode := node.Content[i+1]
 
-		if keyNode.Kind == yaml.ScalarNode && removeSet[keyNode.Value] {
-			// Skip this key-value pair (it's unknown)
-			continue
+		if keyNode.Kind == yaml.ScalarNode {
+			if _, shouldRemove := removeSet[keyNode.Value]; shouldRemove {
+				// Skip this key-value pair (it's unknown)
+				continue
+			}
 		}
 
 		// Keep this key-value pair
@@ -399,14 +431,28 @@ func removePropertiesFromNode(node *yaml.Node, keysToRemove []string) {
 }
 
 // matchesAnyPattern checks if a string matches any of the provided glob patterns.
-func matchesAnyPattern(str string, patterns []string) bool {
+// Returns (matched bool, invalidPatterns []string) where invalidPatterns contains
+// any patterns that failed to compile.
+func matchesAnyPattern(str string, patterns []string) (bool, []string) {
+	var invalidPatterns []string
 	for _, pattern := range patterns {
 		matched, err := filepath.Match(pattern, str)
 		if err != nil {
-			// Invalid pattern, skip it
+			// Collect invalid pattern
+			invalidPatterns = append(invalidPatterns, pattern)
 			continue
 		}
 		if matched {
+			return true, invalidPatterns
+		}
+	}
+	return false, invalidPatterns
+}
+
+// contains checks if a string slice contains a specific string.
+func contains(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
 			return true
 		}
 	}

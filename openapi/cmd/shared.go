@@ -114,3 +114,10 @@ func (p *OpenAPIProcessor) PrintInfo(message string) {
 		fmt.Printf("📋 %s\n", message)
 	}
 }
+
+// PrintWarning prints a warning message if not writing to stdout
+func (p *OpenAPIProcessor) PrintWarning(message string) {
+	if !p.WriteToStdout {
+		fmt.Printf("⚠️  Warning: %s\n", message)
+	}
+}
