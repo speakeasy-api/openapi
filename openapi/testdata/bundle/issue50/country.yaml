@@ -1,0 +1,25 @@
+openapi: 3.0.0
+info:
+  title: common definitions
+  version: "1.0"
+  description: common definitions
+  license:
+    name: apache 2
+    url: "https://apache.org/licenses/LICENSE-2.0"
+paths:
+  /dummy:
+    get:
+      summary: Dummy endpoint to satisfy OpenAPI validator
+      responses:
+        "200":
+          description: Successful response
+components:
+  schemas:
+    CountryCode2:
+      title: CountryCode2
+      type: string
+      enum:
+        - AW
+        - AF
+        - FR
+      example: FR

@@ -7,7 +7,8 @@ gotestsum = "latest"
 description = "Create VSCode symlinks for tools not automatically handled by mise-vscode"
 run = [
   "mkdir -p .vscode/mise-tools",
-  "ln -sf $(mise exec golangci-lint@2.1.1 -- which golangci-lint) .vscode/mise-tools/golangci-lint",
+  "ln -sf $(mise exec -- which golangci-lint-v2) $(dirname $(mise exec -- which golangci-lint-v2))/golangci-lint || true",
+  "ln -sf $(mise exec -- which golangci-lint) .vscode/mise-tools/golangci-lint",
 ]
 
 [hooks]

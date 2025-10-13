@@ -148,7 +148,8 @@ func (rc *ReferenceClassification) JoinWith(relative string) (string, error) {
 	}
 
 	if rc.IsFile {
-		return rc.joinFilePath(relative)
+		joined := rc.joinFilePath(relative)
+		return joined, nil
 	}
 
 	// If base is a fragment, treat relative as the new reference
@@ -157,7 +158,8 @@ func (rc *ReferenceClassification) JoinWith(relative string) (string, error) {
 	}
 
 	// Fallback: treat as file path
-	return rc.joinFilePath(relative)
+	joined := rc.joinFilePath(relative)
+	return joined, nil
 }
 
 // joinURL joins this URL reference with a relative reference using the cached ParsedURL
@@ -185,11 +187,11 @@ func (rc *ReferenceClassification) joinURL(relative string) (string, error) {
 }
 
 // joinFilePath joins this file path reference with a relative path using cross-platform path handling
-func (rc *ReferenceClassification) joinFilePath(relative string) (string, error) {
+func (rc *ReferenceClassification) joinFilePath(relative string) string {
 	// If relative path is absolute, return it as-is
 	// Check for both OS-specific absolute paths and Unix-style absolute paths (for cross-platform compatibility)
 	if filepath.IsAbs(relative) || strings.HasPrefix(relative, "/") || rc.isWindowsAbsolutePath(relative) {
-		return relative, nil
+		return relative
 	}
 
 	// Determine the path separator style from the original path
@@ -217,7 +219,7 @@ func (rc *ReferenceClassification) joinFilePath(relative string) (string, error)
 		joined = strings.ReplaceAll(joined, "\\", "/")
 	}
 
-	return joined, nil
+	return joined
 }
 
 // getWindowsDir extracts the directory part from a Windows-style path
