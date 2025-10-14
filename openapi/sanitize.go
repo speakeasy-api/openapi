@@ -255,6 +255,9 @@ func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) 
 	var warnings []string
 	for _, pattern := range patterns {
 		info := patternUsage[pattern]
+		if info == nil {
+			continue
+		}
 		if info.invalid {
 			warnings = append(warnings, fmt.Sprintf("invalid glob pattern '%s' was skipped", pattern))
 		} else if !info.matched {

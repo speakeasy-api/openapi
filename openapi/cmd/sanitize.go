@@ -164,13 +164,14 @@ func reportSanitizationResults(processor *OpenAPIProcessor, opts *openapi.Saniti
 	var messages []string
 
 	// Determine what was done with extensions
-	if opts == nil || opts.ExtensionPatterns == nil {
+	switch {
+	case opts == nil || opts.ExtensionPatterns == nil:
 		// nil patterns = remove all extensions (default)
 		messages = append(messages, "removed all extensions")
-	} else if len(opts.ExtensionPatterns) == 0 {
+	case len(opts.ExtensionPatterns) == 0:
 		// empty slice = keep all extensions (explicit)
 		messages = append(messages, "kept all extensions")
-	} else {
+	default:
 		// specific patterns = remove matching extensions
 		messages = append(messages, fmt.Sprintf("removed extensions matching %v", opts.ExtensionPatterns))
 	}
