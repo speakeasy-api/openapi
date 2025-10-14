@@ -27,8 +27,8 @@ echo ""
 
 echo "### 🎯 Functions with 0% Coverage"
 echo ""
-echo "| File:Function | Coverage |"
-echo "|---------------|----------|"
+echo "| File:Function                                                          | Coverage |"
+echo "|------------------------------------------------------------------------|----------|"
 
 # Show functions with 0% coverage
 go tool cover -func=coverage.out | awk '
@@ -43,15 +43,15 @@ go tool cover -func=coverage.out | awk '
     
     # Show functions with 0% coverage
     if (coverage == "0.0") {
-        printf "| %s | %.1f%% |\n", file_func, coverage
+        printf "| %-70s | %7s%% |\n", file_func, coverage
     }
 }' | head -30
 
 echo ""
 echo "### 🔍 Functions with Low Coverage (< 50%)"
 echo ""
-echo "| File:Function | Coverage |"
-echo "|---------------|----------|"
+echo "| File:Function                                                          | Coverage |"
+echo "|------------------------------------------------------------------------|----------|"
 
 # Show functions with low coverage
 go tool cover -func=coverage.out | awk '
@@ -66,15 +66,15 @@ go tool cover -func=coverage.out | awk '
     
     # Show functions with less than 50% coverage (but not 0%)
     if (coverage != "" && coverage > 0 && coverage < 50) {
-        printf "| %s | %.1f%% |\n", file_func, coverage
+        printf "| %-70s | %7s%% |\n", file_func, coverage
     }
 }' | head -30
 
 echo ""
 echo "### 📋 Packages Needing Improvement (< 80%)"
 echo ""
-echo "| Package | Coverage | Priority |"
-echo "|---------|----------|----------|"
+echo "| Package                                                       | Coverage | Priority        |"
+echo "|---------------------------------------------------------------|----------|-----------------|"
 
 # Show packages that need improvement
 go tool cover -func=coverage.out | awk '
@@ -112,10 +112,10 @@ END {
             if (avg_coverage > 60) priority = "🟡 Medium"
             if (avg_coverage > 40) priority = "🟠 Medium-High"
             if (avg_coverage == 0) priority = "🚨 Critical"
-            printf "| %s | %.1f%% | %s |\n", pkg, avg_coverage, priority
+            printf "| %-61s | %7s%% | %-14s |\n", pkg, sprintf("%.1f", avg_coverage), priority
         }
     }
-}' | sort -k2 -n | head -15
+}' | sort -k4,4n | head -15
 
 echo ""
 echo "---"
