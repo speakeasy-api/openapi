@@ -13,18 +13,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ExtensionFilter specifies patterns for filtering extensions using whitelist and/or blacklist.
+// ExtensionFilter specifies patterns for filtering extensions using allowed and denied lists.
 type ExtensionFilter struct {
-	// Keep specifies glob patterns for extensions to keep (whitelist).
+	// Keep specifies glob patterns for extensions to keep (allow list).
 	// If provided and not empty, ONLY extensions matching these patterns are kept.
 	// When both Keep and Remove are provided, extensions matching Keep are kept even if they also match Remove.
 	// Use ["*"] to keep all extensions.
-	// nil or []: Defaults to blacklist mode using Remove patterns, or removes all if Remove is also empty.
+	// nil or []: Defaults to deny list mode using Remove patterns, or removes all if Remove is also empty.
 	Keep []string `yaml:"keep,omitempty"`
 
-	// Remove specifies glob patterns for extensions to remove (blacklist).
+	// Remove specifies glob patterns for extensions to remove (deny list).
 	// Extensions matching these patterns are removed.
-	// When both Keep and Remove are provided, Keep takes precedence (whitelist overrides blacklist).
+	// When both Keep and Remove are provided, Keep takes precedence (allow overrides deny).
 	// nil or []: If Keep is also empty, removes all extensions.
 	Remove []string `yaml:"remove,omitempty"`
 }
