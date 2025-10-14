@@ -218,6 +218,7 @@ import (
 - Use `assert.Equal()` for value comparisons with descriptive messages
 - Use `assert.Nil()` and `assert.NotNil()` for pointer checks
 - Use `require.*` when the test should stop on failure (e.g., setup operations)
+- **Use `require.Error()` for error assertions** - The linter enforces this via testifylint
 - **Always include descriptive error messages**
 
 ```go
