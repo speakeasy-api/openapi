@@ -55,7 +55,7 @@ Configuration file format (YAML):
 
   # Extension filtering (not provided or empty = remove all extensions by default)
   extensionPatterns:
-    # Whitelist: keep only matching extensions (when provided, only these are kept)
+    # Keep only matching extensions (when provided, only these are kept)
     # Keep takes precedence over Remove when both are specified
     keep:
       - "x-speakeasy-schema-*"  # Keeps x-speakeasy-schema-*, allows narrowing Remove patterns
