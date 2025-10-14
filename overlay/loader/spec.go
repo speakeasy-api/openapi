@@ -76,6 +76,7 @@ func LoadSpecification(path string) (*yaml.Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open schema from path %q: %w", path, err)
 	}
+	defer rs.Close()
 
 	var ys yaml.Node
 	err = yaml.NewDecoder(rs).Decode(&ys)
