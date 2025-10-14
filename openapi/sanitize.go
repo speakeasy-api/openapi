@@ -167,7 +167,7 @@ func LoadSanitizeConfigFromFile(path string) (*SanitizeOptions, error) {
 }
 
 // removeExtensions walks through the document and removes extensions based on options.
-// Returns a slice of warnings for any invalid glob patterns encountered.
+// Returns a slice of warnings for invalid patterns or patterns that matched nothing.
 func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) ([]string, error) {
 	// Determine removal strategy:
 	// - nil ExtensionPatterns: remove ALL extensions (default)
@@ -176,7 +176,6 @@ func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) 
 
 	var patterns []string
 	removeAll := true
-	var invalidPatterns []string
 
 	// Handle extension patterns if explicitly set
 	if opts != nil && opts.ExtensionPatterns != nil {
@@ -187,6 +186,18 @@ func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) 
 		// Use patterns for selective removal
 		patterns = opts.ExtensionPatterns
 		removeAll = false
+	}
+
+	// Track pattern usage: map[pattern]MatchInfo
+	type matchInfo struct {
+		invalid bool // true if pattern has invalid syntax
+		matched bool // true if pattern matched at least one extension
+	}
+	patternUsage := make(map[string]*matchInfo)
+
+	// Initialize tracking for all patterns
+	for _, pattern := range patterns {
+		patternUsage[pattern] = &matchInfo{}
 	}
 
 	// Walk through the document and process all Extensions
@@ -206,12 +217,18 @@ func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) 
 						shouldRemove = true
 					} else {
 						// Check if extension matches any pattern
-						matched, invalid := matchesAnyPattern(key, patterns)
-						shouldRemove = matched
-						// Collect invalid patterns (only once per pattern)
-						for _, pattern := range invalid {
-							if !contains(invalidPatterns, pattern) {
-								invalidPatterns = append(invalidPatterns, pattern)
+						for _, pattern := range patterns {
+							info := patternUsage[pattern]
+							matched, err := filepath.Match(pattern, key)
+							if err != nil {
+								// Mark pattern as invalid
+								info.invalid = true
+								continue
+							}
+							if matched {
+								// Mark pattern as having matched something
+								info.matched = true
+								shouldRemove = true
 							}
 						}
 					}
@@ -234,10 +251,15 @@ func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) 
 		}
 	}
 
-	// Convert invalid patterns to warnings
+	// Generate warnings for invalid patterns and patterns that never matched
 	var warnings []string
-	for _, pattern := range invalidPatterns {
-		warnings = append(warnings, fmt.Sprintf("invalid glob pattern '%s' was skipped", pattern))
+	for _, pattern := range patterns {
+		info := patternUsage[pattern]
+		if info.invalid {
+			warnings = append(warnings, fmt.Sprintf("invalid glob pattern '%s' was skipped", pattern))
+		} else if !info.matched {
+			warnings = append(warnings, fmt.Sprintf("pattern '%s' did not match any extensions in the document", pattern))
+		}
 	}
 
 	return warnings, nil
@@ -428,33 +450,4 @@ func removePropertiesFromNode(node *yaml.Node, keysToRemove []string) {
 
 	// Update the node's content
 	node.Content = newContent
-}
-
-// matchesAnyPattern checks if a string matches any of the provided glob patterns.
-// Returns (matched bool, invalidPatterns []string) where invalidPatterns contains
-// any patterns that failed to compile.
-func matchesAnyPattern(str string, patterns []string) (bool, []string) {
-	var invalidPatterns []string
-	for _, pattern := range patterns {
-		matched, err := filepath.Match(pattern, str)
-		if err != nil {
-			// Collect invalid pattern
-			invalidPatterns = append(invalidPatterns, pattern)
-			continue
-		}
-		if matched {
-			return true, invalidPatterns
-		}
-	}
-	return false, invalidPatterns
-}
-
-// contains checks if a string slice contains a specific string.
-func contains(slice []string, str string) bool {
-	for _, s := range slice {
-		if s == str {
-			return true
-		}
-	}
-	return false
 }
