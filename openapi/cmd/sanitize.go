@@ -184,13 +184,13 @@ func reportSanitizationResults(processor *OpenAPIProcessor, opts *openapi.Saniti
 			// empty filter = remove all extensions
 			messages = append(messages, "removed all extensions")
 		case hasKeep && !hasRemove:
-			// whitelist only
+			// keep only
 			messages = append(messages, fmt.Sprintf("kept only extensions matching %v", filter.Keep))
 		case !hasKeep && hasRemove:
-			// blacklist only
+			// remove only
 			messages = append(messages, fmt.Sprintf("removed extensions matching %v", filter.Remove))
 		case hasKeep && hasRemove:
-			// both (whitelist overrides blacklist)
+			// both (keep overrides remove)
 			messages = append(messages, fmt.Sprintf("kept extensions matching %v (remove patterns %v overridden by keep)", filter.Keep, filter.Remove))
 		}
 	}
