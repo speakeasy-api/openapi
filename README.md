@@ -95,20 +95,24 @@ go install github.com/speakeasy-api/openapi/cmd/openapi@latest
 
 The CLI provides three main command groups:
 
-- **`openapi spec`** - Commands for working with OpenAPI specifications ([documentation](./openapi/cmd/README.md))
+- **`openapi spec`** - Commands for working with OpenAPI specifications ([documentation](./cmd/openapi/commands/openapi/README.md))
   - `bootstrap` - Create a new OpenAPI document with best practice examples
   - `bundle` - Bundle external references into components section
   - `clean` - Remove unused components from an OpenAPI specification
+  - `explore` - Interactively explore an OpenAPI specification in the terminal
   - `inline` - Inline all references in an OpenAPI specification
   - `join` - Join multiple OpenAPI documents into a single document
+  - `localize` - Localize an OpenAPI specification by copying external references to a target directory
   - `optimize` - Optimize an OpenAPI specification by deduplicating inline schemas
+  - `sanitize` - Remove unwanted elements from an OpenAPI specification
+  - `snip` - Remove selected operations from an OpenAPI specification (interactive or CLI)
   - `upgrade` - Upgrade an OpenAPI specification to the latest supported version
   - `validate` - Validate an OpenAPI specification document
 
-- **`openapi arazzo`** - Commands for working with Arazzo workflow documents ([documentation](./arazzo/cmd/README.md))
+- **`openapi arazzo`** - Commands for working with Arazzo workflow documents ([documentation](./cmd/openapi/commands/arazzo/README.md))
   - `validate` - Validate an Arazzo workflow document
 
-- **`openapi overlay`** - Commands for working with OpenAPI overlays ([documentation](./overlay/cmd/README.md))
+- **`openapi overlay`** - Commands for working with OpenAPI overlays ([documentation](./cmd/openapi/commands/overlay/README.md))
   - `apply` - Apply an overlay to an OpenAPI specification
   - `compare` - Compare two specifications and generate an overlay describing differences
   - `validate` - Validate an OpenAPI overlay document
