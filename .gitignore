@@ -10,3 +10,5 @@ dist/
 
 # Symlinked from AGENTS.md by mise install
 CLAUDE.md
+
+go.work.sum

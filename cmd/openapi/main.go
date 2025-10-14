@@ -6,9 +6,9 @@ import (
 	"runtime/debug"
 	"strings"
 
-	arazzoCmd "github.com/speakeasy-api/openapi/arazzo/cmd"
-	openapiCmd "github.com/speakeasy-api/openapi/openapi/cmd"
-	overlayCmd "github.com/speakeasy-api/openapi/overlay/cmd"
+	arazzoCmd "github.com/speakeasy-api/openapi/cmd/openapi/commands/arazzo"
+	openapiCmd "github.com/speakeasy-api/openapi/cmd/openapi/commands/openapi"
+	overlayCmd "github.com/speakeasy-api/openapi/cmd/openapi/commands/overlay"
 	"github.com/spf13/cobra"
 )
 
