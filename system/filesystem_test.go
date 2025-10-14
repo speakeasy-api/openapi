@@ -41,7 +41,7 @@ func TestFileSystem_Open_Error(t *testing.T) {
 	fsys := &FileSystem{}
 	file, err := fsys.Open("nonexistent-file.txt")
 
-	assert.Error(t, err, "should return error for nonexistent file")
+	require.Error(t, err, "should return error for nonexistent file")
 	assert.Nil(t, file, "should return nil file on error")
 }
 

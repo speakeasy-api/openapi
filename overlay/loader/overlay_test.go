@@ -27,7 +27,7 @@ func TestLoadOverlay_Error_InvalidPath(t *testing.T) {
 
 	result, err := LoadOverlay("nonexistent-file.yaml")
 
-	assert.Error(t, err, "should return error for nonexistent file")
+	require.Error(t, err, "should return error for nonexistent file")
 	assert.Nil(t, result, "should return nil overlay on error")
 	assert.Contains(t, err.Error(), "failed to parse overlay", "error should mention parsing failure")
 }
@@ -42,7 +42,7 @@ func TestLoadOverlay_Error_InvalidYAML(t *testing.T) {
 
 	result, err := LoadOverlay(invalidFile)
 
-	assert.Error(t, err, "should return error for invalid YAML")
+	require.Error(t, err, "should return error for invalid YAML")
 	assert.Nil(t, result, "should return nil overlay on error")
 }
 

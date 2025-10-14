@@ -98,7 +98,7 @@ func TestGetOverlayExtendsPath_Error(t *testing.T) {
 
 			result, err := GetOverlayExtendsPath(tt.overlay)
 
-			assert.Error(t, err, "should return error")
+			require.Error(t, err, "should return error")
 			assert.Empty(t, result, "should return empty path on error")
 			assert.Contains(t, err.Error(), tt.wantErrorMsg, "error should contain expected message")
 		})
@@ -155,7 +155,7 @@ func TestLoadSpecification_Error_FileNotFound(t *testing.T) {
 
 	result, err := LoadSpecification("nonexistent-file.yaml")
 
-	assert.Error(t, err, "should return error for nonexistent file")
+	require.Error(t, err, "should return error for nonexistent file")
 	assert.Nil(t, result, "should return nil node on error")
 	assert.Contains(t, err.Error(), "failed to open schema", "error should mention opening failure")
 }
@@ -170,7 +170,7 @@ func TestLoadSpecification_Error_InvalidYAML(t *testing.T) {
 
 	result, err := LoadSpecification(testFile)
 
-	assert.Error(t, err, "should return error for invalid YAML")
+	require.Error(t, err, "should return error for invalid YAML")
 	assert.Nil(t, result, "should return nil node on error")
 	assert.Contains(t, err.Error(), "failed to parse schema", "error should mention parsing failure")
 }
@@ -210,7 +210,7 @@ func TestLoadExtendsSpecification_Error_NoExtends(t *testing.T) {
 
 	result, err := LoadExtendsSpecification(o)
 
-	assert.Error(t, err, "should return error when extends is empty")
+	require.Error(t, err, "should return error when extends is empty")
 	assert.Nil(t, result, "should return nil node on error")
 	assert.Contains(t, err.Error(), "overlay does not specify an extends URL", "error should mention missing extends")
 }
@@ -224,7 +224,7 @@ func TestLoadExtendsSpecification_Error_InvalidURL(t *testing.T) {
 
 	result, err := LoadExtendsSpecification(o)
 
-	assert.Error(t, err, "should return error for non-file URL")
+	require.Error(t, err, "should return error for non-file URL")
 	assert.Nil(t, result, "should return nil node on error")
 	assert.Contains(t, err.Error(), "only file:// extends URLs are supported", "error should mention unsupported URL scheme")
 }
@@ -238,7 +238,7 @@ func TestLoadExtendsSpecification_Error_FileNotFound(t *testing.T) {
 
 	result, err := LoadExtendsSpecification(o)
 
-	assert.Error(t, err, "should return error for nonexistent file")
+	require.Error(t, err, "should return error for nonexistent file")
 	assert.Nil(t, result, "should return nil node on error")
 	assert.Contains(t, err.Error(), "failed to open schema", "error should mention file opening failure")
 }
@@ -306,7 +306,7 @@ func TestLoadEitherSpecification_Error_NoPathNoExtends(t *testing.T) {
 
 	result, name, err := LoadEitherSpecification("", o)
 
-	assert.Error(t, err, "should return error when neither path nor extends provided")
+	require.Error(t, err, "should return error when neither path nor extends provided")
 	assert.Nil(t, result, "should return nil node on error")
 	assert.Empty(t, name, "should return empty name on error")
 }
@@ -318,7 +318,7 @@ func TestLoadEitherSpecification_Error_InvalidPath(t *testing.T) {
 
 	result, name, err := LoadEitherSpecification("nonexistent-file.yaml", o)
 
-	assert.Error(t, err, "should return error for invalid path")
+	require.Error(t, err, "should return error for invalid path")
 	assert.Nil(t, result, "should return nil node on error")
 	assert.Equal(t, "nonexistent-file.yaml", name, "should return attempted path as name")
 }
