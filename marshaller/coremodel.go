@@ -24,13 +24,16 @@ type CoreModeler interface {
 	SetConfig(config *yml.Config)
 	GetConfig() *yml.Config
 	Marshal(ctx context.Context, w io.Writer) error
+	SetUnknownProperties(props []string)
+	GetUnknownProperties() []string
 }
 
 type CoreModel struct {
-	RootNode  *yaml.Node  // RootNode is the node that was unmarshaled into this model
-	Valid     bool        // Valid indicates whether the model passed validation, ie all its required fields were present and ValidYaml is true
-	ValidYaml bool        // ValidYaml indicates whether the model's underlying YAML representation is valid, for example a mapping node was received for a model
-	Config    *yml.Config // Generally only set on the top-level model that was unmarshaled
+	RootNode          *yaml.Node  // RootNode is the node that was unmarshaled into this model
+	Valid             bool        // Valid indicates whether the model passed validation, ie all its required fields were present and ValidYaml is true
+	ValidYaml         bool        // ValidYaml indicates whether the model's underlying YAML representation is valid, for example a mapping node was received for a model
+	Config            *yml.Config // Generally only set on the top-level model that was unmarshaled
+	UnknownProperties []string    // UnknownProperties lists property keys that were present in the YAML but not defined in the model (excludes extensions which start with "x-")
 }
 
 var _ CoreModeler = (*CoreModel)(nil)
@@ -84,6 +87,18 @@ func (c *CoreModel) SetConfig(config *yml.Config) {
 
 func (c *CoreModel) GetConfig() *yml.Config {
 	return c.Config
+}
+
+func (c *CoreModel) SetUnknownProperties(props []string) {
+	c.UnknownProperties = props
+}
+
+func (c *CoreModel) GetUnknownProperties() []string {
+	if c.UnknownProperties == nil {
+		return []string{}
+	}
+
+	return c.UnknownProperties
 }
 
 // GetJSONPointer returns the JSON pointer path from the topLevelRootNode to this CoreModel's RootNode.

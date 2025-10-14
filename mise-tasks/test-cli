@@ -26,6 +26,7 @@ $CLI spec validate --help > /dev/null
 $CLI spec upgrade --help > /dev/null
 $CLI spec inline --help > /dev/null
 $CLI spec clean --help > /dev/null
+$CLI spec sanitize --help > /dev/null
 $CLI spec bundle --help > /dev/null
 $CLI spec join --help > /dev/null
 $CLI spec bootstrap --help > /dev/null
@@ -122,6 +123,23 @@ if ! diff -q dist/test/test-cleaned-empty.yaml openapi/testdata/clean/clean_empt
     exit 1
 fi
 
+# Test sanitize command with known test files
+echo "  ✓ Testing sanitize command..."
+$CLI spec sanitize openapi/testdata/sanitize/sanitize_input.yaml dist/test/test-sanitized.yaml > /dev/null
+$CLI spec sanitize --config openapi/testdata/sanitize/sanitize_pattern_config.yaml openapi/testdata/sanitize/sanitize_pattern_input.yaml dist/test/test-sanitized-pattern.yaml > /dev/null
+
+# Compare sanitize outputs with expected
+echo "  ✓ Comparing sanitize outputs with expected..."
+if ! diff -q dist/test/test-sanitized.yaml openapi/testdata/sanitize/sanitize_expected.yaml > /dev/null; then
+    echo "    ❌ Sanitize output differs from expected"
+    exit 1
+fi
+
+if ! diff -q dist/test/test-sanitized-pattern.yaml openapi/testdata/sanitize/sanitize_pattern_expected.yaml > /dev/null; then
+    echo "    ❌ Sanitize pattern output differs from expected"
+    exit 1
+fi
+
 # Test join command with known test files
 echo "  ✓ Testing join command..."
 $CLI spec join openapi/testdata/join/main.yaml openapi/testdata/join/subdir/second.yaml openapi/testdata/join/third.yaml dist/test/test-joined-counter.yaml > /dev/null
@@ -161,6 +179,8 @@ $CLI spec validate dist/test/test-joined-counter.yaml > /dev/null
 $CLI spec validate dist/test/test-joined-filepath.yaml > /dev/null
 $CLI spec validate dist/test/test-cleaned.yaml > /dev/null
 $CLI spec validate dist/test/test-cleaned-empty.yaml > /dev/null
+$CLI spec validate dist/test/test-sanitized.yaml > /dev/null
+$CLI spec validate dist/test/test-sanitized-pattern.yaml > /dev/null
 $CLI spec validate dist/test/test-joined-conflicts.yaml > /dev/null
 
 # Test arazzo validation with known test files
@@ -232,7 +252,7 @@ echo "✅ All CLI integration tests passed!"
 echo "📊 Test summary:"
 echo "   - Tested all command help outputs"
 echo "   - Validated known good and bad files"
-echo "   - Tested bootstrap, upgrade, inline, clean, bundle, join commands"
+echo "   - Tested bootstrap, upgrade, inline, clean, sanitize, bundle, join commands"
 echo "   - Compared outputs with expected results"
 echo "   - Tested arazzo validation"
 echo "   - Tested overlay validation, apply, and compare"

@@ -8,6 +8,7 @@ func Apply(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(upgradeCmd)
 	rootCmd.AddCommand(inlineCmd)
 	rootCmd.AddCommand(cleanCmd)
+	rootCmd.AddCommand(sanitizeCmd)
 	rootCmd.AddCommand(bundleCmd)
 	rootCmd.AddCommand(joinCmd)
 	rootCmd.AddCommand(bootstrapCmd)

@@ -166,6 +166,10 @@ jobs:
           timeout 300 go test -coverprofile=main-coverage.out -covermode=atomic ./... > /dev/null 2>&1 || echo "Main branch tests failed or timed out"
 
           if [ -f main-coverage.out ]; then
+            # Filter out cmd and tests folders from main branch coverage (same as current branch)
+            grep -v -E '/cmd/|/tests/' main-coverage.out > main-coverage.filtered.out || true
+            mv main-coverage.filtered.out main-coverage.out
+            
             MAIN_COVERAGE=$(go tool cover -func=main-coverage.out | grep total | awk '{print $3}' || echo "0.0%")
             echo "main-coverage=$MAIN_COVERAGE" >> $GITHUB_OUTPUT
             echo "Main branch coverage: $MAIN_COVERAGE"

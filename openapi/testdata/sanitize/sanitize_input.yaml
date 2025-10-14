@@ -1,0 +1,100 @@
+openapi: 3.1.0
+info:
+  title: Test API with Extensions
+  version: 1.0.0
+  x-api-id: test-api-123
+  x-go-package: testapi
+  contact:
+    name: API Support
+    email: support@example.com
+    x-slack-channel: api-support
+  license:
+    name: MIT
+    x-internal-id: lic-001
+x-custom-extension: root-level
+x-go-name: TestAPI
+x-internal-config:
+  setting1: value1
+  setting2: value2
+servers:
+  - url: https://api.example.com
+    description: Production server
+    x-environment: production
+    x-go-server-name: ProductionServer
+paths:
+  /users:
+    get:
+      summary: List users
+      operationId: listUsers
+      x-go-name: ListUsers
+      x-rate-limit: 100
+      responses:
+        "200":
+          description: Success
+          x-response-type: UserList
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+              x-content-encoding: gzip
+  /products:
+    x-internal-endpoint: true
+    post:
+      summary: Create product
+      operationId: createProduct
+      x-go-name: CreateProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Product"
+      responses:
+        "201":
+          description: Created
+components:
+  schemas:
+    User:
+      type: object
+      x-go-type: User
+      x-db-table: users
+      properties:
+        id:
+          type: string
+          x-go-name: ID
+        name:
+          type: string
+          x-validation: required
+      x-examples:
+        - id: "123"
+          name: "John Doe"
+    Product:
+      type: object
+      x-go-type: Product
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    UnusedSchema:
+      type: object
+      description: This schema is not referenced anywhere
+      x-go-type: UnusedSchema
+      properties:
+        field:
+          type: string
+  responses:
+    UnusedResponse:
+      description: Not used anywhere
+      x-internal: true
+      content:
+        application/json:
+          schema:
+            type: object
+  parameters:
+    UnusedParam:
+      name: unused
+      in: query
+      schema:
+        type: string
+      x-go-name: UnusedParam

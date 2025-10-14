@@ -1,0 +1,32 @@
+openapi: 3.1.0
+info:
+  title: Test API with Multiple Extension Types
+  version: 1.0.0
+  x-speakeasy-retries: 3
+  x-internal-version: 2.0
+paths:
+  /users:
+    get:
+      summary: List users
+      operationId: listUsers
+      x-speakeasy-pagination: true
+      x-internal-cache-ttl: 300
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+components:
+  schemas:
+    User:
+      type: object
+      x-speakeasy-entity: user
+      x-internal-table: users
+      properties:
+        id:
+          type: string
+          x-speakeasy-example: "user-123"
+        name:
+          type: string

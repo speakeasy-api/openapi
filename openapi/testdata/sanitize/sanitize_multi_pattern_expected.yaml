@@ -1,0 +1,25 @@
+openapi: 3.1.0
+info:
+  title: Multi-Pattern Test API
+  version: 1.0.0
+  x-speakeasy-retries: 3
+  x-other-extension: value
+paths:
+  /test:
+    get:
+      summary: Test endpoint
+      operationId: test
+      x-speakeasy-pagination: false
+      x-rate-limit: 100
+      responses:
+        "200":
+          description: Success
+components:
+  schemas:
+    TestSchema:
+      type: object
+      x-speakeasy-entity: test
+      x-custom: value
+      properties:
+        field:
+          type: string
