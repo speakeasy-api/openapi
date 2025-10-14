@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -62,10 +63,12 @@ func TestFileSystem_WriteFile_Success(t *testing.T) {
 	require.NoError(t, err, "should read written file")
 	assert.Equal(t, testContent, content, "should have correct content")
 
-	// Verify file permissions
-	info, err := os.Stat(testFile)
-	require.NoError(t, err, "should stat file")
-	assert.Equal(t, fs.FileMode(0o644), info.Mode().Perm(), "should have correct permissions")
+	// Verify file permissions (Unix only - Windows doesn't support Unix-style permissions)
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(testFile)
+		require.NoError(t, err, "should stat file")
+		assert.Equal(t, fs.FileMode(0o644), info.Mode().Perm(), "should have correct permissions")
+	}
 }
 
 func TestFileSystem_WriteFile_CreatesDirectories(t *testing.T) {
@@ -130,7 +133,11 @@ func TestFileSystem_MkdirAll_Success(t *testing.T) {
 	info, err := os.Stat(testPath)
 	require.NoError(t, err, "should stat created directory")
 	assert.True(t, info.IsDir(), "should be a directory")
-	assert.Equal(t, fs.FileMode(0o755), info.Mode().Perm(), "should have correct permissions")
+
+	// Verify directory permissions (Unix only - Windows doesn't support Unix-style permissions)
+	if runtime.GOOS != "windows" {
+		assert.Equal(t, fs.FileMode(0o755), info.Mode().Perm(), "should have correct permissions")
+	}
 }
 
 func TestFileSystem_MkdirAll_ExistingDirectory(t *testing.T) {

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/speakeasy-api/openapi/overlay"
 	"gopkg.in/yaml.v3"
@@ -19,6 +22,23 @@ func GetOverlayExtendsPath(o *overlay.Overlay) (string, error) {
 		return "", errors.New("overlay does not specify an extends URL")
 	}
 
+	// Handle Windows file paths that might be formatted as file URLs
+	// file:///C:/path or file://C:/path on Windows need special handling
+	if runtime.GOOS == "windows" && strings.HasPrefix(o.Extends, "file://") {
+		// Remove the file:// or file:/// prefix
+		path := strings.TrimPrefix(o.Extends, "file:///")
+		if path == o.Extends {
+			path = strings.TrimPrefix(o.Extends, "file://")
+		}
+
+		// If it looks like a Windows path (e.g., C:/... or C:\...), use it directly
+		if len(path) >= 2 && path[1] == ':' {
+			// Convert forward slashes to backslashes for Windows
+			path = filepath.FromSlash(path)
+			return path, nil
+		}
+	}
+
 	specUrl, err := url.Parse(o.Extends)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse URL %q: %w", o.Extends, err)
@@ -28,7 +48,14 @@ func GetOverlayExtendsPath(o *overlay.Overlay) (string, error) {
 		return "", fmt.Errorf("only file:// extends URLs are supported, not %q", o.Extends)
 	}
 
-	return specUrl.Path, nil
+	// On Windows, url.Parse().Path for file:///C:/path returns /C:/path
+	// We need to strip the leading slash for Windows absolute paths
+	path := specUrl.Path
+	if runtime.GOOS == "windows" && len(path) >= 3 && path[0] == '/' && path[2] == ':' {
+		path = path[1:] // Remove leading slash
+	}
+
+	return path, nil
 }
 
 // LoadExtendsSpecification will load and parse a YAML or JSON file as specified

@@ -3,6 +3,8 @@ package loader
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/overlay"
@@ -10,6 +12,28 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
+
+// pathToFileURL converts a file path to a proper file:// URL
+// that works cross-platform (Windows and Unix)
+func pathToFileURL(path string) string {
+	// Convert backslashes to forward slashes for Windows
+	path = filepath.ToSlash(path)
+
+	// On Windows, absolute paths start with a drive letter (e.g., C:/)
+	// For file URLs, we need file:///C:/path format (three slashes)
+	if runtime.GOOS == "windows" && len(path) >= 2 && path[1] == ':' {
+		return "file:///" + path
+	}
+
+	// On Unix, absolute paths start with /
+	// For file URLs, we need file:///path format (three slashes)
+	if strings.HasPrefix(path, "/") {
+		return "file://" + path
+	}
+
+	// Relative paths
+	return "file:///" + path
+}
 
 func TestGetOverlayExtendsPath_Success(t *testing.T) {
 	t.Parallel()
@@ -191,7 +215,7 @@ paths: {}
 	require.NoError(t, err, "should create test file")
 
 	o := &overlay.Overlay{
-		Extends: "file://" + testFile,
+		Extends: pathToFileURL(testFile),
 	}
 
 	result, err := LoadExtendsSpecification(o)
@@ -286,7 +310,7 @@ paths: {}
 	require.NoError(t, err, "should create test file")
 
 	o := &overlay.Overlay{
-		Extends: "file://" + testFile,
+		Extends: pathToFileURL(testFile),
 	}
 
 	result, name, err := LoadEitherSpecification("", o)
