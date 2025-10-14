@@ -1,2 +1,3 @@
 extensionPatterns:
-  - "x-go-*"
+  remove:
+    - "x-go-*"

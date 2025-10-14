@@ -53,10 +53,17 @@ Benefits of sanitization:
 
 Configuration file format (YAML):
 
-  # Only remove extensions that match these patterns, null will remove ALL extensions, [] will remove no extensions (default: null, removes ALL extensions)
+  # Extension filtering (not provided or empty = remove all extensions by default)
   extensionPatterns:
-    - "x-go-*"
-    - "x-internal-*"
+    # Keep only matching extensions (when provided, only these are kept)
+    # Keep takes precedence over Remove when both are specified
+    keep:
+      - "x-speakeasy-schema-*"  # Keeps x-speakeasy-schema-*, allows narrowing Remove patterns
+    # Remove only matching extensions, keep all others
+    remove:
+      - "x-go-*"
+      - "x-internal-*"
+      - "x-speakeasy-*"  # When combined with Keep above, removes all x-speakeasy-* EXCEPT x-speakeasy-schema-*
   
   # Keep unused components (default: false, removes them)
   keepUnusedComponents: true
@@ -164,16 +171,28 @@ func reportSanitizationResults(processor *OpenAPIProcessor, opts *openapi.Saniti
 	var messages []string
 
 	// Determine what was done with extensions
-	switch {
-	case opts == nil || opts.ExtensionPatterns == nil:
+	if opts == nil || opts.ExtensionPatterns == nil {
 		// nil patterns = remove all extensions (default)
 		messages = append(messages, "removed all extensions")
-	case len(opts.ExtensionPatterns) == 0:
-		// empty slice = keep all extensions (explicit)
-		messages = append(messages, "kept all extensions")
-	default:
-		// specific patterns = remove matching extensions
-		messages = append(messages, fmt.Sprintf("removed extensions matching %v", opts.ExtensionPatterns))
+	} else {
+		filter := opts.ExtensionPatterns
+		hasKeep := len(filter.Keep) > 0
+		hasRemove := len(filter.Remove) > 0
+
+		switch {
+		case !hasKeep && !hasRemove:
+			// empty filter = remove all extensions
+			messages = append(messages, "removed all extensions")
+		case hasKeep && !hasRemove:
+			// keep only
+			messages = append(messages, fmt.Sprintf("kept only extensions matching %v", filter.Keep))
+		case !hasKeep && hasRemove:
+			// remove only
+			messages = append(messages, fmt.Sprintf("removed extensions matching %v", filter.Remove))
+		case hasKeep && hasRemove:
+			// both (keep overrides remove)
+			messages = append(messages, fmt.Sprintf("kept extensions matching %v (remove patterns %v overridden by keep)", filter.Keep, filter.Remove))
+		}
 	}
 
 	// Determine what was done with components

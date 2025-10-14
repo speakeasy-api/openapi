@@ -13,15 +13,77 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ExtensionFilter specifies patterns for filtering extensions using allowed and denied lists.
+type ExtensionFilter struct {
+	// Keep specifies glob patterns for extensions to keep (allow list).
+	// If provided and not empty, ONLY extensions matching these patterns are kept.
+	// When both Keep and Remove are provided, extensions matching Keep are kept even if they also match Remove.
+	// Use ["*"] to keep all extensions.
+	// nil or []: Defaults to deny list mode using Remove patterns, or removes all if Remove is also empty.
+	Keep []string `yaml:"keep,omitempty"`
+
+	// Remove specifies glob patterns for extensions to remove (deny list).
+	// Extensions matching these patterns are removed.
+	// When both Keep and Remove are provided, Keep takes precedence (allow overrides deny).
+	// nil or []: If Keep is also empty, removes all extensions.
+	Remove []string `yaml:"remove,omitempty"`
+}
+
 // SanitizeOptions configures the sanitization behavior.
 // Can be loaded from a YAML config file or constructed programmatically.
 // Zero values provide aggressive cleanup (remove everything non-standard).
 type SanitizeOptions struct {
-	// ExtensionPatterns specifies glob patterns for selective extension removal.
-	// nil: Remove ALL extensions (default)
-	// []: Keep ALL extensions (empty array)
-	// ["x-go-*", ...]: Remove only extensions matching these patterns
-	ExtensionPatterns []string `yaml:"extensionPatterns"`
+	// ExtensionPatterns specifies patterns for selective extension filtering.
+	// Supports whitelist (Keep), blacklist (Remove), or both.
+	//
+	// Default behavior:
+	//   nil: Remove ALL extensions (default, aggressive cleanup)
+	//   &ExtensionFilter{}: Remove ALL extensions (empty whitelist and blacklist)
+	//
+	// Whitelist mode (Keep provided, Remove empty):
+	//   When Keep is provided and not empty, ONLY extensions matching Keep patterns are kept.
+	//
+	//   &ExtensionFilter{Keep: ["x-speakeasy-*"]}: Keep only x-speakeasy-*, remove all others
+	//   &ExtensionFilter{Keep: ["*"]}: Keep ALL extensions (wildcard matches everything)
+	//
+	// Blacklist mode (Remove provided, Keep empty):
+	//   When Keep is empty/nil and Remove is provided, only extensions matching Remove are removed.
+	//   All other extensions are kept.
+	//
+	//   &ExtensionFilter{Remove: ["x-go-*"]}: Remove only x-go-*, keep all others
+	//   &ExtensionFilter{Remove: ["x-go-*", "x-internal-*"]}: Remove x-go-* and x-internal-*, keep others
+	//
+	// Combined mode (both Keep and Remove provided):
+	//   When both are provided, Keep takes precedence (whitelist overrides blacklist).
+	//   Extensions matching Keep are kept even if they also match Remove.
+	//
+	//   &ExtensionFilter{Keep: ["x-speakeasy-schema*"], Remove: ["x-speakeasy-*"]}:
+	//     Remove all x-speakeasy-{something} extensions except x-speakeasy-schema-{something} (whitelist overrides wildcard blacklist)
+	//
+	// Examples:
+	//   // Remove all extensions (default)
+	//   opts := &SanitizeOptions{ExtensionPatterns: nil}
+	//
+	//   // Remove all extensions (explicit)
+	//   opts := &SanitizeOptions{ExtensionPatterns: &ExtensionFilter{}}
+	//
+	//   // Blacklist: Remove only x-go-* extensions
+	//   opts := &SanitizeOptions{ExtensionPatterns: &ExtensionFilter{Remove: []string{"x-go-*"}}}
+	//
+	//   // Whitelist: Keep only x-speakeasy-* extensions
+	//   opts := &SanitizeOptions{ExtensionPatterns: &ExtensionFilter{Keep: []string{"x-speakeasy-*"}}}
+	//
+	//   // Whitelist: Keep all extensions
+	//   opts := &SanitizeOptions{ExtensionPatterns: &ExtensionFilter{Keep: []string{"*"}}}
+	//
+	//   // Combined: Remove all except x-speakeasy-* (whitelist narrows broad blacklist)
+	//   opts := &SanitizeOptions{
+	//       ExtensionPatterns: &ExtensionFilter{
+	//           Keep:   []string{"x-speakeasy-schema-*"},
+	//           Remove: []string{"x-speakeasy-*"}, // Remove all x-speakeasy-* extensions except those matching x-speakeasy-schema-*
+	//       },
+	//   }
+	ExtensionPatterns *ExtensionFilter `yaml:"extensionPatterns,omitempty"`
 
 	// KeepUnusedComponents preserves unused components in the document.
 	// Default (false): removes unused components.
@@ -65,8 +127,9 @@ type SanitizeResult struct {
 //   - Unknown properties not defined in the OpenAPI specification
 //
 // Extension removal behavior:
-//   - If opts is nil or opts.ExtensionPatterns is empty: removes ALL x-* extensions
-//   - If opts.ExtensionPatterns has values: removes only matching extensions
+//   - If opts is nil or opts.ExtensionPatterns is nil: removes ALL x-* extensions (default)
+//   - If opts.ExtensionPatterns is &ExtensionFilter{}: removes ALL extensions (empty filter)
+//   - Use Keep patterns for whitelist mode, Remove patterns for blacklist mode
 //
 // Example usage:
 //
@@ -79,9 +142,9 @@ type SanitizeResult struct {
 //		fmt.Fprintf(os.Stderr, "Warning: %s\n", warning)
 //	}
 //
-//	// Remove only x-go-* extensions, keep everything else
+//	// Blacklist: Remove only x-go-* extensions, keep everything else
 //	opts := &SanitizeOptions{
-//		ExtensionPatterns: []string{"x-go-*"},
+//		ExtensionPatterns: &ExtensionFilter{Remove: []string{"x-go-*"}},
 //		KeepUnusedComponents: true,
 //		KeepUnknownProperties: true,
 //	}
@@ -90,9 +153,9 @@ type SanitizeResult struct {
 //		return fmt.Errorf("failed to sanitize document: %w", err)
 //	}
 //
-//	// Remove extensions and unknown properties, but keep components
+//	// Whitelist: Keep only x-speakeasy-* extensions, remove all others
 //	opts := &SanitizeOptions{
-//		KeepUnusedComponents: true,
+//		ExtensionPatterns: &ExtensionFilter{Keep: []string{"x-speakeasy-*"}},
 //	}
 //	result, err := Sanitize(ctx, doc, opts)
 //
@@ -167,37 +230,182 @@ func LoadSanitizeConfigFromFile(path string) (*SanitizeOptions, error) {
 }
 
 // removeExtensions walks through the document and removes extensions based on options.
+// determineRemovalAction determines whether an extension should be removed based on filtering rules.
+func determineRemovalAction(
+	key string,
+	removeAll bool,
+	hasWhitelist bool,
+	keepPatterns []string,
+	removePatterns []string,
+	keepPatternUsage map[string]*matchInfo,
+	removePatternUsage map[string]*matchInfo,
+) bool {
+	switch {
+	case removeAll:
+		// Default: remove all extensions
+		return true
+
+	case hasWhitelist && len(removePatterns) == 0:
+		// Pure whitelist mode: remove unless it matches Keep patterns
+		shouldRemove := true // default to remove
+
+		// Check if extension matches any Keep pattern
+		for _, pattern := range keepPatterns {
+			info := keepPatternUsage[pattern]
+			if info == nil {
+				continue
+			}
+			matched, err := filepath.Match(pattern, key)
+			if err != nil {
+				info.invalid = true
+				continue
+			}
+			if matched {
+				info.matched = true
+				shouldRemove = false // keep it
+				break
+			}
+		}
+		return shouldRemove
+
+	case hasWhitelist && len(removePatterns) > 0:
+		// Combined mode: Apply Remove patterns, but Keep overrides
+		// First check if it matches Remove patterns
+		matchesRemove := false
+		for _, pattern := range removePatterns {
+			info := removePatternUsage[pattern]
+			if info == nil {
+				continue
+			}
+			matched, err := filepath.Match(pattern, key)
+			if err != nil {
+				info.invalid = true
+				continue
+			}
+			if matched {
+				matchesRemove = true
+				break
+			}
+		}
+
+		if matchesRemove {
+			// It matches Remove, but check if Keep overrides
+			shouldRemove := true // default to remove
+			for _, pattern := range keepPatterns {
+				info := keepPatternUsage[pattern]
+				if info == nil {
+					continue
+				}
+				matched, err := filepath.Match(pattern, key)
+				if err != nil {
+					info.invalid = true
+					continue
+				}
+				if matched {
+					info.matched = true
+					shouldRemove = false // keep it (whitelist overrides blacklist)
+					break
+				}
+			}
+
+			// Track that Remove pattern matched (even if Keep overrode it)
+			if matchesRemove {
+				for _, pattern := range removePatterns {
+					matched, err := filepath.Match(pattern, key)
+					if err == nil && matched {
+						if info := removePatternUsage[pattern]; info != nil {
+							info.matched = true
+						}
+					}
+				}
+			}
+			return shouldRemove
+		}
+		// If it doesn't match Remove patterns, keep it (not affected)
+		return false
+
+	case len(removePatterns) > 0:
+		// Pure blacklist mode: keep unless it matches Remove patterns
+		shouldRemove := false // default to keep
+
+		// Check if extension matches any Remove pattern
+		for _, pattern := range removePatterns {
+			info := removePatternUsage[pattern]
+			if info == nil {
+				continue
+			}
+			matched, err := filepath.Match(pattern, key)
+			if err != nil {
+				info.invalid = true
+				continue
+			}
+			if matched {
+				info.matched = true
+				shouldRemove = true // remove it (matches blacklist)
+				break
+			}
+		}
+		return shouldRemove
+
+	default:
+		return false
+	}
+}
+
+// matchInfo tracks pattern usage and validity for warning generation.
+type matchInfo struct {
+	invalid bool // true if pattern has invalid syntax
+	matched bool // true if pattern matched at least one extension
+}
+
 // Returns a slice of warnings for invalid patterns or patterns that matched nothing.
 func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) ([]string, error) {
-	// Determine removal strategy:
-	// - nil ExtensionPatterns: remove ALL extensions (default)
-	// - empty array []: keep ALL extensions (explicit no-op)
-	// - non-empty array: remove only matching patterns
+	// Determine removal strategy based on ExtensionPatterns:
+	// - nil: remove ALL extensions (default)
+	// - &ExtensionFilter{}: remove ALL extensions (empty whitelist and blacklist)
+	// - &ExtensionFilter{Keep: [...}}: whitelist mode - keep only matching extensions
+	// - &ExtensionFilter{Remove: [...}}: blacklist mode - remove only matching extensions
+	// - &ExtensionFilter{Keep: [...], Remove: [...}}: whitelist overrides blacklist
 
-	var patterns []string
-	removeAll := true
+	var keepPatterns, removePatterns []string
+	hasWhitelist := false
+	removeAll := true // Default: remove all extensions
 
-	// Handle extension patterns if explicitly set
 	if opts != nil && opts.ExtensionPatterns != nil {
-		if len(opts.ExtensionPatterns) == 0 {
-			// Empty array explicitly set = keep all extensions
-			return nil, nil
+		filter := opts.ExtensionPatterns
+
+		// Check for whitelist (Keep patterns)
+		if len(filter.Keep) > 0 {
+			keepPatterns = filter.Keep
+			hasWhitelist = true
+			removeAll = false
 		}
-		// Use patterns for selective removal
-		patterns = opts.ExtensionPatterns
-		removeAll = false
+
+		// Check for blacklist (Remove patterns)
+		if len(filter.Remove) > 0 {
+			removePatterns = filter.Remove
+			if !hasWhitelist {
+				// Blacklist mode only (no whitelist)
+				removeAll = false
+			}
+		}
+
+		// If both Keep and Remove are empty, remove all (empty filter)
+		if len(filter.Keep) == 0 && len(filter.Remove) == 0 {
+			removeAll = true
+		}
 	}
 
-	// Track pattern usage: map[pattern]MatchInfo
-	type matchInfo struct {
-		invalid bool // true if pattern has invalid syntax
-		matched bool // true if pattern matched at least one extension
-	}
-	patternUsage := make(map[string]*matchInfo)
+	// Track pattern usage for warnings
+	keepPatternUsage := make(map[string]*matchInfo)
+	removePatternUsage := make(map[string]*matchInfo)
 
 	// Initialize tracking for all patterns
-	for _, pattern := range patterns {
-		patternUsage[pattern] = &matchInfo{}
+	for _, pattern := range keepPatterns {
+		keepPatternUsage[pattern] = &matchInfo{}
+	}
+	for _, pattern := range removePatterns {
+		removePatternUsage[pattern] = &matchInfo{}
 	}
 
 	// Walk through the document and process all Extensions
@@ -211,27 +419,15 @@ func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) 
 				// Collect keys to remove
 				keysToRemove := []string{}
 				for key := range ext.All() {
-					var shouldRemove bool
-					if removeAll {
-						// Remove all extensions
-						shouldRemove = true
-					} else {
-						// Check if extension matches any pattern
-						for _, pattern := range patterns {
-							info := patternUsage[pattern]
-							matched, err := filepath.Match(pattern, key)
-							if err != nil {
-								// Mark pattern as invalid
-								info.invalid = true
-								continue
-							}
-							if matched {
-								// Mark pattern as having matched something
-								info.matched = true
-								shouldRemove = true
-							}
-						}
-					}
+					shouldRemove := determineRemovalAction(
+						key,
+						removeAll,
+						hasWhitelist,
+						keepPatterns,
+						removePatterns,
+						keepPatternUsage,
+						removePatternUsage,
+					)
 
 					if shouldRemove {
 						keysToRemove = append(keysToRemove, key)
@@ -253,15 +449,30 @@ func removeExtensions(ctx context.Context, doc *OpenAPI, opts *SanitizeOptions) 
 
 	// Generate warnings for invalid patterns and patterns that never matched
 	var warnings []string
-	for _, pattern := range patterns {
-		info := patternUsage[pattern]
+
+	// Check Keep patterns
+	for _, pattern := range keepPatterns {
+		info := keepPatternUsage[pattern]
 		if info == nil {
 			continue
 		}
 		if info.invalid {
-			warnings = append(warnings, fmt.Sprintf("invalid glob pattern '%s' was skipped", pattern))
+			warnings = append(warnings, fmt.Sprintf("invalid keep pattern '%s' was skipped", pattern))
 		} else if !info.matched {
-			warnings = append(warnings, fmt.Sprintf("pattern '%s' did not match any extensions in the document", pattern))
+			warnings = append(warnings, fmt.Sprintf("keep pattern '%s' did not match any extensions in the document", pattern))
+		}
+	}
+
+	// Check Remove patterns
+	for _, pattern := range removePatterns {
+		info := removePatternUsage[pattern]
+		if info == nil {
+			continue
+		}
+		if info.invalid {
+			warnings = append(warnings, fmt.Sprintf("invalid remove pattern '%s' was skipped", pattern))
+		} else if !info.matched {
+			warnings = append(warnings, fmt.Sprintf("remove pattern '%s' did not match any extensions in the document", pattern))
 		}
 	}
 
