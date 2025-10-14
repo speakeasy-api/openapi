@@ -251,7 +251,7 @@ Create a YAML configuration file to control sanitization behavior:
 ```yaml
 # sanitize-config.yaml
 
-# Remove only specific extension patterns (if not set, removes ALL extensions)
+# Only remove extensions that match these patterns, null will remove ALL extensions, [] will remove no extensions (default: null, removes ALL extensions)
 extensionPatterns:
   - "x-go-*"
   - "x-internal-*"
