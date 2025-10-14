@@ -5,6 +5,7 @@ info:
   x-go-package: testapi
   x-internal-version: 2.0
   x-speakeasy-retries: 3
+  x-speakeasy-schema-version: v1
   x-other-extension: value
 paths:
   /test:
@@ -14,6 +15,7 @@ paths:
       x-go-name: Test
       x-internal-cache: true
       x-speakeasy-pagination: false
+      x-speakeasy-schema-id: test-op
       x-rate-limit: 100
       responses:
         "200":
@@ -25,6 +27,7 @@ components:
       x-go-type: TestSchema
       x-internal-table: test
       x-speakeasy-entity: test
+      x-speakeasy-schema-name: TestSchema
       x-custom: value
       properties:
         field:

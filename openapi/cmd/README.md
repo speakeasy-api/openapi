@@ -251,10 +251,17 @@ Create a YAML configuration file to control sanitization behavior:
 ```yaml
 # sanitize-config.yaml
 
-# Only remove extensions that match these patterns, null will remove ALL extensions, [] will remove no extensions (default: null, removes ALL extensions)
+# Extension filtering (not provided or empty = remove all extensions by default)
 extensionPatterns:
-  - "x-go-*"
-  - "x-internal-*"
+  # Whitelist: keep only matching extensions (when provided, only these are kept)
+  # Keep takes precedence over Remove when both are specified
+  keep:
+    - "x-speakeasy-schema-*"  # Example: keep only schema-related extensions
+  # Blacklist: remove only matching extensions, keep all others
+  remove:
+    - "x-go-*"
+    - "x-internal-*"
+    - "x-speakeasy-*"  # Combined with Keep above, removes all x-speakeasy-* EXCEPT x-speakeasy-schema-*
 
 # Keep unused components (default: false, removes them)
 keepUnusedComponents: true
@@ -333,7 +340,7 @@ components:
 
 **After sanitization (with pattern config):**
 
-Using config with `extensionPatterns: ["x-go-*"]`:
+Using config with `extensionPatterns: { remove: ["x-go-*"] }`:
 
 ```yaml
 openapi: 3.1.0

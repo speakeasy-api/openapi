@@ -58,9 +58,11 @@ func TestSanitize_PatternBased_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, validationErrs, "Input document should be valid")
 
-	// Sanitize with pattern matching - only remove x-go-* extensions
+	// Sanitize with pattern matching - only remove x-go-* extensions (blacklist mode)
 	opts := &openapi.SanitizeOptions{
-		ExtensionPatterns:     []string{"x-go-*"},
+		ExtensionPatterns: &openapi.ExtensionFilter{
+			Remove: []string{"x-go-*"},
+		},
 		KeepUnusedComponents:  true,
 		KeepUnknownProperties: true,
 	}
@@ -96,9 +98,11 @@ func TestSanitize_MultiplePatterns_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, validationErrs, "Input document should be valid")
 
-	// Sanitize with multiple patterns
+	// Sanitize with multiple patterns (blacklist mode)
 	opts := &openapi.SanitizeOptions{
-		ExtensionPatterns:    []string{"x-go-*", "x-internal-*"},
+		ExtensionPatterns: &openapi.ExtensionFilter{
+			Remove: []string{"x-go-*", "x-internal-*"},
+		},
 		KeepUnusedComponents: true,
 	}
 	result, err := openapi.Sanitize(ctx, inputDoc, opts)
@@ -206,8 +210,9 @@ func TestLoadSanitizeConfig_Success(t *testing.T) {
 	t.Parallel()
 
 	configYAML := `extensionPatterns:
-  - "x-go-*"
-  - "x-internal-*"
+  remove:
+    - "x-go-*"
+    - "x-internal-*"
 keepUnusedComponents: true
 keepUnknownProperties: false
 `
@@ -218,7 +223,8 @@ keepUnknownProperties: false
 	require.NotNil(t, opts)
 
 	// Verify config was loaded correctly
-	assert.Equal(t, []string{"x-go-*", "x-internal-*"}, opts.ExtensionPatterns)
+	require.NotNil(t, opts.ExtensionPatterns)
+	assert.Equal(t, []string{"x-go-*", "x-internal-*"}, opts.ExtensionPatterns.Remove)
 	assert.True(t, opts.KeepUnusedComponents)
 	assert.False(t, opts.KeepUnknownProperties)
 }
@@ -236,7 +242,8 @@ func TestLoadSanitizeConfig_InvalidYAML_Error(t *testing.T) {
 	t.Parallel()
 
 	invalidYAML := `extensionPatterns:
-  - "x-go-*"
+  remove:
+    - "x-go-*"
   invalid yaml syntax here: [
 keepUnusedComponents: true
 `
@@ -262,7 +269,8 @@ func TestSanitize_ConfigFile_Success(t *testing.T) {
 	require.Empty(t, validationErrs, "Input document should be valid")
 
 	configYAML := `extensionPatterns:
-  - "x-go-*"
+  remove:
+    - "x-go-*"
 keepUnusedComponents: true
 keepUnknownProperties: true
 `
@@ -304,11 +312,12 @@ func TestSanitize_KeepExtensionsRemoveUnknownProperties_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, validationErrs, "Input document should be valid")
 
-	// Configure to keep ALL extensions but remove unknown properties
-	// Empty array = keep all extensions, nil = remove all
+	// Configure to keep ALL extensions using wildcard whitelist
 	opts := &openapi.SanitizeOptions{
-		ExtensionPatterns:     []string{}, // Empty array = keep ALL extensions
-		KeepUnknownProperties: false,      // Remove unknown properties
+		ExtensionPatterns: &openapi.ExtensionFilter{
+			Keep: []string{"*"}, // Wildcard = keep ALL extensions
+		},
+		KeepUnknownProperties: false, // Remove unknown properties
 		KeepUnusedComponents:  true,
 	}
 
@@ -328,4 +337,213 @@ func TestSanitize_KeepExtensionsRemoveUnknownProperties_Success(t *testing.T) {
 
 	// Compare the actual output with expected output
 	assert.Equal(t, string(expectedBytes), string(actualYAML), "Should keep extensions but remove unknown properties")
+}
+
+func TestSanitize_WhitelistMode_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Load the input document with various extensions
+	inputFile, err := os.Open("testdata/sanitize/sanitize_pattern_input.yaml")
+	require.NoError(t, err)
+	defer inputFile.Close()
+
+	inputDoc, validationErrs, err := openapi.Unmarshal(ctx, inputFile)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs, "Input document should be valid")
+
+	// Sanitize with whitelist - only keep x-speakeasy-* extensions
+	opts := &openapi.SanitizeOptions{
+		ExtensionPatterns: &openapi.ExtensionFilter{
+			Keep: []string{"x-speakeasy-*"},
+		},
+		KeepUnusedComponents:  true,
+		KeepUnknownProperties: true,
+	}
+	result, err := openapi.Sanitize(ctx, inputDoc, opts)
+	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
+
+	// Marshal the sanitized document to YAML
+	var buf bytes.Buffer
+	err = openapi.Marshal(ctx, inputDoc, &buf)
+	require.NoError(t, err)
+	actualYAML := buf.String()
+
+	// Verify that only x-speakeasy-* extensions remain
+	assert.Contains(t, actualYAML, "x-speakeasy-", "Should contain x-speakeasy-* extensions")
+	assert.NotContains(t, actualYAML, "x-go-", "Should not contain x-go-* extensions")
+}
+
+func TestSanitize_WhitelistOverridesBlacklist_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Load the input document
+	inputFile, err := os.Open("testdata/sanitize/sanitize_multi_pattern_input.yaml")
+	require.NoError(t, err)
+	defer inputFile.Close()
+
+	inputDoc, validationErrs, err := openapi.Unmarshal(ctx, inputFile)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs, "Input document should be valid")
+
+	// Remove all x-speakeasy-* extensions EXCEPT x-speakeasy-schema-*
+	// This demonstrates whitelist overriding blacklist for a narrower match
+	opts := &openapi.SanitizeOptions{
+		ExtensionPatterns: &openapi.ExtensionFilter{
+			Keep:   []string{"x-speakeasy-schema-*"}, // Keep only schema-related extensions
+			Remove: []string{"x-speakeasy-*"},        // Remove all speakeasy extensions
+		},
+		KeepUnusedComponents: true,
+	}
+	result, err := openapi.Sanitize(ctx, inputDoc, opts)
+	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
+
+	// Marshal the sanitized document
+	var buf bytes.Buffer
+	err = openapi.Marshal(ctx, inputDoc, &buf)
+	require.NoError(t, err)
+	actualYAML := buf.String()
+
+	// Verify whitelist overrides blacklist
+	// x-speakeasy-schema-* should be kept (matches whitelist)
+	assert.Contains(t, actualYAML, "x-speakeasy-schema-version", "Should keep x-speakeasy-schema-version (whitelist)")
+	assert.Contains(t, actualYAML, "x-speakeasy-schema-id", "Should keep x-speakeasy-schema-id (whitelist)")
+	assert.Contains(t, actualYAML, "x-speakeasy-schema-name", "Should keep x-speakeasy-schema-name (whitelist)")
+
+	// Other x-speakeasy-* should be removed (matches blacklist, not whitelist)
+	assert.NotContains(t, actualYAML, "x-speakeasy-retries", "Should remove x-speakeasy-retries (blacklist, not in whitelist)")
+	assert.NotContains(t, actualYAML, "x-speakeasy-pagination", "Should remove x-speakeasy-pagination (blacklist, not in whitelist)")
+	assert.NotContains(t, actualYAML, "x-speakeasy-entity", "Should remove x-speakeasy-entity (blacklist, not in whitelist)")
+
+	// Non-speakeasy extensions should remain (not affected by either pattern)
+	assert.Contains(t, actualYAML, "x-go-", "Should keep x-go-* (not affected by patterns)")
+	assert.Contains(t, actualYAML, "x-internal-", "Should keep x-internal-* (not affected by patterns)")
+}
+
+func TestSanitize_EmptyFilter_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Load the input document
+	inputFile, err := os.Open("testdata/sanitize/sanitize_input.yaml")
+	require.NoError(t, err)
+	defer inputFile.Close()
+
+	inputDoc, validationErrs, err := openapi.Unmarshal(ctx, inputFile)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs, "Input document should be valid")
+
+	// Empty filter should remove all extensions
+	opts := &openapi.SanitizeOptions{
+		ExtensionPatterns:    &openapi.ExtensionFilter{},
+		KeepUnusedComponents: true,
+	}
+	result, err := openapi.Sanitize(ctx, inputDoc, opts)
+	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
+
+	// Marshal the sanitized document
+	var buf bytes.Buffer
+	err = openapi.Marshal(ctx, inputDoc, &buf)
+	require.NoError(t, err)
+	actualYAML := buf.String()
+
+	// Verify all extensions are removed
+	assert.NotContains(t, actualYAML, "x-go-", "Should not contain any x-go-* extensions")
+	assert.NotContains(t, actualYAML, "x-speakeasy-", "Should not contain any x-speakeasy-* extensions")
+}
+
+func TestSanitize_WildcardKeep_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Load the input document
+	inputFile, err := os.Open("testdata/sanitize/sanitize_input.yaml")
+	require.NoError(t, err)
+	defer inputFile.Close()
+
+	inputDoc, validationErrs, err := openapi.Unmarshal(ctx, inputFile)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs, "Input document should be valid")
+
+	// Keep all extensions with wildcard
+	opts := &openapi.SanitizeOptions{
+		ExtensionPatterns: &openapi.ExtensionFilter{
+			Keep: []string{"*"},
+		},
+		KeepUnusedComponents: true,
+	}
+	result, err := openapi.Sanitize(ctx, inputDoc, opts)
+	require.NoError(t, err)
+	assert.Empty(t, result.Warnings, "Should not have warnings")
+
+	// Marshal the sanitized document
+	var buf bytes.Buffer
+	err = openapi.Marshal(ctx, inputDoc, &buf)
+	require.NoError(t, err)
+	actualYAML := buf.String()
+
+	// Verify all extensions are kept
+	assert.Contains(t, actualYAML, "x-", "Should contain extensions")
+}
+
+func TestSanitize_InvalidKeepPattern_Warning(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Load the input document
+	inputFile, err := os.Open("testdata/sanitize/sanitize_input.yaml")
+	require.NoError(t, err)
+	defer inputFile.Close()
+
+	inputDoc, validationErrs, err := openapi.Unmarshal(ctx, inputFile)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs, "Input document should be valid")
+
+	// Use invalid glob pattern in Keep
+	opts := &openapi.SanitizeOptions{
+		ExtensionPatterns: &openapi.ExtensionFilter{
+			Keep: []string{"x-[invalid-pattern"},
+		},
+		KeepUnusedComponents: true,
+	}
+	result, err := openapi.Sanitize(ctx, inputDoc, opts)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Warnings, "Should have warnings for invalid pattern")
+	assert.Contains(t, result.Warnings[0], "invalid keep pattern", "Warning should mention invalid keep pattern")
+}
+
+func TestSanitize_InvalidRemovePattern_Warning(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Load the input document
+	inputFile, err := os.Open("testdata/sanitize/sanitize_input.yaml")
+	require.NoError(t, err)
+	defer inputFile.Close()
+
+	inputDoc, validationErrs, err := openapi.Unmarshal(ctx, inputFile)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs, "Input document should be valid")
+
+	// Use invalid glob pattern in Remove
+	opts := &openapi.SanitizeOptions{
+		ExtensionPatterns: &openapi.ExtensionFilter{
+			Remove: []string{"x-[invalid-pattern"},
+		},
+		KeepUnusedComponents: true,
+	}
+	result, err := openapi.Sanitize(ctx, inputDoc, opts)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Warnings, "Should have warnings for invalid pattern")
+	assert.Contains(t, result.Warnings[0], "invalid remove pattern", "Warning should mention invalid remove pattern")
 }
