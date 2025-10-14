@@ -59,7 +59,7 @@ Configuration file format (YAML):
     # Keep takes precedence over Remove when both are specified
     keep:
       - "x-speakeasy-schema-*"  # Keeps x-speakeasy-schema-*, allows narrowing Remove patterns
-    # Blacklist: remove only matching extensions, keep all others
+    # Remove only matching extensions, keep all others
     remove:
       - "x-go-*"
       - "x-internal-*"
