@@ -13,9 +13,11 @@ import (
 )
 
 var (
-	snipWriteInPlace bool
-	snipOperationIDs []string
-	snipOperations   []string
+	snipWriteInPlace     bool
+	snipOperationIDs     []string
+	snipOperations       []string
+	snipKeepOperationIDs []string
+	snipKeepOperations   []string
 )
 
 var snipCmd = &cobra.Command{
@@ -73,6 +75,9 @@ func init() {
 	snipCmd.Flags().BoolVarP(&snipWriteInPlace, "write", "w", false, "write result in-place to input file")
 	snipCmd.Flags().StringSliceVar(&snipOperationIDs, "operationId", nil, "operation ID to remove (can be comma-separated or repeated)")
 	snipCmd.Flags().StringSliceVar(&snipOperations, "operation", nil, "operation as path:method to remove (can be comma-separated or repeated)")
+	// Keep-mode flags (mutually exclusive with remove-mode flags)
+	snipCmd.Flags().StringSliceVar(&snipKeepOperationIDs, "keepOperationId", nil, "operation ID to keep (can be comma-separated or repeated)")
+	snipCmd.Flags().StringSliceVar(&snipKeepOperations, "keepOperation", nil, "operation as path:method to keep (can be comma-separated or repeated)")
 }
 
 func runSnip(cmd *cobra.Command, args []string) error {
@@ -84,20 +89,29 @@ func runSnip(cmd *cobra.Command, args []string) error {
 		outputFile = args[1]
 	}
 
-	// Check if any operations were specified via flags
-	hasOperationFlags := len(snipOperationIDs) > 0 || len(snipOperations) > 0
+	// Check which flag sets were specified
+	hasRemoveFlags := len(snipOperationIDs) > 0 || len(snipOperations) > 0
+	hasKeepFlags := len(snipKeepOperationIDs) > 0 || len(snipKeepOperations) > 0
 
-	// If -w is specified without operation flags, error
-	if snipWriteInPlace && !hasOperationFlags {
-		return fmt.Errorf("--write flag requires specifying operations via --operationId or --operation flags")
+	// If -w is specified without any operation selection flags, error
+	if snipWriteInPlace && !(hasRemoveFlags || hasKeepFlags) {
+		return fmt.Errorf("--write flag requires specifying operations via --operationId/--operation or --keepOperationId/--keepOperation")
 	}
 
-	if !hasOperationFlags {
-		// No flags - interactive mode
+	// Interactive mode when no flags provided
+	if !hasRemoveFlags && !hasKeepFlags {
 		return runSnipInteractive(ctx, inputFile, outputFile)
 	}
 
-	// Flags specified - CLI mode
+	// Disallow mixing keep + remove flags; ambiguous intent
+	if hasRemoveFlags && hasKeepFlags {
+		return fmt.Errorf("cannot combine keep and remove flags; use either --operationId/--operation or --keepOperationId/--keepOperation")
+	}
+
+	// CLI mode
+	if hasKeepFlags {
+		return runSnipCLIKeep(ctx, inputFile, outputFile)
+	}
 	return runSnipCLI(ctx, inputFile, outputFile)
 }
 
@@ -134,6 +148,87 @@ func runSnipCLI(ctx context.Context, inputFile, outputFile string) error {
 	}
 
 	processor.PrintSuccess(fmt.Sprintf("Successfully removed %d operation(s) and cleaned unused components", removed))
+
+	// Write the snipped document
+	return processor.WriteDocument(ctx, doc)
+}
+
+func runSnipCLIKeep(ctx context.Context, inputFile, outputFile string) error {
+	// Create processor
+	processor, err := NewOpenAPIProcessor(inputFile, outputFile, snipWriteInPlace)
+	if err != nil {
+		return err
+	}
+
+	// Load document
+	doc, validationErrors, err := processor.LoadDocument(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Report validation errors (if any)
+	processor.ReportValidationErrors(validationErrors)
+
+	// Parse keep flags
+	keepOps, err := parseKeepOperationFlags()
+	if err != nil {
+		return err
+	}
+	if len(keepOps) == 0 {
+		return fmt.Errorf("no operations specified to keep")
+	}
+
+	// Collect all operations from the document
+	allOps, err := explore.CollectOperations(ctx, doc)
+	if err != nil {
+		return fmt.Errorf("failed to collect operations: %w", err)
+	}
+	if len(allOps) == 0 {
+		return fmt.Errorf("no operations found in the OpenAPI document")
+	}
+
+	// Build lookup sets for keep filters
+	keepByID := map[string]bool{}
+	keepByPathMethod := map[string]bool{}
+	for _, k := range keepOps {
+		if k.OperationID != "" {
+			keepByID[k.OperationID] = true
+		}
+		if k.Path != "" && k.Method != "" {
+			key := strings.ToUpper(k.Method) + " " + k.Path
+			keepByPathMethod[key] = true
+		}
+	}
+
+	// Compute removal list = all - keep
+	var operationsToRemove []openapi.OperationIdentifier
+	for _, op := range allOps {
+		if op.OperationID != "" && keepByID[op.OperationID] {
+			continue
+		}
+		key := strings.ToUpper(op.Method) + " " + op.Path
+		if keepByPathMethod[key] {
+			continue
+		}
+		operationsToRemove = append(operationsToRemove, openapi.OperationIdentifier{
+			Path:   op.Path,
+			Method: strings.ToUpper(op.Method),
+		})
+	}
+
+	// If nothing to remove, write as-is
+	if len(operationsToRemove) == 0 {
+		processor.PrintSuccess("No operations to remove based on keep filters; writing document unchanged")
+		return processor.WriteDocument(ctx, doc)
+	}
+
+	// Perform the snip
+	removed, err := openapi.Snip(ctx, doc, operationsToRemove)
+	if err != nil {
+		return fmt.Errorf("failed to snip operations: %w", err)
+	}
+
+	processor.PrintSuccess(fmt.Sprintf("Successfully kept %d operation(s) and removed %d operation(s) with cleanup", len(allOps)-removed, removed))
 
 	// Write the snipped document
 	return processor.WriteDocument(ctx, doc)
@@ -295,6 +390,47 @@ func parseOperationFlags() ([]openapi.OperationIdentifier, error) {
 
 		if path == "" || method == "" {
 			return nil, fmt.Errorf("invalid operation format: %s (path and method cannot be empty)", op)
+		}
+
+		operations = append(operations, openapi.OperationIdentifier{
+			Path:   path,
+			Method: method,
+		})
+	}
+
+	return operations, nil
+}
+
+// parseKeepOperationFlags parses the keep flags into operation identifiers
+// Handles both repeated flags and comma-separated values
+func parseKeepOperationFlags() ([]openapi.OperationIdentifier, error) {
+	var operations []openapi.OperationIdentifier
+
+	// Parse keep operation IDs
+	for _, opID := range snipKeepOperationIDs {
+		if opID != "" {
+			operations = append(operations, openapi.OperationIdentifier{
+				OperationID: opID,
+			})
+		}
+	}
+
+	// Parse keep path:method operations
+	for _, op := range snipKeepOperations {
+		if op == "" {
+			continue
+		}
+
+		parts := strings.SplitN(op, ":", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid keep operation format: %s (expected path:METHOD format, e.g., /users:GET)", op)
+		}
+
+		path := parts[0]
+		method := strings.ToUpper(parts[1])
+
+		if path == "" || method == "" {
+			return nil, fmt.Errorf("invalid keep operation format: %s (path and method cannot be empty)", op)
 		}
 
 		operations = append(operations, openapi.OperationIdentifier{

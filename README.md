@@ -98,7 +98,7 @@ The CLI provides three main command groups:
 - **`openapi spec`** - Commands for working with OpenAPI specifications ([documentation](./cmd/openapi/commands/openapi/README.md))
   - `bootstrap` - Create a new OpenAPI document with best practice examples
   - `bundle` - Bundle external references into components section
-  - `clean` - Remove unused components from an OpenAPI specification
+  - `clean` - Remove unused components and unused top-level tags from an OpenAPI specification
   - `explore` - Interactively explore an OpenAPI specification in the terminal
   - `inline` - Inline all references in an OpenAPI specification
   - `join` - Join multiple OpenAPI documents into a single document

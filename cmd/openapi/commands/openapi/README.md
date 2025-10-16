@@ -135,7 +135,7 @@ paths:
 
 ### `clean`
 
-Remove unused components from an OpenAPI specification to create a cleaner, more maintainable document.
+Remove unused components and unused top‑level tags from an OpenAPI specification using reachability seeded from /paths and top‑level security.
 
 ```bash
 # Clean to stdout (pipe-friendly)
@@ -150,10 +150,12 @@ openapi spec clean -w ./spec.yaml
 
 What cleaning does:
 
-- Removes unused components from all component types (schemas, responses, parameters, etc.)
-- Tracks all references throughout the document including `$ref` and security scheme name references
-- Preserves all components that are actually used in the specification
-- Handles complex reference patterns including circular references and nested components
+- Performs reachability-based cleanup seeded only from API surface areas (/paths and top‑level security)
+- Expands through $ref links to components until a fixed point is reached
+- Preserves security schemes referenced by name in security requirement objects (global and operation‑level)
+- Removes unused components from all component types (schemas, responses, parameters, examples, request bodies, headers, links, callbacks, path items)
+- Removes unused top‑level tags that are not referenced by any operation
+- Handles complex reference patterns; only components reachable from the API surface are kept
 
 **Before cleaning:**
 
@@ -823,6 +825,7 @@ openapi spec snip -w --operation /internal/debug:GET ./spec.yaml
 **Two Operation Modes:**
 
 **Interactive Mode** (no operation flags):
+
 - Launch a terminal UI to browse all operations
 - Select operations with Space key
 - Press 'a' to select all, 'A' to deselect all
@@ -830,6 +833,7 @@ openapi spec snip -w --operation /internal/debug:GET ./spec.yaml
 - Press 'q' or Esc to cancel
 
 **Command-Line Mode** (operation flags specified):
+
 - Remove operations specified via flags without UI
 - Supports `--operationId` for operation IDs
 - Supports `--operation` for path:method pairs
@@ -951,7 +955,7 @@ openapi spec clean | \
 openapi spec upgrade | \
 openapi spec validate
 
-# Alternative: Clean after bundling to remove unused components
+# Alternative: Clean after bundling to remove unused components and unused top-level tags
 openapi spec bundle ./spec.yaml ./bundled.yaml
 openapi spec clean ./bundled.yaml ./clean-bundled.yaml
 openapi spec validate ./clean-bundled.yaml
