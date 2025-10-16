@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
+# Use provided packages or default to all packages
+PACKAGES="${@:-./...}"
+
 echo "🧪 Running tests with coverage using gotestsum..."
-if ! gotestsum --format testname -- -race -coverprofile=coverage.out -covermode=atomic ./...; then
+if ! gotestsum --format testname -- -race -coverprofile=coverage.out -covermode=atomic ${PACKAGES}; then
     echo "❌ Tests failed!"
     exit 1
 fi

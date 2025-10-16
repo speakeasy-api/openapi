@@ -81,12 +81,29 @@ func UnmarshalNode[T any](ctx context.Context, parentName string, node *yaml.Nod
 }
 
 func UnmarshalCore(ctx context.Context, parentName string, node *yaml.Node, out any) ([]error, error) {
+	// Store the DocumentNode if this is a top-level document and the output implements CoreModeler
+	var documentNode *yaml.Node
 	if node.Kind == yaml.DocumentNode {
 		if len(node.Content) != 1 {
 			return nil, fmt.Errorf("expected 1 node, got %d at line %d, column %d", len(node.Content), node.Line, node.Column)
 		}
 
-		return UnmarshalCore(ctx, parentName, node.Content[0], out)
+		// Save the document node for potential use by CoreModeler implementations
+		documentNode = node
+		node = node.Content[0]
+	}
+
+	// Set DocumentNode on CoreModeler implementations after unwrapping
+	if documentNode != nil {
+		v := reflect.ValueOf(out)
+		if v.Kind() == reflect.Ptr && !v.IsNil() {
+			v = v.Elem()
+		}
+		if implementsInterface(v, coreModelerType) {
+			if coreModeler, ok := v.Addr().Interface().(CoreModeler); ok {
+				coreModeler.SetDocumentNode(documentNode)
+			}
+		}
 	}
 
 	v := reflect.ValueOf(out)

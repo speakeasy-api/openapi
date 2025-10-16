@@ -1,0 +1,216 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Comprehensive Swagger API",
+    "version": "1.0.0",
+    "description": "A comprehensive Swagger API for testing walk functionality",
+    "termsOfService": "https://example.com/terms",
+    "contact": {
+      "name": "API Team",
+      "url": "https://example.com/contact",
+      "email": "api@example.com",
+      "x-contact-custom": "contact-extension"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT",
+      "x-license-custom": "license-extension"
+    },
+    "x-info-custom": "info-extension"
+  },
+  "host": "api.example.com",
+  "basePath": "/v1",
+  "schemes": ["https", "http"],
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "tags": [
+    {
+      "name": "users",
+      "description": "User operations",
+      "externalDocs": {
+        "url": "https://example.com/users",
+        "description": "User documentation"
+      }
+    },
+    {
+      "name": "pets",
+      "description": "Pet operations"
+    }
+  ],
+  "externalDocs": {
+    "url": "https://example.com/docs",
+    "description": "Additional documentation"
+  },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
+  "paths": {
+    "/users/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "integer",
+          "format": "int64",
+          "description": "User ID"
+        }
+      ],
+      "get": {
+        "tags": ["users"],
+        "summary": "Get user by ID",
+        "description": "Retrieve a user by their ID",
+        "operationId": "getUser",
+        "parameters": [
+          {
+            "name": "expand",
+            "in": "query",
+            "type": "string",
+            "description": "Expand related resources"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "schema": {
+              "$ref": "#/definitions/User"
+            },
+            "headers": {
+              "X-Rate-Limit": {
+                "type": "integer",
+                "description": "Rate limit remaining"
+              }
+            },
+            "examples": {
+              "application/json": {
+                "id": 123,
+                "name": "John Doe"
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "default": {
+            "description": "Error response"
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ]
+      }
+    },
+    "/pets": {
+      "get": {
+        "tags": ["pets"],
+        "summary": "List pets",
+        "operationId": "listPets",
+        "parameters": [
+          {
+            "name": "tags",
+            "in": "query",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "csv"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pet list",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Pet"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "User": {
+      "type": "object",
+      "description": "User object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      }
+    },
+    "Pet": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "parameters": {
+    "PageParam": {
+      "name": "page",
+      "in": "query",
+      "type": "integer",
+      "description": "Page number"
+    }
+  },
+  "responses": {
+    "ErrorResponse": {
+      "description": "Error response",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "code": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "apiKey": {
+      "type": "apiKey",
+      "name": "X-API-Key",
+      "in": "header",
+      "description": "API key authentication"
+    },
+    "oauth2": {
+      "type": "oauth2",
+      "flow": "accessCode",
+      "authorizationUrl": "https://example.com/oauth/authorize",
+      "tokenUrl": "https://example.com/oauth/token",
+      "scopes": {
+        "read": "Read access",
+        "write": "Write access"
+      }
+    }
+  },
+  "x-root-custom": "root-extension"
+}

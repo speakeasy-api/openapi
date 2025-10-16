@@ -145,13 +145,14 @@ func TestGetConfigFromContext_Success(t *testing.T) {
 func TestGetConfigFromDoc_Success(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name               string
-		data               []byte
-		doc                *yaml.Node
-		expectedFormat     yml.OutputFormat
-		expectedIndent     int
-		expectedKeyStyle   yaml.Style
-		expectedValueStyle yaml.Style
+		name                string
+		data                []byte
+		doc                 *yaml.Node
+		expectedFormat      yml.OutputFormat
+		expectedIndent      int
+		expectedIndentStyle yml.IndentationStyle
+		expectedKeyStyle    yaml.Style
+		expectedValueStyle  yaml.Style
 	}{
 		{
 			name: "YAML document with quoted strings",
@@ -176,10 +177,11 @@ func TestGetConfigFromDoc_Success(t *testing.T) {
 					},
 				},
 			},
-			expectedFormat:     yml.OutputFormatYAML,
-			expectedIndent:     2,
-			expectedKeyStyle:   0,
-			expectedValueStyle: yaml.DoubleQuotedStyle,
+			expectedFormat:      yml.OutputFormatYAML,
+			expectedIndent:      2,
+			expectedIndentStyle: yml.IndentationStyleSpace,
+			expectedKeyStyle:    0,
+			expectedValueStyle:  yaml.DoubleQuotedStyle,
 		},
 		{
 			name: "JSON document",
@@ -200,10 +202,11 @@ func TestGetConfigFromDoc_Success(t *testing.T) {
 					},
 				},
 			},
-			expectedFormat:     yml.OutputFormatJSON,
-			expectedIndent:     2,
-			expectedKeyStyle:   0,
-			expectedValueStyle: 0,
+			expectedFormat:      yml.OutputFormatJSON,
+			expectedIndent:      2,
+			expectedIndentStyle: yml.IndentationStyleSpace,
+			expectedKeyStyle:    0,
+			expectedValueStyle:  0,
 		},
 		{
 			name: "YAML with 4-space indentation",
@@ -224,10 +227,55 @@ func TestGetConfigFromDoc_Success(t *testing.T) {
 					},
 				},
 			},
-			expectedFormat:     yml.OutputFormatYAML,
-			expectedIndent:     4,
-			expectedKeyStyle:   0,
-			expectedValueStyle: 0,
+			expectedFormat:      yml.OutputFormatYAML,
+			expectedIndent:      4,
+			expectedIndentStyle: yml.IndentationStyleSpace,
+			expectedKeyStyle:    0,
+			expectedValueStyle:  0,
+		},
+		{
+			name: "YAML with single tab indentation",
+			data: []byte("key1: value1\nnested:\n\tkey2: value2"),
+			doc: &yaml.Node{
+				Kind: yaml.DocumentNode,
+				Content: []*yaml.Node{
+					{
+						Kind: yaml.MappingNode,
+						Tag:  "!!map",
+						Content: []*yaml.Node{
+							{Value: "key1", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "value1", Kind: yaml.ScalarNode, Tag: "!!str"},
+						},
+					},
+				},
+			},
+			expectedFormat:      yml.OutputFormatYAML,
+			expectedIndent:      1,
+			expectedIndentStyle: yml.IndentationStyleTab,
+			expectedKeyStyle:    0,
+			expectedValueStyle:  0,
+		},
+		{
+			name: "YAML with double tab indentation",
+			data: []byte("key1: value1\nnested:\n\t\tkey2: value2"),
+			doc: &yaml.Node{
+				Kind: yaml.DocumentNode,
+				Content: []*yaml.Node{
+					{
+						Kind: yaml.MappingNode,
+						Tag:  "!!map",
+						Content: []*yaml.Node{
+							{Value: "key1", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "value1", Kind: yaml.ScalarNode, Tag: "!!str"},
+						},
+					},
+				},
+			},
+			expectedFormat:      yml.OutputFormatYAML,
+			expectedIndent:      2,
+			expectedIndentStyle: yml.IndentationStyleTab,
+			expectedKeyStyle:    0,
+			expectedValueStyle:  0,
 		},
 	}
 
@@ -240,6 +288,7 @@ func TestGetConfigFromDoc_Success(t *testing.T) {
 			assert.Equal(t, tt.expectedFormat, result.OutputFormat)
 			assert.Equal(t, tt.expectedFormat, result.OriginalFormat)
 			assert.Equal(t, tt.expectedIndent, result.Indentation)
+			assert.Equal(t, tt.expectedIndentStyle, result.IndentationStyle)
 			assert.Equal(t, tt.expectedKeyStyle, result.KeyStringStyle)
 			assert.Equal(t, tt.expectedValueStyle, result.ValueStringStyle)
 		})
@@ -294,6 +343,7 @@ func TestGetConfigFromDoc_WithComplexDocument_Success(t *testing.T) {
 	assert.Equal(t, yml.OutputFormatYAML, result.OutputFormat)
 	assert.Equal(t, yml.OutputFormatYAML, result.OriginalFormat)
 	assert.Equal(t, 2, result.Indentation)
+	assert.Equal(t, yml.IndentationStyleSpace, result.IndentationStyle)
 	assert.Equal(t, yaml.Style(0), result.KeyStringStyle)
 	assert.Equal(t, yaml.Style(0), result.ValueStringStyle) // First string found doesn't have style
 }
@@ -339,34 +389,39 @@ func TestGetConfigFromDoc_WithAliasNodes_Success(t *testing.T) {
 func TestGetConfigFromDoc_EdgeCases_Success(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name           string
-		data           []byte
-		expectedFormat yml.OutputFormat
-		expectedIndent int
+		name                string
+		data                []byte
+		expectedFormat      yml.OutputFormat
+		expectedIndent      int
+		expectedIndentStyle yml.IndentationStyle
 	}{
 		{
-			name:           "empty data",
-			data:           []byte(""),
-			expectedFormat: yml.OutputFormatYAML,
-			expectedIndent: 2,
+			name:                "empty data",
+			data:                []byte(""),
+			expectedFormat:      yml.OutputFormatYAML,
+			expectedIndent:      2,
+			expectedIndentStyle: yml.IndentationStyleSpace,
 		},
 		{
-			name:           "only comments",
-			data:           []byte("# Just a comment\n# Another comment"),
-			expectedFormat: yml.OutputFormatYAML,
-			expectedIndent: 2,
+			name:                "only comments",
+			data:                []byte("# Just a comment\n# Another comment"),
+			expectedFormat:      yml.OutputFormatYAML,
+			expectedIndent:      2,
+			expectedIndentStyle: yml.IndentationStyleSpace,
 		},
 		{
-			name:           "only whitespace",
-			data:           []byte("   \n  \n   "),
-			expectedFormat: yml.OutputFormatYAML,
-			expectedIndent: 2,
+			name:                "only whitespace",
+			data:                []byte("   \n  \n   "),
+			expectedFormat:      yml.OutputFormatYAML,
+			expectedIndent:      2,
+			expectedIndentStyle: yml.IndentationStyleSpace,
 		},
 		{
-			name:           "JSON with no indentation",
-			data:           []byte(`{"key":"value"}`),
-			expectedFormat: yml.OutputFormatJSON,
-			expectedIndent: 2,
+			name:                "JSON with no indentation",
+			data:                []byte(`{"key":"value"}`),
+			expectedFormat:      yml.OutputFormatJSON,
+			expectedIndent:      2,
+			expectedIndentStyle: yml.IndentationStyleSpace,
 		},
 	}
 
@@ -390,6 +445,7 @@ func TestGetConfigFromDoc_EdgeCases_Success(t *testing.T) {
 			require.NotNil(t, result)
 			assert.Equal(t, tt.expectedFormat, result.OutputFormat)
 			assert.Equal(t, tt.expectedIndent, result.Indentation)
+			assert.Equal(t, tt.expectedIndentStyle, result.IndentationStyle)
 		})
 	}
 }

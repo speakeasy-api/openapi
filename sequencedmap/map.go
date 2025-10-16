@@ -588,38 +588,98 @@ func (m *Map[K, V]) NavigateWithKey(key string) (any, error) {
 	return v, nil
 }
 
-// MarshalJSON returns the JSON representation of the map.
 func (m *Map[K, V]) MarshalJSON() ([]byte, error) {
 	if m == nil {
 		return []byte("null"), nil
 	}
 
-	// TODO there might be a more efficient way to serialize this but this is fine for now
-	var buf bytes.Buffer
+	var (
+		buf    bytes.Buffer
+		keyBuf bytes.Buffer
+		valBuf bytes.Buffer
 
-	buf.WriteString("{")
+		keyEnc = json.NewEncoder(&keyBuf)
+		valEnc = json.NewEncoder(&valBuf)
+	)
 
-	for i, element := range m.l {
-		ks := fmt.Sprintf("%v", element.Key)
-		kb, err := json.Marshal(ks)
-		if err != nil {
+	// Preserve your “no HTML escaping” requirement.
+	keyEnc.SetEscapeHTML(false)
+	valEnc.SetEscapeHTML(false)
+
+	// Heuristic growth to reduce reallocations for large maps.
+	// We don't know value sizes; this just cuts down growth churn.
+	// Tweak the multiplier based on your typical key/value sizes.
+	if n := len(m.l); n > 0 {
+		// ~= `{` + `}` + commas/colons + rough key/value payloads
+		buf.Grow(n * 32)
+	}
+
+	buf.WriteByte('{')
+
+	first := true
+	for _, element := range m.l {
+		// ---- comma ----
+		if first {
+			first = false
+		} else {
+			buf.WriteByte(',')
+		}
+
+		// ---- key ----
+		var ks string
+		switch k := any(element.Key).(type) {
+		case string:
+			ks = k
+		case fmt.Stringer:
+			ks = k.String()
+		default:
+			ks = fmt.Sprint(element.Key)
+		}
+
+		keyBuf.Reset()
+		if err := keyEnc.Encode(ks); err != nil {
 			return nil, err
 		}
-		buf.Write(kb)
-		buf.WriteString(":")
-		vb, err := json.Marshal(element.Value)
-		if err != nil {
-			return nil, err
+		// Remove trailing newline from encoded key
+		keyBytes := keyBuf.Bytes()
+		if len(keyBytes) > 0 && keyBytes[len(keyBytes)-1] == '\n' {
+			keyBytes = keyBytes[:len(keyBytes)-1]
 		}
-		buf.Write(vb)
+		buf.Write(keyBytes)
+		buf.WriteByte(':')
 
-		if i < len(m.l)-1 {
-			buf.WriteString(",")
+		// ---- value ----
+		// Fast-path: json.RawMessage means "already-JSON" → write as-is.
+		switch v := any(element.Value).(type) {
+		case json.RawMessage:
+			// v is nil/empty → write "null" to match json.Marshal(nil)
+			if v == nil {
+				buf.WriteString("null")
+			} else {
+				buf.Write([]byte(v))
+			}
+		case *json.RawMessage:
+			if v == nil || *v == nil {
+				buf.WriteString("null")
+			} else {
+				buf.Write([]byte(*v))
+			}
+		default:
+			// Fallback: regular encode without HTML escaping.
+			valBuf.Reset()
+			if err := valEnc.Encode(element.Value); err != nil {
+				return nil, err
+			}
+			// Remove trailing newline from encoded value
+			valBytes := valBuf.Bytes()
+			if len(valBytes) > 0 && valBytes[len(valBytes)-1] == '\n' {
+				valBytes = valBytes[:len(valBytes)-1]
+			}
+			buf.Write(valBytes)
 		}
 	}
 
-	buf.WriteString("}")
-
+	buf.WriteByte('}')
 	return buf.Bytes(), nil
 }
 
