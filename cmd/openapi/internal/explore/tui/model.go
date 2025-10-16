@@ -140,8 +140,8 @@ func NewModelWithConfig(operations []explore.OperationInfo, docTitle, docVersion
 // Only relevant when selectionConfig.Enabled is true
 func (m Model) GetSelectedOperations() []explore.OperationInfo {
 	var selected []explore.OperationInfo
-	for idx := range m.selected {
-		if idx < len(m.operations) {
+	for idx, isSelected := range m.selected {
+		if isSelected && idx < len(m.operations) {
 			selected = append(selected, m.operations[idx])
 		}
 	}

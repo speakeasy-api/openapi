@@ -633,7 +633,7 @@ func joinReferenceChain(chain []string) string {
 	return result
 }
 
-func unmarshaler[T any, V interfaces.Validator[T], C marshaller.CoreModeler](o *OpenAPI) func(context.Context, *yaml.Node, bool) (*Reference[T, V, C], []error, error) {
+func unmarshaler[T any, V interfaces.Validator[T], C marshaller.CoreModeler](_ *OpenAPI) func(context.Context, *yaml.Node, bool) (*Reference[T, V, C], []error, error) {
 	return func(ctx context.Context, node *yaml.Node, skipValidation bool) (*Reference[T, V, C], []error, error) {
 		var ref Reference[T, V, C]
 		validationErrs, err := marshaller.UnmarshalNode(ctx, "reference", node, &ref)

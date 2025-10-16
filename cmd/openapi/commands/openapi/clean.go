@@ -12,15 +12,19 @@ import (
 
 var cleanCmd = &cobra.Command{
 	Use:   "clean <input-file> [output-file]",
-	Short: "Remove unused components from an OpenAPI specification",
-	Long: `Remove unused components from an OpenAPI specification to create a cleaner, more focused document.
+	Short: "Remove unused components and unused top-level tags from an OpenAPI specification",
+	Long: `Remove unused components and unused top-level tags from an OpenAPI specification to create a cleaner, more focused document.
 
-This command analyzes an OpenAPI document to identify which components are actually referenced
-and removes any unused components, reducing document size and improving clarity.
+This command uses reachability-based analysis to keep only what is actually used by the API surface:
+- Seeds reachability exclusively from API surface areas: entries under /paths and the top-level security section
+- Expands through $ref links across component sections until a fixed point is reached
+- Preserves security schemes referenced by name in security requirement objects (global or operation-level)
+- Prunes any components that are not reachable from the API surface
+- Removes unused top-level tags that are not referenced by any operation
 
 What gets cleaned:
 - Unused schemas in components/schemas
-- Unused responses in components/responses  
+- Unused responses in components/responses
 - Unused parameters in components/parameters
 - Unused examples in components/examples
 - Unused request bodies in components/requestBodies
@@ -29,14 +33,13 @@ What gets cleaned:
 - Unused links in components/links
 - Unused callbacks in components/callbacks
 - Unused path items in components/pathItems
+- Unused top-level tags (global tags not referenced by any operation)
 
 Special handling for security schemes:
 Security schemes can be referenced in two ways:
 1. By $ref (like other components)
 2. By name in security requirement objects (global or operation-level)
-
-The clean command correctly handles both cases and preserves security schemes
-that are referenced by name in security blocks.
+The clean command correctly handles both cases and preserves security schemes that are referenced by name in security blocks.
 
 Benefits of cleaning:
 - Reduce document size by removing dead code
