@@ -313,6 +313,31 @@ func trackSecuritySchemeReference(ref *ReferencedSecurityScheme, tracker map[str
 	return nil
 }
 
+// trackOperationTags tracks operation tag names into the tracker
+func trackOperationTags(op *Operation, tracker *referencedComponentTracker) error {
+	if op == nil || tracker == nil {
+		return nil
+	}
+	for _, tag := range op.GetTags() {
+		if tracker.tags == nil {
+			tracker.tags = make(map[string]bool)
+		}
+		tracker.tags[tag] = true
+	}
+	return nil
+}
+
+// trackSecurityRequirementNames tracks security scheme names referenced by a security requirement
+func trackSecurityRequirementNames(req *SecurityRequirement, tracker map[string]bool) error {
+	if req == nil || tracker == nil {
+		return nil
+	}
+	for schemeName := range req.All() {
+		tracker[schemeName] = true
+	}
+	return nil
+}
+
 // extractComponentName extracts the component name from a reference string
 func extractComponentName(refStr, componentType string) string {
 	prefix := "#/components/" + componentType + "/"
@@ -575,25 +600,11 @@ func walkAndTrackWithFilter(ctx context.Context, doc *OpenAPI, tracker *referenc
 			},
 			// Track operation tags (only under allowed locations)
 			Operation: func(op *Operation) error {
-				if op == nil {
-					return nil
-				}
-				for _, tag := range op.GetTags() {
-					if tracker.tags == nil {
-						tracker.tags = make(map[string]bool)
-					}
-					tracker.tags[tag] = true
-				}
-				return nil
+				return trackOperationTags(op, tracker)
 			},
 			// Track security requirements (special case for security schemes)
 			Security: func(req *SecurityRequirement) error {
-				if req != nil {
-					for schemeName := range req.All() {
-						tracker.securitySchemes[schemeName] = true
-					}
-				}
-				return nil
+				return trackSecurityRequirementNames(req, tracker.securitySchemes)
 			},
 		})
 		if err != nil {

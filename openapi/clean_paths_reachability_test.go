@@ -218,3 +218,67 @@ paths: {}
 
 	assert.Equal(t, expected, actual, "All components should be removed when only self/component-only references exist")
 }
+
+func TestClean_Reachability_CircularSchemas_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	const yml = `
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /keep:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cycle1"
+components:
+  schemas:
+    Cycle1:
+      $ref: "#/components/schemas/Cycle2"
+    Cycle2:
+      $ref: "#/components/schemas/Cycle1"
+`
+
+	doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(yml))
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "input should be valid")
+
+	err = openapi.Clean(ctx, doc)
+	require.NoError(t, err, "clean should succeed")
+
+	var buf bytes.Buffer
+	err = openapi.Marshal(ctx, doc, &buf)
+	require.NoError(t, err, "marshal should succeed")
+	actual := buf.String()
+
+	const expected = `openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /keep:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cycle1"
+components:
+  schemas:
+    Cycle1:
+      $ref: "#/components/schemas/Cycle2"
+    Cycle2:
+      $ref: "#/components/schemas/Cycle1"
+`
+
+	assert.Equal(t, expected, actual, "Clean should keep circularly referenced components reachable from paths without hanging")
+}
