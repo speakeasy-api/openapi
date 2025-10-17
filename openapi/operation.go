@@ -169,6 +169,7 @@ func (o *Operation) Validate(ctx context.Context, opts ...validation.Option) []e
 		errs = append(errs, securityRequirement.Validate(ctx, opts...)...)
 	}
 
+	// TODO allow validation of parameters, this isn't done at the moment as we would need to resolve references
 	for _, parameter := range o.Parameters {
 		errs = append(errs, parameter.Validate(ctx, opts...)...)
 	}
