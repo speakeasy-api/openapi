@@ -127,7 +127,11 @@ func inspectData(data []byte) (OutputFormat, int, IndentationStyle) {
 			docFormat = OutputFormatJSON
 			foundDocFormat = true
 		default:
-			currentLeading := len(line) - len(trimLine)
+			// Calculate leading whitespace by counting from the start
+			currentLeading := 0
+			for currentLeading < len(line) && (line[currentLeading] == ' ' || line[currentLeading] == '\t') {
+				currentLeading++
+			}
 
 			// Track minimum leading whitespace (baseline indentation)
 			if minLeadingWhitespace == -1 || currentLeading < minLeadingWhitespace {

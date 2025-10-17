@@ -449,3 +449,61 @@ func TestGetConfigFromDoc_EdgeCases_Success(t *testing.T) {
 		})
 	}
 }
+
+func TestGetConfigFromDoc_TrailingWhitespace_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		data           []byte
+		expectedIndent int
+	}{
+		{
+			name: "YAML with trailing whitespace on lines",
+			data: []byte(`key: value    
+nested:    
+  child: value    `),
+			expectedIndent: 2,
+		},
+		{
+			name:           "YAML with trailing tabs",
+			data:           []byte("key: value\t\t\nnested:\t\t\n  child: value\t\t"),
+			expectedIndent: 2,
+		},
+		{
+			name:           "line with only leading brace and trailing whitespace",
+			data:           []byte("{    "),
+			expectedIndent: 2, // default when no indentation found
+		},
+		{
+			name: "mixed leading and trailing whitespace",
+			data: []byte(`  key: value   
+  nested:   
+    child: value   `),
+			expectedIndent: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create a minimal document structure
+			doc := &yaml.Node{
+				Kind: yaml.DocumentNode,
+				Content: []*yaml.Node{
+					{
+						Kind:    yaml.MappingNode,
+						Tag:     "!!map",
+						Content: []*yaml.Node{},
+					},
+				},
+			}
+
+			result := yml.GetConfigFromDoc(tt.data, doc)
+
+			require.NotNil(t, result)
+			assert.Equal(t, tt.expectedIndent, result.Indentation, "should correctly calculate indentation ignoring trailing whitespace")
+		})
+	}
+}

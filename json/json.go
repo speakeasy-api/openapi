@@ -35,7 +35,7 @@ func YAMLToJSONWithConfig(node *yaml.Node, indent string, indentCount int, trail
 		indent:       indentStr,
 		buffer:       &bytes.Buffer{},
 		currentCol:   0,
-		forceCompact: indentCount == 0, // Force compact mode when no indentation
+		forceCompact: len(indentStr) == 0, // Force compact mode when no indentation
 	}
 
 	// Write the JSON

@@ -383,6 +383,15 @@ middle: second`,
 			indentCount:  1,
 			expectedJSON: "{\n\t\"zebra\": \"last\",\n\t\"apple\": \"first\",\n\t\"middle\": \"second\"\n}\n",
 		},
+		{
+			name: "empty indent string with non-zero count (compact)",
+			yamlInput: `name: John
+age: 30`,
+			indent:      "",
+			indentCount: 5,
+			expectedJSON: `{"name":"John","age":30}
+`,
+		},
 	}
 
 	for _, tt := range tests {
