@@ -197,7 +197,7 @@ jobs:
           ./.github/scripts/format-coverage.sh coverage.out "$CURRENT_COV" "$MAIN_COV" > coverage-summary.md
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-report
           path: |
