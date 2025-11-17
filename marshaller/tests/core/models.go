@@ -184,14 +184,7 @@ type TestTypeConversionCoreModel struct {
 	Extensions      core.Extensions          `key:"extensions"`
 }
 
-// TestSimpleArrayModel is a minimal model with only an array field for testing array sync behavior
-type TestSimpleArrayModel struct {
-	marshaller.CoreModel `model:"testSimpleArrayModel"`
-
-	ArrayField marshaller.Node[[]string] `key:"arrayField"`
-}
-
-// TestItemModel represents a simple item with name and description
+// TestItemModel represents an item with a name and description
 type TestItemModel struct {
 	marshaller.CoreModel `model:"testItemModel"`
 
@@ -199,7 +192,7 @@ type TestItemModel struct {
 	Description marshaller.Node[string] `key:"description"`
 }
 
-// TestArrayOfObjectsModel is a minimal model with an array of objects for testing array sync behavior
+// TestArrayOfObjectsModel contains an array of items
 type TestArrayOfObjectsModel struct {
 	marshaller.CoreModel `model:"testArrayOfObjectsModel"`
 

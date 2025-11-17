@@ -129,20 +129,14 @@ type TestEmbeddedMapWithFieldsPointerHighModel struct {
 	Extensions *extensions.Extensions
 }
 
-// TestSimpleArrayHighModel is a minimal high-level model with only an array field for testing array sync behavior
-type TestSimpleArrayHighModel struct {
-	marshaller.Model[core.TestSimpleArrayModel]
-	ArrayField []string
-}
-
-// TestItemHighModel represents a simple item with name and description
+// TestItemHighModel represents an item with a name and description
 type TestItemHighModel struct {
 	marshaller.Model[core.TestItemModel]
 	Name        string
 	Description string
 }
 
-// TestArrayOfObjectsHighModel is a minimal high-level model with an array of objects for testing array sync behavior
+// TestArrayOfObjectsHighModel contains an array of items
 type TestArrayOfObjectsHighModel struct {
 	marshaller.Model[core.TestArrayOfObjectsModel]
 	Items []*TestItemHighModel
