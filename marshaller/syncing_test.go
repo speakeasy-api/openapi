@@ -1143,3 +1143,109 @@ func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
 		require.Equal(t, "shared_key: shared_value\n", string(ptrYAML))
 	})
 }
+
+func TestSync_ArraySubset_Debug(t *testing.T) {
+	t.Parallel()
+
+	// Create items for the high-level model (3 items - subset)
+	// Source: items one, four, and six
+	itemOne := &tests.TestItemHighModel{
+		Name:        "one",
+		Description: "First item",
+	}
+	itemFour := &tests.TestItemHighModel{
+		Name:        "four",
+		Description: "Fourth item",
+	}
+	itemSix := &tests.TestItemHighModel{
+		Name:        "six",
+		Description: "Sixth item",
+	}
+
+	highModel := tests.TestArrayOfObjectsHighModel{
+		Items: []*tests.TestItemHighModel{itemOne, itemFour, itemSix},
+	}
+
+	// Set the root node for the high-level model by creating a YAML node
+	// This simulates the case where we have an existing YAML document with 6 items
+	// Target: items three, five, one, four, second, and six (in this order)
+	initialYAML := `items:
+    - name: three
+      description: Third item
+    - name: five
+      description: Fifth item
+    - name: one
+      description: First item
+    - name: four
+      description: Fourth item
+    - name: second
+      description: Second item
+    - name: six
+      description: Sixth item
+`
+	var rootNode yaml.Node
+	err := yaml.Unmarshal([]byte(initialYAML), &rootNode)
+	require.NoError(t, err)
+
+	// Get the core model
+	coreModel := highModel.GetCore()
+
+	// Set the root node on the core model (accessed through GetCore())
+	coreModel.SetRootNode(rootNode.Content[0]) // Content[0] is the actual root mapping node
+
+	// Unmarshal the YAML into the core model to populate it with the 6 items
+	_, err = marshaller.UnmarshalModel(t.Context(), rootNode.Content[0], coreModel)
+	require.NoError(t, err)
+
+	// Use SetCore to link each high-level item to its corresponding core item
+	// This establishes the connection between high-level items and their core counterparts
+	for _, item := range coreModel.Items.Value {
+		switch item.Name.Value {
+		case "one":
+			itemOne.SetCore(item)
+		case "four":
+			itemFour.SetCore(item)
+		case "six":
+			itemSix.SetCore(item)
+		}
+	}
+
+	// Sync the high model (3 items) to the core model (currently 6 items)
+	// This tests what happens when syncing a subset
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	require.NoError(t, err)
+	require.NotNil(t, resultNode)
+
+	// Verify the synced array - should now match the high model's subset (3 items)
+	// After sync, items two, three, five, and second should be removed
+	items := coreModel.Items.Value
+	require.Len(t, items, 3, "After sync, core model should have 3 items matching high model")
+
+	// Debug: Print what we actually got
+	t.Logf("Item 0: %s - %s", items[0].Name.Value, items[0].Description.Value)
+	t.Logf("Item 1: %s - %s", items[1].Name.Value, items[1].Description.Value)
+	t.Logf("Item 2: %s - %s", items[2].Name.Value, items[2].Description.Value)
+
+	require.Equal(t, "one", items[0].Name.Value)
+	require.Equal(t, "First item", items[0].Description.Value)
+
+	require.Equal(t, "four", items[1].Name.Value)
+	require.Equal(t, "Fourth item", items[1].Description.Value)
+
+	require.Equal(t, "six", items[2].Name.Value)
+	require.Equal(t, "Sixth item", items[2].Description.Value)
+
+	// Verify the core model's RootNode contains the correct YAML
+	expectedYAML := `items:
+    - name: one
+      description: First item
+    - name: four
+      description: Fourth item
+    - name: six
+      description: Sixth item
+`
+
+	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
+	require.NoError(t, err)
+	require.Equal(t, expectedYAML, string(actualYAML))
+}
