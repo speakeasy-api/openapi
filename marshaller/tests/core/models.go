@@ -183,3 +183,18 @@ type TestTypeConversionCoreModel struct {
 	HTTPMethodField marshaller.Node[*string] `key:"httpMethodField"`
 	Extensions      core.Extensions          `key:"extensions"`
 }
+
+// TestItemModel represents an item with a name and description
+type TestItemModel struct {
+	marshaller.CoreModel `model:"testItemModel"`
+
+	Name        marshaller.Node[string] `key:"name"`
+	Description marshaller.Node[string] `key:"description"`
+}
+
+// TestArrayOfObjectsModel contains an array of items
+type TestArrayOfObjectsModel struct {
+	marshaller.CoreModel `model:"testArrayOfObjectsModel"`
+
+	Items marshaller.Node[[]*TestItemModel] `key:"items"`
+}
