@@ -128,3 +128,16 @@ type TestEmbeddedMapWithFieldsPointerHighModel struct {
 	NameField  string
 	Extensions *extensions.Extensions
 }
+
+// TestItemHighModel represents an item with a name and description
+type TestItemHighModel struct {
+	marshaller.Model[core.TestItemModel]
+	Name        string
+	Description string
+}
+
+// TestArrayOfObjectsHighModel contains an array of items
+type TestArrayOfObjectsHighModel struct {
+	marshaller.Model[core.TestArrayOfObjectsModel]
+	Items []*TestItemHighModel
+}

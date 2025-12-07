@@ -1143,3 +1143,94 @@ func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
 		require.Equal(t, "shared_key: shared_value\n", string(ptrYAML))
 	})
 }
+
+func TestSync_ArraySubset_Success(t *testing.T) {
+	t.Parallel()
+
+	// Create high-level model with 3 items
+	itemOne := &tests.TestItemHighModel{
+		Name:        "one",
+		Description: "First item",
+	}
+	itemFour := &tests.TestItemHighModel{
+		Name:        "four",
+		Description: "Fourth item",
+	}
+	itemSix := &tests.TestItemHighModel{
+		Name:        "six",
+		Description: "Sixth item",
+	}
+
+	highModel := tests.TestArrayOfObjectsHighModel{
+		Items: []*tests.TestItemHighModel{itemOne, itemFour, itemSix},
+	}
+
+	// Populate core model with 6 items from YAML
+	initialYAML := `items:
+    - name: three
+      description: Third item
+    - name: five
+      description: Fifth item
+    - name: one
+      description: First item
+    - name: four
+      description: Fourth item
+    - name: second
+      description: Second item
+    - name: six
+      description: Sixth item
+`
+	var rootNode yaml.Node
+	err := yaml.Unmarshal([]byte(initialYAML), &rootNode)
+	require.NoError(t, err)
+
+	coreModel := highModel.GetCore()
+	coreModel.SetRootNode(rootNode.Content[0])
+
+	_, err = marshaller.UnmarshalModel(t.Context(), rootNode.Content[0], coreModel)
+	require.NoError(t, err)
+
+	// Link high-level items to their corresponding core items
+	for _, item := range coreModel.Items.Value {
+		switch item.Name.Value {
+		case "one":
+			itemOne.SetCore(item)
+		case "four":
+			itemFour.SetCore(item)
+		case "six":
+			itemSix.SetCore(item)
+		}
+	}
+
+	// Sync high model subset to core model
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	require.NoError(t, err)
+	require.NotNil(t, resultNode)
+
+	// Verify synced array matches high model subset
+	items := coreModel.Items.Value
+	require.Len(t, items, 3)
+
+	require.Equal(t, "one", items[0].Name.Value)
+	require.Equal(t, "First item", items[0].Description.Value)
+
+	require.Equal(t, "four", items[1].Name.Value)
+	require.Equal(t, "Fourth item", items[1].Description.Value)
+
+	require.Equal(t, "six", items[2].Name.Value)
+	require.Equal(t, "Sixth item", items[2].Description.Value)
+
+	// Verify YAML output
+	expectedYAML := `items:
+    - name: one
+      description: First item
+    - name: four
+      description: Fourth item
+    - name: six
+      description: Sixth item
+`
+
+	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
+	require.NoError(t, err)
+	require.Equal(t, expectedYAML, string(actualYAML))
+}
