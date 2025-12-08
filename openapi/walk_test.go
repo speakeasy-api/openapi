@@ -616,6 +616,7 @@ func TestWalkMediaType_Success(t *testing.T) {
 			name:     "media type with schema",
 			location: "/paths/~1users~1{id}/get/requestBody/content/application~1json",
 			assertMediaType: func(t *testing.T, mt *openapi.MediaType) {
+				t.Helper()
 				assert.NotNil(t, mt.Schema, "Schema should not be nil")
 				assert.True(t, mt.Schema.IsLeft() || mt.Schema.IsRight(), "Schema should be Left or Right")
 				assert.Nil(t, mt.ItemSchema, "ItemSchema should be nil when Schema is present")
@@ -625,6 +626,7 @@ func TestWalkMediaType_Success(t *testing.T) {
 			name:     "media type with itemSchema",
 			location: "/paths/~1users/post/responses/202/content/application~1json",
 			assertMediaType: func(t *testing.T, mt *openapi.MediaType) {
+				t.Helper()
 				assert.Nil(t, mt.Schema, "Schema should be nil when ItemSchema is present")
 				assert.NotNil(t, mt.ItemSchema, "ItemSchema should not be nil")
 				assert.True(t, mt.ItemSchema.IsLeft() || mt.ItemSchema.IsRight(), "ItemSchema should be Left or Right")
