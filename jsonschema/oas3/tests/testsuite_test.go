@@ -71,14 +71,15 @@ var blacklistedTestCases = map[string]string{
 	"ref.json:17": "requires complex $id resolution chain",
 	"ref.json:18": "requires $id evaluation before $ref",
 	"ref.json:19": "requires $id and $anchor evaluation before $ref",
-	"ref.json:20": "requires URN scheme support",
-	"ref.json:25": "requires URN scheme with JSON pointer",
-	"ref.json:26": "requires URN scheme with anchor",
-	"ref.json:27": "requires URN scheme with nested references",
-	"ref.json:28": "requires conditional schema reference resolution",
+	"ref.json:20": "requires $id evaluation before $ref on nested schemas",
+	"ref.json:21": "requires URN scheme support",
+	"ref.json:26": "requires URN scheme with JSON pointer",
+	"ref.json:27": "requires URN scheme with anchor",
+	"ref.json:28": "requires URN scheme with nested references",
 	"ref.json:29": "requires conditional schema reference resolution",
 	"ref.json:30": "requires conditional schema reference resolution",
-	"ref.json:31": "requires absolute path reference resolution",
+	"ref.json:31": "requires conditional schema reference resolution",
+	"ref.json:32": "requires absolute path reference resolution",
 
 	// dynamicRef.json tests - all failing due to lack of dynamic reference support
 	"dynamicRef.json:0":  "requires dynamic reference resolution support",
@@ -98,6 +99,7 @@ var blacklistedTestCases = map[string]string{
 	"dynamicRef.json:15": "requires dynamic reference resolution support",
 	"dynamicRef.json:16": "requires dynamic reference resolution support",
 	"dynamicRef.json:19": "requires dynamic reference resolution support",
+	"dynamicRef.json:20": "requires dynamic reference resolution support",
 
 	// optional/dynamicRef.json tests
 	"optional/dynamicRef.json:0": "requires dynamic reference resolution support",
