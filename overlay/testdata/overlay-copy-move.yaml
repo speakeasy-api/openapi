@@ -1,0 +1,20 @@
+overlay: 1.1.0
+x-speakeasy-jsonpath: rfc9535
+info:
+  title: Copy and Move Pattern
+  version: 1.0.0
+actions:
+  # Move pattern: create target, copy, then remove
+  # First, create the target path by updating the parent
+  - target: $.paths
+    description: Create target location /bar
+    update:
+      /bar: {}
+
+  - target: $.paths["/bar"]
+    description: Copy /foo to /bar
+    copy: $.paths["/foo"]
+
+  - target: $.paths["/foo"]
+    description: Remove original /foo
+    remove: true

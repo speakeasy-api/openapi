@@ -25,16 +25,16 @@
 
 ## Features
 
-- **OpenAPI Overlay Specification Compliance**: Full implementation of the [OpenAPI Overlay Specification](https://github.com/OAI/Overlay-Specification/blob/3f398c6/versions/1.0.0.md) (2023-10-12)
+- **OpenAPI Overlay Specification Compliance**: Full implementation of the [OpenAPI Overlay Specification](https://github.com/OAI/Overlay-Specification/blob/3f398c6/versions/1.0.0.md) (2023-10-12) and [version 1.1.0](https://github.com/OAI/Overlay-Specification/blob/e2c3cec/versions/1.1.0-dev.md)
 - **JSONPath Target Selection**: Uses JSONPath expressions to select nodes for modification
-- **Remove and Update Actions**: Support for both remove actions (pruning nodes) and update actions (merging values)
+- **Remove, Update, and Copy Actions**: Support for remove actions (pruning nodes), update actions (merging values), and copy actions (duplicating or moving nodes)
 - **Flexible Input/Output**: Works with both YAML and JSON formats
 - **Batch Operations**: Apply multiple modifications to large numbers of nodes in a single operation
 - **YAML v1.2 Support**: Uses [gopkg.in/yaml.v3](https://pkg.go.dev/gopkg.in/yaml.v3) for YAML v1.2 parsing (superset of JSON)
 
 ## About OpenAPI Overlays
 
-This specification defines a means of editing an OpenAPI Specification file by applying a list of actions. Each action is either a remove action that prunes nodes or an update that merges a value into nodes. The nodes impacted are selected by a target expression which uses JSONPath.
+This specification defines a means of editing an OpenAPI Specification file by applying a list of actions. Each action is either a remove action that prunes nodes or an update that merges a value into nodes. The nodes impacted are selected by a target expression which uses JSONPath. This implementation also supports [version 1.1.0](https://github.com/OAI/Overlay-Specification/blob/e2c3cec/versions/1.1.0-dev.md) which adds a `copy` action for duplicating or moving nodes within the document.
 
 The specification itself says very little about the input file to be modified or the output file. The presumed intention is that the input and output be an OpenAPI Specification, but that is not required.
 

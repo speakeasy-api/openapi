@@ -1,0 +1,10 @@
+overlay: 1.1.0
+x-speakeasy-jsonpath: rfc9535
+info:
+  title: Copy Action Overlay
+  version: 1.0.0
+actions:
+  # Copy with merge: copy properties from /foo to existing /existing
+  - target: $.paths["/existing"]
+    description: Copy /foo to /existing (merge)
+    copy: $.paths["/foo"]
