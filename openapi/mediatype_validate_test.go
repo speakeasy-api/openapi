@@ -101,6 +101,42 @@ x-test: some-value
 x-custom: custom-data
 `,
 		},
+		{
+			name: "valid media type with itemSchema only",
+			yml: `
+itemSchema:
+  type: object
+  properties:
+    id:
+      type: integer
+    name:
+      type: string
+`,
+		},
+		{
+			name: "valid media type with itemSchema and example",
+			yml: `
+itemSchema:
+  type: string
+example: "hello world"
+`,
+		},
+		{
+			name: "valid media type with itemSchema and examples",
+			yml: `
+itemSchema:
+  $ref: "#/components/schemas/User"
+examples:
+  user1:
+    value:
+      id: 1
+      name: John
+  user2:
+    value:
+      id: 2
+      name: Jane
+`,
+		},
 	}
 
 	for _, tt := range tests {

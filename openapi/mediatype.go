@@ -16,8 +16,10 @@ import (
 type MediaType struct {
 	marshaller.Model[core.MediaType]
 
-	// Schema is the schema defining the type used for the parameter.
+	// Schema is the schema defining the type used for the media type.
 	Schema *oas3.JSONSchema[oas3.Referenceable]
+	// ItemSchema is a schema describing each item within a sequential media type like text/event-stream.
+	ItemSchema *oas3.JSONSchema[oas3.Referenceable]
 	// Encoding is a map allowing for more complex encoding scenarios.
 	Encoding *sequencedmap.Map[string, *Encoding]
 	// Example is an example of the media type's value.
@@ -35,6 +37,14 @@ func (m *MediaType) GetSchema() *oas3.JSONSchema[oas3.Referenceable] {
 		return nil
 	}
 	return m.Schema
+}
+
+// GetItemSchema returns the value of the ItemSchema field. Returns nil if not set.
+func (m *MediaType) GetItemSchema() *oas3.JSONSchema[oas3.Referenceable] {
+	if m == nil {
+		return nil
+	}
+	return m.ItemSchema
 }
 
 // GetEncoding returns the value of the Encoding field. Returns nil if not set.
@@ -68,6 +78,10 @@ func (m *MediaType) Validate(ctx context.Context, opts ...validation.Option) []e
 
 	if core.Schema.Present {
 		errs = append(errs, m.Schema.Validate(ctx, opts...)...)
+	}
+
+	if core.ItemSchema.Present {
+		errs = append(errs, m.ItemSchema.Validate(ctx, opts...)...)
 	}
 
 	for _, obj := range m.Examples.All() {

@@ -450,8 +450,13 @@ func walkAndUpdateRefsInResponse(_ context.Context, response *ReferencedResponse
 	// Walk through the response's content schemas
 	if response.Object.Content != nil {
 		for _, mediaType := range response.Object.Content.All() {
-			if mediaType != nil && mediaType.Schema != nil && mediaType.Schema.IsReference() {
-				updateSchemaRefWithSource(mediaType.Schema, componentStorage, sourceLocation)
+			if mediaType != nil {
+				if mediaType.Schema != nil && mediaType.Schema.IsReference() {
+					updateSchemaRefWithSource(mediaType.Schema, componentStorage, sourceLocation)
+				}
+				if mediaType.ItemSchema != nil && mediaType.ItemSchema.IsReference() {
+					updateSchemaRefWithSource(mediaType.ItemSchema, componentStorage, sourceLocation)
+				}
 			}
 		}
 	}
@@ -491,8 +496,13 @@ func walkAndUpdateRefsInRequestBody(_ context.Context, body *ReferencedRequestBo
 	// Walk through the request body's content schemas
 	if body.Object.Content != nil {
 		for _, mediaType := range body.Object.Content.All() {
-			if mediaType != nil && mediaType.Schema != nil && mediaType.Schema.IsReference() {
-				updateSchemaRefWithSource(mediaType.Schema, componentStorage, sourceLocation)
+			if mediaType != nil {
+				if mediaType.Schema != nil && mediaType.Schema.IsReference() {
+					updateSchemaRefWithSource(mediaType.Schema, componentStorage, sourceLocation)
+				}
+				if mediaType.ItemSchema != nil && mediaType.ItemSchema.IsReference() {
+					updateSchemaRefWithSource(mediaType.ItemSchema, componentStorage, sourceLocation)
+				}
 			}
 		}
 	}

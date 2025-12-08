@@ -324,6 +324,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "202":
+          description: Batch user creation accepted
+          content:
+            application/json:
+              itemSchema:
+                $ref: "#/components/schemas/User"
+              x-custom: batch-create-response-content-extension
         "400":
           description: Invalid user data
       x-custom: create-user-operation-extension

@@ -12,6 +12,7 @@ type MediaType struct {
 	marshaller.CoreModel `model:"mediaType"`
 
 	Schema     marshaller.Node[oascore.JSONSchema]                              `key:"schema"`
+	ItemSchema marshaller.Node[oascore.JSONSchema]                              `key:"itemSchema"`
 	Encoding   marshaller.Node[*sequencedmap.Map[string, *Encoding]]            `key:"encoding"`
 	Example    marshaller.Node[values.Value]                                    `key:"example"`
 	Examples   marshaller.Node[*sequencedmap.Map[string, *Reference[*Example]]] `key:"examples"`

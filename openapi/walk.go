@@ -549,6 +549,11 @@ func walkMediaType(ctx context.Context, mediaType *MediaType, loc []LocationCont
 		return false
 	}
 
+	// Walk through item schema
+	if !walkSchema(ctx, mediaType.ItemSchema, append(loc, LocationContext{ParentMatchFunc: mediaTypeMatchFunc, ParentField: "itemSchema"}), openAPI, yield) {
+		return false
+	}
+
 	// Walk through encoding
 	if !walkEncodings(ctx, mediaType.Encoding, append(loc, LocationContext{ParentMatchFunc: mediaTypeMatchFunc, ParentField: "encoding"}), openAPI, yield) {
 		return false
