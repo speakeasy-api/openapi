@@ -1,0 +1,89 @@
+name: Update CMD OpenAPI Dependency
+
+on:
+    push:
+        branches: [main]
+        # Only run if changes affect the root module (not cmd/openapi itself)
+        paths-ignore:
+            - "cmd/openapi/**"
+            - ".github/workflows/update-cmd-dependency.yaml"
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    update-dependency:
+        name: Update cmd/openapi dependency
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+
+            - name: Setup Go
+              uses: actions/setup-go@v6
+              with:
+                  go-version-file: "go.mod"
+                  cache: false # Disable caching to ensure fresh dependency resolution
+
+            - name: Update cmd/openapi go.mod
+              run: |
+                  cd cmd/openapi
+
+                  # Update to latest main commit
+                  go get github.com/speakeasy-api/openapi@main
+                  go mod tidy
+
+            - name: Check for changes
+              id: changes
+              run: |
+                  if git diff --quiet cmd/openapi/go.mod cmd/openapi/go.sum; then
+                    echo "changed=false" >> $GITHUB_OUTPUT
+                    echo "No changes detected in cmd/openapi/go.mod or go.sum"
+                  else
+                    echo "changed=true" >> $GITHUB_OUTPUT
+                    echo "Changes detected in cmd/openapi/go.mod or go.sum"
+                    
+                    # Get the new version for the PR description
+                    NEW_VERSION=$(grep 'github.com/speakeasy-api/openapi v' cmd/openapi/go.mod | head -1 | awk '{print $2}')
+                    echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+                    echo "Updated to version: ${NEW_VERSION}"
+                  fi
+
+            - name: Create Pull Request
+              if: steps.changes.outputs.changed == 'true'
+              uses: peter-evans/create-pull-request@v7
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  commit-message: |
+                      chore(cmd): update openapi dependency to latest main
+
+                      Updates cmd/openapi/go.mod to use the latest commit from main.
+                      Version: ${{ steps.changes.outputs.version }}
+                  branch: bot/update-cmd-openapi-dependency
+                  delete-branch: true
+                  title: "chore(cmd): update openapi dependency to latest main"
+                  body: |
+                      ## Updates cmd/openapi dependency
+
+                      This PR updates the `cmd/openapi/go.mod` file to reference the latest commit from main.
+
+                      **Updated to:** `${{ steps.changes.outputs.version }}`
+
+                      **Changes:**
+                      - Updated `github.com/speakeasy-api/openapi` dependency in `cmd/openapi/go.mod`
+                      - Ran `go mod tidy` to update dependencies
+
+                      ---
+                      *This PR was automatically created by the [update-cmd-dependency workflow](.github/workflows/update-cmd-dependency.yaml)*
+                  labels: |
+                      dependencies
+                      automated
+
+            - name: Summary
+              run: |
+                  if [ "${{ steps.changes.outputs.changed }}" == "true" ]; then
+                    echo "✅ Pull request created to update cmd/openapi dependency"
+                    echo "Version: ${{ steps.changes.outputs.version }}"
+                  else
+                    echo "ℹ️ No changes needed - cmd/openapi dependency already up to date"
+                  fi
