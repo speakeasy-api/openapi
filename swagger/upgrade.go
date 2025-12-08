@@ -70,8 +70,7 @@ func Upgrade(ctx context.Context, src *Swagger) (*openapi.OpenAPI, error) {
 	dst.Security = convertSecurityRequirements(src)
 
 	// External docs (root)
-	// Swagger ExternalDocs type differs from OpenAPI's; skip explicit convert at root
-	// (Operation-level externalDocs handled similarly)
+	dst.ExternalDocs = convertExternalDocs(src.ExternalDocs)
 
 	// Rewrite schema $refs from "#/definitions/" -> "#/components/schemas/"
 	rewriteRefTargets(ctx, dst)
@@ -135,6 +134,17 @@ func copyExtensions(src *extensions.Extensions) *extensions.Extensions {
 	return dst
 }
 
+func convertExternalDocs(src *ExternalDocumentation) *oas3.ExternalDocumentation {
+	if src == nil {
+		return nil
+	}
+	return &oas3.ExternalDocumentation{
+		Description: src.Description,
+		URL:         src.URL,
+		Extensions:  copyExtensions(src.Extensions),
+	}
+}
+
 func convertTags(src []*Tag) []*openapi.Tag {
 	if len(src) == 0 {
 		return nil
@@ -145,13 +155,10 @@ func convertTags(src []*Tag) []*openapi.Tag {
 			continue
 		}
 		out = append(out, &openapi.Tag{
-			Name:        t.Name,
-			Description: t.Description,
-			ExternalDocs: func() *oas3.ExternalDocumentation {
-				// Swagger Tag has ExternalDocs type swagger.ExternalDocumentation; omit mapping for now
-				return nil
-			}(),
-			Extensions: copyExtensions(t.Extensions),
+			Name:         t.Name,
+			Description:  t.Description,
+			ExternalDocs: convertExternalDocs(t.ExternalDocs),
+			Extensions:   copyExtensions(t.Extensions),
 		})
 	}
 	return out
@@ -419,6 +426,21 @@ func convertOperation(root *Swagger, src *Operation) *openapi.Operation {
 		dst.Tags = append([]string{}, src.Tags...)
 	}
 
+	// Security requirements
+	if len(src.Security) > 0 {
+		dst.Security = make([]*openapi.SecurityRequirement, 0, len(src.Security))
+		for _, req := range src.Security {
+			if req == nil {
+				continue
+			}
+			secReq := openapi.NewSecurityRequirement()
+			for k, v := range req.All() {
+				secReq.Set(k, v)
+			}
+			dst.Security = append(dst.Security, secReq)
+		}
+	}
+
 	// Determine consumes/produces for this operation
 	consumes := src.Consumes
 	if len(consumes) == 0 {
@@ -530,7 +552,7 @@ func convertOperation(root *Swagger, src *Operation) *openapi.Operation {
 		}
 		// required list is optional; omitted for minimal conversion
 		for _, fp := range formParams {
-			propSchema := schemaForSwaggerParamType(fp)
+			propSchema := schemaForSwaggerParamType(fp, true)
 			obj.Properties.Set(fp.Name, propSchema)
 		}
 
@@ -565,29 +587,63 @@ func anyRequired(params []*Parameter) bool {
 	return false
 }
 
-func schemaForSwaggerParamType(p *Parameter) *oas3.JSONSchema[oas3.Referenceable] {
+func schemaForSwaggerParamType(p *Parameter, copyDescription bool) *oas3.JSONSchema[oas3.Referenceable] {
 	if p == nil {
 		return nil
 	}
 	switch {
 	case p.Type != nil && *p.Type == "array":
 		items := &oas3.Schema{Type: oas3.NewTypeFromString(oas3.SchemaType("string"))}
-		if p.Items != nil && p.Items.Type != "" {
-			items.Type = oas3.NewTypeFromString(oas3.SchemaType(strings.ToLower(p.Items.Type)))
+		if p.Items != nil {
+			if p.Items.Type != "" {
+				items.Type = oas3.NewTypeFromString(oas3.SchemaType(strings.ToLower(p.Items.Type)))
+			}
+			// Preserve enum and default from items
+			if len(p.Items.Enum) > 0 {
+				items.Enum = make([]values.Value, len(p.Items.Enum))
+				copy(items.Enum, p.Items.Enum)
+			}
+			if p.Items.Default != nil {
+				items.Default = p.Items.Default
+			}
 		}
 		return oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{
 			Type:  oas3.NewTypeFromString(oas3.SchemaType("array")),
 			Items: oas3.NewJSONSchemaFromSchema[oas3.Referenceable](items),
 		})
 	case p.Type != nil && *p.Type == "file":
-		return oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{
+		schema := &oas3.Schema{
 			Type:   oas3.NewTypeFromString(oas3.SchemaType("string")),
 			Format: pointer.From("binary"),
-		})
+		}
+		if p.Description != nil && copyDescription {
+			schema.Description = p.Description
+		}
+		return oas3.NewJSONSchemaFromSchema[oas3.Referenceable](schema)
 	case p.Type != nil && *p.Type != "":
-		return oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{
+		schema := &oas3.Schema{
 			Type: oas3.NewTypeFromString(oas3.SchemaType(strings.ToLower(*p.Type))),
-		})
+		}
+		if p.Description != nil && copyDescription {
+			schema.Description = p.Description
+		}
+		if p.Format != nil {
+			schema.Format = p.Format
+		}
+		if p.Minimum != nil {
+			schema.Minimum = p.Minimum
+		}
+		if p.Maximum != nil {
+			schema.Maximum = p.Maximum
+		}
+		if len(p.Enum) > 0 {
+			schema.Enum = make([]values.Value, len(p.Enum))
+			copy(schema.Enum, p.Enum)
+		}
+		if p.Default != nil {
+			schema.Default = p.Default
+		}
+		return oas3.NewJSONSchemaFromSchema[oas3.Referenceable](schema)
 	default:
 		// Body parameter case should not call this; fall back to string
 		return oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{
@@ -625,7 +681,7 @@ func convertParameter(p *Parameter) *openapi.Parameter {
 
 	// schema from type/format/items (non-body only)
 	if p.In != ParameterInBody {
-		dst.Schema = schemaForSwaggerParamType(p)
+		dst.Schema = schemaForSwaggerParamType(p, false)
 		// collectionFormat -> style/explode
 		if p.CollectionFormat != nil {
 			switch *p.CollectionFormat {
@@ -858,7 +914,11 @@ func rewriteRefTargets(ctx context.Context, doc *openapi.OpenAPI) {
 				ref := string(js.GetReference())
 				if strings.HasPrefix(ref, "#/definitions/") {
 					newRef := references.Reference(strings.Replace(ref, "#/definitions/", "#/components/schemas/", 1))
-					*js = *oas3.NewJSONSchemaFromReference(newRef)
+					// Update only the reference, preserving all other metadata (XML, etc.)
+					schema := js.GetSchema()
+					if schema != nil {
+						schema.Ref = pointer.From(newRef)
+					}
 				}
 				return nil
 			},

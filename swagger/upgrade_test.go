@@ -2,6 +2,7 @@ package swagger
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -881,20 +882,20 @@ paths:
 
 	actualYAML := buf.String()
 
-	expectedYAML := `openapi: "3.0.0"
+	expectedYAML := `openapi: 3.0.0
 info:
-  title: "Produces Override"
-  version: "1.0.0"
+  title: Produces Override
+  version: 1.0.0
 paths:
   /data:
     get:
       responses:
         "200":
-          description: "ok"
+          description: ok
           content:
             text/plain:
               schema:
-                type: "string"
+                type: string
 `
 
 	require.Equal(t, expectedYAML, actualYAML, "operation-level produces should override global produces in response content")
@@ -942,10 +943,10 @@ paths:
 
 	actualYAML := buf.String()
 
-	expectedYAML := `openapi: "3.0.0"
+	expectedYAML := `openapi: 3.0.0
 info:
-  title: "Submit API"
-  version: "1.0.0"
+  title: Submit API
+  version: 1.0.0
 paths:
   /submit:
     post:
@@ -953,16 +954,16 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              type: "object"
+              type: object
               properties:
                 a:
-                  type: "string"
+                  type: string
                 b:
-                  type: "integer"
+                  type: integer
         required: true
       responses:
         "200":
-          description: "ok"
+          description: ok
 `
 
 	require.Equal(t, expectedYAML, actualYAML, "formData without file should map to x-www-form-urlencoded and aggregate fields in object schema")
@@ -1503,4 +1504,41 @@ func TestUpgrade_PathLevelParameters_JSON_Success(t *testing.T) {
 `
 
 	require.Equal(t, expected, actual, "path-level non-body parameters should be preserved and mapped with schema")
+}
+
+func TestUpgrade_Petstore_YAML_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	// Read the petstore swagger file
+	inputBytes, err := os.ReadFile("testdata/petstore.swagger.yaml")
+	require.NoError(t, err, "should read petstore swagger file")
+
+	// Unmarshal Swagger 2.0
+	swDoc, validationErrs, err := Unmarshal(ctx, bytes.NewReader(inputBytes))
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "swagger should be valid")
+
+	// Upgrade to OpenAPI 3.0
+	oaDoc, err := Upgrade(ctx, swDoc)
+	require.NoError(t, err, "upgrade should succeed")
+	require.NotNil(t, oaDoc, "openapi document should not be nil")
+
+	// Preserve YAML format
+	cfg := swDoc.GetCore().GetConfig()
+	oaDoc.GetCore().SetConfig(cfg)
+
+	// Marshal the upgraded document
+	var buf bytes.Buffer
+	err = marshaller.Marshal(ctx, oaDoc, &buf)
+	require.NoError(t, err, "marshal should succeed")
+
+	actualYAML := buf.String()
+
+	// Read the expected output
+	expectedBytes, err := os.ReadFile("testdata/petstore.expected.openapi.yaml")
+	require.NoError(t, err, "should read expected openapi file")
+	expectedYAML := string(expectedBytes)
+
+	require.Equal(t, expectedYAML, actualYAML, "upgraded petstore should match expected OpenAPI output")
 }
