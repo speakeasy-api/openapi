@@ -323,12 +323,10 @@ func rewriteRefsInBundledSchemas(ctx context.Context, componentStorage *componen
 	return nil
 }
 
-// rewriteRefsInSchema rewrites references within a single schema
-func rewriteRefsInSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceable], componentStorage *componentStorage, sourceLocation string) error {
-	if schema == nil {
-		return nil
-	}
-
+// prepareSourceURI extracts and normalizes a source URI for use with handleReference.
+// It extracts just the URI part (removing any fragment) and converts it to native path
+// format for filepath operations.
+func prepareSourceURI(sourceLocation string) string {
 	// Extract just the URI part from sourceLocation (remove fragment if present)
 	// sourceLocation might be like "/path/to/file.yaml#/components/schemas/SchemaName"
 	// but we need just "/path/to/file.yaml" for resolving relative references
@@ -337,11 +335,23 @@ func rewriteRefsInSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Refer
 		sourceURI = sourceLocation // Fallback if no URI part
 	}
 
-	// On Windows, normalize sourceURI to backslashes before using with filepath operations
-	// This prevents malformed paths when joining with relative references
+	// On Windows, convert forward slashes to backslashes for filepath operations
+	// componentLocations stores paths with forward slashes (from handleReference normalization)
+	// but filepath.Join needs native separators to work correctly
 	if filepath.Separator == '\\' && filepath.IsAbs(sourceURI) {
 		sourceURI = filepath.FromSlash(sourceURI)
 	}
+
+	return sourceURI
+}
+
+// rewriteRefsInSchema rewrites references within a single schema
+func rewriteRefsInSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceable], componentStorage *componentStorage, sourceLocation string) error {
+	if schema == nil {
+		return nil
+	}
+
+	sourceURI := prepareSourceURI(sourceLocation)
 
 	// Walk through the schema and rewrite references
 	for item := range oas3.Walk(ctx, schema) {
@@ -571,12 +581,7 @@ func updateSchemaRefWithSource(schema *oas3.JSONSchema[oas3.Referenceable], comp
 		return
 	}
 
-	// Extract just the URI part from sourceLocation (remove fragment if present)
-	sourceURI := references.Reference(sourceLocation).GetURI()
-	if sourceURI == "" {
-		sourceURI = sourceLocation
-	}
-
+	sourceURI := prepareSourceURI(sourceLocation)
 	ref := schema.GetRef()
 	absRef, _ := handleReference(ref, sourceURI)
 
@@ -592,12 +597,7 @@ func updateComponentRefWithSource(ref *references.Reference, componentStorage *c
 		return
 	}
 
-	// Extract just the URI part from sourceLocation (remove fragment if present)
-	sourceURI := references.Reference(sourceLocation).GetURI()
-	if sourceURI == "" {
-		sourceURI = sourceLocation
-	}
-
+	sourceURI := prepareSourceURI(sourceLocation)
 	absRef, _ := handleReference(*ref, sourceURI)
 
 	if newName, exists := componentStorage.refs[absRef]; exists {
@@ -637,6 +637,11 @@ func bundleGenericReference[T any, V interfaces.Validator[T], C marshaller.CoreM
 	// Get the final absolute reference by following the resolution chain
 	// This handles chained references (e.g., common.yaml -> headers.yaml)
 	finalAbsRef := getFinalAbsoluteRef(ref, refStr)
+
+	// Normalize finalAbsRef to forward slashes for consistent map keys across platforms
+	// On Windows, resolution chains may introduce backslashes, but we need forward slashes
+	// to match the keys created by handleReference which always normalizes to forward slashes
+	finalAbsRef = filepath.ToSlash(finalAbsRef)
 
 	// Check if we've already processed this reference (using final absolute ref for deduplication)
 	if existingName, exists := componentStorage.refs[finalAbsRef]; exists {
