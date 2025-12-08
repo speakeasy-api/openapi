@@ -2,14 +2,10 @@ package arazzo_test
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -18,6 +14,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo/criterion"
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/extensions"
+	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	jsonschema_core "github.com/speakeasy-api/openapi/jsonschema/oas3/core"
@@ -303,11 +300,11 @@ sourceDescriptions:
 		column          int
 		underlyingError error
 	}{
-		{line: 1, column: 1, underlyingError: validation.NewMissingFieldError("arazzo field workflows is missing")},
-		{line: 1, column: 9, underlyingError: validation.NewValueValidationError("arazzo field version only Arazzo versions between 1.0.0 and 1.0.1 are supported")},
-		{line: 4, column: 3, underlyingError: validation.NewMissingFieldError("info field version is missing")},
-		{line: 6, column: 5, underlyingError: validation.NewMissingFieldError("sourceDescription field url is missing")},
-		{line: 7, column: 11, underlyingError: validation.NewValueValidationError("sourceDescription field type must be one of [openapi, arazzo]")},
+		{line: 1, column: 1, underlyingError: validation.NewMissingFieldError("arazzo.workflows is missing")},
+		{line: 1, column: 9, underlyingError: validation.NewValueValidationError("arazzo.version only Arazzo versions between 1.0.0 and 1.0.1 are supported")},
+		{line: 4, column: 3, underlyingError: validation.NewMissingFieldError("info.version is missing")},
+		{line: 6, column: 5, underlyingError: validation.NewMissingFieldError("sourceDescription.url is missing")},
+		{line: 7, column: 11, underlyingError: validation.NewValueValidationError("sourceDescription.type must be one of [openapi, arazzo]")},
 	}
 
 	require.Len(t, validationErrs, len(expectedErrors), "number of validation errors should match")
@@ -635,7 +632,7 @@ var stressTests = []struct {
 		args: args{
 			location: "https://raw.githubusercontent.com/frankkilcommins/simple-spectral-arazzo-GA/4ec8856f1cf21c0f77597c715c150ef3e2772a89/apis/OnlineStore.arazzo.yaml",
 			validationIgnores: []string{
-				"field title is missing", // legit issue
+				"info.title is missing", // legit issue
 				"operationId must be a valid expression if there are multiple OpenAPI source descriptions", // legit issue
 				"$responses.body.menuItems[0].subcategories[0].id",                                         // legit issue
 			},
@@ -726,7 +723,7 @@ func TestArazzo_StressTests_Validate(t *testing.T) {
 				require.NoError(t, err)
 			} else {
 				var err error
-				r, err = downloadFile(tt.args.location)
+				r, err = testutils.DownloadFile(tt.args.location, "ARAZZO_CACHE_DIR", "speakeasy-api_arazzo")
 				require.NoError(t, err)
 			}
 			defer r.Close()
@@ -759,7 +756,7 @@ func TestArazzo_StressTests_RoundTrip(t *testing.T) {
 				require.NoError(t, err)
 			} else {
 				var err error
-				r, err = downloadFile(tt.args.location)
+				r, err = testutils.DownloadFile(tt.args.location, "ARAZZO_CACHE_DIR", "speakeasy-api_arazzo")
 				require.NoError(t, err)
 			}
 			defer r.Close()
@@ -785,58 +782,6 @@ func TestArazzo_StressTests_RoundTrip(t *testing.T) {
 			assert.Equal(t, string(sanitizedData), outBuf.String())
 		})
 	}
-}
-
-func downloadFile(url string) (io.ReadCloser, error) {
-	// Use environment variable for cache directory, fallback to system temp dir
-	cacheDir := os.Getenv("ARAZZO_CACHE_DIR")
-	if cacheDir == "" {
-		cacheDir = os.TempDir()
-	}
-	tempDir := filepath.Join(cacheDir, "speakeasy-api_arazzo")
-
-	if err := os.MkdirAll(tempDir, os.ModePerm); err != nil {
-		return nil, err
-	}
-
-	// hash url to create a unique filename
-	hash := sha256.Sum256([]byte(url))
-	filename := hex.EncodeToString(hash[:])
-
-	filepath := filepath.Join(tempDir, filename)
-
-	// check if file exists and return it otherwise download it
-	r, err := os.Open(filepath)
-	if err == nil {
-		return r, nil
-	}
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// Read all data from response body
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	// Write data to cache file
-	f, err := os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	_, err = f.Write(data)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return the data as a ReadCloser
-	return io.NopCloser(bytes.NewReader(data)), nil
 }
 
 func roundTripYamlOnly(data []byte) ([]byte, error) {

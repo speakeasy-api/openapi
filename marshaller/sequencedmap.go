@@ -29,8 +29,8 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 
 	// Check if the node is actually a mapping node
 	if resolvedNode.Kind != yaml.MappingNode {
-		validationErr := validation.NewTypeMismatchError("%sexpected mapping node for sequenced map, got %v", getOptionalParentName(parentName), resolvedNode.Kind)
-		return []error{validationErr}, nil
+		validationErr := validation.NewTypeMismatchError(parentName, "expected mapping node for sequenced map, got %v", resolvedNode.Kind)
+		return []error{validation.NewValidationError(validationErr, resolvedNode)}, nil
 	}
 
 	target.Init()
@@ -71,7 +71,7 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 			}
 
 			// Unmarshal into the concrete value
-			validationErrs, err := UnmarshalKeyValuePair(ctx, parentName, keyNode, valueNode, concreteValue)
+			validationErrs, err := UnmarshalKeyValuePair(ctx, parentName+"."+key, keyNode, valueNode, concreteValue)
 			if err != nil {
 				return err
 			}
@@ -122,21 +122,24 @@ func populateSequencedMap(source any, target interfaces.SequencedMapInterface, p
 	var sm interfaces.SequencedMapInterface
 	var ok bool
 
-	// Handle both pointer and non-pointer cases
-	switch {
-	case sourceValue.Kind() == reflect.Ptr:
-		// Source is already a pointer
-		sm, ok = source.(interfaces.SequencedMapInterface)
-	case sourceValue.CanAddr():
-		// Source is addressable, get a pointer to it
+	// Handle pointer embeds: dereference until we get to the actual map
+	for sourceValue.Kind() == reflect.Ptr {
+		if sourceValue.IsNil() {
+			return nil
+		}
+		sourceValue = sourceValue.Elem()
+	}
+
+	// Now try to get the SequencedMapInterface
+	if sourceValue.CanAddr() {
 		sm, ok = sourceValue.Addr().Interface().(interfaces.SequencedMapInterface)
-	default:
-		// Source is neither a pointer nor addressable
-		return fmt.Errorf("expected source to be addressable or a pointer to SequencedMap, got %s", sourceValue.Type())
+	} else {
+		// Try direct interface conversion as fallback
+		sm, ok = sourceValue.Interface().(interfaces.SequencedMapInterface)
 	}
 
 	if !ok {
-		return fmt.Errorf("expected source to be SequencedMap, got %s", sourceValue.Type())
+		return fmt.Errorf("expected source to be SequencedMap, got %s", reflect.TypeOf(source))
 	}
 
 	target.Init()

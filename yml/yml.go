@@ -2,6 +2,7 @@ package yml
 
 import (
 	"context"
+	"reflect"
 	"strconv"
 
 	"gopkg.in/yaml.v3"
@@ -236,4 +237,66 @@ func EqualNodes(a, b *yaml.Node) bool {
 	}
 
 	return true
+}
+
+// TypeToYamlTags returns all acceptable YAML tags for a given reflect.Type.
+// For numeric types, both the specific tag and !!str are acceptable since
+// YAML can decode string representations of numbers.
+// For pointer types, !!null is also acceptable.
+func TypeToYamlTags(typ reflect.Type) []string {
+	if typ == nil {
+		return nil
+	}
+
+	// Check if this is a pointer type
+	isPointer := typ.Kind() == reflect.Ptr
+	if isPointer {
+		typ = typ.Elem()
+	}
+
+	var tags []string
+	switch typ.Kind() {
+	case reflect.String:
+		tags = append(tags, "!!bool")
+		fallthrough
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64:
+		tags = append(tags, "!!float", "!!str", "!!int")
+	case reflect.Bool:
+		tags = append(tags, "!!bool", "!!str") // Allow string representations of booleans
+	case reflect.Struct, reflect.Map:
+		tags = append(tags, "!!map")
+	case reflect.Slice, reflect.Array:
+		tags = append(tags, "!!seq")
+	default:
+		return nil
+	}
+
+	// For pointer types, also accept !!null
+	if isPointer {
+		tags = append(tags, "!!null")
+	}
+
+	return tags
+}
+
+func NodeTagToString(tag string) string {
+	switch tag {
+	case "!!str":
+		return "string"
+	case "!!int":
+		return "int"
+	case "!!float":
+		return "float"
+	case "!!bool":
+		return "bool"
+	case "!!map":
+		return "object"
+	case "!!seq":
+		return "sequence"
+	case "!!null":
+		return "null"
+	default:
+		return tag
+	}
 }

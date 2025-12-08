@@ -64,9 +64,9 @@ func TestJSONSchema_Resolve_ExternalWithInternalRefs(t *testing.T) {
 		// Get the resolved schema
 		result := schema.GetResolvedSchema()
 		require.NotNil(t, result, "resolved schema should not be nil")
-		assert.True(t, result.IsLeft(), "should be a schema object")
+		assert.True(t, result.IsSchema(), "should be a schema object")
 
-		personSchema := result.GetLeft()
+		personSchema := result.GetSchema()
 		require.NotNil(t, personSchema, "person schema should not be nil")
 
 		// Check that Person has properties
@@ -97,9 +97,9 @@ func TestJSONSchema_Resolve_ExternalWithInternalRefs(t *testing.T) {
 			// Get the resolved address schema
 			addressResolved := addressProp.GetResolvedSchema()
 			require.NotNil(t, addressResolved, "resolved address schema should not be nil")
-			assert.True(t, addressResolved.IsLeft(), "address should be a schema object")
+			assert.True(t, addressResolved.IsSchema(), "address should be a schema object")
 
-			addressSchema := addressResolved.GetLeft()
+			addressSchema := addressResolved.GetSchema()
 			require.NotNil(t, addressSchema, "address schema should not be nil")
 
 			// Verify address has the expected properties
@@ -115,8 +115,8 @@ func TestJSONSchema_Resolve_ExternalWithInternalRefs(t *testing.T) {
 			t.Log("Address property is not a reference - it may have been inlined during resolution")
 			// The reference may have been automatically resolved
 			// Check if it's directly an object
-			assert.True(t, addressProp.IsLeft(), "address should be a schema object")
-			addressSchema := addressProp.GetLeft()
+			assert.True(t, addressProp.IsSchema(), "address should be a schema object")
+			addressSchema := addressProp.GetSchema()
 			require.NotNil(t, addressSchema, "address schema should not be nil")
 		}
 	})
@@ -166,9 +166,9 @@ func TestJSONSchema_Resolve_ExternalWithInternalRefs(t *testing.T) {
 		// Get the resolved schema
 		result := schema.GetResolvedSchema()
 		require.NotNil(t, result, "resolved schema should not be nil")
-		assert.True(t, result.IsLeft(), "should be a schema object")
+		assert.True(t, result.IsSchema(), "should be a schema object")
 
-		treeNodeSchema := result.GetLeft()
+		treeNodeSchema := result.GetSchema()
 		require.NotNil(t, treeNodeSchema, "tree node schema should not be nil")
 
 		// Check that TreeNode has properties
@@ -181,8 +181,8 @@ func TestJSONSchema_Resolve_ExternalWithInternalRefs(t *testing.T) {
 		require.NotNil(t, childrenProp, "children property should not be nil")
 
 		// Check the items property of the array
-		assert.True(t, childrenProp.IsLeft(), "children should be a schema object")
-		childrenSchema := childrenProp.GetLeft()
+		assert.True(t, childrenProp.IsSchema(), "children should be a schema object")
+		childrenSchema := childrenProp.GetSchema()
 		require.NotNil(t, childrenSchema, "children schema should not be nil")
 		// Check that it's an array type
 		schemaTypes := childrenSchema.GetType()

@@ -6,9 +6,10 @@ import (
 	"runtime/debug"
 	"strings"
 
-	arazzoCmd "github.com/speakeasy-api/openapi/arazzo/cmd"
-	openapiCmd "github.com/speakeasy-api/openapi/openapi/cmd"
-	overlayCmd "github.com/speakeasy-api/openapi/overlay/cmd"
+	arazzoCmd "github.com/speakeasy-api/openapi/cmd/openapi/commands/arazzo"
+	openapiCmd "github.com/speakeasy-api/openapi/cmd/openapi/commands/openapi"
+	overlayCmd "github.com/speakeasy-api/openapi/cmd/openapi/commands/overlay"
+	swaggerCmd "github.com/speakeasy-api/openapi/cmd/openapi/commands/swagger"
 	"github.com/spf13/cobra"
 )
 
@@ -105,6 +106,15 @@ OpenAPI specifications define REST APIs in a standard format.
 These commands help you validate and work with OpenAPI documents.`,
 }
 
+var swaggerCmds = &cobra.Command{
+	Use:   "swagger",
+	Short: "Work with Swagger 2.0 (OpenAPI v2) specifications",
+	Long: `Commands for working with Swagger 2.0 (OpenAPI v2) specifications.
+
+Swagger 2.0 documents describe REST APIs prior to OpenAPI 3.x.
+These commands help you validate and upgrade Swagger documents.`,
+}
+
 var arazzoCmds = &cobra.Command{
 	Use:   "arazzo",
 	Short: "Work with Arazzo workflow documents",
@@ -138,6 +148,9 @@ func init() {
 	// Add OpenAPI spec validation command
 	openapiCmd.Apply(openapiCmds)
 
+	// Add Swagger 2.0 commands
+	swaggerCmd.Apply(swaggerCmds)
+
 	// Add Arazzo workflow validation command
 	arazzoCmd.Apply(arazzoCmds)
 
@@ -146,6 +159,7 @@ func init() {
 
 	// Add all commands to root
 	rootCmd.AddCommand(openapiCmds)
+	rootCmd.AddCommand(swaggerCmds)
 	rootCmd.AddCommand(arazzoCmds)
 	rootCmd.AddCommand(overlayCmds)
 

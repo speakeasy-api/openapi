@@ -37,7 +37,7 @@ func (r *Reusable[T]) Unmarshal(ctx context.Context, parentName string, node *ya
 		r.SetValid(false, false)
 
 		return []error{
-			validation.NewValidationError(validation.NewTypeMismatchError("reusable expected mapping node, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+			validation.NewValidationError(validation.NewTypeMismatchError(parentName, "reusable expected object, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
 		}, nil
 	}
 

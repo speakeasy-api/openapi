@@ -1,0 +1,961 @@
+# OpenAPI Commands
+
+Commands for working with OpenAPI specifications.
+
+OpenAPI specifications define REST APIs in a standard format. These commands help you validate, transform, and work with OpenAPI documents.
+
+## Table of Contents
+
+- [Table of Contents](#table-of-contents)
+- [Available Commands](#available-commands)
+  - [`validate`](#validate)
+  - [`upgrade`](#upgrade)
+  - [`inline`](#inline)
+  - [`clean`](#clean)
+  - [`sanitize`](#sanitize)
+  - [`bundle`](#bundle)
+    - [Bundle vs Inline](#bundle-vs-inline)
+  - [`join`](#join)
+  - [`optimize`](#optimize)
+  - [`bootstrap`](#bootstrap)
+  - [`localize`](#localize)
+  - [`explore`](#explore)
+  - [`snip`](#snip)
+- [Common Options](#common-options)
+- [Output Formats](#output-formats)
+- [Examples](#examples)
+  - [Validation Workflow](#validation-workflow)
+  - [Processing Pipeline](#processing-pipeline)
+
+## Available Commands
+
+### `validate`
+
+Validate an OpenAPI specification document for compliance with the OpenAPI Specification.
+
+```bash
+# Validate a specification file
+openapi spec validate ./spec.yaml
+
+# Validate with verbose output
+openapi spec validate -v ./spec.yaml
+```
+
+This command checks for:
+
+- Structural validity according to the OpenAPI Specification
+- Schema compliance and consistency
+- Reference resolution and validity
+- Best practice recommendations
+
+### `upgrade`
+
+Upgrade an OpenAPI specification to the latest supported version (3.1.1).
+
+```bash
+# Upgrade to stdout
+openapi spec upgrade ./spec.yaml
+
+# Upgrade to specific file
+openapi spec upgrade ./spec.yaml ./upgraded-spec.yaml
+
+# Upgrade in-place
+openapi spec upgrade -w ./spec.yaml
+
+# Upgrade with specific target version
+openapi spec upgrade --version 3.1.0 ./spec.yaml
+```
+
+Features:
+
+- Converts OpenAPI 3.0.x specifications to 3.1.x
+- Maintains backward compatibility where possible
+- Updates schema formats and structures
+- Preserves all custom extensions and vendor-specific content
+
+### `inline`
+
+Inline all references in an OpenAPI specification to create a self-contained document.
+
+```bash
+# Inline to stdout (pipe-friendly)
+openapi spec inline ./spec-with-refs.yaml
+
+# Inline to specific file
+openapi spec inline ./spec.yaml ./inlined-spec.yaml
+
+# Inline in-place
+openapi spec inline -w ./spec.yaml
+```
+
+What inlining does:
+
+- Replaces all `$ref` references with their actual content
+- Creates a completely self-contained document
+- Removes unused components after inlining
+- Handles circular references using JSON Schema `$defs`
+
+**Before inlining:**
+
+```yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          $ref: "#/components/responses/UserResponse"
+components:
+  responses:
+    UserResponse:
+      description: User response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/User"
+```
+
+**After inlining:**
+
+```yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          description: User response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+# components section removed (unused after inlining)
+```
+
+### `clean`
+
+Remove unused components and unused top‑level tags from an OpenAPI specification using reachability seeded from /paths and top‑level security.
+
+```bash
+# Clean to stdout (pipe-friendly)
+openapi spec clean ./spec.yaml
+
+# Clean to specific file
+openapi spec clean ./spec.yaml ./cleaned-spec.yaml
+
+# Clean in-place
+openapi spec clean -w ./spec.yaml
+```
+
+What cleaning does:
+
+- Performs reachability-based cleanup seeded only from API surface areas (/paths and top‑level security)
+- Expands through $ref links to components until a fixed point is reached
+- Preserves security schemes referenced by name in security requirement objects (global and operation‑level)
+- Removes unused components from all component types (schemas, responses, parameters, examples, request bodies, headers, links, callbacks, path items)
+- Removes unused top‑level tags that are not referenced by any operation
+- Handles complex reference patterns; only components reachable from the API surface are kept
+
+**Before cleaning:**
+
+```yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          $ref: "#/components/responses/UserResponse"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        name:
+          type: string
+    UnusedSchema:  # This will be removed
+      type: object
+      properties:
+        id:
+          type: string
+  responses:
+    UserResponse:
+      description: User response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/User"
+    UnusedResponse:  # This will be removed
+      description: Unused response
+```
+
+**After cleaning:**
+
+```yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          $ref: "#/components/responses/UserResponse"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        name:
+          type: string
+  responses:
+    UserResponse:
+      description: User response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/User"
+# UnusedSchema and UnusedResponse removed
+```
+
+**Use Clean when:**
+
+- You want to remove unused components after refactoring
+- You're preparing a specification for publication or distribution
+- You want to reduce document size and complexity
+- You're maintaining a large specification with many components
+  
+### `sanitize`
+
+Remove unwanted elements from an OpenAPI specification to create clean, standards-compliant documents.
+
+```bash
+# Default sanitization (remove all extensions and unused components)
+openapi spec sanitize ./spec.yaml
+
+# Sanitize and write to new file
+openapi spec sanitize ./spec.yaml ./clean-spec.yaml
+
+# Sanitize in-place
+openapi spec sanitize -w ./spec.yaml
+
+# Use config file for selective sanitization
+openapi spec sanitize --config sanitize-config.yaml ./spec.yaml
+```
+
+**Default Behavior (no config):**
+
+By default, sanitize performs aggressive cleanup:
+
+- Removes ALL x-* vendor extensions throughout the document
+- Removes unused components (schemas, responses, parameters, etc.)
+- Removes unknown properties not defined in the OpenAPI specification
+
+**Configuration File Support:**
+
+Create a YAML configuration file to control sanitization behavior:
+
+```yaml
+# sanitize-config.yaml
+
+# Extension filtering (not provided or empty = remove all extensions by default)
+extensionPatterns:
+  # Whitelist: keep only matching extensions (when provided, only these are kept)
+  # Keep takes precedence over Remove when both are specified
+  keep:
+    - "x-speakeasy-schema-*"  # Example: keep only schema-related extensions
+  # Blacklist: remove only matching extensions, keep all others
+  remove:
+    - "x-go-*"
+    - "x-internal-*"
+    - "x-speakeasy-*"  # Combined with Keep above, removes all x-speakeasy-* EXCEPT x-speakeasy-schema-*
+
+# Keep unused components (default: false, removes them)
+keepUnusedComponents: true
+
+# Keep unknown properties (default: false, removes them)
+keepUnknownProperties: true
+```
+
+**What gets sanitized:**
+
+- **Extensions**: All x-* vendor extensions (info, paths, operations, schemas, etc.)
+- **Unused Components**: Schemas, responses, parameters, examples, request bodies, headers, security schemes, links, callbacks, and path items that aren't referenced
+- **Unknown Properties**: Properties not defined in the OpenAPI specification
+
+**Before sanitization:**
+
+```yaml
+openapi: 3.1.0
+info:
+  title: My API
+  version: 1.0.0
+  x-api-id: internal-123
+  x-go-package: myapi
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      x-go-name: ListUsers
+      x-rate-limit: 100
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      x-go-type: User
+      properties:
+        id:
+          type: string
+    UnusedSchema:
+      type: object
+      description: Not referenced anywhere
+```
+
+**After sanitization (default):**
+
+```yaml
+openapi: 3.1.0
+info:
+  title: My API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+```
+
+**After sanitization (with pattern config):**
+
+Using config with `extensionPatterns: { remove: ["x-go-*"] }`:
+
+```yaml
+openapi: 3.1.0
+info:
+  title: My API
+  version: 1.0.0
+  x-api-id: internal-123  # kept (doesn't match x-go-*)
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      x-rate-limit: 100  # kept (doesn't match x-go-*)
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+```
+
+**Benefits of sanitization:**
+
+- **Standards compliance**: Remove vendor-specific extensions for clean, standard specs
+- **Clean distribution**: Prepare specifications for public sharing or publishing
+- **Reduced size**: Remove unnecessary extensions and unused components
+- **Selective cleanup**: Use patterns to target specific extension families
+- **Flexible control**: Config file allows fine-grained control over what to keep
+
+**Use Sanitize when:**
+
+- You want to remove all vendor extensions before publishing
+- You're preparing specifications for standards-compliant distribution
+- You need to clean up internal annotations before sharing externally
+- You want to remove specific extension families (e.g., x-go-*, x-internal-*)
+- You're combining extension removal with component cleanup in one operation
+
+### `bundle`
+
+Bundle external references into the components section while preserving the reference structure.
+
+```bash
+# Bundle to stdout (pipe-friendly)
+openapi spec bundle ./spec-with-refs.yaml
+
+# Bundle to specific file with filepath naming (default)
+openapi spec bundle ./spec.yaml ./bundled-spec.yaml
+
+# Bundle in-place with counter naming
+openapi spec bundle -w --naming counter ./spec.yaml
+
+# Bundle with filepath naming (explicit)
+openapi spec bundle --naming filepath ./spec.yaml ./bundled.yaml
+```
+
+**Naming Strategies:**
+
+- `filepath` (default): Uses file path-based naming like `external_api_yaml~User` for conflicts
+- `counter`: Uses counter-based suffixes like `User_1`, `User_2` for conflicts
+
+What bundling does:
+
+- Brings all external references into the components section
+- Maintains reference structure (unlike inline which expands everything)
+- Creates self-contained documents that work with reference-aware tooling
+- Handles circular references and naming conflicts intelligently
+
+**Before bundling:**
+
+```yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: "external_api.yaml#/User"
+```
+
+**After bundling:**
+
+```yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+```
+
+#### Bundle vs Inline
+
+**Use Bundle when:**
+
+- You want a self-contained document but need to preserve references
+- Your tooling works better with references than expanded content
+- You want to maintain the logical structure of your API definition
+- You need to prepare documents for further processing
+
+**Use Inline when:**
+
+- You want a completely expanded document with no references
+- Your tooling doesn't support references well
+- You want the simplest possible document structure
+- You're creating documentation or examples
+
+### `join`
+
+Join multiple OpenAPI specifications into a single document.
+
+```bash
+# Join specifications to stdout
+openapi spec join ./main.yaml ./additional.yaml
+
+# Join specifications to specific file
+openapi spec join ./main.yaml ./additional.yaml ./joined-spec.yaml
+
+# Join in-place (modifies the first file)
+openapi spec join -w ./main.yaml ./additional.yaml
+
+# Join with conflict resolution strategy
+openapi spec join --strategy merge ./main.yaml ./additional.yaml
+```
+
+Features:
+
+- Combines multiple OpenAPI specifications into one
+- Handles conflicts between specifications intelligently
+- Merges paths, components, and other sections
+- Preserves all valid OpenAPI structure and references
+
+### `optimize`
+
+Optimize an OpenAPI specification by finding duplicate inline schemas and extracting them to reusable components.
+
+```bash
+# Interactive optimization (shows schemas, prompts for custom names)
+openapi spec optimize ./spec.yaml
+
+# Non-interactive optimization (auto-generated names)
+openapi spec optimize ./spec.yaml --non-interactive
+
+# Optimize to specific file
+openapi spec optimize ./spec.yaml ./optimized-spec.yaml
+
+# Optimize in-place
+openapi spec optimize -w ./spec.yaml
+```
+
+What optimization does:
+
+- Finds inline JSON schemas that appear multiple times with identical content
+- Replaces duplicate inline schemas with references to newly created components
+- Preserves existing component schemas (not modified or replaced)
+- Only processes complex schemas (objects, enums, oneOf/allOf/anyOf, conditionals)
+- Ignores simple type schemas (string, number, boolean) that don't benefit from extraction
+
+**Interactive Mode (default):**
+
+- Shows each duplicate schema in a beautiful formatted code block
+- Displays all locations where the schema appears
+- Prompts for custom component names
+- Allows meaningful naming instead of auto-generated names
+
+**Non-Interactive Mode (`--non-interactive`):**
+
+- Uses automatically generated names based on schema content hash
+- No user prompts - suitable for automation and CI/CD pipelines
+- Generates names like `Schema_da0c4bbf` based on content
+
+**Before optimization:**
+
+```yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: integer}
+                  name: {type: string}
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: {type: integer}
+                name: {type: string}
+```
+
+**After optimization:**
+
+```yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+```
+
+**Benefits of optimization:**
+
+- Reduces document size by eliminating duplicate schema definitions
+- Improves maintainability by centralizing schema definitions
+- Enhances reusability by making schemas available as components
+- Optimizes tooling performance with smaller, cleaner documents
+- Follows OpenAPI best practices for schema organization
+
+**Use Optimize when:**
+
+- You have inline schemas that are duplicated across your specification
+- You want to improve document maintainability and reduce redundancy
+- You're preparing specifications for better tooling support
+- You want to follow OpenAPI best practices for component reuse
+
+### `bootstrap`
+
+Create a new OpenAPI document with best practice examples.
+
+```bash
+# Create bootstrap document and output to stdout
+openapi spec bootstrap
+
+# Create bootstrap document and save to file
+openapi spec bootstrap ./my-api.yaml
+
+# Create bootstrap document in current directory
+openapi spec bootstrap ./openapi.yaml
+```
+
+What bootstrap creates:
+
+- Complete OpenAPI specification template with comprehensive examples
+- Proper document structure and metadata (info, servers, tags)
+- Example operations with request/response definitions
+- Reusable components (schemas, responses, security schemes)
+- Reference usage ($ref) for component reuse
+- Security scheme definitions (API key authentication)
+- Comprehensive schema examples with validation rules
+
+The generated document serves as both a template for new APIs and a learning resource for OpenAPI best practices.
+
+### `localize`
+
+Localize an OpenAPI specification by copying all external reference files to a target directory and creating a new version of the document with references rewritten to point to the localized files.
+
+```bash
+# Localize to a target directory with path-based naming (default)
+openapi spec localize ./spec.yaml ./localized/
+
+# Localize with counter-based naming for conflicts
+openapi spec localize --naming counter ./spec.yaml ./localized/
+
+# Localize with explicit path-based naming
+openapi spec localize --naming path ./spec.yaml ./localized/
+```
+
+**Naming Strategies:**
+
+- `path` (default): Uses file path-based naming like `schemas-address.yaml` for conflicts
+- `counter`: Uses counter-based suffixes like `address_1.yaml` for conflicts
+
+What localization does:
+
+- Copies all external reference files to the target directory
+- Creates a new version of the main document with updated references
+- Leaves the original document and files completely untouched
+- Creates a portable, self-contained document bundle
+- Handles circular references and naming conflicts intelligently
+- Supports both file-based and URL-based external references
+
+**Before localization:**
+
+```yaml
+# main.yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: "./components.yaml#/components/schemas/User"
+
+# components.yaml
+components:
+  schemas:
+    User:
+      properties:
+        address:
+          $ref: "./schemas/address.yaml#/Address"
+
+# schemas/address.yaml
+Address:
+  type: object
+  properties:
+    street: {type: string}
+```
+
+**After localization (in target directory):**
+
+```yaml
+# localized/main.yaml
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: "components.yaml#/components/schemas/User"
+
+# localized/components.yaml
+components:
+  schemas:
+    User:
+      properties:
+        address:
+          $ref: "schemas-address.yaml#/Address"
+
+# localized/schemas-address.yaml
+Address:
+  type: object
+  properties:
+    street: {type: string}
+```
+
+**Benefits of localization:**
+
+- Creates portable document bundles for easy distribution
+- Simplifies deployment by packaging all dependencies together
+- Enables offline development without external file dependencies
+- Improves version control by keeping all related files together
+- Ensures all dependencies are available in CI/CD pipelines
+- Facilitates documentation generation with complete file sets
+
+**Use Localize when:**
+
+- You need to package an API specification for distribution
+- You want to create a self-contained bundle for deployment
+- You're preparing specifications for offline use or air-gapped environments
+- You need to ensure all dependencies are available in build pipelines
+- You want to simplify file management for complex multi-file specifications
+- You're creating documentation packages that include all referenced files
+
+### `explore`
+
+Interactively explore an OpenAPI specification in a terminal user interface.
+
+```bash
+# Launch the explorer
+openapi spec explore ./spec.yaml
+
+# Get help on keyboard shortcuts
+# (Press '?' in the explorer)
+```
+
+What the explorer provides:
+
+- **Interactive navigation** - Browse all API operations with vim-style keyboard shortcuts
+- **Operation details** - View parameters, request bodies, responses, and more
+- **Color-coded methods** - Visual differentiation by HTTP method (GET=green, POST=blue, etc.)
+- **Fold/unfold details** - Toggle detailed information with Space or Enter
+- **Search through operations** - Quickly find endpoints in large specifications
+- **Help modal** - Built-in keyboard shortcut reference
+
+**Keyboard Navigation:**
+
+| Key               | Action                     |
+| ----------------- | -------------------------- |
+| `↑` / `k`         | Move up                    |
+| `↓` / `j`         | Move down                  |
+| `gg`              | Jump to top                |
+| `G`               | Jump to bottom             |
+| `Ctrl-U`          | Scroll up by half screen   |
+| `Ctrl-D`          | Scroll down by half screen |
+| `Enter` / `Space` | Toggle operation details   |
+| `?`               | Show/hide help             |
+| `q` / `Esc`       | Quit                       |
+
+**What you can view:**
+
+- Operation ID, summary, and description
+- HTTP method and path
+- Parameters (name, location, required status, description)
+- Request body content types
+- Response status codes and descriptions
+- Tags and deprecation warnings
+
+**Benefits:**
+
+- **Faster understanding** - Quickly grasp API structure without parsing YAML/JSON
+- **Better navigation** - Jump between operations more efficiently than text editors
+- **Visual clarity** - Color-coding and formatting make operations easier to distinguish
+- **No tool installation** - Works in any terminal, no browser required
+- **Offline friendly** - Explore specifications without network access
+
+**Use Explore when:**
+
+- You need to understand a new or unfamiliar API specification
+- You want to quickly review endpoints and their parameters
+- You're debugging API structure or looking for specific operations
+- You prefer terminal-based workflows over web-based viewers
+- You need to present or demo API operations in a meeting
+
+### `snip`
+
+Remove selected operations from an OpenAPI specification and automatically clean up unused components.
+
+```bash
+# Interactive mode - browse and select operations via TUI
+openapi spec snip ./spec.yaml
+openapi spec snip ./spec.yaml ./filtered-spec.yaml
+
+# CLI mode - remove by operation ID
+openapi spec snip --operationId deleteUser --operationId adminDebug ./spec.yaml
+
+# CLI mode - remove by operation ID (comma-separated)
+openapi spec snip --operationId deleteUser,adminDebug ./spec.yaml
+
+# CLI mode - remove by path:method
+openapi spec snip --operation /users/{id}:DELETE --operation /admin:GET ./spec.yaml
+
+# CLI mode - remove by path:method (comma-separated)
+openapi spec snip --operation /users/{id}:DELETE,/admin:GET ./spec.yaml
+
+# CLI mode - mixed approaches
+openapi spec snip --operationId deleteUser --operation /admin:GET ./spec.yaml
+
+# Write in-place (CLI mode only)
+openapi spec snip -w --operation /internal/debug:GET ./spec.yaml
+```
+
+**Two Operation Modes:**
+
+**Interactive Mode** (no operation flags):
+
+- Launch a terminal UI to browse all operations
+- Select operations with Space key
+- Press 'a' to select all, 'A' to deselect all
+- Press 'w' to write the result (prompts for file path)
+- Press 'q' or Esc to cancel
+
+**Command-Line Mode** (operation flags specified):
+
+- Remove operations specified via flags without UI
+- Supports `--operationId` for operation IDs
+- Supports `--operation` for path:method pairs
+- Both flags support comma-separated values or multiple flags
+
+**What snip does:**
+
+1. Removes the specified operations from the document
+2. Removes path items that become empty after operation removal
+3. Automatically runs Clean() to remove unused components
+4. Preserves all other operations and valid references
+
+**Before snipping:**
+
+```yaml
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        '200':
+          $ref: '#/components/responses/UserResponse'
+    delete:
+      operationId: deleteAllUsers
+      responses:
+        '204':
+          description: No content
+  /admin/debug:
+    get:
+      operationId: debugInfo
+      responses:
+        '200':
+          description: Debug info
+components:
+  schemas:
+    User:
+      type: object
+    UnusedSchema:
+      type: object
+  responses:
+    UserResponse:
+      description: User response
+```
+
+**After snipping** (removed deleteAllUsers and debugInfo):
+
+```yaml
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        '200':
+          $ref: '#/components/responses/UserResponse'
+components:
+  schemas:
+    User:
+      type: object
+  responses:
+    UserResponse:
+      description: User response
+# DELETE operation removed, /admin/debug path removed entirely
+# UnusedSchema cleaned up automatically
+```
+
+**Benefits of snipping:**
+
+- **Reduce API surface**: Remove deprecated or internal operations before publishing
+- **Create filtered specs**: Generate subsets of your API for specific clients or use cases
+- **Interactive selection**: Visual browser makes it easy to identify and select operations
+- **Automatic cleanup**: Unused components are removed automatically
+- **Flexible input**: Support both operation IDs and path:method pairs
+- **Batch processing**: Remove multiple operations in one command
+
+**Use Snip when:**
+
+- You need to remove deprecated operations from a specification
+- You want to create a filtered version of your API for specific clients
+- You're preparing a public API specification and need to remove internal endpoints
+- You want to reduce the size and complexity of a specification
+- You need to create different API variants from a single source
+
+## Common Options
+
+All commands support these common options:
+
+- `-h, --help`: Show help for the command
+- `-v, --verbose`: Enable verbose output (global flag)
+- `-w, --write`: Write output back to the input file (where applicable)
+
+## Output Formats
+
+All commands work with both YAML and JSON input files and preserve the original format in the output. When writing to stdout (for piping), the output is optimized to be clean and parseable.
+
+## Examples
+
+### Validation Workflow
+
+```bash
+# Validate before processing
+openapi spec validate ./spec.yaml
+
+# Upgrade if needed
+openapi spec upgrade ./spec.yaml ./spec-v3.1.yaml
+
+# Bundle external references
+openapi spec bundle ./spec-v3.1.yaml ./spec-bundled.yaml
+
+# Final validation
+openapi spec validate ./spec-bundled.yaml
+```
+
+### Processing Pipeline
+
+```bash
+# Create a processing pipeline
+openapi spec bundle ./spec.yaml | \
+openapi spec clean | \
+openapi spec upgrade | \
+openapi spec validate
+
+# Alternative: Clean after bundling to remove unused components and unused top-level tags
+openapi spec bundle ./spec.yaml ./bundled.yaml
+openapi spec clean ./bundled.yaml ./clean-bundled.yaml
+openapi spec validate ./clean-bundled.yaml

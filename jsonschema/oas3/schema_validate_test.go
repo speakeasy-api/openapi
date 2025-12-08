@@ -2,12 +2,12 @@ package oas3_test
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -378,7 +378,10 @@ title: Missing External Docs URL
 externalDocs:
   description: More information
 `,
-			wantErrs: []string{"[5:3] externalDocumentation field url is missing"},
+			wantErrs: []string{
+				"[2:1] schema.externalDocs missing property 'url'",
+				"[5:3] externalDocumentation.url is missing",
+			},
 		},
 		{
 			name: "invalid type property",
@@ -387,8 +390,8 @@ type: invalid_type
 title: Invalid Type
 `,
 			wantErrs: []string{
-				"schema field type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
-				"schema field type got string, want array",
+				"[2:7] schema.type expected array, got string",
+				"[2:7] schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
 			},
 		},
 		{
@@ -397,7 +400,7 @@ title: Invalid Type
 type: string
 minLength: -1
 `,
-			wantErrs: []string{"schema field minLength minimum: got -1, want 0"},
+			wantErrs: []string{"[3:12] schema.minLength minimum: got -1, want 0"},
 		},
 		{
 			name: "negative multipleOf",
@@ -405,7 +408,7 @@ minLength: -1
 type: number
 multipleOf: -1
 `,
-			wantErrs: []string{"schema field multipleOf exclusiveMinimum: got -1, want 0"},
+			wantErrs: []string{"[3:13] schema.multipleOf exclusiveMinimum: got -1, want 0"},
 		},
 		{
 			name: "zero multipleOf",
@@ -413,7 +416,7 @@ multipleOf: -1
 type: number
 multipleOf: 0
 `,
-			wantErrs: []string{"schema field multipleOf exclusiveMinimum: got 0, want 0"},
+			wantErrs: []string{"[3:13] schema.multipleOf exclusiveMinimum: got 0, want 0"},
 		},
 		{
 			name: "invalid additionalProperties type",
@@ -422,8 +425,9 @@ type: object
 additionalProperties: "invalid"
 `,
 			wantErrs: []string{
-				"schema field additionalProperties got string, want boolean or object",
-				"schema.additionalProperties expected object, got scalar",
+				"[2:1] schema.additionalProperties expected one of [boolean, object], got string",
+				"[2:1] schema.additionalProperties expected one of [boolean, object], got string",
+				"[3:23] schema.additionalProperties failed to validate either Schema [schema.additionalProperties expected object, got `invalid`] or bool [schema.additionalProperties line 3: cannot unmarshal !!str `invalid` into bool]",
 			},
 		},
 		{
@@ -432,7 +436,7 @@ additionalProperties: "invalid"
 type: array
 minItems: -1
 `,
-			wantErrs: []string{"schema field minItems minimum: got -1, want 0"},
+			wantErrs: []string{"[3:11] schema.minItems minimum: got -1, want 0"},
 		},
 		{
 			name: "negative minProperties",
@@ -440,7 +444,7 @@ minItems: -1
 type: object
 minProperties: -1
 `,
-			wantErrs: []string{"schema field minProperties minimum: got -1, want 0"},
+			wantErrs: []string{"[3:16] schema.minProperties minimum: got -1, want 0"},
 		},
 		{
 			name: "invalid items type",
@@ -449,8 +453,9 @@ type: array
 items: "invalid"
 `,
 			wantErrs: []string{
-				"schema field items got string, want boolean or object",
-				"schema.items expected object, got scalar",
+				"[2:1] schema.items expected one of [boolean, object], got string",
+				"[2:1] schema.items expected one of [boolean, object], got string",
+				"[3:8] schema.items failed to validate either Schema [schema.items expected object, got `invalid`] or bool [schema.items line 3: cannot unmarshal !!str `invalid` into bool]",
 			},
 		},
 		{
@@ -459,28 +464,40 @@ items: "invalid"
 type: object
 required: "invalid"
 `,
-			wantErrs: []string{"schema field required got string, want array"},
+			wantErrs: []string{
+				"[2:1] schema.required expected array, got string",
+				"[3:11] schema.required expected sequence, got `invalid`",
+			},
 		},
 		{
 			name: "invalid allOf not array",
 			yml: `
 allOf: "invalid"
 `,
-			wantErrs: []string{"schema field allOf got string, want array"},
+			wantErrs: []string{
+				"[2:1] schema.allOf expected array, got string",
+				"[2:8] schema.allOf expected sequence, got `invalid`",
+			},
 		},
 		{
 			name: "invalid anyOf not array",
 			yml: `
 anyOf: "invalid"
 `,
-			wantErrs: []string{"schema field anyOf got string, want array"},
+			wantErrs: []string{
+				"[2:1] schema.anyOf expected array, got string",
+				"[2:8] schema.anyOf expected sequence, got `invalid`",
+			},
 		},
 		{
 			name: "invalid oneOf not array",
 			yml: `
 oneOf: "invalid"
 `,
-			wantErrs: []string{"schema field oneOf got string, want array"},
+			wantErrs: []string{
+				"[2:1] schema.oneOf expected array, got string",
+				"[2:8] schema.oneOf expected sequence, got `invalid`",
+			},
 		},
 		{
 			name: "$ref with additional properties not allowed in OpenAPI 3.0",
@@ -489,7 +506,7 @@ $schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
 $ref: "#/components/schemas/User"
 required: ["name", "email"]
 `,
-			wantErrs: []string{"additional properties '$ref' not allowed"},
+			wantErrs: []string{"[2:1] schema. additional properties '$ref' not allowed"},
 		},
 	}
 
@@ -519,16 +536,7 @@ required: ["name", "email"]
 				}
 			}
 
-			for _, expectedErr := range tt.wantErrs {
-				found := false
-				for _, errMsg := range errMessages {
-					if strings.Contains(errMsg, expectedErr) {
-						found = true
-						break
-					}
-				}
-				require.True(t, found, "expected error message '%s' not found in: %v", expectedErr, errMessages)
-			}
+			assert.Equal(t, tt.wantErrs, errMessages)
 		})
 	}
 }

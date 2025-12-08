@@ -427,6 +427,7 @@ func TestUpgradeTagGroups(t *testing.T) {
 				return doc
 			},
 			validate: func(t *testing.T, doc *openapi.OpenAPI) {
+				t.Helper()
 				// Should have 4 tags total (3 existing + 1 new parent)
 				assert.Len(t, doc.Tags, 4, "should have 4 tags after migration")
 
@@ -484,6 +485,7 @@ func TestUpgradeTagGroups(t *testing.T) {
 				return doc
 			},
 			validate: func(t *testing.T, doc *openapi.OpenAPI) {
+				t.Helper()
 				// Find parent tag
 				var parentTag *openapi.Tag
 				for _, tag := range doc.Tags {
@@ -527,6 +529,7 @@ func TestUpgradeTagGroups(t *testing.T) {
 				return doc
 			},
 			validate: func(t *testing.T, doc *openapi.OpenAPI) {
+				t.Helper()
 				// Should have 3 tags (1 parent + 2 children)
 				assert.Len(t, doc.Tags, 3, "should have 3 tags after migration")
 
@@ -564,6 +567,7 @@ func TestUpgradeTagGroups(t *testing.T) {
 				return doc
 			},
 			validate: func(t *testing.T, doc *openapi.OpenAPI) {
+				t.Helper()
 				// Should have 6 tags (2 parents + 4 children)
 				assert.Len(t, doc.Tags, 6, "should have 6 tags after migration")
 
@@ -614,6 +618,7 @@ func TestUpgradeTagGroups(t *testing.T) {
 				return doc
 			},
 			validate: func(t *testing.T, doc *openapi.OpenAPI) {
+				t.Helper()
 				// Should remain unchanged
 				assert.Len(t, doc.Tags, 1, "should have 1 tag")
 				assert.Equal(t, "existing", doc.Tags[0].Name, "existing tag should remain")
@@ -628,6 +633,7 @@ func TestUpgradeTagGroups(t *testing.T) {
 				return doc
 			},
 			validate: func(t *testing.T, doc *openapi.OpenAPI) {
+				t.Helper()
 				// Should remove empty extension
 				_, exists := doc.Extensions.Get("x-tagGroups")
 				assert.False(t, exists, "empty x-tagGroups should be removed")
@@ -720,6 +726,7 @@ func TestUpgradeTagGroups(t *testing.T) {
 
 // Helper functions for test setup
 
+//nolint:unparam // version parameter kept for flexibility even though currently only used with "3.1.0"
 func createTestDocWithVersion(version string) *openapi.OpenAPI {
 	return &openapi.OpenAPI{
 		OpenAPI: version,

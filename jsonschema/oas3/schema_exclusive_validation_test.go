@@ -214,8 +214,7 @@ func TestSchema_ExclusiveMinimumMaximum_Error(t *testing.T) {
 		name           string
 		yaml           string
 		openAPIVersion *string
-		expectError    bool
-		errorContains  string
+		wantErrs       []string
 	}{
 		// Boolean values should fail with OpenAPI 3.1
 		{
@@ -228,8 +227,7 @@ exclusiveMinimum: true
 exclusiveMaximum: false
 `,
 			openAPIVersion: pointer.From("3.1.0"),
-			expectError:    true,
-			errorContains:  "got boolean, want number",
+			wantErrs:       []string{"[5:19] schema.exclusiveMinimum expected number, got boolean", "[6:19] schema.exclusiveMaximum expected number, got boolean"},
 		},
 		{
 			name: "boolean exclusiveMinimum with 3.1 $schema should fail",
@@ -241,8 +239,7 @@ maximum: 100
 exclusiveMinimum: true
 exclusiveMaximum: false
 `,
-			expectError:   true,
-			errorContains: "got boolean, want number",
+			wantErrs: []string{"[6:19] schema.exclusiveMinimum expected number, got boolean", "[7:19] schema.exclusiveMaximum expected number, got boolean"},
 		},
 		// Invalid types should always fail
 		{
@@ -251,8 +248,7 @@ exclusiveMaximum: false
 type: number
 exclusiveMinimum: "invalid"
 `,
-			expectError:   true,
-			errorContains: "exclusiveMinimum",
+			wantErrs: []string{"[2:1] schema.exclusiveMinimum expected number, got string", "[3:19] schema.exclusiveMinimum failed to validate either bool [schema.exclusiveMinimum line 3: cannot unmarshal !!str `invalid` into bool] or float64 [schema.exclusiveMinimum line 3: cannot unmarshal !!str `invalid` into float64]"},
 		},
 		{
 			name: "invalid string type for exclusiveMaximum",
@@ -260,8 +256,7 @@ exclusiveMinimum: "invalid"
 type: number
 exclusiveMaximum: "invalid"
 `,
-			expectError:   true,
-			errorContains: "exclusiveMaximum",
+			wantErrs: []string{"[2:1] schema.exclusiveMaximum expected number, got string", "[3:19] schema.exclusiveMaximum failed to validate either bool [schema.exclusiveMaximum line 3: cannot unmarshal !!str `invalid` into bool] or float64 [schema.exclusiveMaximum line 3: cannot unmarshal !!str `invalid` into float64]"},
 		},
 		{
 			name: "invalid array type for exclusiveMinimum",
@@ -269,8 +264,7 @@ exclusiveMaximum: "invalid"
 type: number
 exclusiveMinimum: [1, 2, 3]
 `,
-			expectError:   true,
-			errorContains: "exclusiveMinimum",
+			wantErrs: []string{"[2:1] schema.exclusiveMinimum expected number, got array", "[3:19] schema.exclusiveMinimum failed to validate either bool [schema.exclusiveMinimum expected bool, got sequence] or float64 [schema.exclusiveMinimum expected float64, got sequence]"},
 		},
 		// Mixed boolean and numeric should fail with OpenAPI 3.0 (only supports boolean)
 		{
@@ -282,8 +276,7 @@ exclusiveMinimum: true
 exclusiveMaximum: 50.5
 `,
 			openAPIVersion: pointer.From("3.0.3"),
-			expectError:    true,
-			errorContains:  "got number, want boolean",
+			wantErrs:       []string{"[5:19] schema.exclusiveMaximum expected boolean, got number"},
 		},
 		{
 			name: "mixed numeric exclusiveMinimum and boolean exclusiveMaximum with OpenAPI 3.0 should fail",
@@ -294,8 +287,7 @@ exclusiveMinimum: 0.5
 exclusiveMaximum: true
 `,
 			openAPIVersion: pointer.From("3.0.3"),
-			expectError:    true,
-			errorContains:  "got number, want boolean",
+			wantErrs:       []string{"[4:19] schema.exclusiveMinimum expected boolean, got number"},
 		},
 	}
 
@@ -306,51 +298,25 @@ exclusiveMaximum: true
 			var schema oas3.Schema
 
 			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yaml), &schema)
-
-			if tt.expectError {
-				// We expect either unmarshaling to fail or validation errors
-				if err == nil && len(validationErrs) == 0 {
-					// If unmarshaling succeeded, check schema validation
-					var validationErrors []error
-					if tt.openAPIVersion != nil {
-						docVersion := &oas3.ParentDocumentVersion{
-							OpenAPI: tt.openAPIVersion,
-						}
-						validationErrors = schema.Validate(t.Context(), validation.WithContextObject(docVersion))
-					} else {
-						validationErrors = schema.Validate(t.Context())
-					}
-
-					assert.NotEmpty(t, validationErrors, "Should have validation errors for: %s", tt.name)
-
-					// Check if any error contains the expected string
-					found := false
-					for _, validationErr := range validationErrors {
-						if assert.Contains(t, validationErr.Error(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Should find error containing '%s'", tt.errorContains)
-				} else {
-					// Unmarshaling failed or had validation errors, which is expected
-					assert.True(t, err != nil || len(validationErrs) > 0, "Should have errors during unmarshaling")
-				}
-			} else {
-				require.NoError(t, err, "Unmarshaling should succeed")
-				require.Empty(t, validationErrs, "Should have no validation errors during unmarshaling")
-
-				var validationErrors []error
+			if err == nil {
 				if tt.openAPIVersion != nil {
 					docVersion := &oas3.ParentDocumentVersion{
 						OpenAPI: tt.openAPIVersion,
 					}
-					validationErrors = schema.Validate(t.Context(), validation.WithContextObject(docVersion))
+					validationErrs = append(validationErrs, schema.Validate(t.Context(), validation.WithContextObject(docVersion))...)
 				} else {
-					validationErrors = schema.Validate(t.Context())
+					validationErrs = append(validationErrs, schema.Validate(t.Context())...)
 				}
-				assert.Empty(t, validationErrors, "Schema validation should pass for: %s", tt.name)
 			}
+
+			validation.SortValidationErrors(validationErrs)
+
+			// Check if any error contains the expected string
+			gotErrs := make([]string, len(validationErrs))
+			for i, validationErr := range validationErrs {
+				gotErrs[i] = validationErr.Error()
+			}
+			assert.Equal(t, tt.wantErrs, gotErrs)
 		})
 	}
 }

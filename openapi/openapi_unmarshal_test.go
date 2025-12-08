@@ -109,9 +109,9 @@ func TestOpenAPI_Unmarshal_Error(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		yaml          string
-		expectedError string
+		name     string
+		yaml     string
+		wantErrs []string
 	}{
 		{
 			name: "missing openapi field",
@@ -119,13 +119,16 @@ func TestOpenAPI_Unmarshal_Error(t *testing.T) {
   title: Test API
   version: 1.0.0
 paths: {}`,
-			expectedError: "field openapi is missing",
+			wantErrs: []string{
+				"[1:1] openapi.openapi invalid OpenAPI version : invalid version ",
+				"[1:1] openapi.openapi is missing",
+			},
 		},
 		{
 			name: "missing info field",
 			yaml: `openapi: 3.1.0
 paths: {}`,
-			expectedError: "field info is missing",
+			wantErrs: []string{"[1:1] openapi.info is missing"},
 		},
 		{
 			name: "invalid openapi version",
@@ -134,7 +137,7 @@ info:
   title: Test API
   version: 1.0.0
 paths: {}`,
-			expectedError: fmt.Sprintf("openapi field only OpenAPI versions between %s and %s are supported", openapi.MinimumSupportedVersion(), openapi.MaximumSupportedVersion()),
+			wantErrs: []string{fmt.Sprintf("[1:10] openapi.openapi only OpenAPI versions between %s and %s are supported", openapi.MinimumSupportedVersion(), openapi.MaximumSupportedVersion())},
 		},
 	}
 
@@ -145,27 +148,18 @@ paths: {}`,
 			ctx := t.Context()
 
 			doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
+			require.NoError(t, err)
 
-			if tt.expectedError != "" {
-				if err != nil {
-					assert.Contains(t, err.Error(), tt.expectedError)
-				} else {
-					require.NotEmpty(t, validationErrs, "Expected validation errors but got none")
-					found := false
-					for _, validationErr := range validationErrs {
-						if assert.Contains(t, validationErr.Error(), tt.expectedError) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error message not found in validation errors")
-				}
+			// Check that all expected error messages are present
+			var errMessages []string
+			for _, err := range validationErrs {
+				errMessages = append(errMessages, err.Error())
 			}
 
-			// Document might still be created even with validation errors
-			if doc != nil {
-				assert.NotNil(t, doc)
-			}
+			assert.Equal(t, tt.wantErrs, errMessages)
+
+			// Document will still be created even with validation errors
+			assert.NotNil(t, doc)
 		})
 	}
 }

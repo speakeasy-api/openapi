@@ -1,31 +1,54 @@
 package core
 
 import (
-	"context"
-
 	"github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
-	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
 
 type Paths struct {
 	marshaller.CoreModel `model:"paths"`
-	sequencedmap.Map[string, *Reference[*PathItem]]
+	*sequencedmap.Map[string, *Reference[*PathItem]]
 
 	Extensions core.Extensions `key:"extensions"`
 }
 
 func NewPaths() *Paths {
 	return &Paths{
-		Map: *sequencedmap.New[string, *Reference[*PathItem]](),
+		Map: sequencedmap.New[string, *Reference[*PathItem]](),
 	}
+}
+
+func (p *Paths) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Node) *yaml.Node {
+	if !p.IsInitialized() {
+		return rootNode
+	}
+
+	if p.RootNode == nil {
+		return rootNode
+	}
+
+	for i := 0; i < len(p.RootNode.Content); i += 2 {
+		if p.RootNode.Content[i].Value == key {
+			return p.RootNode.Content[i]
+		}
+	}
+
+	return rootNode
+}
+
+func (p *Paths) GetMapKeyNodeOrRootLine(key string, rootNode *yaml.Node) int {
+	node := p.GetMapKeyNodeOrRoot(key, rootNode)
+	if node == nil {
+		return -1
+	}
+	return node.Line
 }
 
 type PathItem struct {
 	marshaller.CoreModel `model:"pathItem"`
-	sequencedmap.Map[string, *Operation]
+	*sequencedmap.Map[string, *Operation]
 
 	Summary     marshaller.Node[*string] `key:"summary"`
 	Description marshaller.Node[*string] `key:"description"`
@@ -40,13 +63,32 @@ type PathItem struct {
 
 func NewPathItem() *PathItem {
 	return &PathItem{
-		Map: *sequencedmap.New[string, *Operation](),
+		Map: sequencedmap.New[string, *Operation](),
 	}
 }
-func (n PathItem) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Node) *yaml.Node {
-	keyNode, _, found := yml.GetMapElementNodes(context.Background(), n.RootNode, key)
-	if found {
-		return keyNode
+
+func (p *PathItem) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Node) *yaml.Node {
+	if !p.IsInitialized() {
+		return rootNode
 	}
+
+	if p.RootNode == nil {
+		return rootNode
+	}
+
+	for i := 0; i < len(p.RootNode.Content); i += 2 {
+		if p.RootNode.Content[i].Value == key {
+			return p.RootNode.Content[i]
+		}
+	}
+
 	return rootNode
+}
+
+func (p *PathItem) GetMapKeyNodeOrRootLine(key string, rootNode *yaml.Node) int {
+	node := p.GetMapKeyNodeOrRoot(key, rootNode)
+	if node == nil {
+		return -1
+	}
+	return node.Line
 }

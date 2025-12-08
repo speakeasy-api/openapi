@@ -133,7 +133,7 @@ func createBootstrapPaths() *Paths {
 }
 
 // createUserResponses creates example responses with references
-func createUserResponses() *Responses {
+func createUserResponses() Responses {
 	return NewResponses(
 		sequencedmap.NewElem("201", NewReferencedResponseFromRef("#/components/responses/UserResponse")),
 		sequencedmap.NewElem("400", NewReferencedResponseFromRef("#/components/responses/BadRequestResponse")),

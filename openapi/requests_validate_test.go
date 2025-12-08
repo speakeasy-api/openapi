@@ -2,11 +2,11 @@ package openapi_test
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -130,7 +130,7 @@ func TestRequestBody_Validate_Error(t *testing.T) {
 description: Request body without content
 required: true
 `,
-			wantErrs: []string{"[2:1] requestBody field content is missing"},
+			wantErrs: []string{"[2:1] requestBody.content is missing"},
 		},
 		{
 			name: "empty content",
@@ -138,7 +138,7 @@ required: true
 content: {}
 description: Request body with empty content
 `,
-			wantErrs: []string{"[2:10] requestBody field content is required"},
+			wantErrs: []string{"[2:10] requestBody.content is required"},
 		},
 		{
 			name: "invalid schema in content",
@@ -149,7 +149,10 @@ content:
       type: invalid-type
 description: Request body with invalid schema
 `,
-			wantErrs: []string{"[5:13] schema field type value must be one of"},
+			wantErrs: []string{
+				"[5:13] schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"[5:13] schema.type expected array, got string",
+			},
 		},
 	}
 
@@ -178,16 +181,7 @@ description: Request body with invalid schema
 				}
 			}
 
-			for _, expectedErr := range tt.wantErrs {
-				found := false
-				for _, errMsg := range errMessages {
-					if strings.Contains(errMsg, expectedErr) {
-						found = true
-						break
-					}
-				}
-				require.True(t, found, "expected error message '%s' not found in: %v", expectedErr, errMessages)
-			}
+			assert.Equal(t, tt.wantErrs, errMessages)
 		})
 	}
 }

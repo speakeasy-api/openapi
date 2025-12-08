@@ -1,0 +1,684 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Comprehensive Swagger Test API",
+    "description": "A comprehensive test document that exercises all Swagger 2.0 specification features",
+    "version": "1.0.0",
+    "termsOfService": "https://example.com/terms",
+    "contact": {
+      "name": "API Support",
+      "url": "https://example.com/support",
+      "email": "support@example.com"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "x-custom-info": "custom info extension"
+  },
+  "host": "api.example.com",
+  "basePath": "/v1",
+  "schemes": ["https", "http"],
+  "consumes": ["application/json", "application/xml"],
+  "produces": ["application/json", "application/xml"],
+  "securityDefinitions": {
+    "basic_auth": {
+      "type": "basic",
+      "description": "Basic HTTP authentication"
+    },
+    "api_key": {
+      "type": "apiKey",
+      "name": "X-API-Key",
+      "in": "header",
+      "description": "API key authentication"
+    },
+    "api_key_query": {
+      "type": "apiKey",
+      "name": "api_key",
+      "in": "query",
+      "description": "API key in query parameter"
+    },
+    "oauth2_implicit": {
+      "type": "oauth2",
+      "flow": "implicit",
+      "authorizationUrl": "https://example.com/oauth/authorize",
+      "scopes": {
+        "read:items": "Read access to items",
+        "write:items": "Write access to items"
+      },
+      "description": "OAuth2 implicit flow"
+    },
+    "oauth2_password": {
+      "type": "oauth2",
+      "flow": "password",
+      "tokenUrl": "https://example.com/oauth/token",
+      "scopes": {
+        "admin": "Admin access"
+      }
+    },
+    "oauth2_application": {
+      "type": "oauth2",
+      "flow": "application",
+      "tokenUrl": "https://example.com/oauth/token",
+      "scopes": {
+        "read:public": "Read public data"
+      }
+    },
+    "oauth2_accessCode": {
+      "type": "oauth2",
+      "flow": "accessCode",
+      "authorizationUrl": "https://example.com/oauth/authorize",
+      "tokenUrl": "https://example.com/oauth/token",
+      "scopes": {
+        "read:all": "Read all data",
+        "write:all": "Write all data"
+      }
+    }
+  },
+  "security": [
+    {
+      "api_key": []
+    },
+    {
+      "oauth2_implicit": ["read:items"]
+    }
+  ],
+  "tags": [
+    {
+      "name": "items",
+      "description": "Operations on items",
+      "externalDocs": {
+        "description": "Find out more about items",
+        "url": "https://example.com/docs/items"
+      }
+    },
+    {
+      "name": "users",
+      "description": "User management operations"
+    }
+  ],
+  "externalDocs": {
+    "description": "Find out more about our API",
+    "url": "https://example.com/docs"
+  },
+  "paths": {
+    "/items": {
+      "get": {
+        "tags": ["items"],
+        "summary": "List all items",
+        "description": "Returns a list of items with optional filtering",
+        "operationId": "listItems",
+        "consumes": ["application/json"],
+        "produces": ["application/json", "application/xml"],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return",
+            "required": false,
+            "type": "integer",
+            "format": "int32",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of items to skip",
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "minimum": 0
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "description": "Filter by tags",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "csv"
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "description": "Unique request identifier",
+            "type": "string",
+            "pattern": "^[a-f0-9-]+$"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Item"
+              }
+            },
+            "headers": {
+              "X-Rate-Limit": {
+                "type": "integer",
+                "description": "Requests per hour allowed"
+              },
+              "X-Rate-Limit-Remaining": {
+                "type": "integer",
+                "description": "Requests remaining in the current period"
+              }
+            },
+            "examples": {
+              "application/json": [
+                {
+                  "id": 1,
+                  "name": "Item 1"
+                }
+              ]
+            }
+          },
+          "400": {
+            "$ref": "#/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/responses/Unauthorized"
+          },
+          "default": {
+            "description": "Unexpected error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "oauth2_implicit": ["read:items"]
+          }
+        ],
+        "x-code-samples": [
+          {
+            "lang": "curl",
+            "source": "curl -X GET https://api.example.com/v1/items"
+          }
+        ]
+      },
+      "post": {
+        "tags": ["items"],
+        "summary": "Create a new item",
+        "description": "Creates a new item with the provided data",
+        "operationId": "createItem",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Item to create",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NewItem"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Item created successfully",
+            "schema": {
+              "$ref": "#/definitions/Item"
+            }
+          },
+          "400": {
+            "$ref": "#/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "oauth2_implicit": ["write:items"]
+          }
+        ]
+      }
+    },
+    "/items/{itemId}": {
+      "parameters": [
+        {
+          "$ref": "#/parameters/itemId"
+        }
+      ],
+      "get": {
+        "tags": ["items"],
+        "summary": "Get item by ID",
+        "description": "Returns a single item",
+        "operationId": "getItemById",
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "schema": {
+              "$ref": "#/definitions/Item"
+            }
+          },
+          "404": {
+            "description": "Item not found"
+          }
+        }
+      },
+      "put": {
+        "tags": ["items"],
+        "summary": "Update an item",
+        "description": "Updates an existing item",
+        "operationId": "updateItem",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Updated item data",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Item"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item updated successfully",
+            "schema": {
+              "$ref": "#/definitions/Item"
+            }
+          },
+          "404": {
+            "description": "Item not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["items"],
+        "summary": "Delete an item",
+        "description": "Deletes an item",
+        "operationId": "deleteItem",
+        "responses": {
+          "204": {
+            "description": "Item deleted successfully"
+          },
+          "404": {
+            "description": "Item not found"
+          }
+        }
+      }
+    },
+    "/items/{itemId}/upload": {
+      "post": {
+        "tags": ["items"],
+        "summary": "Upload file for item",
+        "description": "Upload a file associated with an item",
+        "operationId": "uploadFile",
+        "consumes": ["multipart/form-data"],
+        "parameters": [
+          {
+            "$ref": "#/parameters/itemId"
+          },
+          {
+            "name": "file",
+            "in": "formData",
+            "description": "File to upload",
+            "required": true,
+            "type": "file"
+          },
+          {
+            "name": "description",
+            "in": "formData",
+            "description": "File description",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File uploaded successfully"
+          }
+        }
+      }
+    },
+    "/users/{username}": {
+      "get": {
+        "tags": ["users"],
+        "summary": "Get user by username",
+        "operationId": "getUserByName",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "description": "The username",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "schema": {
+              "$ref": "#/definitions/User"
+            }
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/items/search": {
+      "get": {
+        "tags": ["items"],
+        "summary": "Search items",
+        "operationId": "searchItems",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search query",
+            "required": true,
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Category filter",
+            "type": "string",
+            "enum": ["electronics", "clothing", "books"]
+          },
+          {
+            "name": "price_range",
+            "in": "query",
+            "description": "Price range filter",
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            },
+            "collectionFormat": "pipes",
+            "minItems": 2,
+            "maxItems": 2
+          },
+          {
+            "name": "in_stock",
+            "in": "query",
+            "description": "Filter by stock availability",
+            "type": "boolean"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "results": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Item"
+                  }
+                },
+                "total": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/items/batch": {
+      "post": {
+        "tags": ["items"],
+        "summary": "Create multiple items",
+        "operationId": "createBatchItems",
+        "parameters": [
+          {
+            "name": "items",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/NewItem"
+              },
+              "minItems": 1,
+              "maxItems": 100
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Items created"
+          }
+        }
+      }
+    },
+    "/auth/basic": {
+      "get": {
+        "tags": ["users"],
+        "summary": "Test basic auth",
+        "operationId": "testBasicAuth",
+        "responses": {
+          "200": {
+            "description": "Authentication successful"
+          }
+        },
+        "security": [
+          {
+            "basic_auth": []
+          }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "Item": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Unique identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Item name",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "description": {
+          "type": "string",
+          "description": "Item description"
+        },
+        "price": {
+          "type": "number",
+          "format": "double",
+          "minimum": 0,
+          "exclusiveMinimum": true
+        },
+        "quantity": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "status": {
+          "type": "string",
+          "enum": ["available", "pending", "sold"],
+          "default": "available"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "xml": {
+        "name": "Item"
+      },
+      "example": {
+        "id": 1,
+        "name": "Example Item",
+        "price": 19.99
+      }
+    },
+    "NewItem": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "price": {
+          "type": "number",
+          "format": "double",
+          "minimum": 0
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "User": {
+      "type": "object",
+      "required": ["id", "username"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "username": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string",
+          "pattern": "^\\+?[1-9]\\d{1,14}$"
+        },
+        "userStatus": {
+          "type": "integer",
+          "format": "int32",
+          "description": "User Status"
+        }
+      }
+    },
+    "Error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "parameters": {
+    "itemId": {
+      "name": "itemId",
+      "in": "path",
+      "description": "ID of the item",
+      "required": true,
+      "type": "integer",
+      "format": "int64",
+      "minimum": 1
+    },
+    "pageLimit": {
+      "name": "limit",
+      "in": "query",
+      "description": "Number of items to return",
+      "type": "integer",
+      "format": "int32",
+      "default": 20,
+      "minimum": 1,
+      "maximum": 100
+    }
+  },
+  "responses": {
+    "BadRequest": {
+      "description": "Invalid request",
+      "schema": {
+        "$ref": "#/definitions/Error"
+      },
+      "examples": {
+        "application/json": {
+          "code": 400,
+          "message": "Bad Request"
+        }
+      }
+    },
+    "Unauthorized": {
+      "description": "Authentication required",
+      "schema": {
+        "$ref": "#/definitions/Error"
+      },
+      "headers": {
+        "WWW-Authenticate": {
+          "type": "string",
+          "description": "Authentication challenge"
+        }
+      }
+    },
+    "NotFound": {
+      "description": "Resource not found",
+      "schema": {
+        "$ref": "#/definitions/Error"
+      }
+    }
+  },
+  "x-custom-root": {
+    "custom-property": "value"
+  }
+}

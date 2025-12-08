@@ -1,0 +1,163 @@
+openapi: 3.0.0
+info:
+  title: common definitions
+  version: "1.0"
+  description: common definitions
+  license:
+    name: apache 2
+    url: "https://apache.org/licenses/LICENSE-2.0"
+paths:
+  /dummy:
+    get:
+      summary: Dummy endpoint to satisfy OpenAPI validator
+      responses:
+        "200":
+          description: Successful response
+components:
+  responses:
+    internal-server-error:
+      description: Internal server error
+      headers:
+        X-RateLimit-Limit:
+          $ref: "./headers.yaml#/components/headers/X-RateLimit-Limit"
+        X-RateLimit-Remaining:
+          $ref: "./headers.yaml#/components/headers/X-RateLimit-Remaining"
+        X-RateLimit-Reset:
+          $ref: "./headers.yaml#/components/headers/X-RateLimit-Reset"
+        Retry-After:
+          $ref: "./headers.yaml#/components/headers/Retry-After"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+          examples:
+            Example 1:
+              value:
+                type: "https://example.com/v2/problems/internal-server-error"
+                title: Internal Server Error
+                instance: accounts/123
+                detail: "An unexpected error occurred on the server."
+  schemas:
+    IndividualEntity:
+      title: IndividualEntity
+      type: object
+      description: individual entity
+      properties:
+        id:
+          $ref: "#/components/schemas/EntityID"
+        email:
+          $ref: "#/components/schemas/Email"
+        name:
+          $ref: "#/components/schemas/PermissiveString"
+        country:
+          $ref: "./country.yaml#/components/schemas/CountryCode2"
+        birth_date:
+          $ref: "#/components/schemas/Date"
+    CorporateEntity:
+      title: CorporateEntity
+      description: corporate entity
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/EntityID"
+        name:
+          $ref: "#/components/schemas/PermissiveString"
+        email:
+          $ref: "#/components/schemas/Email"
+        country:
+          $ref: "./country.yaml#/components/schemas/CountryCode2"
+        company_name:
+          $ref: "#/components/schemas/PermissiveString"
+        incorporation_date:
+          $ref: "#/components/schemas/Date"
+    ProblemDetail:
+      title: ProblemDetail
+      type: object
+      description: RFC9457
+      required:
+        - type
+        - title
+        - detail
+        - instance
+      properties:
+        type:
+          type: string
+          example: "https://example.com/probs/out-of-credit"
+          maxLength: 2000
+          minLength: 0
+          format: uri
+        title:
+          type: string
+          example: You do not have enough credit.
+          minLength: 0
+          maxLength: 1000
+          pattern: "^[\\w\\s\\-\\.,'\"!?()]+$"
+        detail:
+          type: string
+          example: "Your current balance is 30, but that costs 50."
+          minLength: 0
+          maxLength: 1000
+          pattern: "^[\\w\\s\\-\\.,'\"!?()]+$"
+        instance:
+          type: string
+          example: /account/12345/msgs/abc
+          minLength: 0
+          maxLength: 1000
+          format: uri
+      x-examples:
+        out of credit:
+          type: "https://example.com/probs/out-of-credit"
+          title: You do not have enough credit.
+          detail: "Your current balance is 30, but that costs 50."
+          instance: /account/12345/msgs/abc
+    UUID:
+      title: UUID
+      type: string
+      example: 123e4567-e89b-7023-a456-426614174000
+      minLength: 36
+      maxLength: 36
+      format: uuid
+      pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    EntityID:
+      type: string
+      title: Entity id
+      maxLength: 30
+      minLength: 30
+      pattern: ^xxx-
+      description: entity id
+      example: xxx-01hzy23cq44ae6k7vy5jtp8bef
+    PermissiveString:
+      type: string
+      example: "lorem ipsum"
+      minLength: 0
+      maxLength: 500
+      pattern: '^[\p{L}\p{N}\p{P}\p{S}\s]*$'
+    Date:
+      title: Date
+      description: date
+      type: string
+      format: date
+      minLength: 0
+      maxLength: 200
+      example: "2024-06-31"
+    Email:
+      type: string
+      format: email
+      example: random@example.com
+      maxLength: 254
+  parameters:
+    X-Idempotency-Key:
+      name: X-Idempotency-Key
+      in: header
+      required: true
+      schema:
+        $ref: "#/components/schemas/UUID"
+  headers:
+    X-RateLimit-Limit:
+      $ref: "./headers.yaml#/components/headers/X-RateLimit-Limit"
+    X-RateLimit-Remaining:
+      $ref: "./headers.yaml#/components/headers/X-RateLimit-Remaining"
+    X-RateLimit-Reset:
+      $ref: "./headers.yaml#/components/headers/X-RateLimit-Reset"
+    Retry-After:
+      $ref: "./headers.yaml#/components/headers/Retry-After"

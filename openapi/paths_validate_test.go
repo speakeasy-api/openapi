@@ -309,7 +309,7 @@ get:
     '200':
       description: Successful response
 `,
-			wantErrs: []string{"field url is missing"},
+			wantErrs: []string{"[3:5] server.url is missing"},
 		},
 		{
 			name: "invalid_parameter",
@@ -324,7 +324,7 @@ get:
     '200':
       description: Successful response
 `,
-			wantErrs: []string{"field name is missing"},
+			wantErrs: []string{"[3:5] parameter.name is missing"},
 		},
 		{
 			name:           "unexpected_additional_operations",

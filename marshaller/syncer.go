@@ -306,30 +306,6 @@ func syncArraySlice(ctx context.Context, source any, target any, valueNode *yaml
 		targetVal.Set(reflect.MakeSlice(targetVal.Type(), 0, 0))
 	}
 
-	if targetVal.Len() > sourceVal.Len() {
-		// Shorten the slice
-		tempVal := reflect.MakeSlice(targetVal.Type(), sourceVal.Len(), sourceVal.Len())
-		for i := 0; i < sourceVal.Len(); i++ {
-			tempVal.Index(i).Set(targetVal.Index(i))
-		}
-
-		targetVal.Set(tempVal)
-	}
-
-	if targetVal.Len() < sourceVal.Len() {
-		// Equalize the slice
-		tempVal := reflect.MakeSlice(targetVal.Type(), sourceVal.Len(), sourceVal.Len())
-
-		for i := 0; i < targetVal.Len(); i++ {
-			tempVal.Index(i).Set(targetVal.Index(i))
-		}
-		for i := targetVal.Len(); i < sourceVal.Len(); i++ {
-			tempVal.Index(i).Set(reflect.Zero(targetVal.Type().Elem()))
-		}
-
-		targetVal.Set(tempVal)
-	}
-
 	// When arrays are reordered at the high level (e.g., moving workflows around),
 	// we need to match source elements with their corresponding target core models
 	// by identity (RootNode) rather than by array position to preserve elements.
@@ -362,6 +338,24 @@ func syncArraySlice(ctx context.Context, source any, target any, valueNode *yaml
 
 		elements[i] = currentElementNode
 	}
+
+	// Update targetVal to contain only the synced elements in the correct order
+	// This ensures the target slice reflects the reordering and removals
+	tempVal := reflect.MakeSlice(targetVal.Type(), sourceVal.Len(), sourceVal.Len())
+	for i := 0; i < sourceVal.Len(); i++ {
+		// reorderedTargets[i] contains pointers from .Addr().Interface()
+		// Use dereferenceToLastPtr to handle chains of pointers (e.g., **T -> *T)
+		targetPtr := dereferenceToLastPtr(reflect.ValueOf(reorderedTargets[i]))
+
+		if targetVal.Type().Elem().Kind() == reflect.Ptr {
+			// Target slice expects pointers (*T), set the pointer directly
+			tempVal.Index(i).Set(targetPtr)
+		} else {
+			// Target slice expects values (T), dereference the pointer
+			tempVal.Index(i).Set(targetPtr.Elem())
+		}
+	}
+	targetVal.Set(tempVal)
 
 	return yml.CreateOrUpdateSliceNode(ctx, elements, valueNode), nil
 }

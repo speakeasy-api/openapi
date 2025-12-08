@@ -184,7 +184,7 @@ func TestEmbeddedMapModel_Success(t *testing.T) {
 	embeddedMap.Set("data", "some data")
 
 	model := &tests.TestEmbeddedMapHighModel{
-		Map: *embeddedMap,
+		Map: embeddedMap,
 	}
 
 	tests := []struct {

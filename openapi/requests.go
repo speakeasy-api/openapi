@@ -57,7 +57,7 @@ func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) [
 	errs := []error{}
 
 	if core.Content.Present && r.Content.Len() == 0 {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("requestBody field content is required"), core, core.Content))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("requestBody.content is required"), core, core.Content))
 	}
 
 	for _, content := range r.Content.All() {

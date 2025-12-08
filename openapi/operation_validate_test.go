@@ -139,7 +139,7 @@ externalDocs:
   description: Invalid docs
   url: ":invalid"
 `,
-			wantErrs: []string{"[7:8] externalDocumentation field url is not a valid uri: parse \":invalid\": missing protocol scheme"},
+			wantErrs: []string{"[7:8] externalDocumentation.url is not a valid uri: parse \":invalid\": missing protocol scheme"},
 		},
 		{
 			name: "invalid server URL",
@@ -151,7 +151,7 @@ servers:
   - url: ":invalid"
     description: Invalid server
 `,
-			wantErrs: []string{"[6:10] server field url is not a valid uri: parse \":invalid\": missing protocol scheme"},
+			wantErrs: []string{"[6:10] server.url is not a valid uri: parse \":invalid\": missing protocol scheme"},
 		},
 	}
 

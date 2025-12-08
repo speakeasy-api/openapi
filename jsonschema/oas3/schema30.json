@@ -129,6 +129,9 @@
       "type": "string"
     },
     "default": {},
+    "const": {
+      "description": "Speakeasy addition to 3.0 schema to allow forward compatibility with OpenAPI 3.1"
+    },
     "nullable": {
       "type": "boolean",
       "default": false

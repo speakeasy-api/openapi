@@ -10,6 +10,8 @@ import (
 )
 
 func TestWindowsPathClassification_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name               string
 		windowsPath        string
@@ -46,6 +48,7 @@ func TestWindowsPathClassification_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			classification, err := ClassifyReference(tt.windowsPath)
 			require.NoError(t, err)
 			require.NotNil(t, classification)
@@ -60,6 +63,8 @@ func TestWindowsPathClassification_Success(t *testing.T) {
 }
 
 func TestWindowsPathJoining_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		base     string
@@ -87,8 +92,8 @@ func TestWindowsPathJoining_Success(t *testing.T) {
 		{
 			name:     "windows path with absolute relative path",
 			base:     "C:\\path\\to\\schemas\\user.json",
-			relative: "D:\\other\\path\\schema.json",
-			expected: "D:\\other\\path\\schema.json",
+			relative: "D:\\some\\path\\schema.json",
+			expected: "D:\\some\\path\\schema.json",
 		},
 		{
 			name:     "windows path with fragment",
@@ -100,6 +105,7 @@ func TestWindowsPathJoining_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			classification, err := ClassifyReference(tt.base)
 			require.NoError(t, err)
 			require.NotNil(t, classification)
@@ -113,6 +119,8 @@ func TestWindowsPathJoining_Success(t *testing.T) {
 }
 
 func TestWindowsPathJoinReference_Success(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		base     string
@@ -135,6 +143,7 @@ func TestWindowsPathJoinReference_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, err := JoinReference(tt.base, tt.relative)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)

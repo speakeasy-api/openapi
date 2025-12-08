@@ -177,7 +177,7 @@ server:
   description: Invalid server without URL
 description: Link with invalid server
 `,
-			wantErrs: []string{"field url is missing"},
+			wantErrs: []string{"[4:3] server.url is missing"},
 		},
 		{
 			name: "invalid_operation_ref_uri",
@@ -262,7 +262,7 @@ func TestLink_Validate_OperationID_NotFound(t *testing.T) {
 
 	errs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 	require.NotEmpty(t, errs, "Expected validation error for non-existent operationId")
-	require.Contains(t, errs[0].Error(), "link field operationId value nonExistentOperation does not exist in document")
+	require.Contains(t, errs[0].Error(), "link.operationId value nonExistentOperation does not exist in document")
 }
 
 func TestLink_Validate_OperationID_Found(t *testing.T) {

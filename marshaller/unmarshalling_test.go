@@ -7,6 +7,8 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/marshaller/tests"
 	"github.com/speakeasy-api/openapi/marshaller/tests/core"
+	"github.com/speakeasy-api/openapi/validation"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -151,10 +153,10 @@ func TestUnmarshal_PrimitiveTypes_Error(t *testing.T) {
 stringPtrField: "optional field"
 `,
 			wantErrs: []string{
-				"[2:1] testPrimitiveModel field stringField is missing",
-				"[2:1] testPrimitiveModel field boolField is missing",
-				"[2:1] testPrimitiveModel field intField is missing",
-				"[2:1] testPrimitiveModel field float64Field is missing",
+				"[2:1] testPrimitiveModel.boolField is missing",
+				"[2:1] testPrimitiveModel.float64Field is missing",
+				"[2:1] testPrimitiveModel.intField is missing",
+				"[2:1] testPrimitiveModel.stringField is missing",
 			},
 		},
 		{
@@ -175,7 +177,7 @@ boolField: "not a bool"
 intField: 42
 float64Field: 3.14
 `,
-			wantErrs: []string{"[3:12] testPrimitiveModel.boolField yaml: unmarshal errors:"},
+			wantErrs: []string{"[3:12] testPrimitiveModel.boolField line 3: cannot unmarshal !!str `not a bool` into bool"},
 		},
 		{
 			name: "type mismatch - int field gets string",
@@ -185,7 +187,7 @@ boolField: true
 intField: "not an int"
 float64Field: 3.14
 `,
-			wantErrs: []string{"[4:11] testPrimitiveModel.intField yaml: unmarshal errors:"},
+			wantErrs: []string{"[4:11] testPrimitiveModel.intField line 4: cannot unmarshal !!str `not an int` into int"},
 		},
 		{
 			name: "type mismatch - float field gets string",
@@ -195,7 +197,7 @@ boolField: true
 intField: 42
 float64Field: "not a float"
 `,
-			wantErrs: []string{"[5:15] testPrimitiveModel.float64Field yaml: unmarshal errors:"},
+			wantErrs: []string{"[5:15] testPrimitiveModel.float64Field line 5: cannot unmarshal !!str `not a f...` into float64"},
 		},
 		{
 			name: "multiple validation errors",
@@ -204,9 +206,10 @@ boolField: "not a bool"
 intField: "not an int"
 `,
 			wantErrs: []string{
-				"[2:1] testPrimitiveModel field stringField is missing",
-				"[2:1] testPrimitiveModel field float64Field is missing",
-				"[2:12] testPrimitiveModel.boolField yaml: unmarshal errors:",
+				"[2:1] testPrimitiveModel.float64Field is missing",
+				"[2:1] testPrimitiveModel.stringField is missing",
+				"[2:12] testPrimitiveModel.boolField line 2: cannot unmarshal !!str `not a bool` into bool",
+				"[3:11] testPrimitiveModel.intField line 3: cannot unmarshal !!str `not an int` into int",
 			},
 		},
 	}
@@ -218,6 +221,7 @@ intField: "not an int"
 			validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 			require.NotEmpty(t, validationErrs)
+			validation.SortValidationErrors(validationErrs)
 
 			// Check that all expected error messages are present
 			var errMessages []string
@@ -225,16 +229,7 @@ intField: "not an int"
 				errMessages = append(errMessages, err.Error())
 			}
 
-			for _, expectedErr := range tt.wantErrs {
-				found := false
-				for _, errMsg := range errMessages {
-					if strings.Contains(errMsg, expectedErr) {
-						found = true
-						break
-					}
-				}
-				require.True(t, found, "expected error message '%s' not found in: %v", expectedErr, errMessages)
-			}
+			assert.Equal(t, tt.wantErrs, errMessages)
 		})
 	}
 }
@@ -363,9 +358,9 @@ nestedModel:
   # missing required stringField, boolField, float64Field
 `,
 			wantErrs: []string{
-				"[8:3] testPrimitiveModel field stringField is missing",
-				"[8:3] testPrimitiveModel field boolField is missing",
-				"[8:3] testPrimitiveModel field float64Field is missing",
+				"[8:3] testPrimitiveModel.stringField is missing",
+				"[8:3] testPrimitiveModel.boolField is missing",
+				"[8:3] testPrimitiveModel.float64Field is missing",
 			},
 		},
 		{
@@ -412,7 +407,7 @@ structArrayField:
     float64Field: 4.56
     # missing required stringField in second element
 `,
-			wantErrs: []string{"[12:5] testPrimitiveModel field stringField is missing"},
+			wantErrs: []string{"[12:5] testPrimitiveModel.stringField is missing"},
 		},
 	}
 
@@ -663,7 +658,7 @@ func TestUnmarshal_RequiredPointer_Error(t *testing.T) {
 			yml: `
 optionalPtr: "only optional set"
 `,
-			wantErrs: []string{"[2:1] testRequiredPointerModel field requiredPtr is missing"},
+			wantErrs: []string{"[2:1] testRequiredPointerModel.requiredPtr is missing"},
 		},
 		{
 			name: "required pointer field with null value should be valid",
@@ -773,12 +768,12 @@ func TestUnmarshal_RequiredNilableTypes_Error(t *testing.T) {
 optionalPtr: "only optional set"
 `,
 			wantErrs: []string{
-				"[2:1] testRequiredNilableModel field requiredPtr is missing",
-				"[2:1] testRequiredNilableModel field requiredSlice is missing",
-				"[2:1] testRequiredNilableModel field requiredMap is missing",
-				"[2:1] testRequiredNilableModel field requiredStruct is missing",
-				"[2:1] testRequiredNilableModel field requiredEither is missing",
-				"[2:1] testRequiredNilableModel field requiredRawNode is missing",
+				"[2:1] testRequiredNilableModel.requiredEither is missing",
+				"[2:1] testRequiredNilableModel.requiredMap is missing",
+				"[2:1] testRequiredNilableModel.requiredPtr is missing",
+				"[2:1] testRequiredNilableModel.requiredRawNode is missing",
+				"[2:1] testRequiredNilableModel.requiredSlice is missing",
+				"[2:1] testRequiredNilableModel.requiredStruct is missing",
 			},
 		},
 		{
@@ -789,10 +784,10 @@ requiredSlice: ["item1"]
 # missing requiredMap, requiredStruct, requiredEither, requiredRawNode
 `,
 			wantErrs: []string{
-				"[2:1] testRequiredNilableModel field requiredMap is missing",
-				"[2:1] testRequiredNilableModel field requiredStruct is missing",
-				"[2:1] testRequiredNilableModel field requiredEither is missing",
-				"[2:1] testRequiredNilableModel field requiredRawNode is missing",
+				"[2:1] testRequiredNilableModel.requiredEither is missing",
+				"[2:1] testRequiredNilableModel.requiredMap is missing",
+				"[2:1] testRequiredNilableModel.requiredRawNode is missing",
+				"[2:1] testRequiredNilableModel.requiredStruct is missing",
 			},
 		},
 		{
@@ -809,10 +804,10 @@ requiredEither: "string value"
 requiredRawNode: "raw value"
 `,
 			wantErrs: []string{
-				"[8:3] testPrimitiveModel field stringField is missing",
-				"[8:3] testPrimitiveModel field boolField is missing",
-				"[8:3] testPrimitiveModel field intField is missing",
-				"[8:3] testPrimitiveModel field float64Field is missing",
+				"[8:3] testPrimitiveModel.boolField is missing",
+				"[8:3] testPrimitiveModel.float64Field is missing",
+				"[8:3] testPrimitiveModel.intField is missing",
+				"[8:3] testPrimitiveModel.stringField is missing",
 			},
 		},
 	}
@@ -824,6 +819,7 @@ requiredRawNode: "raw value"
 			validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, tt.yml), &model)
 			require.NoError(t, err)
 			require.NotEmpty(t, validationErrs)
+			validation.SortValidationErrors(validationErrs)
 
 			// Check that all expected error messages are present
 			var errMessages []string
@@ -831,16 +827,7 @@ requiredRawNode: "raw value"
 				errMessages = append(errMessages, err.Error())
 			}
 
-			for _, expectedErr := range tt.wantErrs {
-				found := false
-				for _, errMsg := range errMessages {
-					if strings.Contains(errMsg, expectedErr) {
-						found = true
-						break
-					}
-				}
-				require.True(t, found, "expected error message '%s' not found in: %v", expectedErr, errMessages)
-			}
+			assert.Equal(t, tt.wantErrs, errMessages)
 		})
 	}
 }

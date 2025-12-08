@@ -44,12 +44,12 @@ type TestComplexHighModel struct {
 
 type TestEmbeddedMapHighModel struct {
 	marshaller.Model[core.TestEmbeddedMapModel]
-	sequencedmap.Map[string, string]
+	*sequencedmap.Map[string, string]
 }
 
 type TestEmbeddedMapWithFieldsHighModel struct {
 	marshaller.Model[core.TestEmbeddedMapWithFieldsModel]
-	sequencedmap.Map[string, *TestPrimitiveHighModel]
+	*sequencedmap.Map[string, *TestPrimitiveHighModel]
 	NameField  string
 	Extensions *extensions.Extensions
 }
@@ -108,7 +108,7 @@ const (
 // This reproduces the issue where high-level model expects HTTPMethod keys but core provides string keys
 type TestTypeConversionHighModel struct {
 	marshaller.Model[core.TestTypeConversionCoreModel]
-	sequencedmap.Map[HTTPMethod, *TestPrimitiveHighModel]
+	*sequencedmap.Map[HTTPMethod, *TestPrimitiveHighModel]
 	HTTPMethodField *HTTPMethod
 	Extensions      *extensions.Extensions
 }
@@ -127,4 +127,17 @@ type TestEmbeddedMapWithFieldsPointerHighModel struct {
 	*sequencedmap.Map[string, *TestPrimitiveHighModel]
 	NameField  string
 	Extensions *extensions.Extensions
+}
+
+// TestItemHighModel represents an item with a name and description
+type TestItemHighModel struct {
+	marshaller.Model[core.TestItemModel]
+	Name        string
+	Description string
+}
+
+// TestArrayOfObjectsHighModel contains an array of items
+type TestArrayOfObjectsHighModel struct {
+	marshaller.Model[core.TestArrayOfObjectsModel]
+	Items []*TestItemHighModel
 }

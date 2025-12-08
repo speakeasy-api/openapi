@@ -14,7 +14,7 @@ import (
 
 type Responses struct {
 	marshaller.Model[core.Responses]
-	sequencedmap.Map[string, *ReferencedResponse]
+	*sequencedmap.Map[string, *ReferencedResponse]
 
 	// Default represents the remaining responses not declared in the map.
 	Default *ReferencedResponse
@@ -26,10 +26,18 @@ type Responses struct {
 var _ interfaces.Model[core.Responses] = (*Responses)(nil)
 
 // NewResponses creates a new Responses instance with an initialized map.
-func NewResponses(elements ...*sequencedmap.Element[string, *ReferencedResponse]) *Responses {
-	return &Responses{
-		Map: *sequencedmap.New(elements...),
+func NewResponses(elements ...*sequencedmap.Element[string, *ReferencedResponse]) Responses {
+	return Responses{
+		Map: sequencedmap.New(elements...),
 	}
+}
+
+// Len returns the number of elements in the responses map. nil safe.
+func (r *Responses) Len() int {
+	if r == nil || r.Map == nil {
+		return 0
+	}
+	return r.Map.Len()
 }
 
 // GetDefault returns the value of the Default field. Returns nil if not set.
@@ -60,7 +68,7 @@ func (r *Responses) Populate(source any) error {
 	}
 
 	if !r.IsInitialized() {
-		r.Map = *sequencedmap.New[string, *ReferencedResponse]()
+		r.Map = sequencedmap.New[string, *ReferencedResponse]()
 	}
 
 	// Manually populate the map to handle type conversion from string to HTTPStatusCode
@@ -183,7 +191,7 @@ func (r *Response) Validate(ctx context.Context, opts ...validation.Option) []er
 	errs := []error{}
 
 	if core.Description.Present && r.Description == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("response field description is required"), core, core.Description))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("response.description is required"), core, core.Description))
 	}
 
 	for _, header := range r.GetHeaders().All() {

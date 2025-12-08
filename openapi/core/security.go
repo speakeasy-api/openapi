@@ -23,7 +23,13 @@ type SecurityScheme struct {
 
 type SecurityRequirement struct {
 	marshaller.CoreModel `model:"securityRequirement"`
-	sequencedmap.Map[string, marshaller.Node[[]marshaller.Node[string]]]
+	*sequencedmap.Map[string, marshaller.Node[[]marshaller.Node[string]]]
+}
+
+func NewSecurityRequirement() *SecurityRequirement {
+	return &SecurityRequirement{
+		Map: sequencedmap.New[string, marshaller.Node[[]marshaller.Node[string]]](),
+	}
 }
 
 func (s *SecurityRequirement) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Node) *yaml.Node {
@@ -31,13 +37,25 @@ func (s *SecurityRequirement) GetMapKeyNodeOrRoot(key string, rootNode *yaml.Nod
 		return rootNode
 	}
 
-	for i := 0; i < len(rootNode.Content); i += 2 {
-		if rootNode.Content[i].Value == key {
-			return rootNode.Content[i]
+	if s.RootNode == nil {
+		return rootNode
+	}
+
+	for i := 0; i < len(s.RootNode.Content); i += 2 {
+		if s.RootNode.Content[i].Value == key {
+			return s.RootNode.Content[i]
 		}
 	}
 
 	return rootNode
+}
+
+func (s *SecurityRequirement) GetMapKeyNodeOrRootLine(key string, rootNode *yaml.Node) int {
+	node := s.GetMapKeyNodeOrRoot(key, rootNode)
+	if node == nil {
+		return -1
+	}
+	return node.Line
 }
 
 type OAuthFlows struct {

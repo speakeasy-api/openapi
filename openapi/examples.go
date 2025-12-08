@@ -82,12 +82,12 @@ func (e *Example) Validate(ctx context.Context, opts ...validation.Option) []err
 	errs := []error{}
 
 	if core.Value.Present && core.ExternalValue.Present {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("example field value and externalValue are mutually exclusive"), core, core.Value))
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("example.value and externalValue are mutually exclusive"), core, core.Value))
 	}
 
 	if core.ExternalValue.Present {
 		if _, err := url.Parse(*e.ExternalValue); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(fmt.Sprintf("example field externalValue is not a valid uri: %s", err)), core, core.ExternalValue))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(fmt.Sprintf("example.externalValue is not a valid uri: %s", err)), core, core.ExternalValue))
 		}
 	}
 

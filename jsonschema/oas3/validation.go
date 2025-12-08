@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -48,8 +49,8 @@ func Validate[T Referenceable | Concrete](ctx context.Context, schema *JSONSchem
 		return nil
 	}
 
-	if schema.IsLeft() {
-		return schema.GetLeft().Validate(ctx, opts...)
+	if schema.IsSchema() {
+		return schema.GetSchema().Validate(ctx, opts...)
 	}
 
 	return nil
@@ -98,14 +99,14 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	if err := json.YAMLToJSON(core.RootNode, 0, buf); err != nil {
 		return []error{
-			validation.NewValidationError(validation.NewTypeMismatchError("schema is not valid json: %s", err.Error()), core.RootNode),
+			validation.NewValidationError(fmt.Errorf("schema is not valid json: %w", err), core.RootNode),
 		}
 	}
 
 	jsAny, err := jsValidator.UnmarshalJSON(buf)
 	if err != nil {
 		return []error{
-			validation.NewValidationError(validation.NewTypeMismatchError("schema is not valid json: %s", err.Error()), core.RootNode),
+			validation.NewValidationError(fmt.Errorf("schema is not valid json: %w", err), core.RootNode),
 		}
 	}
 
@@ -144,8 +145,7 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 
 			t, err := jsonpointer.GetTarget(js, errJP, jsonpointer.WithStructTags("key"))
 			if err != nil {
-				// TODO need to potentially handle this in another way
-				errs = append(errs, err)
+				errs = append(errs, validation.NewValidationError(err, js.GetRootNode()))
 				continue
 			}
 
@@ -164,13 +164,29 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 				}
 			}
 
-			switch cause.ErrorKind.(type) {
+			parentName := "schema." + strings.Join(cause.InstanceLocation, ".")
+			msg := cause.ErrorKind.LocalizedString(defaultPrinter)
+
+			var newErr error
+			switch t := cause.ErrorKind.(type) {
 			case *kind.Type:
-				errs = append(errs, validation.NewValidationError(validation.NewTypeMismatchError("schema field %s %s", strings.Join(cause.InstanceLocation, "."), cause.ErrorKind.LocalizedString(defaultPrinter)), valueNode))
+				var want string
+				if len(t.Want) == 1 {
+					want = t.Want[0]
+				} else {
+					want = fmt.Sprintf("one of [%s]", strings.Join(t.Want, ", "))
+				}
+
+				msg = fmt.Sprintf("expected %s, got %s", want, t.Got)
+
+				newErr = validation.NewValidationError(validation.NewTypeMismatchError(parentName, msg), valueNode)
 			case *kind.Required:
-				errs = append(errs, validation.NewValidationError(validation.NewMissingFieldError("schema field %s %s", strings.Join(cause.InstanceLocation, "."), cause.ErrorKind.LocalizedString(defaultPrinter)), valueNode))
+				newErr = validation.NewValidationError(validation.NewMissingFieldError("%s %s", parentName, msg), valueNode)
 			default:
-				errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("schema field %s %s", strings.Join(cause.InstanceLocation, "."), cause.ErrorKind.LocalizedString(defaultPrinter)), valueNode))
+				newErr = validation.NewValidationError(validation.NewValueValidationError("%s %s", parentName, msg), valueNode)
+			}
+			if newErr != nil {
+				errs = append(errs, newErr)
 			}
 		} else {
 			errs = append(errs, getRootCauses(cause, js)...)

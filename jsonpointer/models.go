@@ -107,9 +107,9 @@ func navigateModel(sourceVal reflect.Value, currentPart navigationPart, stack []
 
 	if coreFieldIndex == -1 {
 		// Field not found in core model, try searching the associated YAML node
-		// Check if the model implements CoreModeler interface (which has GetRootNode)
-		if coreModeler, ok := coreAny.(marshaller.CoreModeler); ok {
-			rootNode := coreModeler.GetRootNode()
+		// Check if the high-level model implements RootNodeAccessor interface (which has GetRootNode)
+		if rootNodeAccessor, ok := sourceVal.Interface().(marshaller.RootNodeAccessor); ok {
+			rootNode := rootNodeAccessor.GetRootNode()
 			if rootNode != nil {
 				// Use the existing YAML node navigation logic to search for the key
 				result, newStack, err := getYamlNodeTarget(rootNode, currentPart, stack, currentPath, o)

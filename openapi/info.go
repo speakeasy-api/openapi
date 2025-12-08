@@ -106,16 +106,16 @@ func (i *Info) Validate(ctx context.Context, opts ...validation.Option) []error 
 	errs := []error{}
 
 	if core.Title.Present && i.Title == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("info field title is required"), core, core.Title))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("info.title is required"), core, core.Title))
 	}
 
 	if core.Version.Present && i.Version == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("info field version is required"), core, core.Version))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("info.version is required"), core, core.Version))
 	}
 
 	if core.TermsOfService.Present {
 		if _, err := url.Parse(*i.TermsOfService); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("info field termsOfService is not a valid uri: %s", err), core, core.TermsOfService))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("info.termsOfService is not a valid uri: %s", err), core, core.TermsOfService))
 		}
 	}
 
@@ -186,13 +186,13 @@ func (c *Contact) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	if core.URL.Present {
 		if _, err := url.Parse(*c.URL); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("contact field url is not a valid uri: %s", err), core, core.URL))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("contact.url is not a valid uri: %s", err), core, core.URL))
 		}
 	}
 
 	if core.Email.Present {
 		if _, err := mail.ParseAddress(*c.Email); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("contact field email is not a valid email address: %s", err), core, core.Email))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("contact.email is not a valid email address: %s", err), core, core.Email))
 		}
 	}
 
@@ -207,9 +207,9 @@ type License struct {
 
 	// Name is the name of the license used for the API.
 	Name string
-	// A SPDX license identifier for the license used for the API. This field is mutually exclusive of the URL field.
+	// A SPDX license identifier for the license used for the API. This.is mutually exclusive of the URL field.
 	Identifier *string
-	// URL is the URL to the license used for the API. It MUST be in the format of a URI. This field is mutually exclusive of the Identifier field.
+	// URL is the URL to the license used for the API. It MUST be in the format of a URI. This.is mutually exclusive of the Identifier field.
 	URL *string
 	// Extensions provides a list of extensions to the License object.
 	Extensions *extensions.Extensions
@@ -255,12 +255,12 @@ func (l *License) Validate(ctx context.Context, opts ...validation.Option) []err
 	errs := []error{}
 
 	if core.Name.Present && l.Name == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("license field name is required"), core, core.Name))
+		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("license.name is required"), core, core.Name))
 	}
 
 	if core.URL.Present {
 		if _, err := url.Parse(*l.URL); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("license field url is not a valid uri: %s", err), core, core.URL))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("license.url is not a valid uri: %s", err), core, core.URL))
 		}
 	}
 

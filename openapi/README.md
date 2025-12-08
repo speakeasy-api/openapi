@@ -109,8 +109,8 @@ if len(validationErrs) > 0 {
 	}
 }
 
-if schema.IsLeft() {
-	schemaObj := schema.GetLeft()
+if schema.IsSchema() {
+	schemaObj := schema.GetSchema()
 	fmt.Println("Schema Types:")
 	for _, t := range schemaObj.GetType() {
 		fmt.Printf("  %s\n", t)
@@ -178,9 +178,9 @@ if err := marshaller.Marshal(ctx, schema, buf); err != nil {
 fmt.Printf("%s", buf.String())
 ```
 
-## Validate an OpenAPI document
+## Validate an OpenAPI document and fix validation errors
 
-Shows both automatic validation during unmarshaling and explicit validation.
+Shows automatic validation during unmarshaling, fixing errors programmatically, and re-validating.
 
 ```go
 ctx := context.Background()
@@ -198,18 +198,52 @@ if err != nil {
 	panic(err)
 }
 
+fmt.Printf("Initial validation errors: %d\n", len(validationErrs))
 for _, err := range validationErrs {
-	fmt.Printf("Validation error: %s\n", err.Error())
+	fmt.Printf("  %s\n", err.Error())
 }
 
-additionalErrs := doc.Validate(ctx)
-for _, err := range additionalErrs {
-	fmt.Printf("Additional validation error: %s\n", err.Error())
+fmt.Println("\nFixing validation errors...")
+
+doc.Info.Version = "1.0.0"
+fmt.Println("  ✓ Added missing info.version")
+
+if doc.Paths != nil {
+	if pathItem, ok := doc.Paths.Get("/users/{id}"); ok && pathItem.GetObject() != nil {
+		if post := pathItem.GetObject().Post(); post != nil {
+			post.Responses.Set("200", &openapi.ReferencedResponse{
+				Object: &openapi.Response{
+					Description: "Success",
+				},
+			})
+			fmt.Println("  ✓ Added missing response to POST /users/{id}")
+		}
+	}
 }
 
-if len(validationErrs) == 0 && len(additionalErrs) == 0 {
-	fmt.Println("Document is valid!")
+if doc.Paths != nil {
+	if pathItem, ok := doc.Paths.Get("/invalid"); ok && pathItem.GetObject() != nil {
+		if post := pathItem.GetObject().Post(); post != nil {
+			post.Responses = openapi.NewResponses()
+			post.Responses.Set("200", &openapi.ReferencedResponse{
+				Object: &openapi.Response{
+					Description: "Success",
+				},
+			})
+			fmt.Println("  ✓ Added missing responses to POST /invalid")
+		}
+	}
 }
+
+newValidationErrs := doc.Validate(ctx)
+validation.SortValidationErrors(newValidationErrs)
+
+fmt.Printf("\nValidation errors after fixes: %d\n", len(newValidationErrs))
+for _, err := range newValidationErrs {
+	fmt.Printf("  %s\n", err.Error())
+}
+
+fmt.Printf("\nReduced validation errors from %d to %d\n", len(validationErrs), len(newValidationErrs))
 ```
 
 ## Read and modify an OpenAPI document
@@ -289,14 +323,14 @@ for item := range openapi.Walk(ctx, doc) {
 			}
 			operationCount++
 
-			if operationCount >= 2 {
+			if operationCount >= 3 {
 				return walk.ErrTerminate
 			}
 			return nil
 		},
 		Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
-			if schema.IsLeft() && schema.GetLeft().Type != nil {
-				types := schema.GetLeft().GetType()
+			if schema.IsSchema() && schema.GetSchema().Type != nil {
+				types := schema.GetSchema().GetType()
 				if len(types) > 0 {
 					fmt.Printf("Found Schema of type: %s\n", types[0])
 				}
@@ -447,18 +481,16 @@ if doc.Paths != nil {
 				}
 			}
 
-			if operation.Responses != nil {
-				for statusCode, response := range operation.Responses.All() {
-					if response.IsReference() && !response.IsResolved() {
-						fmt.Printf("    Resolving response reference [%s]: %s\n", statusCode, response.GetReference())
-						_, err := response.Resolve(ctx, resolveOpts)
-						if err != nil {
-							fmt.Printf("    Failed to resolve response: %v\n", err)
-							continue
-						}
-						if respObj := response.GetObject(); respObj != nil {
-							fmt.Printf("    Response resolved: %s\n", respObj.Description)
-						}
+			for statusCode, response := range operation.Responses.All() {
+				if response.IsReference() && !response.IsResolved() {
+					fmt.Printf("    Resolving response reference [%s]: %s\n", statusCode, response.GetReference())
+					_, err := response.Resolve(ctx, resolveOpts)
+					if err != nil {
+						fmt.Printf("    Failed to resolve response: %v\n", err)
+						continue
+					}
+					if respObj := response.GetObject(); respObj != nil {
+						fmt.Printf("    Response resolved: %s\n", respObj.Description)
 					}
 				}
 			}
@@ -605,8 +637,8 @@ doc := &openapi.OpenAPI{
 if doc.Components != nil && doc.Components.Schemas != nil {
 	for name, schema := range doc.Components.Schemas.All() {
 		fmt.Printf("Found schema component: %s\n", name)
-		if schema.IsLeft() && schema.GetLeft().Type != nil {
-			types := schema.GetLeft().GetType()
+		if schema.IsSchema() && schema.GetSchema().Type != nil {
+			types := schema.GetSchema().GetType()
 			if len(types) > 0 {
 				fmt.Printf("  Type: %s\n", types[0])
 			}

@@ -134,7 +134,7 @@ func TestHash(t *testing.T) {
 		{
 			name: "model with embedded map",
 			v: &tests.TestEmbeddedMapWithFieldsHighModel{
-				Map: *sequencedmap.New(sequencedmap.NewElem("hello", &tests.TestPrimitiveHighModel{
+				Map: sequencedmap.New(sequencedmap.NewElem("hello", &tests.TestPrimitiveHighModel{
 					StringField: "world",
 				})),
 				NameField: "some name",

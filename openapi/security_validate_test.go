@@ -127,7 +127,7 @@ func TestSecurityScheme_Validate_Error(t *testing.T) {
 			yml: `
 description: Some security scheme
 `,
-			wantErrs: []string{"field type is missing"},
+			wantErrs: []string{"[2:1] securityScheme.type is missing"},
 		},
 		{
 			name: "invalid_type",

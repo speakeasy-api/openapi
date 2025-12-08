@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -175,7 +174,7 @@ info:
   version: 1.0.0
 paths: {}
 `,
-			wantErrs: []string{"openapi field openapi invalid OpenAPI version invalid-version"},
+			wantErrs: []string{"openapi.openapi invalid OpenAPI version invalid-version"},
 		},
 		{
 			name: "unsupported_openapi_version",
@@ -186,7 +185,7 @@ info:
   version: 1.0.0
 paths: {}
 `,
-			wantErrs: []string{fmt.Sprintf("openapi field only OpenAPI versions between %s and %s are supported", openapi.MinimumSupportedVersion(), openapi.MaximumSupportedVersion())},
+			wantErrs: []string{"openapi.openapi only OpenAPI versions between"},
 		},
 		{
 			name: "invalid_info_missing_title",
@@ -196,7 +195,7 @@ info:
   version: 1.0.0
 paths: {}
 `,
-			wantErrs: []string{"field title is missing"},
+			wantErrs: []string{"[4:3] info.title is missing"},
 		},
 		{
 			name: "invalid_info_missing_version",
@@ -206,7 +205,7 @@ info:
   title: Test API
 paths: {}
 `,
-			wantErrs: []string{"field version is missing"},
+			wantErrs: []string{"[4:3] info.version is missing"},
 		},
 		{
 			name: "invalid_server",
@@ -219,7 +218,7 @@ servers:
   - description: Invalid server without URL
 paths: {}
 `,
-			wantErrs: []string{"field url is missing"},
+			wantErrs: []string{"[7:5] server.url is missing"},
 		},
 		{
 			name: "invalid_tag",
@@ -232,7 +231,7 @@ tags:
   - description: Tag without name
 paths: {}
 `,
-			wantErrs: []string{"field name is missing"},
+			wantErrs: []string{"[7:5] tag.name is missing"},
 		},
 		{
 			name: "invalid_external_docs",
@@ -245,7 +244,7 @@ externalDocs:
   description: External docs without URL
 paths: {}
 `,
-			wantErrs: []string{"field url is missing"},
+			wantErrs: []string{"[7:3] externalDocumentation.url is missing"},
 		},
 	}
 

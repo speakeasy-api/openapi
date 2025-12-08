@@ -1,0 +1,29 @@
+openapi: 3.1.0
+info:
+  title: Test API with Extensions and Unknown Properties
+  version: 1.0.0
+  x-api-id: test-123
+  unknownProperty: should-be-removed
+  x-go-package: myapi
+paths:
+  /test:
+    get:
+      summary: Test endpoint
+      operationId: test
+      x-custom: keep-this
+      anotherUnknown: remove-this
+      unknownField: also-remove
+      responses:
+        "200":
+          description: Success
+          x-response-code: 200
+          invalidProp: remove-me
+components:
+  schemas:
+    TestSchema:
+      type: object
+      x-go-type: TestSchema
+      notInSpec: should-go
+      properties:
+        field:
+          type: string

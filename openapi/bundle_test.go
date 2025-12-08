@@ -173,6 +173,47 @@ func TestBundle_SiblingDirectories_Success(t *testing.T) {
 	assert.Equal(t, string(expectedBytes), string(actualYAML), "Bundled document should match expected output")
 }
 
+func TestBundle_Issue50_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Load the input document
+	inputFile, err := os.Open("testdata/bundle/issue50/test/testapi.yaml")
+	require.NoError(t, err)
+	defer inputFile.Close()
+
+	inputDoc, validationErrs, err := openapi.Unmarshal(ctx, inputFile)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs, "Input document should be valid")
+
+	// Configure bundling options
+	opts := openapi.BundleOptions{
+		ResolveOptions: openapi.ResolveOptions{
+			RootDocument:   inputDoc,
+			TargetLocation: "testdata/bundle/issue50/test/testapi.yaml",
+		},
+		NamingStrategy: openapi.BundleNamingFilePath,
+	}
+
+	// Bundle all external references
+	err = openapi.Bundle(ctx, inputDoc, opts)
+	require.NoError(t, err)
+
+	// Marshal the bundled document to YAML
+	var buf bytes.Buffer
+	err = openapi.Marshal(ctx, inputDoc, &buf)
+	require.NoError(t, err)
+	actualYAML := buf.Bytes()
+
+	// Load the expected output
+	expectedBytes, err := os.ReadFile("testdata/bundle/issue50/expected.yaml")
+	require.NoError(t, err)
+
+	// Compare the actual output with expected output
+	assert.Equal(t, string(expectedBytes), string(actualYAML), "Bundled document should match expected output")
+}
+
 func TestBundle_AdditionalOperations_Success(t *testing.T) {
 	t.Parallel()
 

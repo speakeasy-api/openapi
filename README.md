@@ -69,6 +69,10 @@ The `arazzo` package provides an API for working with Arazzo documents including
 
 The `openapi` package provides an API for working with OpenAPI documents including reading, creating, mutating, walking, validating and upgrading them. Supports both OpenAPI 3.0.x and 3.1.x specifications.
 
+### [swagger](./swagger)
+
+The `swagger` package provides an API for working with Swagger 2.0 documents including reading, creating, mutating, walking, validating, and upgrading them to OpenAPI 3.0.
+
 ### [overlay](./overlay)
 
 The `overlay` package provides an API for working with OpenAPI Overlays including applying overlays to specifications, comparing specifications to generate overlays, and validating overlay documents.
@@ -93,22 +97,30 @@ go install github.com/speakeasy-api/openapi/cmd/openapi@latest
 
 ### Usage
 
-The CLI provides three main command groups:
+The CLI provides four main command groups:
 
-- **`openapi spec`** - Commands for working with OpenAPI specifications ([documentation](./openapi/cmd/README.md))
+- **`openapi spec`** - Commands for working with OpenAPI specifications ([documentation](./cmd/openapi/commands/openapi/README.md))
   - `bootstrap` - Create a new OpenAPI document with best practice examples
   - `bundle` - Bundle external references into components section
-  - `clean` - Remove unused components from an OpenAPI specification
+  - `clean` - Remove unused components and unused top-level tags from an OpenAPI specification
+  - `explore` - Interactively explore an OpenAPI specification in the terminal
   - `inline` - Inline all references in an OpenAPI specification
   - `join` - Join multiple OpenAPI documents into a single document
+  - `localize` - Localize an OpenAPI specification by copying external references to a target directory
   - `optimize` - Optimize an OpenAPI specification by deduplicating inline schemas
+  - `sanitize` - Remove unwanted elements from an OpenAPI specification
+  - `snip` - Remove selected operations from an OpenAPI specification (interactive or CLI)
   - `upgrade` - Upgrade an OpenAPI specification to the latest supported version
   - `validate` - Validate an OpenAPI specification document
 
-- **`openapi arazzo`** - Commands for working with Arazzo workflow documents ([documentation](./arazzo/cmd/README.md))
+- **`openapi swagger`** - Commands for working with Swagger 2.0 documents ([documentation](./cmd/openapi/commands/swagger/README.md))
+  - `validate` - Validate a Swagger 2.0 specification document
+  - `upgrade` - Upgrade a Swagger 2.0 specification to OpenAPI 3.0
+
+- **`openapi arazzo`** - Commands for working with Arazzo workflow documents ([documentation](./cmd/openapi/commands/arazzo/README.md))
   - `validate` - Validate an Arazzo workflow document
 
-- **`openapi overlay`** - Commands for working with OpenAPI overlays ([documentation](./overlay/cmd/README.md))
+- **`openapi overlay`** - Commands for working with OpenAPI overlays ([documentation](./cmd/openapi/commands/overlay/README.md))
   - `apply` - Apply an overlay to an OpenAPI specification
   - `compare` - Compare two specifications and generate an overlay describing differences
   - `validate` - Validate an OpenAPI overlay document
@@ -133,6 +145,12 @@ openapi overlay apply --overlay overlay.yaml --schema spec.yaml
 
 # Validate an Arazzo workflow document
 openapi arazzo validate ./workflow.arazzo.yaml
+
+# Validate a Swagger 2.0 document
+openapi swagger validate ./api.swagger.yaml
+
+# Upgrade Swagger 2.0 to OpenAPI 3.0
+openapi swagger upgrade ./api.swagger.yaml ./openapi.yaml
 ```
 
 For detailed usage instructions for each command group, see the individual documentation linked above.

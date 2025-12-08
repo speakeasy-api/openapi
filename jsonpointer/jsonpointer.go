@@ -313,6 +313,23 @@ func getKeyBasedStructTarget(sourceVal reflect.Value, currentPart navigationPart
 		}
 	}
 
+	// Field not found in struct fields, try searching the associated YAML node if available
+	// Check if the struct implements RootNodeAccessor interface (which has GetRootNode)
+	type rootNodeAccessor interface {
+		GetRootNode() *yaml.Node
+	}
+
+	if rootNodeAccessor, ok := sourceVal.Interface().(rootNodeAccessor); ok {
+		rootNode := rootNodeAccessor.GetRootNode()
+		if rootNode != nil {
+			// Use the existing YAML node navigation logic to search for the key
+			result, newStack, err := getYamlNodeTarget(rootNode, currentPart, stack, currentPath, o)
+			if err == nil {
+				return result, newStack, nil
+			}
+		}
+	}
+
 	return nil, nil, ErrNotFound.Wrap(fmt.Errorf("key %s not found in %v at %s", key, sourceVal.Type(), currentPath))
 }
 

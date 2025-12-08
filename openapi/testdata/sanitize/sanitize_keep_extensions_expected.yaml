@@ -1,0 +1,24 @@
+openapi: 3.1.0
+info:
+  title: Test API with Extensions and Unknown Properties
+  version: 1.0.0
+  x-api-id: test-123
+  x-go-package: myapi
+paths:
+  /test:
+    get:
+      summary: Test endpoint
+      operationId: test
+      x-custom: keep-this
+      responses:
+        "200":
+          description: Success
+          x-response-code: 200
+components:
+  schemas:
+    TestSchema:
+      type: object
+      x-go-type: TestSchema
+      properties:
+        field:
+          type: string

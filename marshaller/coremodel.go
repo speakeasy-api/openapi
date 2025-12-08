@@ -17,6 +17,7 @@ import (
 type CoreModeler interface {
 	GetRootNode() *yaml.Node
 	SetRootNode(rootNode *yaml.Node)
+	SetDocumentNode(documentNode *yaml.Node)
 	GetValid() bool
 	GetValidYaml() bool
 	SetValid(valid, validYaml bool)
@@ -24,13 +25,17 @@ type CoreModeler interface {
 	SetConfig(config *yml.Config)
 	GetConfig() *yml.Config
 	Marshal(ctx context.Context, w io.Writer) error
+	SetUnknownProperties(props []string)
+	GetUnknownProperties() []string
 }
 
 type CoreModel struct {
-	RootNode  *yaml.Node  // RootNode is the node that was unmarshaled into this model
-	Valid     bool        // Valid indicates whether the model passed validation, ie all its required fields were present and ValidYaml is true
-	ValidYaml bool        // ValidYaml indicates whether the model's underlying YAML representation is valid, for example a mapping node was received for a model
-	Config    *yml.Config // Generally only set on the top-level model that was unmarshaled
+	RootNode          *yaml.Node  // RootNode is the node that was unmarshaled into this model
+	DocumentNode      *yaml.Node  // DocumentNode is the top-level document node (only set for top-level models) - contains header comments
+	Valid             bool        // Valid indicates whether the model passed validation, ie all its required fields were present and ValidYaml is true
+	ValidYaml         bool        // ValidYaml indicates whether the model's underlying YAML representation is valid, for example a mapping node was received for a model
+	Config            *yml.Config // Generally only set on the top-level model that was unmarshaled
+	UnknownProperties []string    // UnknownProperties lists property keys that were present in the YAML but not defined in the model (excludes extensions which start with "x-")
 }
 
 var _ CoreModeler = (*CoreModel)(nil)
@@ -48,6 +53,15 @@ func (c CoreModel) GetRootNodeLine() int {
 
 func (c *CoreModel) SetRootNode(rootNode *yaml.Node) {
 	c.RootNode = rootNode
+
+	// If we have a DocumentNode, update its content to point to the new RootNode
+	if c.DocumentNode != nil && c.DocumentNode.Kind == yaml.DocumentNode {
+		c.DocumentNode.Content = []*yaml.Node{rootNode}
+	}
+}
+
+func (c *CoreModel) SetDocumentNode(documentNode *yaml.Node) {
+	c.DocumentNode = documentNode
 }
 
 func (c CoreModel) GetValid() bool {
@@ -84,6 +98,18 @@ func (c *CoreModel) SetConfig(config *yml.Config) {
 
 func (c *CoreModel) GetConfig() *yml.Config {
 	return c.Config
+}
+
+func (c *CoreModel) SetUnknownProperties(props []string) {
+	c.UnknownProperties = props
+}
+
+func (c *CoreModel) GetUnknownProperties() []string {
+	if c.UnknownProperties == nil {
+		return []string{}
+	}
+
+	return c.UnknownProperties
 }
 
 // GetJSONPointer returns the JSON pointer path from the topLevelRootNode to this CoreModel's RootNode.
@@ -137,20 +163,27 @@ func (c *CoreModel) GetJSONPath(topLevelRootNode *yaml.Node) string {
 func (c *CoreModel) Marshal(ctx context.Context, w io.Writer) error {
 	cfg := yml.GetConfigFromContext(ctx)
 
+	// Use DocumentNode if available for YAML output (to preserve comments)
+	// For JSON output, use RootNode since JSON doesn't support comments
+	nodeToMarshal := c.RootNode
+	if c.DocumentNode != nil && cfg.OutputFormat == yml.OutputFormatYAML {
+		nodeToMarshal = c.DocumentNode
+	}
+
 	switch cfg.OutputFormat {
 	case yml.OutputFormatYAML:
 		// Check if we need to reset node styles (original was JSON, now want YAML)
 		if cfg.OriginalFormat == yml.OutputFormatJSON && cfg.OutputFormat == yml.OutputFormatYAML {
-			resetNodeStylesForYAML(c.RootNode, cfg)
+			resetNodeStylesForYAML(nodeToMarshal, cfg)
 		}
 
 		enc := yaml.NewEncoder(w)
 		enc.SetIndent(cfg.Indentation)
-		if err := enc.Encode(c.RootNode); err != nil {
+		if err := enc.Encode(nodeToMarshal); err != nil {
 			return err
 		}
 	case yml.OutputFormatJSON:
-		if err := json.YAMLToJSON(c.RootNode, cfg.Indentation, w); err != nil {
+		if err := json.YAMLToJSONWithConfig(nodeToMarshal, cfg.IndentationStyle.ToIndent(), cfg.Indentation, cfg.TrailingNewline, w); err != nil {
 			return err
 		}
 	default:

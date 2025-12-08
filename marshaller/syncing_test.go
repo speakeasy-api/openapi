@@ -327,7 +327,7 @@ func TestSync_EmbeddedMapWithFields_Success(t *testing.T) {
 	}
 
 	// Initialize the embedded map
-	highModel.Map = *sequencedmap.New[string, *tests.TestPrimitiveHighModel]()
+	highModel.Map = sequencedmap.New[string, *tests.TestPrimitiveHighModel]()
 	highModel.Set("syncKey1", dynamicVal1)
 	highModel.Set("syncKey2", dynamicVal2)
 
@@ -389,7 +389,7 @@ func TestSync_EmbeddedMap_Success(t *testing.T) {
 	highModel := tests.TestEmbeddedMapHighModel{}
 
 	// Initialize the embedded map
-	highModel.Map = *sequencedmap.New[string, string]()
+	highModel.Map = sequencedmap.New[string, string]()
 	highModel.Set("syncKey1", "synced value1")
 	highModel.Set("syncKey2", "synced value2")
 	highModel.Set("syncKey3", "synced value3")
@@ -704,7 +704,7 @@ func TestSync_TypeConversionModel_Success(t *testing.T) {
 	}
 
 	// Initialize the embedded map with HTTPMethod keys
-	highModel.Map = *sequencedmap.New[tests.HTTPMethod, *tests.TestPrimitiveHighModel]()
+	highModel.Map = sequencedmap.New[tests.HTTPMethod, *tests.TestPrimitiveHighModel]()
 	highModel.Set(tests.HTTPMethodPost, postOp)
 	highModel.Set(tests.HTTPMethodGet, getOp)
 	highModel.Set(tests.HTTPMethodPut, putOp)
@@ -1097,7 +1097,7 @@ func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
 		t.Parallel()
 		// Test value embedded map
 		valueModel := tests.TestEmbeddedMapHighModel{}
-		valueModel.Map = *sequencedmap.New[string, string]()
+		valueModel.Map = sequencedmap.New[string, string]()
 		valueModel.Set("key1", "val_value1")
 		valueModel.Set("key2", "val_value2")
 
@@ -1122,7 +1122,7 @@ func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
 		ptrModel.Set("shared_key", "shared_value")
 
 		valueModel := tests.TestEmbeddedMapHighModel{}
-		valueModel.Map = *sequencedmap.New[string, string]()
+		valueModel.Map = sequencedmap.New[string, string]()
 		valueModel.Set("shared_key", "shared_value")
 
 		// Sync both models
@@ -1142,4 +1142,95 @@ func TestSync_EmbeddedMapComparison_PointerVsValue_Success(t *testing.T) {
 		require.Equal(t, string(ptrYAML), string(valueYAML))
 		require.Equal(t, "shared_key: shared_value\n", string(ptrYAML))
 	})
+}
+
+func TestSync_ArraySubset_Success(t *testing.T) {
+	t.Parallel()
+
+	// Create high-level model with 3 items
+	itemOne := &tests.TestItemHighModel{
+		Name:        "one",
+		Description: "First item",
+	}
+	itemFour := &tests.TestItemHighModel{
+		Name:        "four",
+		Description: "Fourth item",
+	}
+	itemSix := &tests.TestItemHighModel{
+		Name:        "six",
+		Description: "Sixth item",
+	}
+
+	highModel := tests.TestArrayOfObjectsHighModel{
+		Items: []*tests.TestItemHighModel{itemOne, itemFour, itemSix},
+	}
+
+	// Populate core model with 6 items from YAML
+	initialYAML := `items:
+    - name: three
+      description: Third item
+    - name: five
+      description: Fifth item
+    - name: one
+      description: First item
+    - name: four
+      description: Fourth item
+    - name: second
+      description: Second item
+    - name: six
+      description: Sixth item
+`
+	var rootNode yaml.Node
+	err := yaml.Unmarshal([]byte(initialYAML), &rootNode)
+	require.NoError(t, err)
+
+	coreModel := highModel.GetCore()
+	coreModel.SetRootNode(rootNode.Content[0])
+
+	_, err = marshaller.UnmarshalModel(t.Context(), rootNode.Content[0], coreModel)
+	require.NoError(t, err)
+
+	// Link high-level items to their corresponding core items
+	for _, item := range coreModel.Items.Value {
+		switch item.Name.Value {
+		case "one":
+			itemOne.SetCore(item)
+		case "four":
+			itemFour.SetCore(item)
+		case "six":
+			itemSix.SetCore(item)
+		}
+	}
+
+	// Sync high model subset to core model
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	require.NoError(t, err)
+	require.NotNil(t, resultNode)
+
+	// Verify synced array matches high model subset
+	items := coreModel.Items.Value
+	require.Len(t, items, 3)
+
+	require.Equal(t, "one", items[0].Name.Value)
+	require.Equal(t, "First item", items[0].Description.Value)
+
+	require.Equal(t, "four", items[1].Name.Value)
+	require.Equal(t, "Fourth item", items[1].Description.Value)
+
+	require.Equal(t, "six", items[2].Name.Value)
+	require.Equal(t, "Sixth item", items[2].Description.Value)
+
+	// Verify YAML output
+	expectedYAML := `items:
+    - name: one
+      description: First item
+    - name: four
+      description: Fourth item
+    - name: six
+      description: Sixth item
+`
+
+	actualYAML, err := yaml.Marshal(coreModel.GetRootNode())
+	require.NoError(t, err)
+	require.Equal(t, expectedYAML, string(actualYAML))
 }

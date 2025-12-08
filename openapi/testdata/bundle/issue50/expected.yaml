@@ -1,0 +1,305 @@
+openapi: 3.1.0
+info:
+  title: test API
+  version: "0.1"
+  description: test
+  license:
+    name: apache 2
+    url: "https://apache.org/licenses/LICENSE-2.0"
+servers:
+  - url: "https://localhost:8086"
+    description: local dev server
+security:
+  - bearerAuth: []
+paths:
+  "/v3/entities":
+    post:
+      summary: create a entity
+      operationId: post-v3-entities
+      tags:
+        - entities
+      x-permissions:
+        - "entity:create"
+      requestBody:
+        $ref: "#/components/requestBodies/create-entity"
+      responses:
+        "201":
+          $ref: "#/components/responses/entity-response"
+        "500":
+          $ref: "#/components/responses/internal-server-error"
+      parameters:
+        - $ref: "#/components/parameters/X-Idempotency-Key"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    CreateEntity:
+      description: Create a entity
+      oneOf:
+        - $ref: "#/components/schemas/CreateEntityIndividual"
+        - $ref: "#/components/schemas/CreateEntityCorporate"
+      discriminator:
+        propertyName: entity_type
+        mapping:
+          individual: "#/components/schemas/CreateEntityIndividual"
+          corporate: "#/components/schemas/CreateEntityCorporate"
+    CreateEntityIndividual:
+      title: CreateEntityIndividual
+      description: Create a entity individual
+      type: object
+      required:
+        - entity_type
+        - name
+      properties:
+        entity_type:
+          type: string
+          enum:
+            - individual
+        email:
+          $ref: "#/components/schemas/Email"
+        name:
+          type: string
+          example: John
+          maxLength: 100
+          pattern: "^[A-Za-z\\s\\-\\.']+"
+        street:
+          type: string
+          example: 1 rue de la bourse
+          maxLength: 255
+          pattern: "^[\\p{L}\\p{N}\\s\\.,\\-#'\"/()]+$"
+        city:
+          $ref: "#/components/schemas/PermissiveString"
+        country:
+          $ref: "#/components/schemas/CountryCode2"
+        birth_date:
+          $ref: "#/components/schemas/Date"
+    CreateEntityCorporate:
+      title: CreateEntityCorporate
+      description: Create a entity corporate
+      type: object
+      required:
+        - entity_type
+        - company_name
+      properties:
+        entity_type:
+          type: string
+          enum:
+            - corporate
+        email:
+          $ref: "#/components/schemas/Email"
+        country:
+          $ref: "#/components/schemas/CountryCode2"
+        company_name:
+          type: string
+          example: Wisoky - Berge
+          maxLength: 100
+          pattern: '^[a-zA-Z0-9\s\-&,\.]+$'
+        incorporation_date:
+          $ref: "#/components/schemas/Date"
+    UUID:
+      type: string
+      title: UUID
+      maxLength: 36
+      minLength: 36
+      pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      format: uuid
+      example: 123e4567-e89b-7023-a456-426614174000
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          maxLength: 2000
+          minLength: 0
+          format: uri
+          example: "https://example.com/probs/out-of-credit"
+        title:
+          type: string
+          maxLength: 1000
+          minLength: 0
+          pattern: ^[\w\s\-\.,'"!?()]+$
+          example: You do not have enough credit.
+        detail:
+          type: string
+          maxLength: 1000
+          minLength: 0
+          pattern: ^[\w\s\-\.,'"!?()]+$
+          example: "Your current balance is 30, but that costs 50."
+        instance:
+          type: string
+          maxLength: 1000
+          minLength: 0
+          format: uri
+          example: /account/12345/msgs/abc
+      title: ProblemDetail
+      required:
+        - type
+        - title
+        - detail
+        - instance
+      description: RFC9457
+      x-examples:
+        out of credit:
+          type: "https://example.com/probs/out-of-credit"
+          title: You do not have enough credit.
+          detail: "Your current balance is 30, but that costs 50."
+          instance: /account/12345/msgs/abc
+    Email:
+      type: string
+      maxLength: 254
+      format: email
+      example: random@example.com
+    PermissiveString:
+      type: string
+      maxLength: 500
+      minLength: 0
+      pattern: ^[\p{L}\p{N}\p{P}\p{S}\s]*$
+      example: "lorem ipsum"
+    CountryCode2:
+      type: string
+      title: CountryCode2
+      enum:
+        - AW
+        - AF
+        - FR
+      example: FR
+    Date:
+      type: string
+      title: Date
+      maxLength: 200
+      minLength: 0
+      format: date
+      description: date
+      example: "2024-06-31"
+    IndividualEntity:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/EntityID'
+        email:
+          $ref: '#/components/schemas/Email'
+        name:
+          $ref: '#/components/schemas/PermissiveString'
+        country:
+          $ref: '#/components/schemas/CountryCode2'
+        birth_date:
+          $ref: '#/components/schemas/Date'
+      title: IndividualEntity
+      description: individual entity
+    EntityID:
+      type: string
+      title: Entity id
+      maxLength: 30
+      minLength: 30
+      pattern: ^xxx-
+      description: entity id
+      example: xxx-01hzy23cq44ae6k7vy5jtp8bef
+    CorporateEntity:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/EntityID'
+        name:
+          $ref: '#/components/schemas/PermissiveString'
+        email:
+          $ref: '#/components/schemas/Email'
+        country:
+          $ref: '#/components/schemas/CountryCode2'
+        company_name:
+          $ref: '#/components/schemas/PermissiveString'
+        incorporation_date:
+          $ref: '#/components/schemas/Date'
+      title: CorporateEntity
+      description: corporate entity
+  responses:
+    entity-response:
+      description: Entity details
+      headers:
+        X-RateLimit-Limit:
+          $ref: "#/components/headers/X-RateLimit-Limit"
+        X-RateLimit-Remaining:
+          $ref: "#/components/headers/X-RateLimit-Remaining"
+        X-RateLimit-Reset:
+          $ref: "#/components/headers/X-RateLimit-Reset"
+        Retry-After:
+          $ref: "#/components/headers/Retry-After"
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/IndividualEntity"
+              - $ref: "#/components/schemas/CorporateEntity"
+    internal-server-error:
+      description: Internal server error
+      headers:
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            Example 1:
+              value:
+                type: "https://example.com/v2/problems/internal-server-error"
+                title: Internal Server Error
+                instance: accounts/123
+                detail: "An unexpected error occurred on the server."
+  requestBodies:
+    create-entity:
+      description: Entity creation payload
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/CreateEntity"
+  parameters:
+    X-Idempotency-Key:
+      name: X-Idempotency-Key
+      in: header
+      required: true
+      schema:
+        $ref: '#/components/schemas/UUID'
+  headers:
+    X-RateLimit-Limit:
+      description: The maximum number of requests that the client is allowed to make in this window.
+      schema:
+        type: integer
+        maximum: 10000
+        minimum: 1
+        format: int32
+      example: 100
+    X-RateLimit-Remaining:
+      description: The number of requests remaining in the current rate limit window.
+      schema:
+        type: integer
+        maximum: 10000
+        minimum: 0
+        format: int32
+      example: 99
+    X-RateLimit-Reset:
+      description: The time at which the current rate limit window resets in UTC epoch seconds.
+      schema:
+        type: integer
+        maximum: 2.147483647e+09
+        minimum: 0
+        format: int32
+      example: 1652364907
+    Retry-After:
+      description: The number of seconds to wait before making a new request when rate limit is exceeded.
+      schema:
+        type: integer
+        maximum: 3600
+        minimum: 0
+        format: int32
+      example: 60
+tags:
+  - name: entities
+    description: Operations related to entity management

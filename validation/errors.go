@@ -37,18 +37,22 @@ func (e Error) GetColumnNumber() int {
 	return e.Node.Column
 }
 
+// ValueNodeGetter provides access to value nodes for error reporting.
 type ValueNodeGetter interface {
 	GetValueNodeOrRoot(root *yaml.Node) *yaml.Node
 }
 
+// SliceNodeGetter provides access to slice element nodes for error reporting.
 type SliceNodeGetter interface {
 	GetSliceValueNodeOrRoot(index int, root *yaml.Node) *yaml.Node
 }
 
+// MapKeyNodeGetter provides access to map key nodes for error reporting.
 type MapKeyNodeGetter interface {
 	GetMapKeyNodeOrRoot(key string, root *yaml.Node) *yaml.Node
 }
 
+// MapValueNodeGetter provides access to map value nodes for error reporting.
 type MapValueNodeGetter interface {
 	GetMapValueNodeOrRoot(key string, root *yaml.Node) *yaml.Node
 }
@@ -137,23 +141,30 @@ func NewMapValueError(err error, core CoreModeler, node MapValueNodeGetter, key 
 }
 
 type TypeMismatchError struct {
-	Msg string
+	Msg        string
+	ParentName string
 }
 
 var _ error = (*TypeMismatchError)(nil)
 
-func NewTypeMismatchError(msg string, args ...any) *TypeMismatchError {
+func NewTypeMismatchError(parentName, msg string, args ...any) *TypeMismatchError {
 	if len(args) > 0 {
 		msg = fmt.Errorf(msg, args...).Error()
 	}
 
 	return &TypeMismatchError{
-		Msg: msg,
+		Msg:        msg,
+		ParentName: parentName,
 	}
 }
 
 func (e TypeMismatchError) Error() string {
-	return e.Msg
+	name := e.ParentName
+	if name != "" {
+		name += " "
+	}
+
+	return fmt.Sprintf("%s%s", name, e.Msg)
 }
 
 type MissingFieldError struct {

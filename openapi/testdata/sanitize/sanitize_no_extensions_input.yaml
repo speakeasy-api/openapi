@@ -1,0 +1,28 @@
+openapi: 3.1.0
+info:
+  title: Clean API without Extensions
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+paths:
+  /users:
+    get:
+      summary: List users
+      operationId: listUsers
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string

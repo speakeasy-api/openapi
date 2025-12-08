@@ -3,6 +3,7 @@ package references
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -280,7 +281,7 @@ func resolveAgainstData[T any](ctx context.Context, absRef string, reader io.Rea
 
 	targetNode, ok := target.(*yaml.Node)
 	if !ok {
-		return nil, nil, nil, errors.New("target is not a *yaml.Node")
+		return nil, nil, nil, fmt.Errorf("expected *yaml.Node, got %T", target)
 	}
 
 	resolved, validationErrs, err := unmarshaler(ctx, targetNode, opts.SkipValidation)
@@ -309,6 +310,8 @@ func cast[T any](target any) (*T, error) {
 		return &targetT, nil
 	}
 
+	value, _ := json.Marshal(target)
+
 	var expectedType T
-	return nil, fmt.Errorf("target is not a %T or *%T, got %T (value: %v)", expectedType, expectedType, target, target)
+	return nil, fmt.Errorf("expected %T, got %T (value: %s)", expectedType, target, value)
 }

@@ -33,7 +33,7 @@ func TestMarshal_TestEmbeddedMapModel_Empty_Success(t *testing.T) {
 			name: "initialized empty embedded map should render as empty object",
 			setup: func() *tests.TestEmbeddedMapHighModel {
 				model := &tests.TestEmbeddedMapHighModel{}
-				model.Map = *sequencedmap.New[string, string]()
+				model.Map = sequencedmap.New[string, string]()
 				return model
 			},
 			expected: "{}\n",
@@ -42,7 +42,7 @@ func TestMarshal_TestEmbeddedMapModel_Empty_Success(t *testing.T) {
 			name: "embedded map with content should render normally",
 			setup: func() *tests.TestEmbeddedMapHighModel {
 				model := &tests.TestEmbeddedMapHighModel{}
-				model.Map = *sequencedmap.New[string, string]()
+				model.Map = sequencedmap.New[string, string]()
 				model.Set("key1", "value1")
 				return model
 			},
@@ -87,7 +87,7 @@ func TestMarshal_TestEmbeddedMapWithFieldsModel_Empty_Success(t *testing.T) {
 			name: "initialized empty embedded map with fields should render fields only",
 			setup: func() *tests.TestEmbeddedMapWithFieldsHighModel {
 				model := &tests.TestEmbeddedMapWithFieldsHighModel{}
-				model.Map = *sequencedmap.New[string, *tests.TestPrimitiveHighModel]()
+				model.Map = sequencedmap.New[string, *tests.TestPrimitiveHighModel]()
 				model.NameField = "test name"
 				return model
 			},
@@ -97,7 +97,7 @@ func TestMarshal_TestEmbeddedMapWithFieldsModel_Empty_Success(t *testing.T) {
 			name: "embedded map with content and fields should render both",
 			setup: func() *tests.TestEmbeddedMapWithFieldsHighModel {
 				model := &tests.TestEmbeddedMapWithFieldsHighModel{}
-				model.Map = *sequencedmap.New[string, *tests.TestPrimitiveHighModel]()
+				model.Map = sequencedmap.New[string, *tests.TestPrimitiveHighModel]()
 				model.NameField = "test name"
 				model.Set("key1", &tests.TestPrimitiveHighModel{
 					StringField: "value1",

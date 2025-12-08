@@ -1,0 +1,3 @@
+extensionPatterns:
+  remove:
+    - "x-go-*"

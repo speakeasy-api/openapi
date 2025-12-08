@@ -34,7 +34,7 @@ type Operation struct {
 	// RequestBody is the request body applicable for this operation.
 	RequestBody *ReferencedRequestBody
 	// Responses is the list of possible responses as they are returned from executing this operation.
-	Responses *Responses
+	Responses Responses
 	// Callbacks is a map of possible out-of band callbacks related to the parent operation.
 	Callbacks *sequencedmap.Map[string, *ReferencedCallback]
 
@@ -123,10 +123,7 @@ func (o *Operation) GetRequestBody() *ReferencedRequestBody {
 
 // GetResponses returns the value of the Responses field. Returns nil if not set.
 func (o *Operation) GetResponses() *Responses {
-	if o == nil {
-		return nil
-	}
-	return o.Responses
+	return &o.Responses
 }
 
 // GetCallbacks returns the value of the Callbacks field. Returns nil if not set.
@@ -172,6 +169,7 @@ func (o *Operation) Validate(ctx context.Context, opts ...validation.Option) []e
 		errs = append(errs, securityRequirement.Validate(ctx, opts...)...)
 	}
 
+	// TODO allow validation of parameters, this isn't done at the moment as we would need to resolve references
 	for _, parameter := range o.Parameters {
 		errs = append(errs, parameter.Validate(ctx, opts...)...)
 	}
@@ -180,7 +178,7 @@ func (o *Operation) Validate(ctx context.Context, opts ...validation.Option) []e
 		errs = append(errs, o.RequestBody.Validate(ctx, opts...)...)
 	}
 
-	if o.Responses != nil {
+	if core.Responses.Present {
 		errs = append(errs, o.Responses.Validate(ctx, opts...)...)
 	}
 

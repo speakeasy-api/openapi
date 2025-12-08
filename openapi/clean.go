@@ -9,18 +9,24 @@ import (
 	"github.com/speakeasy-api/openapi/sequencedmap"
 )
 
-// Clean removes unused components from the OpenAPI document.
-// It walks through the document to track all referenced components and removes
-// any components that are not referenced. Security schemes are handled specially
-// as they can be referenced by name in security blocks rather than by $ref.
+// Clean removes unused, unreachable elements from the OpenAPI document using reachability from paths and security.
+//
+// How it works (high level):
+//
+//   - Seed reachability only from:
+//   - Operations under /paths (responses, request bodies, parameters, schemas, etc.)
+//   - Security requirements (top-level and operation-level), referenced by $ref and by name
+//   - Expand reachability only through components already marked as used until a fixed point
+//   - Remove anything not reachable from those seeds
+//   - Also remove top-level tags that are not referenced by any operation
 //
 // This function modifies the document in place.
 //
 // Why use Clean?
 //
-//   - **Reduce document size**: Remove unused component definitions that bloat the specification
-//   - **Improve clarity**: Keep only the components that are actually used in the API
-//   - **Optimize tooling performance**: Smaller documents with fewer unused components process faster
+//   - **Reduce document size**: Remove unused component definitions and tags that bloat the specification
+//   - **Improve clarity**: Keep only the elements that are actually used by operations/security
+//   - **Optimize tooling performance**: Smaller documents with fewer unused elements process faster
 //   - **Maintain clean specifications**: Prevent accumulation of dead code in API definitions
 //   - **Prepare for distribution**: Clean up specifications before sharing or publishing
 //
@@ -36,6 +42,7 @@ import (
 //   - Unused links in components/links
 //   - Unused callbacks in components/callbacks
 //   - Unused path items in components/pathItems
+//   - Unused tags in the top-level tags array
 //
 // Special handling for security schemes:
 //
@@ -47,16 +54,13 @@ import (
 //
 // Example usage:
 //
-//	// Load an OpenAPI document with potentially unused components
-//	doc := &OpenAPI{...}
-//
-//	// Clean up unused components (modifies doc in place)
+//	// Load an OpenAPI document and prune unused elements (modifies doc in place)
 //	err := Clean(ctx, doc)
 //	if err != nil {
 //		return fmt.Errorf("failed to clean document: %w", err)
 //	}
 //
-//	// doc now has only the components that are actually referenced
+//	// doc now contains only elements reachable from /paths and security, with unused tags removed
 //
 // Parameters:
 //   - ctx: Context for the operation
@@ -65,12 +69,12 @@ import (
 // Returns:
 //   - error: Any error that occurred during cleaning
 func Clean(ctx context.Context, doc *OpenAPI) error {
-	if doc == nil || doc.Components == nil {
+	if doc == nil {
 		return nil
 	}
 
 	// Track referenced components by type and name
-	referencedComponents := &referencedComponentTracker{
+	referenced := &referencedComponentTracker{
 		schemas:         make(map[string]bool),
 		responses:       make(map[string]bool),
 		parameters:      make(map[string]bool),
@@ -83,58 +87,66 @@ func Clean(ctx context.Context, doc *OpenAPI) error {
 		pathItems:       make(map[string]bool),
 	}
 
-	// Walk through the document and track all references
-	for item := range Walk(ctx, doc) {
-		err := item.Match(Matcher{
-			// Track schema references
-			Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
-				return trackSchemaReferences(schema, referencedComponents)
-			},
-			// Track component references
-			ReferencedPathItem: func(ref *ReferencedPathItem) error {
-				return trackPathItemReference(ref, referencedComponents.pathItems)
-			},
-			ReferencedParameter: func(ref *ReferencedParameter) error {
-				return trackParameterReference(ref, referencedComponents.parameters)
-			},
-			ReferencedExample: func(ref *ReferencedExample) error {
-				return trackExampleReference(ref, referencedComponents.examples)
-			},
-			ReferencedRequestBody: func(ref *ReferencedRequestBody) error {
-				return trackRequestBodyReference(ref, referencedComponents.requestBodies)
-			},
-			ReferencedResponse: func(ref *ReferencedResponse) error {
-				return trackResponseReference(ref, referencedComponents.responses)
-			},
-			ReferencedHeader: func(ref *ReferencedHeader) error {
-				return trackHeaderReference(ref, referencedComponents.headers)
-			},
-			ReferencedCallback: func(ref *ReferencedCallback) error {
-				return trackCallbackReference(ref, referencedComponents.callbacks)
-			},
-			ReferencedLink: func(ref *ReferencedLink) error {
-				return trackLinkReference(ref, referencedComponents.links)
-			},
-			ReferencedSecurityScheme: func(ref *ReferencedSecurityScheme) error {
-				return trackSecuritySchemeReference(ref, referencedComponents.securitySchemes)
-			},
-			// Track security requirements (special case for security schemes)
-			Security: func(req *SecurityRequirement) error {
-				if req != nil {
-					for schemeName := range req.All() {
-						referencedComponents.securitySchemes[schemeName] = true
-					}
-				}
-				return nil
-			},
+	// Phase 1: Seed references only from within /paths
+	err := walkAndTrackWithFilter(ctx, doc, referenced, func(ptr string) bool {
+		// Only allow references originating under paths
+		return strings.HasPrefix(ptr, "/paths/") || strings.HasPrefix(ptr, "/security")
+	})
+	if err != nil {
+		return fmt.Errorf("failed to track references from paths: %w", err)
+	}
+
+	// Phase 2: Expand closure of references reachable from used components.
+	// We repeatedly walk the document but only allow visiting content under components
+	// that are already marked as referenced, until no new references are discovered.
+	for {
+		before := countTracked(referenced)
+
+		err := walkAndTrackWithFilter(ctx, doc, referenced, func(ptr string) bool {
+			typ, name, ok := extractComponentTypeAndName(ptr)
+			if !ok {
+				return false
+			}
+			switch typ {
+			case "schemas":
+				return referenced.schemas[name]
+			case "responses":
+				return referenced.responses[name]
+			case "parameters":
+				return referenced.parameters[name]
+			case "examples":
+				return referenced.examples[name]
+			case "requestBodies":
+				return referenced.requestBodies[name]
+			case "headers":
+				return referenced.headers[name]
+			case "securitySchemes":
+				return referenced.securitySchemes[name]
+			case "links":
+				return referenced.links[name]
+			case "callbacks":
+				return referenced.callbacks[name]
+			case "pathItems":
+				return referenced.pathItems[name]
+			default:
+				return false
+			}
 		})
 		if err != nil {
-			return fmt.Errorf("failed to track references: %w", err)
+			return fmt.Errorf("failed to expand reachable references: %w", err)
+		}
+
+		after := countTracked(referenced)
+		if after == before {
+			break // fixed point reached
 		}
 	}
 
 	// Remove unused components
-	removeUnusedComponentsFromDocument(doc, referencedComponents)
+	removeUnusedComponentsFromDocument(doc, referenced)
+
+	// Remove unused top-level tags
+	removeUnusedTagsFromDocument(doc, referenced)
 
 	return nil
 }
@@ -151,6 +163,8 @@ type referencedComponentTracker struct {
 	links           map[string]bool
 	callbacks       map[string]bool
 	pathItems       map[string]bool
+	// tags used by operations (referenced by name)
+	tags map[string]bool
 }
 
 // trackSchemaReferences tracks references within JSON schemas
@@ -295,6 +309,31 @@ func trackSecuritySchemeReference(ref *ReferencedSecurityScheme, tracker map[str
 	componentName := extractComponentName(refStr, "securitySchemes")
 	if componentName != "" {
 		tracker[componentName] = true
+	}
+	return nil
+}
+
+// trackOperationTags tracks operation tag names into the tracker
+func trackOperationTags(op *Operation, tracker *referencedComponentTracker) error {
+	if op == nil || tracker == nil {
+		return nil
+	}
+	for _, tag := range op.GetTags() {
+		if tracker.tags == nil {
+			tracker.tags = make(map[string]bool)
+		}
+		tracker.tags[tag] = true
+	}
+	return nil
+}
+
+// trackSecurityRequirementNames tracks security scheme names referenced by a security requirement
+func trackSecurityRequirementNames(req *SecurityRequirement, tracker map[string]bool) error {
+	if req == nil || tracker == nil {
+		return nil
+	}
+	for schemeName := range req.All() {
+		tracker[schemeName] = true
 	}
 	return nil
 }
@@ -477,4 +516,154 @@ func removeUnusedComponentsFromDocument(doc *OpenAPI, tracker *referencedCompone
 		doc.Components.PathItems == nil {
 		doc.Components = nil
 	}
+}
+
+// removeUnusedTagsFromDocument prunes tags declared in the top-level tags array
+// when they are not referenced by any operation's tags.
+func removeUnusedTagsFromDocument(doc *OpenAPI, tracker *referencedComponentTracker) {
+	if doc == nil {
+		return
+	}
+
+	// If no tags are declared, nothing to do
+	if len(doc.Tags) == 0 {
+		return
+	}
+
+	// If there were no tags referenced, drop tags entirely
+	if tracker == nil || len(tracker.tags) == 0 {
+		doc.Tags = nil
+		return
+	}
+
+	// Keep only tags with names referenced by operations
+	kept := make([]*Tag, 0, len(doc.Tags))
+	for _, tg := range doc.Tags {
+		if tg == nil {
+			continue
+		}
+		if tracker.tags[tg.GetName()] {
+			kept = append(kept, tg)
+		}
+	}
+
+	if len(kept) > 0 {
+		doc.Tags = kept
+	} else {
+		doc.Tags = nil
+	}
+}
+
+// walkAndTrackWithFilter walks the OpenAPI document and tracks referenced components,
+// but only for WalkItems whose JSON pointer location satisfies the allow predicate.
+func walkAndTrackWithFilter(ctx context.Context, doc *OpenAPI, tracker *referencedComponentTracker, allow func(ptr string) bool) error {
+	for item := range Walk(ctx, doc) {
+		loc := string(item.Location.ToJSONPointer())
+
+		if !allow(loc) {
+			// Skip tracking for this location
+			continue
+		}
+
+		err := item.Match(Matcher{
+			// Track schema references only when allowed by location
+			Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
+				return trackSchemaReferences(schema, tracker)
+			},
+			// Track component references only when allowed by location
+			ReferencedPathItem: func(ref *ReferencedPathItem) error {
+				return trackPathItemReference(ref, tracker.pathItems)
+			},
+			ReferencedParameter: func(ref *ReferencedParameter) error {
+				return trackParameterReference(ref, tracker.parameters)
+			},
+			ReferencedExample: func(ref *ReferencedExample) error {
+				return trackExampleReference(ref, tracker.examples)
+			},
+			ReferencedRequestBody: func(ref *ReferencedRequestBody) error {
+				return trackRequestBodyReference(ref, tracker.requestBodies)
+			},
+			ReferencedResponse: func(ref *ReferencedResponse) error {
+				return trackResponseReference(ref, tracker.responses)
+			},
+			ReferencedHeader: func(ref *ReferencedHeader) error {
+				return trackHeaderReference(ref, tracker.headers)
+			},
+			ReferencedCallback: func(ref *ReferencedCallback) error {
+				return trackCallbackReference(ref, tracker.callbacks)
+			},
+			ReferencedLink: func(ref *ReferencedLink) error {
+				return trackLinkReference(ref, tracker.links)
+			},
+			ReferencedSecurityScheme: func(ref *ReferencedSecurityScheme) error {
+				return trackSecuritySchemeReference(ref, tracker.securitySchemes)
+			},
+			// Track operation tags (only under allowed locations)
+			Operation: func(op *Operation) error {
+				return trackOperationTags(op, tracker)
+			},
+			// Track security requirements (special case for security schemes)
+			Security: func(req *SecurityRequirement) error {
+				return trackSecurityRequirementNames(req, tracker.securitySchemes)
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to track references: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// extractComponentTypeAndName returns component type and name from a JSON pointer location like:
+//
+//	/components/schemas/User/... -> ("schemas", "User", true)
+//
+// Returns ok=false if the pointer does not point under /components/{type}/{name}
+func extractComponentTypeAndName(ptr string) (typ, name string, ok bool) {
+	const prefix = "/components/"
+	if !strings.HasPrefix(ptr, prefix) {
+		return "", "", false
+	}
+
+	parts := strings.Split(ptr, "/")
+	// Expect at least: "", "components", "{type}", "{name}", ...
+	if len(parts) < 4 {
+		return "", "", false
+	}
+
+	typ = parts[2]
+	name = unescapeJSONPointerToken(parts[3])
+	if typ == "" || name == "" {
+		return "", "", false
+	}
+	return typ, name, true
+}
+
+// unescapeJSONPointerToken reverses JSON Pointer escaping (~1 => /, ~0 => ~)
+func unescapeJSONPointerToken(s string) string {
+	// Per RFC 6901: ~1 is '/', ~0 is '~'. Order matters: replace ~1 first, then ~0.
+	s = strings.ReplaceAll(s, "~1", "/")
+	s = strings.ReplaceAll(s, "~0", "~")
+	return s
+}
+
+// countTracked returns the total number of referenced components recorded in the tracker.
+// This is used to detect a fixed point during reachability expansion.
+func countTracked(tr *referencedComponentTracker) int {
+	if tr == nil {
+		return 0
+	}
+	total := 0
+	total += len(tr.schemas)
+	total += len(tr.responses)
+	total += len(tr.parameters)
+	total += len(tr.examples)
+	total += len(tr.requestBodies)
+	total += len(tr.headers)
+	total += len(tr.securitySchemes)
+	total += len(tr.links)
+	total += len(tr.callbacks)
+	total += len(tr.pathItems)
+	return total
 }

@@ -2,11 +2,11 @@ package openapi_test
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -143,7 +143,10 @@ encoding:
         schema:
           type: invalid-type
 `,
-			wantErrs: []string{"schema field type value must be one of"},
+			wantErrs: []string{
+				"[13:17] schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"[13:17] schema.type expected array, got string",
+			},
 		},
 	}
 
@@ -166,16 +169,7 @@ encoding:
 				errMessages = append(errMessages, err.Error())
 			}
 
-			for _, expectedErr := range tt.wantErrs {
-				found := false
-				for _, errMsg := range errMessages {
-					if strings.Contains(errMsg, expectedErr) {
-						found = true
-						break
-					}
-				}
-				require.True(t, found, "expected error message '%s' not found in: %v", expectedErr, errMessages)
-			}
+			assert.Equal(t, tt.wantErrs, errMessages)
 		})
 	}
 }

@@ -93,9 +93,9 @@ summary: Minimal Tag
 
 	require.Equal(t, "minimal", tag.GetName())
 	require.Equal(t, "Minimal Tag", tag.GetSummary())
-	require.Equal(t, "", tag.GetDescription())
-	require.Equal(t, "", tag.GetParent())
-	require.Equal(t, "", tag.GetKind())
+	require.Empty(t, tag.GetDescription())
+	require.Empty(t, tag.GetParent())
+	require.Empty(t, tag.GetKind())
 }
 
 func TestTag_Unmarshal_KindValues_Success(t *testing.T) {

@@ -71,14 +71,15 @@ var blacklistedTestCases = map[string]string{
 	"ref.json:17": "requires complex $id resolution chain",
 	"ref.json:18": "requires $id evaluation before $ref",
 	"ref.json:19": "requires $id and $anchor evaluation before $ref",
-	"ref.json:20": "requires URN scheme support",
-	"ref.json:25": "requires URN scheme with JSON pointer",
-	"ref.json:26": "requires URN scheme with anchor",
-	"ref.json:27": "requires URN scheme with nested references",
-	"ref.json:28": "requires conditional schema reference resolution",
+	"ref.json:20": "requires $id evaluation before $ref on nested schemas",
+	"ref.json:21": "requires URN scheme support",
+	"ref.json:26": "requires URN scheme with JSON pointer",
+	"ref.json:27": "requires URN scheme with anchor",
+	"ref.json:28": "requires URN scheme with nested references",
 	"ref.json:29": "requires conditional schema reference resolution",
 	"ref.json:30": "requires conditional schema reference resolution",
-	"ref.json:31": "requires absolute path reference resolution",
+	"ref.json:31": "requires conditional schema reference resolution",
+	"ref.json:32": "requires absolute path reference resolution",
 
 	// dynamicRef.json tests - all failing due to lack of dynamic reference support
 	"dynamicRef.json:0":  "requires dynamic reference resolution support",
@@ -98,6 +99,7 @@ var blacklistedTestCases = map[string]string{
 	"dynamicRef.json:15": "requires dynamic reference resolution support",
 	"dynamicRef.json:16": "requires dynamic reference resolution support",
 	"dynamicRef.json:19": "requires dynamic reference resolution support",
+	"dynamicRef.json:20": "requires dynamic reference resolution support",
 
 	// optional/dynamicRef.json tests
 	"optional/dynamicRef.json:0": "requires dynamic reference resolution support",
@@ -121,6 +123,7 @@ type CoverageTracker struct {
 	totalCases   int64
 	skippedCases int64
 	passedCases  int64
+	failedCases  int64
 }
 
 func (c *CoverageTracker) AddFile() {
@@ -131,18 +134,20 @@ func (c *CoverageTracker) AddSkippedFile() {
 	atomic.AddInt64(&c.skippedFiles, 1)
 }
 
-func (c *CoverageTracker) AddCases(total, skipped, passed int64) {
+func (c *CoverageTracker) AddCases(total, skipped, passed, failed int64) {
 	atomic.AddInt64(&c.totalCases, total)
 	atomic.AddInt64(&c.skippedCases, skipped)
 	atomic.AddInt64(&c.passedCases, passed)
+	atomic.AddInt64(&c.failedCases, failed)
 }
 
-func (c *CoverageTracker) GetStats() (int, int, int, int, int) {
+func (c *CoverageTracker) GetStats() (int, int, int, int, int, int) {
 	return int(atomic.LoadInt64(&c.totalFiles)),
 		int(atomic.LoadInt64(&c.skippedFiles)),
 		int(atomic.LoadInt64(&c.totalCases)),
 		int(atomic.LoadInt64(&c.skippedCases)),
-		int(atomic.LoadInt64(&c.passedCases))
+		int(atomic.LoadInt64(&c.passedCases)),
+		int(atomic.LoadInt64(&c.failedCases))
 }
 
 func TestMain(m *testing.M) {
@@ -201,16 +206,16 @@ func TestJSONSchemaTestSuite_RoundTrip(t *testing.T) {
 		t.Run(testFile, func(t *testing.T) {
 			defer wg.Done()
 			t.Parallel()
-			fileCases, fileSkipped, filePassed := runRoundTripTestFile(t, filepath.Join(testSuiteDir, testFile))
-			tracker.AddCases(int64(fileCases), int64(fileSkipped), int64(filePassed))
+			fileCases, fileSkipped, filePassed, fileFailed := runRoundTripTestFile(t, filepath.Join(testSuiteDir, testFile))
+			tracker.AddCases(int64(fileCases), int64(fileSkipped), int64(filePassed), int64(fileFailed))
 		})
 	}
 
 	// Print coverage summary after all tests complete
 	t.Cleanup(func() {
 		wg.Wait() // Wait for all parallel tests to complete
-		totalFiles, skippedFiles, totalCases, skippedCases, passedCases := tracker.GetStats()
-		printCoverageSummary(t, totalFiles, skippedFiles, totalCases, skippedCases, passedCases)
+		totalFiles, skippedFiles, totalCases, skippedCases, passedCases, failedCases := tracker.GetStats()
+		printCoverageSummary(t, totalFiles, skippedFiles, totalCases, skippedCases, passedCases, failedCases)
 	})
 }
 
@@ -245,8 +250,8 @@ func getAllTestFiles(t *testing.T, testSuiteDir string) []string {
 }
 
 // runRoundTripTestFile runs all test cases in a single test file with round-trip testing
-// Returns: totalCases, skippedCases, passedCases
-func runRoundTripTestFile(t *testing.T, testFilePath string) (int, int, int) {
+// Returns: totalCases, skippedCases, passedCases, failedCases
+func runRoundTripTestFile(t *testing.T, testFilePath string) (int, int, int, int) {
 	t.Helper()
 	// Read the test file
 	data, err := os.ReadFile(testFilePath)
@@ -257,11 +262,11 @@ func runRoundTripTestFile(t *testing.T, testFilePath string) (int, int, int) {
 	err = json.Unmarshal(data, &testCases)
 	require.NoError(t, err, "failed to parse test file: %s", testFilePath)
 
-	var skippedCases, passedCases int
+	var skippedCases, passedCases, failedCases int
 
 	// Run each test case
 	for i, testCase := range testCases {
-		t.Run(fmt.Sprintf("case_%d_%s", i, sanitizeTestName(testCase.Description)), func(t *testing.T) {
+		testPassed := t.Run(fmt.Sprintf("case_%d_%s", i, sanitizeTestName(testCase.Description)), func(t *testing.T) {
 			// Check if this specific test case is blacklisted
 			fileName := filepath.Base(testFilePath)
 			testCaseKey := fmt.Sprintf("%s:%d", fileName, i)
@@ -272,11 +277,16 @@ func runRoundTripTestFile(t *testing.T, testFilePath string) (int, int, int) {
 			}
 
 			runRoundTripTestCase(t, testCase, testFilePath)
-			passedCases++
 		})
+
+		if testPassed {
+			passedCases++
+		} else {
+			failedCases++
+		}
 	}
 
-	return len(testCases), skippedCases, passedCases
+	return len(testCases), skippedCases, passedCases, failedCases
 }
 
 // runRoundTripTestCase runs a single test case with round-trip testing
@@ -431,7 +441,7 @@ func isSubmoduleInitialized(testSuiteDir string) bool {
 }
 
 // printCoverageSummary prints a summary of test coverage statistics
-func printCoverageSummary(t *testing.T, totalFiles, skippedFiles, totalCases, skippedCases, passedCases int) {
+func printCoverageSummary(t *testing.T, totalFiles, skippedFiles, totalCases, skippedCases, passedCases, failedCases int) {
 	t.Helper()
 
 	runFiles := totalFiles - skippedFiles
@@ -444,8 +454,8 @@ func printCoverageSummary(t *testing.T, totalFiles, skippedFiles, totalCases, sk
 		"==========================================\n"+
 		"Files:      %d/%d (%.1f%%) - %d skipped\n"+
 		"Test Cases: %d/%d (%.1f%%) - %d skipped\n"+
-		"Status:     %d passed, %d skipped, %d total\n",
+		"Status:     %d passed, %d failed, %d skipped, %d total\n",
 		runFiles, totalFiles, filesCoverage, skippedFiles,
 		passedCases, totalCases, casesCoverage, skippedCases,
-		passedCases, skippedCases, totalCases)
+		passedCases, failedCases, skippedCases, totalCases)
 }

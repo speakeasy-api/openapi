@@ -119,12 +119,26 @@ func Bundle(ctx context.Context, doc *OpenAPI, opts BundleOptions) error {
 		return nil
 	}
 
+	// Make target location absolute at the entry point
+	targetLocation := opts.ResolveOptions.TargetLocation
+	if targetLocation != "" && !filepath.IsAbs(targetLocation) {
+		if absTarget, err := filepath.Abs(targetLocation); err == nil {
+			targetLocation = absTarget
+			opts.ResolveOptions.TargetLocation = absTarget
+		}
+		// Error getting absolute path is not fatal - we continue with the relative path
+		// This allows processing to proceed even if there are issues with path resolution
+	}
+
 	componentStorage := &componentStorage{
-		schemaStorage:    sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]](),
-		referenceStorage: sequencedmap.New[string, *sequencedmap.Map[string, any]](),
-		externalRefs:     make(map[string]string),
-		componentNames:   make(map[string]bool),
-		schemaHashes:     make(map[string]string),
+		schemaStorage:      sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]](),
+		referenceStorage:   sequencedmap.New[string, *sequencedmap.Map[string, any]](),
+		refs:               make(map[string]string),
+		componentNames:     make(map[string]bool),
+		schemaHashes:       make(map[string]string),
+		schemaLocations:    make(map[string]string),
+		componentLocations: make(map[string]string),
+		rootLocation:       targetLocation,
 	}
 
 	// Initialize existing component names and hashes to avoid conflicts
@@ -137,7 +151,7 @@ func Bundle(ctx context.Context, doc *OpenAPI, opts BundleOptions) error {
 		}
 	}
 
-	if err := bundleObject(ctx, doc, opts.NamingStrategy, "", opts.ResolveOptions, componentStorage); err != nil {
+	if err := bundleObject(ctx, doc, opts.NamingStrategy, opts.ResolveOptions, componentStorage); err != nil {
 		return err
 	}
 
@@ -145,6 +159,12 @@ func Bundle(ctx context.Context, doc *OpenAPI, opts BundleOptions) error {
 	err := rewriteRefsInBundledSchemas(ctx, componentStorage)
 	if err != nil {
 		return fmt.Errorf("failed to rewrite references in bundled schemas: %w", err)
+	}
+
+	// Rewrite references within bundled components (responses, headers, etc.)
+	err = rewriteRefsInBundledComponents(ctx, componentStorage)
+	if err != nil {
+		return fmt.Errorf("failed to rewrite references in bundled components: %w", err)
 	}
 
 	// Second pass: update all references to point to new component names
@@ -160,45 +180,48 @@ func Bundle(ctx context.Context, doc *OpenAPI, opts BundleOptions) error {
 }
 
 type componentStorage struct {
-	schemaStorage    *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]]
-	referenceStorage *sequencedmap.Map[string, *sequencedmap.Map[string, any]]
-	externalRefs     map[string]string // original ref -> new component name
-	componentNames   map[string]bool   // track used names to avoid conflicts
-	schemaHashes     map[string]string // component name -> hash for conflict detection
+	schemaStorage      *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]]
+	referenceStorage   *sequencedmap.Map[string, *sequencedmap.Map[string, any]]
+	refs               map[string]string // absolute ref -> component name
+	componentNames     map[string]bool   // track used names to avoid conflicts
+	schemaHashes       map[string]string // component name -> hash for conflict detection
+	schemaLocations    map[string]string // component name -> absolute source location (for rewriting refs)
+	componentLocations map[string]string // componentType/componentName -> absolute source location
+	rootLocation       string            // absolute path to root document for relative path calculation
 }
 
-func bundleObject[T any](ctx context.Context, obj *T, namingStrategy BundleNamingStrategy, parentLocation string, opts ResolveOptions, componentStorage *componentStorage) error {
+func bundleObject[T any](ctx context.Context, obj *T, namingStrategy BundleNamingStrategy, opts ResolveOptions, componentStorage *componentStorage) error {
 	for item := range Walk(ctx, obj) {
 		err := item.Match(Matcher{
 			Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
-				return bundleSchema(ctx, schema, namingStrategy, parentLocation, opts, componentStorage)
+				return bundleSchema(ctx, schema, namingStrategy, opts, componentStorage)
 			},
 			ReferencedPathItem: func(ref *ReferencedPathItem) error {
-				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "pathItems")
+				return bundleGenericReference(ctx, ref, namingStrategy, opts, componentStorage, "pathItems")
 			},
 			ReferencedParameter: func(ref *ReferencedParameter) error {
-				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "parameters")
+				return bundleGenericReference(ctx, ref, namingStrategy, opts, componentStorage, "parameters")
 			},
 			ReferencedExample: func(ref *ReferencedExample) error {
-				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "examples")
+				return bundleGenericReference(ctx, ref, namingStrategy, opts, componentStorage, "examples")
 			},
 			ReferencedRequestBody: func(ref *ReferencedRequestBody) error {
-				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "requestBodies")
+				return bundleGenericReference(ctx, ref, namingStrategy, opts, componentStorage, "requestBodies")
 			},
 			ReferencedResponse: func(ref *ReferencedResponse) error {
-				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "responses")
+				return bundleGenericReference(ctx, ref, namingStrategy, opts, componentStorage, "responses")
 			},
 			ReferencedHeader: func(ref *ReferencedHeader) error {
-				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "headers")
+				return bundleGenericReference(ctx, ref, namingStrategy, opts, componentStorage, "headers")
 			},
 			ReferencedCallback: func(ref *ReferencedCallback) error {
-				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "callbacks")
+				return bundleGenericReference(ctx, ref, namingStrategy, opts, componentStorage, "callbacks")
 			},
 			ReferencedLink: func(ref *ReferencedLink) error {
-				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "links")
+				return bundleGenericReference(ctx, ref, namingStrategy, opts, componentStorage, "links")
 			},
 			ReferencedSecurityScheme: func(ref *ReferencedSecurityScheme) error {
-				return bundleGenericReference(ctx, ref, namingStrategy, parentLocation, opts, componentStorage, "securitySchemes")
+				return bundleGenericReference(ctx, ref, namingStrategy, opts, componentStorage, "securitySchemes")
 			},
 		})
 		if err != nil {
@@ -210,23 +233,23 @@ func bundleObject[T any](ctx context.Context, obj *T, namingStrategy BundleNamin
 }
 
 // bundleSchema handles bundling of JSON schemas with external references
-func bundleSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceable], namingStrategy BundleNamingStrategy, parentLocation string, opts ResolveOptions, componentStorage *componentStorage) error {
+func bundleSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceable], namingStrategy BundleNamingStrategy, opts ResolveOptions, componentStorage *componentStorage) error {
 	if !schema.IsReference() {
 		return nil
 	}
 
-	ref, classification := handleReference(schema.GetRef(), parentLocation, opts.TargetLocation)
+	ref, classification := handleReference(schema.GetRef(), opts.TargetLocation)
 	if classification == nil {
 		return nil // Invalid reference, skip
 	}
 
-	// If it's a fragment reference, check if it's pointing to a different document
-	if classification.IsFragment {
-		return nil // Internal reference within the root document, skip
+	// Check if this is an internal reference to the root document
+	if isInternalReference(ref, componentStorage.rootLocation) {
+		return nil
 	}
 
 	// Check if we've already processed this reference
-	if _, exists := componentStorage.externalRefs[ref]; exists {
+	if _, exists := componentStorage.refs[ref]; exists {
 		return nil
 	}
 
@@ -254,13 +277,13 @@ func bundleSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceabl
 	resolvedHash := hashing.Hash(resolvedRefSchema)
 
 	// Generate component name with smart conflict resolution
-	componentName, err := generateComponentNameWithHashConflictResolution(ref, namingStrategy, componentStorage.componentNames, componentStorage.schemaHashes, resolvedHash, opts.TargetLocation)
+	componentName, err := generateComponentNameWithHashConflictResolution(ref, namingStrategy, componentStorage.componentNames, componentStorage.schemaHashes, resolvedHash, componentStorage.rootLocation)
 	if err != nil {
 		return fmt.Errorf("failed to generate component name for %s: %w", ref, err)
 	}
 
 	// Store the mapping
-	componentStorage.externalRefs[ref] = componentName
+	componentStorage.refs[ref] = componentName
 
 	// Only add to componentSchemas if it's a new schema (not a duplicate)
 	if _, exists := componentStorage.schemaHashes[componentName]; !exists {
@@ -268,9 +291,12 @@ func bundleSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceabl
 		componentStorage.schemaHashes[componentName] = resolvedHash
 		componentStorage.schemaStorage.Set(componentName, resolvedRefSchema)
 
+		// Store the source location for this schema for later reference rewriting
+		componentStorage.schemaLocations[componentName] = ref
+
 		targetDocInfo := schema.GetReferenceResolutionInfo()
 
-		if err := bundleObject(ctx, resolvedRefSchema, namingStrategy, opts.TargetLocation, references.ResolveOptions{
+		if err := bundleObject(ctx, resolvedRefSchema, namingStrategy, references.ResolveOptions{
 			RootDocument:   opts.RootDocument,
 			TargetDocument: targetDocInfo.ResolvedDocument,
 			TargetLocation: targetDocInfo.AbsoluteReference,
@@ -285,8 +311,11 @@ func bundleSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceabl
 // rewriteRefsInBundledSchemas rewrites references within bundled schemas to point to their new component locations
 func rewriteRefsInBundledSchemas(ctx context.Context, componentStorage *componentStorage) error {
 	// Walk through each bundled schema and rewrite internal references
-	for _, schema := range componentStorage.schemaStorage.All() {
-		err := rewriteRefsInSchema(ctx, schema, componentStorage)
+	for componentName, schema := range componentStorage.schemaStorage.All() {
+		// Get the source location for this schema
+		sourceLocation := componentStorage.schemaLocations[componentName]
+
+		err := rewriteRefsInSchema(ctx, schema, componentStorage, sourceLocation)
 		if err != nil {
 			return err
 		}
@@ -294,11 +323,35 @@ func rewriteRefsInBundledSchemas(ctx context.Context, componentStorage *componen
 	return nil
 }
 
+// prepareSourceURI extracts and normalizes a source URI for use with handleReference.
+// It extracts just the URI part (removing any fragment) and converts it to native path
+// format for filepath operations.
+func prepareSourceURI(sourceLocation string) string {
+	// Extract just the URI part from sourceLocation (remove fragment if present)
+	// sourceLocation might be like "/path/to/file.yaml#/components/schemas/SchemaName"
+	// but we need just "/path/to/file.yaml" for resolving relative references
+	sourceURI := references.Reference(sourceLocation).GetURI()
+	if sourceURI == "" {
+		sourceURI = sourceLocation // Fallback if no URI part
+	}
+
+	// On Windows, convert forward slashes to backslashes for filepath operations
+	// componentLocations stores paths with forward slashes (from handleReference normalization)
+	// but filepath.Join needs native separators to work correctly
+	if filepath.Separator == '\\' && filepath.IsAbs(sourceURI) {
+		sourceURI = filepath.FromSlash(sourceURI)
+	}
+
+	return sourceURI
+}
+
 // rewriteRefsInSchema rewrites references within a single schema
-func rewriteRefsInSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceable], componentStorage *componentStorage) error {
+func rewriteRefsInSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceable], componentStorage *componentStorage, sourceLocation string) error {
 	if schema == nil {
 		return nil
 	}
+
+	sourceURI := prepareSourceURI(sourceLocation)
 
 	// Walk through the schema and rewrite references
 	for item := range oas3.Walk(ctx, schema) {
@@ -308,23 +361,16 @@ func rewriteRefsInSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Refer
 				if schemaObj != nil && schemaObj.Ref != nil {
 					refStr := schemaObj.Ref.String()
 
-					// Check for direct external reference match
-					if newName, exists := componentStorage.externalRefs[refStr]; exists {
+					// Convert the reference to absolute for lookup using the source URI (without fragment)
+					absRef, _ := handleReference(*schemaObj.Ref, sourceURI)
+
+					// Check for direct reference match or circular reference
+					if newName, exists := componentStorage.refs[absRef]; exists {
 						newRef := "#/components/schemas/" + newName
 						*schemaObj.Ref = references.Reference(newRef)
-					} else if strings.HasPrefix(refStr, "#/") && !strings.HasPrefix(refStr, "#/components/") {
-						// Handle circular references within external schemas
-						// e.g., "#/User" should be mapped to "#/components/schemas/User_1"
-						defName := strings.TrimPrefix(refStr, "#/")
-						for externalRef, componentName := range componentStorage.externalRefs {
-							// Check if the external reference ends with this fragment
-							// e.g., "external_conflicting_user.yaml#/User" ends with "#/User"
-							if strings.HasSuffix(externalRef, "#/"+defName) {
-								newRef := "#/components/schemas/" + componentName
-								*schemaObj.Ref = references.Reference(newRef)
-								break
-							}
-						}
+					} else if newName, found := findCircularReferenceMatch(refStr, componentStorage.refs); found {
+						newRef := "#/components/schemas/" + newName
+						*schemaObj.Ref = references.Reference(newRef)
 					}
 				}
 				return nil
@@ -337,23 +383,242 @@ func rewriteRefsInSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Refer
 	return nil
 }
 
+// rewriteRefsInBundledComponents rewrites references within bundled components (responses, headers, etc.)
+// to point to their new component locations. This handles cases where a bundled response contains
+// header references that also need to be updated.
+func rewriteRefsInBundledComponents(ctx context.Context, componentStorage *componentStorage) error {
+	// Walk through each component type in referenceStorage
+	for componentType, components := range componentStorage.referenceStorage.All() {
+		for componentName, component := range components.All() {
+			// Get the source location for this component
+			sourceLocation := componentStorage.componentLocations[componentType+"/"+componentName]
+
+			// Walk through the component and update references
+			err := walkAndUpdateRefsInComponent(ctx, component, componentStorage, sourceLocation)
+			if err != nil {
+				return fmt.Errorf("failed to rewrite refs in %s component: %w", componentType, err)
+			}
+		}
+	}
+	return nil
+}
+
+// walkAndUpdateRefsInComponent walks through a component and updates its internal references
+func walkAndUpdateRefsInComponent(ctx context.Context, component any, componentStorage *componentStorage, sourceLocation string) error {
+	// We need to handle each component type that can contain references
+	// The Walk function will traverse the component and find all references
+
+	// Use type-specific walking based on the component type
+	switch c := component.(type) {
+	case *ReferencedResponse:
+		return walkAndUpdateRefsInResponse(ctx, c, componentStorage, sourceLocation)
+	case *ReferencedParameter:
+		return walkAndUpdateRefsInParameter(ctx, c, componentStorage, sourceLocation)
+	case *ReferencedRequestBody:
+		return walkAndUpdateRefsInRequestBody(ctx, c, componentStorage, sourceLocation)
+	case *ReferencedCallback:
+		return walkAndUpdateRefsInCallback(ctx, c, componentStorage, sourceLocation)
+	case *ReferencedPathItem:
+		return walkAndUpdateRefsInPathItem(ctx, c, componentStorage, sourceLocation)
+	case *ReferencedLink:
+		return walkAndUpdateRefsInLink(ctx, c, componentStorage, sourceLocation)
+	case *ReferencedExample:
+		return walkAndUpdateRefsInExample(ctx, c, componentStorage, sourceLocation)
+	case *ReferencedSecurityScheme:
+		return walkAndUpdateRefsInSecurityScheme(ctx, c, componentStorage, sourceLocation)
+	case *ReferencedHeader:
+		return walkAndUpdateRefsInHeader(ctx, c, componentStorage, sourceLocation)
+	}
+	return nil
+}
+
+// walkAndUpdateRefsInResponse walks through a response and updates its internal references
+func walkAndUpdateRefsInResponse(_ context.Context, response *ReferencedResponse, componentStorage *componentStorage, sourceLocation string) error {
+	if response == nil || response.Object == nil {
+		return nil
+	}
+
+	// Walk through the response's headers and update references
+	if response.Object.Headers != nil {
+		for _, header := range response.Object.Headers.All() {
+			if header != nil && header.IsReference() {
+				updateComponentRefWithSource(header.Reference, componentStorage, "headers", sourceLocation)
+			}
+		}
+	}
+
+	// Walk through the response's content schemas
+	if response.Object.Content != nil {
+		for _, mediaType := range response.Object.Content.All() {
+			if mediaType != nil && mediaType.Schema != nil && mediaType.Schema.IsReference() {
+				updateSchemaRefWithSource(mediaType.Schema, componentStorage, sourceLocation)
+			}
+		}
+	}
+
+	return nil
+}
+
+// walkAndUpdateRefsInParameter walks through a parameter and updates its internal references
+func walkAndUpdateRefsInParameter(_ context.Context, param *ReferencedParameter, componentStorage *componentStorage, sourceLocation string) error {
+	if param == nil || param.Object == nil {
+		return nil
+	}
+
+	// Walk through the parameter's schema
+	if param.Object.Schema != nil && param.Object.Schema.IsReference() {
+		updateSchemaRefWithSource(param.Object.Schema, componentStorage, sourceLocation)
+	}
+
+	// Walk through parameter examples
+	if param.Object.Examples != nil {
+		for _, example := range param.Object.Examples.All() {
+			if example != nil && example.IsReference() {
+				updateComponentRefWithSource(example.Reference, componentStorage, "examples", sourceLocation)
+			}
+		}
+	}
+
+	return nil
+}
+
+// walkAndUpdateRefsInRequestBody walks through a request body and updates its internal references
+func walkAndUpdateRefsInRequestBody(_ context.Context, body *ReferencedRequestBody, componentStorage *componentStorage, sourceLocation string) error {
+	if body == nil || body.Object == nil {
+		return nil
+	}
+
+	// Walk through the request body's content schemas
+	if body.Object.Content != nil {
+		for _, mediaType := range body.Object.Content.All() {
+			if mediaType != nil && mediaType.Schema != nil && mediaType.Schema.IsReference() {
+				updateSchemaRefWithSource(mediaType.Schema, componentStorage, sourceLocation)
+			}
+		}
+	}
+
+	return nil
+}
+
+// walkAndUpdateRefsInCallback walks through a callback and updates its internal references
+func walkAndUpdateRefsInCallback(_ context.Context, callback *ReferencedCallback, componentStorage *componentStorage, sourceLocation string) error {
+	if callback == nil || callback.Object == nil {
+		return nil
+	}
+
+	// Callbacks contain path items with operations
+	for _, pathItem := range callback.Object.All() {
+		if pathItem != nil && pathItem.IsReference() {
+			updateComponentRefWithSource(pathItem.Reference, componentStorage, "pathItems", sourceLocation)
+		}
+	}
+
+	return nil
+}
+
+// walkAndUpdateRefsInPathItem walks through a path item and updates its internal references
+func walkAndUpdateRefsInPathItem(_ context.Context, pathItem *ReferencedPathItem, componentStorage *componentStorage, sourceLocation string) error {
+	if pathItem == nil || pathItem.Object == nil {
+		return nil
+	}
+
+	// Path items can have parameters
+	if pathItem.Object.Parameters != nil {
+		for _, param := range pathItem.Object.Parameters {
+			if param != nil && param.IsReference() {
+				updateComponentRefWithSource(param.Reference, componentStorage, "parameters", sourceLocation)
+			}
+		}
+	}
+
+	return nil
+}
+
+// walkAndUpdateRefsInLink walks through a link and updates its internal references
+func walkAndUpdateRefsInLink(_ context.Context, _ *ReferencedLink, _ *componentStorage, _ string) error {
+	// Links don't typically contain component references that need updating
+	return nil
+}
+
+// walkAndUpdateRefsInExample walks through an example and updates its internal references
+func walkAndUpdateRefsInExample(_ context.Context, _ *ReferencedExample, _ *componentStorage, _ string) error {
+	// Examples don't typically contain component references that need updating
+	return nil
+}
+
+// walkAndUpdateRefsInSecurityScheme walks through a security scheme and updates its internal references
+func walkAndUpdateRefsInSecurityScheme(_ context.Context, _ *ReferencedSecurityScheme, _ *componentStorage, _ string) error {
+	// Security schemes don't typically contain component references that need updating
+	return nil
+}
+
+// walkAndUpdateRefsInHeader walks through a header and updates its internal references
+func walkAndUpdateRefsInHeader(_ context.Context, header *ReferencedHeader, componentStorage *componentStorage, sourceLocation string) error {
+	if header == nil || header.Object == nil {
+		return nil
+	}
+
+	// Walk through the header's schema
+	if header.Object.Schema != nil && header.Object.Schema.IsReference() {
+		updateSchemaRefWithSource(header.Object.Schema, componentStorage, sourceLocation)
+	}
+
+	// Walk through header examples
+	if header.Object.Examples != nil {
+		for _, example := range header.Object.Examples.All() {
+			if example != nil && example.IsReference() {
+				updateComponentRefWithSource(example.Reference, componentStorage, "examples", sourceLocation)
+			}
+		}
+	}
+
+	return nil
+}
+
+// updateSchemaRefWithSource updates a schema reference using a specific source location for resolution
+func updateSchemaRefWithSource(schema *oas3.JSONSchema[oas3.Referenceable], componentStorage *componentStorage, sourceLocation string) {
+	if schema == nil || !schema.IsReference() {
+		return
+	}
+
+	sourceURI := prepareSourceURI(sourceLocation)
+	ref := schema.GetRef()
+	absRef, _ := handleReference(ref, sourceURI)
+
+	if newName, exists := componentStorage.refs[absRef]; exists {
+		newRef := "#/components/schemas/" + newName
+		*schema.GetLeft().Ref = references.Reference(newRef)
+	}
+}
+
+// updateComponentRefWithSource updates a component reference using a specific source location for resolution
+func updateComponentRefWithSource(ref *references.Reference, componentStorage *componentStorage, componentSection string, sourceLocation string) {
+	if ref == nil {
+		return
+	}
+
+	sourceURI := prepareSourceURI(sourceLocation)
+	absRef, _ := handleReference(*ref, sourceURI)
+
+	if newName, exists := componentStorage.refs[absRef]; exists {
+		newRef := "#/components/" + componentSection + "/" + newName
+		*ref = references.Reference(newRef)
+	}
+}
+
 // bundleGenericReference handles bundling of generic OpenAPI component references
-func bundleGenericReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, ref *Reference[T, V, C], namingStrategy BundleNamingStrategy, parentLocation string, opts ResolveOptions, componentStorage *componentStorage, componentType string) error {
+func bundleGenericReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, ref *Reference[T, V, C], namingStrategy BundleNamingStrategy, opts ResolveOptions, componentStorage *componentStorage, componentType string) error {
 	if ref == nil || !ref.IsReference() {
 		return nil
 	}
 
-	refStr, classification := handleReference(ref.GetReference(), parentLocation, opts.TargetLocation)
+	refStr, classification := handleReference(ref.GetReference(), opts.TargetLocation)
 	if classification == nil {
 		return nil // Invalid reference, skip
 	}
 
-	if classification.IsFragment {
-		return nil // Internal reference within the root document, skip
-	}
-
-	// Check if we've already processed this reference
-	if _, exists := componentStorage.externalRefs[refStr]; exists {
+	// Check if this is an internal reference to the root document
+	if isInternalReference(refStr, componentStorage.rootLocation) {
 		return nil
 	}
 
@@ -369,15 +634,36 @@ func bundleGenericReference[T any, V interfaces.Validator[T], C marshaller.CoreM
 		return fmt.Errorf("failed to resolve external %s reference %s: %w", componentType, refStr, resolveErr)
 	}
 
-	// Generate component name
-	componentName, err := generateComponentName(refStr, namingStrategy, componentStorage.componentNames, opts.TargetLocation)
+	// Get the final absolute reference by following the resolution chain
+	// This handles chained references (e.g., common.yaml -> headers.yaml)
+	finalAbsRef := getFinalAbsoluteRef(ref, refStr)
+
+	// Normalize finalAbsRef to forward slashes for consistent map keys across platforms
+	// On Windows, resolution chains may introduce backslashes, but we need forward slashes
+	// to match the keys created by handleReference which always normalizes to forward slashes
+	finalAbsRef = filepath.ToSlash(finalAbsRef)
+
+	// Check if we've already processed this reference (using final absolute ref for deduplication)
+	if existingName, exists := componentStorage.refs[finalAbsRef]; exists {
+		// Also map the intermediate reference to the same component name
+		if refStr != finalAbsRef {
+			componentStorage.refs[refStr] = existingName
+		}
+		return nil
+	}
+
+	// Generate component name using the final absolute reference
+	componentName, err := generateComponentName(finalAbsRef, namingStrategy, componentStorage.componentNames, componentStorage.rootLocation)
 	if err != nil {
-		return fmt.Errorf("failed to generate component name for %s: %w", refStr, err)
+		return fmt.Errorf("failed to generate component name for %s: %w", finalAbsRef, err)
 	}
 	componentStorage.componentNames[componentName] = true
 
-	// Store the mapping
-	componentStorage.externalRefs[refStr] = componentName
+	// Store the mapping (both original and final refs point to the same component)
+	componentStorage.refs[finalAbsRef] = componentName
+	if refStr != finalAbsRef {
+		componentStorage.refs[refStr] = componentName
+	}
 
 	// Get the resolved content and create a new non-reference version
 	resolvedValue := ref.GetObject()
@@ -397,9 +683,18 @@ func bundleGenericReference[T any, V interfaces.Validator[T], C marshaller.CoreM
 	if !componentStorage.referenceStorage.GetOrZero(componentType).Has(componentName) {
 		componentStorage.referenceStorage.GetOrZero(componentType).Set(componentName, bundledRef)
 
-		targetDocInfo := ref.GetReferenceResolutionInfo()
+		// Get the final resolution info for nested bundling
+		targetDocInfo := getFinalResolutionInfo(ref)
+		if targetDocInfo == nil {
+			// Fall back to the immediate resolution info if final resolution info is unavailable
+			targetDocInfo = ref.GetReferenceResolutionInfo()
+		}
+		if targetDocInfo == nil {
+			return fmt.Errorf("failed to get resolution info for %s reference %s", componentType, refStr)
+		}
+		componentStorage.componentLocations[componentType+"/"+componentName] = targetDocInfo.AbsoluteReference
 
-		if err := bundleObject(ctx, bundledRef, namingStrategy, opts.TargetLocation, references.ResolveOptions{
+		if err := bundleObject(ctx, bundledRef, namingStrategy, references.ResolveOptions{
 			RootDocument:   opts.RootDocument,
 			TargetDocument: targetDocInfo.ResolvedDocument,
 			TargetLocation: targetDocInfo.AbsoluteReference,
@@ -411,51 +706,96 @@ func bundleGenericReference[T any, V interfaces.Validator[T], C marshaller.CoreM
 	return nil
 }
 
+// getFinalAbsoluteRef follows the reference resolution chain to get the final absolute reference.
+// This is needed for proper deduplication when we have chained references like:
+// testapi.yaml -> common.yaml#/components/headers/X -> headers.yaml#/components/headers/X
+// Both should resolve to the same final component.
+func getFinalAbsoluteRef[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ref *Reference[T, V, C], initialAbsRef string) string {
+	if ref == nil {
+		return initialAbsRef
+	}
+
+	resInfo := ref.GetReferenceResolutionInfo()
+	if resInfo == nil {
+		return initialAbsRef
+	}
+
+	// Check if the resolved object is itself a reference (chained reference)
+	if resInfo.Object != nil && resInfo.Object.IsReference() {
+		// Follow the chain to get the final resolution info
+		nextRefInfo := resInfo.Object.GetReferenceResolutionInfo()
+		if nextRefInfo != nil {
+			// Build the absolute reference from the final resolution
+			finalRef := nextRefInfo.AbsoluteReference
+			if nextRefInfo.Object != nil && nextRefInfo.Object.Reference != nil {
+				// Add the fragment from the chained reference
+				fragment := string(nextRefInfo.Object.Reference.GetJSONPointer())
+				if fragment != "" {
+					finalRef = finalRef + "#" + fragment
+				}
+			} else {
+				// Use the original reference's fragment with the final file location
+				origRef := resInfo.Object.GetReference()
+				fragment := string(origRef.GetJSONPointer())
+				if fragment != "" {
+					finalRef = finalRef + "#" + fragment
+				}
+			}
+			// Recursively follow more chains if needed
+			return getFinalAbsoluteRef(resInfo.Object, finalRef)
+		}
+	}
+
+	return initialAbsRef
+}
+
+// getFinalResolutionInfo follows the reference resolution chain to get the final resolution info.
+// This returns the resolution info for the last step in a chained reference.
+func getFinalResolutionInfo[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ref *Reference[T, V, C]) *references.ResolveResult[Reference[T, V, C]] {
+	if ref == nil {
+		return nil
+	}
+
+	resInfo := ref.GetReferenceResolutionInfo()
+	if resInfo == nil {
+		return nil
+	}
+
+	// Check if the resolved object is itself a reference (chained reference)
+	if resInfo.Object != nil && resInfo.Object.IsReference() {
+		// Follow the chain to get the final resolution info
+		nextRefInfo := resInfo.Object.GetReferenceResolutionInfo()
+		if nextRefInfo != nil {
+			// Recursively follow more chains
+			return getFinalResolutionInfo(resInfo.Object)
+		}
+	}
+
+	return resInfo
+}
+
 // generateComponentName creates a new component name based on the reference and naming strategy
 func generateComponentName(ref string, strategy BundleNamingStrategy, usedNames map[string]bool, targetLocation string) (string, error) {
+	// Convert absolute path back to relative for component naming
+	relativeRef := makeReferenceRelativeForNaming(ref, targetLocation)
+
 	switch strategy {
 	case BundleNamingFilePath:
-		return generateFilePathBasedNameWithConflictResolution(ref, usedNames, targetLocation)
+		return generateFilePathBasedNameWithConflictResolution(relativeRef, usedNames, targetLocation)
 	case BundleNamingCounter:
-		return generateCounterBasedName(ref, usedNames), nil
+		return generateCounterBasedName(relativeRef, usedNames), nil
 	default:
-		return generateCounterBasedName(ref, usedNames), nil
+		return generateCounterBasedName(relativeRef, usedNames), nil
 	}
 }
 
 // generateComponentNameWithHashConflictResolution creates a component name with smart conflict resolution based on content hashes
 func generateComponentNameWithHashConflictResolution(ref string, strategy BundleNamingStrategy, usedNames map[string]bool, schemaHashes map[string]string, resolvedHash string, targetLocation string) (string, error) {
-	// Parse the reference to extract the simple name
-	parts := strings.Split(ref, "#")
-	if len(parts) == 0 {
-		parts = []string{ref} // Fallback, though this should never happen
-	}
-	fragment := ""
-	if len(parts) > 1 {
-		fragment = parts[1]
-	}
+	// Convert absolute path back to relative for component naming
+	relativeRef := makeReferenceRelativeForNaming(ref, targetLocation)
 
-	var simpleName string
-	if fragment == "" || fragment == "/" {
-		// Top-level file reference - use filename as simple name
-		filePath := parts[0]
-		baseName := filepath.Base(filePath)
-		ext := filepath.Ext(baseName)
-		if ext != "" {
-			baseName = baseName[:len(baseName)-len(ext)]
-		}
-		simpleName = regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(baseName, "_")
-	} else {
-		// Reference to specific schema within file - extract schema name
-		cleanFragment := strings.TrimPrefix(fragment, "/")
-		fragmentParts := strings.Split(cleanFragment, "/")
-		if len(fragmentParts) == 0 {
-			// This should never happen as strings.Split never returns nil or empty slice
-			simpleName = "unknown"
-		} else {
-			simpleName = fragmentParts[len(fragmentParts)-1]
-		}
-	}
+	// Extract simple name from reference
+	simpleName := extractSimpleNameFromReference(relativeRef)
 
 	// Check if a schema with this simple name already exists
 	if existingHash, exists := schemaHashes[simpleName]; exists {
@@ -464,8 +804,15 @@ func generateComponentNameWithHashConflictResolution(ref string, strategy Bundle
 			return simpleName, nil
 		}
 		// Different content with same name - need conflict resolution
-		// Fall back to the configured naming strategy for conflict resolution
-		return generateComponentName(ref, strategy, usedNames, targetLocation)
+		// Fall back to the configured naming strategy for conflict resolution (use already-relative ref)
+		switch strategy {
+		case BundleNamingFilePath:
+			return generateFilePathBasedNameWithConflictResolution(relativeRef, usedNames, targetLocation)
+		case BundleNamingCounter:
+			return generateCounterBasedName(relativeRef, usedNames), nil
+		default:
+			return generateCounterBasedName(relativeRef, usedNames), nil
+		}
 	}
 
 	// No conflict, use simple name
@@ -474,38 +821,8 @@ func generateComponentNameWithHashConflictResolution(ref string, strategy Bundle
 
 // generateFilePathBasedNameWithConflictResolution tries to use simple names first, falling back to file-path-based names for conflicts
 func generateFilePathBasedNameWithConflictResolution(ref string, usedNames map[string]bool, targetLocation string) (string, error) {
-	// Parse the reference to extract file path and fragment
-	parts := strings.Split(ref, "#")
-	if len(parts) == 0 {
-		// This should never happen as strings.Split never returns nil or empty slice
-		return "unknown", nil
-	}
-	fragment := ""
-	if len(parts) > 1 {
-		fragment = parts[1]
-	}
-
-	var simpleName string
-	if fragment == "" || fragment == "/" {
-		// Top-level file reference - use filename as simple name
-		filePath := parts[0]
-		baseName := filepath.Base(filePath)
-		ext := filepath.Ext(baseName)
-		if ext != "" {
-			baseName = baseName[:len(baseName)-len(ext)]
-		}
-		simpleName = regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(baseName, "_")
-	} else {
-		// Reference to specific schema within file - extract schema name
-		cleanFragment := strings.TrimPrefix(fragment, "/")
-		fragmentParts := strings.Split(cleanFragment, "/")
-		if len(fragmentParts) == 0 {
-			// This should never happen as strings.Split never returns nil or empty slice
-			simpleName = "unknown"
-		} else {
-			simpleName = fragmentParts[len(fragmentParts)-1]
-		}
-	}
+	// Extract simple name from reference
+	simpleName := extractSimpleNameFromReference(ref)
 
 	// Try simple name first
 	if !usedNames[simpleName] {
@@ -518,17 +835,10 @@ func generateFilePathBasedNameWithConflictResolution(ref string, usedNames map[s
 
 // generateFilePathBasedName creates names like "some_path_external_yaml~User" or "some_path_external_yaml" for top-level refs
 func generateFilePathBasedName(ref string, usedNames map[string]bool, targetLocation string) (string, error) {
-	// Parse the reference to extract file path and fragment
-	parts := strings.Split(ref, "#")
-	if len(parts) == 0 {
-		// This should never happen as strings.Split never returns nil or empty slice
-		return "unknown", nil
-	}
-	filePath := parts[0]
-	fragment := ""
-	if len(parts) > 1 {
-		fragment = parts[1]
-	}
+	// Parse the reference to extract file path and fragment using references package
+	reference := references.Reference(ref)
+	filePath := reference.GetURI()
+	fragment := string(reference.GetJSONPointer())
 
 	// Convert full file path to safe component name
 	// Clean the path but keep extension for uniqueness
@@ -537,13 +847,15 @@ func generateFilePathBasedName(ref string, usedNames map[string]bool, targetLoca
 	// Remove leading "./" if present
 	cleanPath = strings.TrimPrefix(cleanPath, "./")
 
-	// Handle parent directory references more elegantly
-	// Instead of converting "../" to "___", we'll normalize the path
-	normalizedPath, err := normalizePathForComponentName(cleanPath, targetLocation)
-	if err != nil {
-		return "", fmt.Errorf("failed to normalize path %s: %w", cleanPath, err)
+	// Normalize paths that are absolute OR contain parent directory references (..)
+	if targetLocation != "" && (filepath.IsAbs(cleanPath) || strings.Contains(cleanPath, "..")) {
+		// Normalize to get actual directory names instead of ../
+		normalizedPath, err := normalizePathForComponentName(cleanPath, targetLocation)
+		if err != nil {
+			return "", fmt.Errorf("failed to normalize path %s: %w", cleanPath, err)
+		}
+		cleanPath = normalizedPath
 	}
-	cleanPath = normalizedPath
 
 	// Replace extension dot with underscore to keep it but make it safe
 	ext := filepath.Ext(cleanPath)
@@ -671,38 +983,8 @@ func normalizePathForComponentName(path, targetLocation string) (string, error) 
 
 // generateCounterBasedName creates names like "User_1", "User_2" for conflicts
 func generateCounterBasedName(ref string, usedNames map[string]bool) string {
-	// Extract the schema name from the reference
-	parts := strings.Split(ref, "#")
-	if len(parts) == 0 {
-		// This should never happen as strings.Split never returns nil or empty slice
-		return "unknown"
-	}
-	fragment := ""
-	if len(parts) > 1 {
-		fragment = parts[1]
-	}
-
-	var baseName string
-	if fragment == "" || fragment == "/" {
-		// Top-level file reference - use filename
-		filePath := parts[0]
-		baseName = filepath.Base(filePath)
-		ext := filepath.Ext(baseName)
-		if ext != "" {
-			baseName = baseName[:len(baseName)-len(ext)]
-		}
-		// Replace unsafe characters
-		baseName = regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(baseName, "_")
-	} else {
-		// Extract last part of fragment as schema name
-		fragmentParts := strings.Split(strings.TrimPrefix(fragment, "/"), "/")
-		if len(fragmentParts) == 0 {
-			// This should never happen as strings.Split never returns nil or empty slice
-			baseName = "unknown"
-		} else {
-			baseName = fragmentParts[len(fragmentParts)-1]
-		}
-	}
+	// Extract simple name from reference
+	baseName := extractSimpleNameFromReference(ref)
 
 	// Ensure uniqueness with counter
 	componentName := baseName
@@ -722,23 +1004,17 @@ func updateReferencesToComponents(ctx context.Context, doc *OpenAPI, componentSt
 			Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
 				if schema.IsReference() {
 					ref := string(schema.GetRef())
-					if newName, exists := componentStorage.externalRefs[ref]; exists {
+
+					// Convert the reference to absolute for lookup using root location
+					absRef, _ := handleReference(schema.GetRef(), componentStorage.rootLocation)
+
+					if newName, exists := componentStorage.refs[absRef]; exists {
 						// Update the reference to point to the new component
 						newRef := "#/components/schemas/" + newName
 						*schema.GetLeft().Ref = references.Reference(newRef)
-					} else if strings.HasPrefix(ref, "#/") && !strings.HasPrefix(ref, "#/components/") {
-						// Handle circular references within external schemas
-						// Look for a matching external reference that ends with this fragment
-						for externalRef, componentName := range componentStorage.externalRefs {
-							// Check if the external reference ends with this fragment
-							// e.g., "external_conflicting_user.yaml#/User" ends with "#/User"
-							if strings.HasSuffix(externalRef, ref) {
-								// Update the circular reference to point to the bundled component
-								newRef := "#/components/schemas/" + componentName
-								*schema.GetLeft().Ref = references.Reference(newRef)
-								break
-							}
-						}
+					} else if newName, found := findCircularReferenceMatch(ref, componentStorage.refs); found {
+						newRef := "#/components/schemas/" + newName
+						*schema.GetLeft().Ref = references.Reference(newRef)
 					}
 				}
 				return nil
@@ -784,8 +1060,10 @@ func updateReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler]
 		return nil
 	}
 
-	refStr := string(ref.GetReference())
-	if newName, exists := componentStorage.externalRefs[refStr]; exists {
+	// Convert the reference to absolute for lookup using root location
+	absRef, _ := handleReference(ref.GetReference(), componentStorage.rootLocation)
+
+	if newName, exists := componentStorage.refs[absRef]; exists {
 		// Update the reference to point to the new component
 		newRef := "#/components/" + componentSection + "/" + newName
 		*ref.Reference = references.Reference(newRef)
@@ -901,7 +1179,23 @@ func addComponentsToDocument(doc *OpenAPI, componentStorage *componentStorage) {
 	}
 }
 
-func handleReference(ref references.Reference, parentLocation, targetLocation string) (string, *utils.ReferenceClassification) {
+// handleReference processes a reference for bundling by converting it to an absolute path.
+// This function is specifically designed for the Bundle operation, which needs to:
+//   - Track all external references using absolute paths as unique identifiers
+//   - Normalize paths to forward slashes for cross-platform consistency in the refs map
+//   - Handle both file-based and URL-based references uniformly
+//
+// This differs from handleLocalizeReference, which preserves relative paths and original
+// path separators to maintain the document structure during file copying operations.
+//
+// Parameters:
+//   - ref: The reference to process
+//   - targetLocation: The absolute path of the document containing this reference
+//
+// Returns:
+//   - string: The absolute reference path (normalized to forward slashes for file paths)
+//   - *utils.ReferenceClassification: Classification of the reference type, or nil if invalid
+func handleReference(ref references.Reference, targetLocation string) (string, *utils.ReferenceClassification) {
 	r := ref.String()
 
 	// Check if this is an external reference using the utility function
@@ -910,42 +1204,150 @@ func handleReference(ref references.Reference, parentLocation, targetLocation st
 		return "", nil // Invalid reference, skip
 	}
 
-	// For URLs, don't do any path manipulation - return as-is
+	// For URLs, they're already absolute - return as-is
 	if classification.Type == utils.ReferenceTypeURL {
 		return r, classification
 	}
 
-	if parentLocation != "" {
-		relPath, err := filepath.Rel(filepath.Dir(parentLocation), targetLocation)
-		if err == nil {
-			if classification.IsFragment {
-				r = relPath + r
-			} else {
-				if ref.GetURI() != "" {
-					r = filepath.Join(filepath.Dir(relPath), r)
+	// If we have a target location, make the reference absolute
+	if targetLocation != "" {
+		// Classify the target location to determine how to join
+		baseClassification, err := utils.ClassifyReference(targetLocation)
+		if err != nil {
+			// Invalid base location - cannot proceed with reference classification
+			return "", nil
+		}
+
+		var absolutePath string
+
+		// For fragment-only references, prepend the target location
+		if classification.IsFragment {
+			absolutePath = targetLocation + r
+		} else {
+			// For file path references, join with the target location
+			if baseClassification.IsURL {
+				// Base is URL, join using URL resolution
+				joined, err := baseClassification.JoinWith(r)
+				if err == nil {
+					absolutePath = joined
 				} else {
-					r = filepath.Join(relPath, r)
+					// Error joining URLs is not fatal - fall back to using the original reference
+					// This can happen with malformed URLs or incompatible URL structures
+					absolutePath = r
+				}
+			} else {
+				// Base is file path, resolve relative path
+				// Base location is assumed to be absolute at this point
+				// Split reference into path and fragment using references package
+				refParsed := references.Reference(r)
+				filePath := refParsed.GetURI()
+				fragment := ""
+				if refParsed.HasJSONPointer() {
+					fragment = "#" + string(refParsed.GetJSONPointer())
+				}
+
+				// Join with target directory
+				baseDir := filepath.Dir(targetLocation)
+				joinedPath := filepath.Join(baseDir, filePath)
+
+				// Clean the path and immediately normalize to forward slashes
+				// This prevents issues with Windows path handling
+				absPath := filepath.Clean(joinedPath)
+				absPath = filepath.ToSlash(absPath)
+
+				absolutePath = absPath + fragment
+			}
+		}
+
+		r = absolutePath
+
+		// Normalize to forward slashes for cross-platform path consistency
+		// This ensures that C:\path and C:/path are treated the same
+		// Apply normalization to the full absolute path (including fragment)
+		refParsed := references.Reference(r)
+		uri := refParsed.GetURI()
+
+		// Always normalize absolute paths to forward slashes
+		if uri != "" {
+			// Check if it's an absolute path (works for both C:\path and C:/path)
+			isAbs := filepath.IsAbs(uri) || (len(uri) >= 3 && uri[1] == ':' && (uri[2] == '/' || uri[2] == '\\'))
+
+			if isAbs {
+				normalizedURI := filepath.ToSlash(uri)
+				if refParsed.HasJSONPointer() {
+					r = normalizedURI + "#" + string(refParsed.GetJSONPointer())
+				} else {
+					r = normalizedURI
 				}
 			}
 		}
 
-		// convert paths back to original separators
-		// detect original separators from the original reference
-		pathStyle := detectPathStyle(ref.String())
-		switch pathStyle {
-		case "windows":
-			r = strings.ReplaceAll(r, "/", "\\")
-		default:
-			r = strings.ReplaceAll(r, "\\", "/")
-		}
-
+		// Re-classify after making absolute and normalizing
 		cl, err := utils.ClassifyReference(r)
 		if err == nil {
 			classification = cl
 		}
+		// Error re-classifying is not fatal - we keep using the previous classification
+		// This maintains backward compatibility and allows processing to continue
 	}
 
 	return r, classification
+}
+
+// makeReferenceRelativeForNaming converts an absolute reference path back to a relative path
+// suitable for component naming, relative to the root document location (assumed to be absolute)
+func makeReferenceRelativeForNaming(ref string, rootLocation string) string {
+	if rootLocation == "" {
+		return ref
+	}
+
+	// Parse reference using the references package
+	reference := references.Reference(ref)
+	uri := reference.GetURI()
+
+	// If there's no URI (just a fragment), return as-is
+	if uri == "" {
+		return ref
+	}
+
+	// On Windows, paths with forward slashes can be misclassified as URLs
+	// Normalize to native separators before classification to avoid this
+	normalizedURI := uri
+	if filepath.Separator == '\\' && len(uri) >= 3 && uri[1] == ':' && uri[2] == '/' {
+		// Windows path with forward slashes like C:/path - convert to backslashes
+		normalizedURI = filepath.FromSlash(uri)
+	}
+
+	// Check if this is a URL - if so, return as-is
+	// Error classifying reference is not fatal - we return the original ref unchanged
+	classification, err := utils.ClassifyReference(normalizedURI)
+	if err != nil || classification.IsURL {
+		return ref
+	}
+
+	// If the URI is absolute, make it relative to the root document's directory
+	// rootLocation is assumed to be absolute at this point
+	if filepath.IsAbs(normalizedURI) {
+		// Normalize rootLocation as well for consistent comparison
+		normalizedRoot := rootLocation
+		if filepath.Separator == '\\' {
+			normalizedRoot = filepath.FromSlash(rootLocation)
+		}
+		rootDir := filepath.Dir(normalizedRoot)
+		relPath, err := filepath.Rel(rootDir, normalizedURI)
+		if err == nil {
+			// Reconstruct the reference with relative path
+			if reference.HasJSONPointer() {
+				return relPath + "#" + string(reference.GetJSONPointer())
+			}
+			return relPath
+		}
+		// Error making path relative is not fatal - we fall through to return the original ref
+		// This can happen when paths are on different drives (Windows) or incompatible
+	}
+
+	// Return as-is if we couldn't make it relative
+	return ref
 }
 
 var winAbs = regexp.MustCompile(`^[a-zA-Z]:\\`)
@@ -961,4 +1363,61 @@ func detectPathStyle(p string) string {
 	default:
 		return "unknown"
 	}
+}
+
+// Helper functions for DRY principle
+
+// isInternalReference checks if a reference points to the root document
+func isInternalReference(ref string, rootLocation string) bool {
+	refURI := references.Reference(ref).GetURI()
+	if refURI == "" {
+		return true // Fragment-only reference
+	}
+
+	cleanRefURI := filepath.Clean(refURI)
+	cleanRootURI := filepath.Clean(rootLocation)
+	return cleanRefURI == cleanRootURI
+}
+
+// extractSimpleNameFromReference extracts a simple component name from a reference
+func extractSimpleNameFromReference(ref string) string {
+	reference := references.Reference(ref)
+	filePath := reference.GetURI()
+	fragment := string(reference.GetJSONPointer())
+
+	if fragment == "" || fragment == "/" {
+		// Top-level file reference - use filename as simple name
+		baseName := filepath.Base(filePath)
+		ext := filepath.Ext(baseName)
+		if ext != "" {
+			baseName = baseName[:len(baseName)-len(ext)]
+		}
+		return regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(baseName, "_")
+	}
+
+	// Reference to specific schema within file - extract schema name
+	cleanFragment := strings.TrimPrefix(fragment, "/")
+	fragmentParts := strings.Split(cleanFragment, "/")
+	if len(fragmentParts) == 0 {
+		return "unknown"
+	}
+	return fragmentParts[len(fragmentParts)-1]
+}
+
+// findCircularReferenceMatch finds a component name for a circular reference
+func findCircularReferenceMatch(refStr string, refs map[string]string) (string, bool) {
+	// Only match fragment-only references that aren't already component references
+	if !strings.HasPrefix(refStr, "#/") || strings.HasPrefix(refStr, "#/components/") {
+		return "", false
+	}
+
+	// Look for a matching reference that ends with this fragment
+	// e.g., "/absolute/path/external_conflicting_user.yaml#/User" ends with "#/User"
+	for externalRef, componentName := range refs {
+		if strings.HasSuffix(externalRef, refStr) {
+			return componentName, true
+		}
+	}
+
+	return "", false
 }

@@ -36,7 +36,7 @@ func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) [
 	if r.ContentType != nil {
 		_, _, err := mime.ParseMediaType(*r.ContentType)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("requestBody field contentType is not valid: %s", err.Error()), core, core.ContentType))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("requestBody.contentType is not valid: %s", err.Error()), core, core.ContentType))
 		}
 	}
 
@@ -47,7 +47,7 @@ func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) [
 		if err == nil && exp != nil {
 			// Only validate if the entire payload IS an expression (not just contains expressions)
 			if err := exp.Validate(); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("requestBody field payload expression is not valid: %s", err.Error()), core, core.Payload))
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("requestBody.payload expression is not valid: %s", err.Error()), core, core.Payload))
 			}
 		}
 		// If exp is nil, the payload is a value (not an expression) - no validation needed
