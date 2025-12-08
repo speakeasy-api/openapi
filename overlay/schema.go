@@ -64,4 +64,8 @@ type Action struct {
 
 	// Remove marks the target node for removal rather than update.
 	Remove bool `yaml:"remove,omitempty"`
+
+	// Copy is a JSONPath to the source node to copy to the target. This is
+	// mutually exclusive with Update and Remove.
+	Copy string `yaml:"copy,omitempty"`
 }

@@ -270,6 +270,21 @@ func cloneNode(node *yaml.Node) *yaml.Node {
 	return clone
 }
 
+func TestApplyTo_CopyVersionToHeader(t *testing.T) {
+	t.Parallel()
+
+	node, err := loader.LoadSpecification("testdata/openapi-version-header.yaml")
+	require.NoError(t, err)
+
+	o, err := loader.LoadOverlay("testdata/overlay-version-header.yaml")
+	require.NoError(t, err)
+
+	err = o.ApplyTo(node)
+	require.NoError(t, err)
+
+	NodeMatchesFile(t, node, "testdata/openapi-version-header-expected.yaml")
+}
+
 func TestApplyToOld(t *testing.T) {
 	t.Parallel()
 

@@ -1,0 +1,41 @@
+openapi: 3.1.0
+info:
+  title: Version Header Test API
+  version: 2.5.0
+  description: API for testing version header copy
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      summary: Get users
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            XAPIVersion:
+              schema:
+                type: string
+                const: "2.5.0"
+    post:
+      operationId: createUser
+      summary: Create user
+      responses:
+        '201':
+          description: Created
+          headers:
+            XAPIVersion:
+              schema:
+                type: string
+                const: "2.5.0"
+  /orders:
+    get:
+      operationId: getOrders
+      summary: Get orders
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            XAPIVersion:
+              schema:
+                type: string
+                const: "2.5.0"

@@ -1,0 +1,12 @@
+overlay: 1.1.0
+x-speakeasy-jsonpath: rfc9535
+info:
+  title: Copy with Update - Mutual Exclusion Test
+  version: 1.0.0
+actions:
+  # Error: copy and update are mutually exclusive
+  - target: $.paths["/bar"]
+    description: Invalid - both copy and update
+    copy: $.paths["/foo"]
+    update:
+      summary: This should not be allowed
