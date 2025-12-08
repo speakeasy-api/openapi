@@ -1,0 +1,49 @@
+openapi: 3.0.0
+info:
+  title: common definitions
+  version: "1.0"
+  description: common definitions
+  license:
+    name: apache 2
+    url: "https://apache.org/licenses/LICENSE-2.0"
+paths:
+  /dummy:
+    get:
+      summary: Dummy endpoint to satisfy OpenAPI validator
+      responses:
+        "200":
+          description: Successful response
+components:
+  headers:
+    X-RateLimit-Limit:
+      description: The maximum number of requests that the client is allowed to make in this window.
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 10000
+      example: 100
+    X-RateLimit-Remaining:
+      description: The number of requests remaining in the current rate limit window.
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        maximum: 10000
+      example: 99
+    X-RateLimit-Reset:
+      description: The time at which the current rate limit window resets in UTC epoch seconds.
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        maximum: 2147483647
+      example: 1652364907
+    Retry-After:
+      description: The number of seconds to wait before making a new request when rate limit is exceeded.
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        maximum: 3600
+      example: 60

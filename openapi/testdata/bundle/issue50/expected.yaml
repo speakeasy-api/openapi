@@ -269,6 +269,7 @@ components:
         $ref: '#/components/schemas/UUID'
   headers:
     X-RateLimit-Limit:
+      description: The maximum number of requests that the client is allowed to make in this window.
       schema:
         type: integer
         maximum: 10000
@@ -276,6 +277,7 @@ components:
         format: int32
       example: 100
     X-RateLimit-Remaining:
+      description: The number of requests remaining in the current rate limit window.
       schema:
         type: integer
         maximum: 10000
@@ -283,6 +285,7 @@ components:
         format: int32
       example: 99
     X-RateLimit-Reset:
+      description: The time at which the current rate limit window resets in UTC epoch seconds.
       schema:
         type: integer
         maximum: 2.147483647e+09
@@ -290,6 +293,7 @@ components:
         format: int32
       example: 1652364907
     Retry-After:
+      description: The number of seconds to wait before making a new request when rate limit is exceeded.
       schema:
         type: integer
         maximum: 3600

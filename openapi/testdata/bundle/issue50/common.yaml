@@ -19,13 +19,13 @@ components:
       description: Internal server error
       headers:
         X-RateLimit-Limit:
-          $ref: "#/components/headers/X-RateLimit-Limit"
+          $ref: "./headers.yaml#/components/headers/X-RateLimit-Limit"
         X-RateLimit-Remaining:
-          $ref: "#/components/headers/X-RateLimit-Remaining"
+          $ref: "./headers.yaml#/components/headers/X-RateLimit-Remaining"
         X-RateLimit-Reset:
-          $ref: "#/components/headers/X-RateLimit-Reset"
+          $ref: "./headers.yaml#/components/headers/X-RateLimit-Reset"
         Retry-After:
-          $ref: "#/components/headers/Retry-After"
+          $ref: "./headers.yaml#/components/headers/Retry-After"
       content:
         application/json:
           schema:
@@ -37,36 +37,6 @@ components:
                 title: Internal Server Error
                 instance: accounts/123
                 detail: "An unexpected error occurred on the server."
-
-  headers:
-    X-RateLimit-Limit:
-      schema:
-        type: integer
-        format: int32
-        minimum: 1
-        maximum: 10000
-      example: 100
-    X-RateLimit-Remaining:
-      schema:
-        type: integer
-        format: int32
-        minimum: 0
-        maximum: 10000
-      example: 99
-    X-RateLimit-Reset:
-      schema:
-        type: integer
-        format: int32
-        minimum: 0
-        maximum: 2147483647
-      example: 1652364907
-    Retry-After:
-      schema:
-        type: integer
-        format: int32
-        minimum: 0
-        maximum: 3600
-      example: 60
   schemas:
     IndividualEntity:
       title: IndividualEntity
@@ -182,3 +152,12 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/UUID"
+  headers:
+    X-RateLimit-Limit:
+      $ref: "./headers.yaml#/components/headers/X-RateLimit-Limit"
+    X-RateLimit-Remaining:
+      $ref: "./headers.yaml#/components/headers/X-RateLimit-Remaining"
+    X-RateLimit-Reset:
+      $ref: "./headers.yaml#/components/headers/X-RateLimit-Reset"
+    Retry-After:
+      $ref: "./headers.yaml#/components/headers/Retry-After"
