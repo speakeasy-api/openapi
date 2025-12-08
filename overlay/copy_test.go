@@ -20,7 +20,7 @@ func TestCopyAction_Basic(t *testing.T) {
 	require.NoError(t, err)
 
 	err = o.ApplyTo(node)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	NodeMatchesFile(t, node, "testdata/openapi-copy-expected.yaml")
 }
@@ -36,7 +36,7 @@ func TestCopyAction_BasicStrict(t *testing.T) {
 	require.NoError(t, err)
 
 	warnings, err := o.ApplyToStrict(node)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, warnings)
 
 	NodeMatchesFile(t, node, "testdata/openapi-copy-expected.yaml")
@@ -53,7 +53,7 @@ func TestCopyAction_Move(t *testing.T) {
 	require.NoError(t, err)
 
 	err = o.ApplyTo(node)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	NodeMatchesFile(t, node, "testdata/openapi-copy-move-expected.yaml")
 }
@@ -70,14 +70,14 @@ func TestCopyAction_SourceNotFound(t *testing.T) {
 
 	// In non-strict mode, copy from non-existent source should be silently ignored
 	err = o.ApplyTo(node)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// In strict mode, it should error
 	node, err = loader.LoadSpecification("testdata/openapi-copy.yaml")
 	require.NoError(t, err)
 
 	_, err = o.ApplyToStrict(node)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "nonexistent")
 }
 
@@ -129,7 +129,7 @@ func TestCopyAction_CopyToExistingPath(t *testing.T) {
 	require.NoError(t, err)
 
 	err = o.ApplyTo(node)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// The /existing path should have been merged with /foo's content
 	// This is verified by checking that it now has both get and post operations
@@ -165,6 +165,7 @@ func TestCopyAction_CopyDifferentNodeTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			node, err := loader.LoadSpecification("testdata/openapi-copy.yaml")
 			require.NoError(t, err)
 
@@ -345,7 +346,7 @@ func TestCopyAction_TargetNotFound(t *testing.T) {
 
 	// In strict mode, this should error
 	_, err = o.ApplyToStrict(node)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "did not match any targets")
 }
 

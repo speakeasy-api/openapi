@@ -280,7 +280,7 @@ func TestApplyTo_CopyVersionToHeader(t *testing.T) {
 	require.NoError(t, err)
 
 	err = o.ApplyTo(node)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	NodeMatchesFile(t, node, "testdata/openapi-version-header-expected.yaml")
 }
