@@ -13,15 +13,19 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/speakeasy-api/openapi/yml"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
 
 // TODO use these more in tests
 func CreateStringYamlNode(value string, line, column int) *yaml.Node {
+	cfg := yml.GetDefaultConfig()
+
 	return &yaml.Node{
 		Value:  value,
 		Kind:   yaml.ScalarNode,
+		Style:  cfg.ValueStringStyle,
 		Tag:    "!!str",
 		Line:   line,
 		Column: column,

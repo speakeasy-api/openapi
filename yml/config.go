@@ -3,6 +3,7 @@ package yml
 import (
 	"bytes"
 	"context"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -56,6 +57,10 @@ var defaultConfig = &Config{
 	KeyStringStyle:   0,
 	ValueStringStyle: 0,
 	OutputFormat:     OutputFormatYAML,
+}
+
+func GetDefaultConfig() *Config {
+	return defaultConfig
 }
 
 func ContextWithConfig(ctx context.Context, config *Config) context.Context {
@@ -182,40 +187,40 @@ func inspectData(data []byte) (OutputFormat, int, IndentationStyle) {
 }
 
 func getGlobalStringStyle(doc *yaml.Node, cfg *Config) {
-	foundMapKeyStyle := false
-	foundStringValueStyle := false
+	const minSamples = 3
+
+	keyStyles := make([]yaml.Style, 0, minSamples)
+	valueStyles := make([]yaml.Style, 0, minSamples)
 
 	var navigate func(node *yaml.Node)
 	navigate = func(node *yaml.Node) {
+		if len(keyStyles) >= minSamples && len(valueStyles) >= minSamples {
+			return
+		}
+
 		switch node.Kind {
 		case yaml.DocumentNode:
 			navigate(node.Content[0])
 		case yaml.SequenceNode:
 			for _, n := range node.Content {
 				navigate(n)
-
-				if foundMapKeyStyle && foundStringValueStyle {
-					return
-				}
 			}
 		case yaml.MappingNode:
 			for i, n := range node.Content {
 				if i%2 == 0 {
-					if n.Kind == yaml.ScalarNode && n.Tag == "!!str" {
-						cfg.KeyStringStyle = n.Style
-						foundMapKeyStyle = true
+					if n.Kind == yaml.ScalarNode && n.Tag == "!!str" && len(keyStyles) < minSamples {
+						keyStyles = append(keyStyles, n.Style)
 					}
 				} else {
 					navigate(n)
-					if foundMapKeyStyle && foundStringValueStyle {
-						return
-					}
 				}
 			}
 		case yaml.ScalarNode:
-			if node.Tag == "!!str" {
-				cfg.ValueStringStyle = node.Style
-				foundStringValueStyle = true
+			if node.Tag == "!!str" && len(valueStyles) < minSamples {
+				// Exclude quoted numbers - they need quotes but don't represent typical string style
+				if !looksLikeNumber(node.Value) {
+					valueStyles = append(valueStyles, node.Style)
+				}
 			}
 		case yaml.AliasNode:
 			navigate(node.Alias)
@@ -225,4 +230,49 @@ func getGlobalStringStyle(doc *yaml.Node, cfg *Config) {
 	}
 
 	navigate(doc)
+
+	// Choose the most common style for keys
+	if len(keyStyles) > 0 {
+		cfg.KeyStringStyle = mostCommonStyle(keyStyles)
+	}
+
+	// Choose the most common style for values
+	if len(valueStyles) > 0 {
+		cfg.ValueStringStyle = mostCommonStyle(valueStyles)
+	}
+}
+
+// looksLikeNumber returns true if the string value looks like a number
+func looksLikeNumber(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	// Try parsing as float (covers int, float, scientific notation)
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil
+}
+
+// mostCommonStyle returns the most frequently occurring style from the provided styles
+func mostCommonStyle(styles []yaml.Style) yaml.Style {
+	if len(styles) == 0 {
+		return 0
+	}
+
+	counts := make(map[yaml.Style]int)
+	for _, style := range styles {
+		counts[style]++
+	}
+
+	// Find the style with the highest count
+	var maxCount int
+	var mostCommon yaml.Style
+	for style, count := range counts {
+		if count > maxCount {
+			maxCount = count
+			mostCommon = style
+		}
+	}
+
+	return mostCommon
 }

@@ -507,3 +507,258 @@ nested:
 		})
 	}
 }
+
+func TestGetConfigFromDoc_WithMixedStringStyles_Success(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name               string
+		data               []byte
+		doc                *yaml.Node
+		expectedKeyStyle   yaml.Style
+		expectedValueStyle yaml.Style
+	}{
+		{
+			name: "mostly double quoted values",
+			data: []byte(`
+  key1: "value1"
+  key2: "value2"
+  key3: 'value3'
+`),
+			doc: &yaml.Node{
+				Kind: yaml.DocumentNode,
+				Content: []*yaml.Node{
+					{
+						Kind: yaml.MappingNode,
+						Tag:  "!!map",
+						Content: []*yaml.Node{
+							{Value: "key1", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "value1", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key2", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "value2", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key3", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "value3", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.SingleQuotedStyle},
+						},
+					},
+				},
+			},
+			expectedKeyStyle:   0,
+			expectedValueStyle: yaml.DoubleQuotedStyle,
+		},
+		{
+			name: "mostly single quoted values",
+			data: []byte(`
+  key1: 'value1'
+  key2: 'value2'
+  key3: "value3"
+`),
+			doc: &yaml.Node{
+				Kind: yaml.DocumentNode,
+				Content: []*yaml.Node{
+					{
+						Kind: yaml.MappingNode,
+						Tag:  "!!map",
+						Content: []*yaml.Node{
+							{Value: "key1", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "value1", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.SingleQuotedStyle},
+							{Value: "key2", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "value2", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.SingleQuotedStyle},
+							{Value: "key3", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "value3", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+						},
+					},
+				},
+			},
+			expectedKeyStyle:   0,
+			expectedValueStyle: yaml.SingleQuotedStyle,
+		},
+		{
+			name: "numeric strings excluded from value style detection",
+			data: []byte(`
+  key1: "123"
+  key2: "456"
+  key3: "actual string"
+  key4: "another string"
+  key5: "third string"
+`),
+			doc: &yaml.Node{
+				Kind: yaml.DocumentNode,
+				Content: []*yaml.Node{
+					{
+						Kind: yaml.MappingNode,
+						Tag:  "!!map",
+						Content: []*yaml.Node{
+							{Value: "key1", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "123", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key2", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "456", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key3", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "actual string", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key4", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "another string", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key5", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "third string", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+						},
+					},
+				},
+			},
+			expectedKeyStyle:   0,
+			expectedValueStyle: yaml.DoubleQuotedStyle,
+		},
+		{
+			name: "mixed key styles chooses most common",
+			data: []byte(`
+  "key1": value1
+  "key2": value2
+  key3: value3
+`),
+			doc: &yaml.Node{
+				Kind: yaml.DocumentNode,
+				Content: []*yaml.Node{
+					{
+						Kind: yaml.MappingNode,
+						Tag:  "!!map",
+						Content: []*yaml.Node{
+							{Value: "key1", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "value1", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "key2", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "value2", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "key3", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+							{Value: "value3", Kind: yaml.ScalarNode, Tag: "!!str", Style: 0},
+						},
+					},
+				},
+			},
+			expectedKeyStyle:   yaml.DoubleQuotedStyle,
+			expectedValueStyle: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := yml.GetConfigFromDoc(tt.data, tt.doc)
+
+			require.NotNil(t, result)
+			assert.Equal(t, tt.expectedKeyStyle, result.KeyStringStyle, "should select most common key string style")
+			assert.Equal(t, tt.expectedValueStyle, result.ValueStringStyle, "should select most common value string style, excluding numbers")
+		})
+	}
+}
+
+func TestGetConfigFromDoc_WithNumericStrings_Success(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name               string
+		data               []byte
+		doc                *yaml.Node
+		expectedValueStyle yaml.Style
+		description        string
+	}{
+		{
+			name: "integers as strings",
+			data: []byte(`
+  key1: "123"
+  key2: "456"
+  key3: "789"
+  key4: "real string"
+`),
+			doc: &yaml.Node{
+				Kind: yaml.DocumentNode,
+				Content: []*yaml.Node{
+					{
+						Kind: yaml.MappingNode,
+						Tag:  "!!map",
+						Content: []*yaml.Node{
+							{Value: "key1", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "123", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key2", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "456", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key3", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "789", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key4", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "real string", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+						},
+					},
+				},
+			},
+			expectedValueStyle: yaml.DoubleQuotedStyle,
+			description:        "should ignore numeric strings and use style from actual strings",
+		},
+		{
+			name: "floats as strings",
+			data: []byte(`
+  key1: "3.14"
+  key2: "2.71"
+  key3: "text value"
+  key4: "another text"
+  key5: "third text"
+`),
+			doc: &yaml.Node{
+				Kind: yaml.DocumentNode,
+				Content: []*yaml.Node{
+					{
+						Kind: yaml.MappingNode,
+						Tag:  "!!map",
+						Content: []*yaml.Node{
+							{Value: "key1", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "3.14", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key2", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "2.71", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key3", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "text value", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key4", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "another text", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key5", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "third text", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+						},
+					},
+				},
+			},
+			expectedValueStyle: yaml.DoubleQuotedStyle,
+			description:        "should ignore float strings and use style from actual strings",
+		},
+		{
+			name: "scientific notation as strings",
+			data: []byte(`
+  key1: "1e10"
+  key2: "2.5e-3"
+  key3: "regular text"
+  key4: "more text"
+  key5: "even more text"
+`),
+			doc: &yaml.Node{
+				Kind: yaml.DocumentNode,
+				Content: []*yaml.Node{
+					{
+						Kind: yaml.MappingNode,
+						Tag:  "!!map",
+						Content: []*yaml.Node{
+							{Value: "key1", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "1e10", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key2", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "2.5e-3", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key3", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "regular text", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key4", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "more text", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+							{Value: "key5", Kind: yaml.ScalarNode, Tag: "!!str"},
+							{Value: "even more text", Kind: yaml.ScalarNode, Tag: "!!str", Style: yaml.DoubleQuotedStyle},
+						},
+					},
+				},
+			},
+			expectedValueStyle: yaml.DoubleQuotedStyle,
+			description:        "should ignore scientific notation strings and use style from actual strings",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := yml.GetConfigFromDoc(tt.data, tt.doc)
+
+			require.NotNil(t, result)
+			assert.Equal(t, tt.expectedValueStyle, result.ValueStringStyle, tt.description)
+		})
+	}
+}
