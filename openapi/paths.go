@@ -287,9 +287,11 @@ func (p *PathItem) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	o := validation.NewOptions(opts...)
 
-	openapi := validation.GetContextObject[OpenAPI](o)
-	if openapi == nil {
-		panic("OpenAPI is required")
+	oa := validation.GetContextObject[OpenAPI](o)
+	// If OpenAPI object is not provided, assume the latest version
+	openapiVersion := Version
+	if oa != nil {
+		openapiVersion = oa.OpenAPI
 	}
 
 	for _, op := range p.All() {
@@ -304,7 +306,7 @@ func (p *PathItem) Validate(ctx context.Context, opts ...validation.Option) []er
 		errs = append(errs, parameter.Validate(ctx, opts...)...)
 	}
 
-	supportsAdditionalOperations, err := version.IsVersionGreaterOrEqual(openapi.OpenAPI, "3.2.0")
+	supportsAdditionalOperations, err := version.IsVersionGreaterOrEqual(openapiVersion, Version)
 	switch {
 	case err != nil:
 		errs = append(errs, err)
@@ -327,7 +329,7 @@ func (p *PathItem) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	case !supportsAdditionalOperations:
 		if core.AdditionalOperations.Present {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("additionalOperations is not supported in OpenAPI version %s", openapi.OpenAPI), core, core.AdditionalOperations))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("additionalOperations is not supported in OpenAPI version %s", openapiVersion), core, core.AdditionalOperations))
 		}
 	}
 

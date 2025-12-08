@@ -17,6 +17,8 @@ jobs:
 
       - name: Install mise
         uses: jdx/mise-action@v3
+        with:
+          experimental: true
 
       - name: Setup Go with caching
         uses: actions/setup-go@v6

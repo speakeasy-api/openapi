@@ -12,6 +12,8 @@ type Version struct {
 	Patch int
 }
 
+var _ fmt.Stringer = (*Version)(nil)
+
 func New(major, minor, patch int) *Version {
 	return &Version{
 		Major: major,

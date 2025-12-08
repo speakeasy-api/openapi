@@ -7,6 +7,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/require"
 )
 
@@ -208,8 +209,18 @@ func TestTag_ValidateWithTags_ParentRelationships_Success(t *testing.T) {
 
 	allTags := []*openapi.Tag{catalogTag, productsTag, booksTag, standaloneTag}
 
+	// Create an OpenAPI document with all tags for validation
+	doc := &openapi.OpenAPI{
+		OpenAPI: "3.2.0",
+		Info: openapi.Info{
+			Title:   "Test API",
+			Version: "1.0.0",
+		},
+		Tags: allTags,
+	}
+
 	for _, tag := range allTags {
-		errs := tag.ValidateWithTags(t.Context(), allTags)
+		errs := tag.Validate(t.Context(), validation.WithContextObject(doc))
 		require.Empty(t, errs, "expected no validation errors for tag %s", tag.Name)
 	}
 }
@@ -221,7 +232,17 @@ func TestTag_ValidateWithTags_ParentNotFound_Error(t *testing.T) {
 	tag := &openapi.Tag{Name: "orphan", Parent: &[]string{"nonexistent"}[0]}
 	allTags := []*openapi.Tag{tag}
 
-	errs := tag.ValidateWithTags(t.Context(), allTags)
+	// Create an OpenAPI document with all tags for validation
+	doc := &openapi.OpenAPI{
+		OpenAPI: "3.2.0",
+		Info: openapi.Info{
+			Title:   "Test API",
+			Version: "1.0.0",
+		},
+		Tags: allTags,
+	}
+
+	errs := tag.Validate(t.Context(), validation.WithContextObject(doc))
 	require.NotEmpty(t, errs, "expected validation errors")
 
 	found := false
@@ -272,10 +293,20 @@ func TestTag_ValidateWithTags_CircularReference_Error(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			// Create an OpenAPI document with all tags for validation
+			doc := &openapi.OpenAPI{
+				OpenAPI: "3.2.0",
+				Info: openapi.Info{
+					Title:   "Test API",
+					Version: "1.0.0",
+				},
+				Tags: tt.tags,
+			}
+
 			// Check each tag that has a parent
 			for _, tag := range tt.tags {
 				if tag.Parent != nil {
-					errs := tag.ValidateWithTags(t.Context(), tt.tags)
+					errs := tag.Validate(t.Context(), validation.WithContextObject(doc))
 					require.NotEmpty(t, errs, "expected validation errors for %s", tt.desc)
 
 					found := false
@@ -312,8 +343,18 @@ func TestTag_ValidateWithTags_ComplexHierarchy_Success(t *testing.T) {
 
 	allTags := []*openapi.Tag{catalogTag, productsTag, booksTag, cdsTag, servicesTag, deliveryTag}
 
+	// Create an OpenAPI document with all tags for validation
+	doc := &openapi.OpenAPI{
+		OpenAPI: "3.2.0",
+		Info: openapi.Info{
+			Title:   "Test API",
+			Version: "1.0.0",
+		},
+		Tags: allTags,
+	}
+
 	for _, tag := range allTags {
-		errs := tag.ValidateWithTags(t.Context(), allTags)
+		errs := tag.Validate(t.Context(), validation.WithContextObject(doc))
 		require.Empty(t, errs, "expected no validation errors for tag %s", tag.Name)
 	}
 }

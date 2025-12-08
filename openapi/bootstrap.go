@@ -73,19 +73,6 @@ func createBootstrapTags() []*Tag {
 				URL:         "https://docs.example.com/users",
 			},
 		},
-		{
-			Name:        "admin",
-			Summary:     pointer.From("Admin"),
-			Description: pointer.From("Administrative operations"),
-			Parent:      pointer.From("users"),
-			Kind:        pointer.From("nav"),
-		},
-		{
-			Name:        "beta-features",
-			Summary:     pointer.From("Beta"),
-			Description: pointer.From("Experimental features"),
-			Kind:        pointer.From("badge"),
-		},
 	}
 }
 

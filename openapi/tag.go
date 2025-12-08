@@ -103,17 +103,14 @@ func (t *Tag) Validate(ctx context.Context, opts ...validation.Option) []error {
 		errs = append(errs, t.ExternalDocs.Validate(ctx, opts...)...)
 	}
 
-	t.Valid = len(errs) == 0 && core.GetValid()
+	// Get OpenAPI object from validation options to check parent relationships
+	o := validation.NewOptions(opts...)
+	openapi := validation.GetContextObject[OpenAPI](o)
 
-	return errs
-}
+	// If we have an OpenAPI object with tags, validate parent relationships
+	if openapi != nil && openapi.Tags != nil && t.Parent != nil && *t.Parent != "" {
+		allTags := openapi.Tags
 
-// ValidateWithTags validates the Tag object in the context of all tags to check for parent relationships.
-// This should be called during document-level validation where all tags are available.
-func (t *Tag) ValidateWithTags(ctx context.Context, allTags []*Tag, opts ...validation.Option) []error {
-	errs := t.Validate(ctx, opts...)
-
-	if t.Parent != nil && *t.Parent != "" {
 		// Check if parent tag exists
 		parentExists := false
 		for _, tag := range allTags {
@@ -124,7 +121,6 @@ func (t *Tag) ValidateWithTags(ctx context.Context, allTags []*Tag, opts ...vali
 		}
 
 		if !parentExists {
-			core := t.GetCore()
 			errs = append(errs, validation.NewValueError(
 				validation.NewMissingValueError("parent tag '%s' does not exist", *t.Parent),
 				core, core.Parent))
@@ -132,12 +128,13 @@ func (t *Tag) ValidateWithTags(ctx context.Context, allTags []*Tag, opts ...vali
 
 		// Check for circular references
 		if t.hasCircularParentReference(allTags, make(map[string]bool)) {
-			core := t.GetCore()
 			errs = append(errs, validation.NewValueError(
 				validation.NewValueValidationError("circular parent reference detected for tag '%s'", t.Name),
 				core, core.Parent))
 		}
 	}
+
+	t.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
 }

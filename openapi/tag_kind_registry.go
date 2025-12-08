@@ -1,9 +1,13 @@
 package openapi
 
+import "fmt"
+
 // TagKind represents commonly used values for the Tag.Kind field.
 // These values are registered in the OpenAPI Initiative's Tag Kind Registry
 // at https://spec.openapis.org/registry/tag-kind/
 type TagKind string
+
+var _ fmt.Stringer = (*TagKind)(nil)
 
 // Officially registered Tag Kind values from the OpenAPI Initiative registry
 const (
