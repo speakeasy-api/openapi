@@ -18,7 +18,7 @@ type UpgradeOptions struct {
 	targetVersion           string
 }
 
-// WithUpgradeSameMinorVersion will upgrade the same minor version of the OpenAPI document. For example 3.1.0 to 3.1.1.
+// WithUpgradeSameMinorVersion will upgrade the same minor version of the OpenAPI document. For example 3.2.0 to 3.2.1.
 func WithUpgradeSameMinorVersion() Option[UpgradeOptions] {
 	return func(uo *UpgradeOptions) {
 		uo.upgradeSameMinorVersion = true

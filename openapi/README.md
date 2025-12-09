@@ -35,7 +35,7 @@
 ## Supported OpenAPI Versions
 
 - OpenAPI 3.0.0 through 3.0.4
-- OpenAPI 3.1.0 through 3.1.1
+- OpenAPI 3.1.0 through 3.1.2
 - OpenAPI 3.2.0
 
 The package can automatically upgrade documents from 3.0.x and 3.1.x to 3.2.0, handling the differences in specification between versions.
@@ -727,7 +727,7 @@ if err := marshaller.Marshal(ctx, inlinedSchema, buf); err != nil {
 fmt.Printf("%s", buf.String())
 ```
 
-## Upgrade an OpenAPI document from 3.0.x to 3.1.1
+## Upgrade an OpenAPI document from 3.0.x to 3.2.0
 
 Shows the automatic conversion of nullable fields, examples, and other version differences.
 
@@ -738,7 +738,7 @@ openAPIYAML := `openapi: 3.0.3
 info:
   title: Legacy API
   version: 1.0.0
-  description: An API that needs upgrading from 3.0.3 to 3.1.1
+  description: An API that needs upgrading from 3.0.3 to 3.2.0
 paths:
   /users:
     get:

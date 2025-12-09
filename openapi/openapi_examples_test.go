@@ -947,7 +947,7 @@ func Example_inliningSchema() {
 	// }
 }
 
-// Example_upgrading demonstrates how to upgrade an OpenAPI document from 3.0.x to 3.1.1.
+// Example_upgrading demonstrates how to upgrade an OpenAPI document from 3.0.x to 3.2.0.
 // Shows the automatic conversion of nullable fields, examples, and other version differences.
 func Example_upgrading() {
 	ctx := context.Background()
@@ -957,7 +957,7 @@ func Example_upgrading() {
 info:
   title: Legacy API
   version: 1.0.0
-  description: An API that needs upgrading from 3.0.3 to 3.1.1
+  description: An API that needs upgrading from 3.0.3 to 3.2.0
 paths:
   /users:
     get:
@@ -1019,7 +1019,7 @@ components:
 	// info:
 	//   title: Legacy API
 	//   version: 1.0.0
-	//   description: An API that needs upgrading from 3.0.3 to 3.1.1
+	//   description: An API that needs upgrading from 3.0.3 to 3.2.0
 	// paths:
 	//   /users:
 	//     get:

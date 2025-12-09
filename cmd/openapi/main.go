@@ -67,7 +67,7 @@ This CLI provides tools for:
 
 OpenAPI Specifications:
 - Validate OpenAPI specification documents for compliance
-- Upgrade OpenAPI specs to the latest supported version (3.1.1)
+- Upgrade OpenAPI specs to the latest supported version (3.2.0)
 - Inline all references to create self-contained documents
 - Bundle external references into components section while preserving structure
 
