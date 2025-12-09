@@ -46,12 +46,12 @@ func Upgrade(ctx context.Context, doc *OpenAPI, opts ...Option[UpgradeOptions]) 
 		options.targetVersion = Version
 	}
 
-	currentVersion, err := version.ParseVersion(doc.OpenAPI)
+	currentVersion, err := version.Parse(doc.OpenAPI)
 	if err != nil {
 		return false, err
 	}
 
-	targetVersion, err := version.ParseVersion(options.targetVersion)
+	targetVersion, err := version.Parse(options.targetVersion)
 	if err != nil {
 		return false, err
 	}
@@ -106,7 +106,7 @@ func upgradeFrom310To312(_ context.Context, doc *OpenAPI, currentVersion *versio
 	}
 
 	// Currently no breaking changes between 3.1.0 and 3.1.2 that need to be handled
-	maxVersion, err := version.ParseVersion("3.1.2")
+	maxVersion, err := version.Parse("3.1.2")
 	if err != nil {
 		panic("failed to parse hardcoded version 3.1.2")
 	}
@@ -130,7 +130,7 @@ func upgradeFrom31To32(ctx context.Context, doc *OpenAPI, currentVersion *versio
 	}
 
 	// Currently no breaking changes between 3.1.x and 3.2.x that need to be handled
-	maxVersion, err := version.ParseVersion("3.2.0")
+	maxVersion, err := version.Parse("3.2.0")
 	if err != nil {
 		return err
 	}

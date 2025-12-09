@@ -50,7 +50,7 @@ func (v Version) LessThan(other Version) bool {
 	return !v.Equal(other) && !v.GreaterThan(other)
 }
 
-func ParseVersion(version string) (*Version, error) {
+func Parse(version string) (*Version, error) {
 	parts := strings.Split(version, ".")
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("invalid version %s", version)
@@ -83,21 +83,29 @@ func ParseVersion(version string) (*Version, error) {
 	return New(major, minor, patch), nil
 }
 
-func IsVersionGreaterOrEqual(a, b string) (bool, error) {
-	versionA, err := ParseVersion(a)
+func MustParse(version string) *Version {
+	v, err := Parse(version)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+func IsGreaterOrEqual(a, b string) (bool, error) {
+	versionA, err := Parse(a)
 	if err != nil {
 		return false, fmt.Errorf("invalid version %s: %w", a, err)
 	}
 
-	versionB, err := ParseVersion(b)
+	versionB, err := Parse(b)
 	if err != nil {
 		return false, fmt.Errorf("invalid version %s: %w", b, err)
 	}
 	return versionA.Equal(*versionB) || versionA.GreaterThan(*versionB), nil
 }
 
-func IsVersionLessThan(a, b string) (bool, error) {
-	greaterOrEqual, err := IsVersionGreaterOrEqual(a, b)
+func IsLessThan(a, b string) (bool, error) {
+	greaterOrEqual, err := IsGreaterOrEqual(a, b)
 	if err != nil {
 		return false, err
 	}

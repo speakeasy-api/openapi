@@ -20,27 +20,10 @@ const (
 	Version = "3.2.0"
 )
 
-func MinimumSupportedVersion() version.Version {
-	v, err := version.ParseVersion("3.0.0")
-	if err != nil {
-		panic("failed to parse minimum supported OpenAPI version: " + err.Error())
-	}
-	if v == nil {
-		panic("minimum supported OpenAPI version is nil")
-	}
-	return *v
-}
-
-func MaximumSupportedVersion() version.Version {
-	v, err := version.ParseVersion(Version)
-	if err != nil {
-		panic("failed to parse maximum supported OpenAPI version: " + err.Error())
-	}
-	if v == nil {
-		panic("maximum supported OpenAPI version is nil")
-	}
-	return *v
-}
+var (
+	MinimumSupportedVersion = version.MustParse("3.0.0")
+	MaximumSupportedVersion = version.MustParse(Version)
+)
 
 // OpenAPI represents an OpenAPI document compatible with the OpenAPI Specification 3.0.X and 3.1.X.
 // Where the specification differs between versions the
@@ -194,13 +177,13 @@ func (o *OpenAPI) Validate(ctx context.Context, opts ...validation.Option) []err
 	opts = append(opts, validation.WithContextObject(o))
 	opts = append(opts, validation.WithContextObject(&oas3.ParentDocumentVersion{OpenAPI: pointer.From(o.OpenAPI)}))
 
-	docVersion, err := version.ParseVersion(o.OpenAPI)
+	docVersion, err := version.Parse(o.OpenAPI)
 	if err != nil {
 		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi.openapi invalid OpenAPI version %s: %s", o.OpenAPI, err.Error()), core, core.OpenAPI))
 	}
 	if docVersion != nil {
-		if docVersion.LessThan(MinimumSupportedVersion()) || docVersion.GreaterThan(MaximumSupportedVersion()) {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi.openapi only OpenAPI versions between %s and %s are supported", MinimumSupportedVersion(), MaximumSupportedVersion()), core, core.OpenAPI))
+		if docVersion.LessThan(*MinimumSupportedVersion) || docVersion.GreaterThan(*MaximumSupportedVersion) {
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi.openapi only OpenAPI versions between %s and %s are supported", MinimumSupportedVersion, MaximumSupportedVersion), core, core.OpenAPI))
 		}
 	}
 

@@ -52,7 +52,7 @@ func Test_ParseVersion_Success(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			version, err := ParseVersion(tt.args.version)
+			version, err := Parse(tt.args.version)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedMajor, version.Major)
 			assert.Equal(t, tt.expectedMinor, version.Minor)
@@ -131,7 +131,7 @@ func Test_ParseVersion_Error(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			version, err := ParseVersion(tt.args.version)
+			version, err := Parse(tt.args.version)
 			require.Error(t, err)
 			assert.Nil(t, version)
 		})

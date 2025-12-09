@@ -23,27 +23,10 @@ const (
 	Version = "1.0.1"
 )
 
-func MinimumSupportedVersion() version.Version {
-	v, err := version.ParseVersion("1.0.0")
-	if err != nil {
-		panic("failed to parse minimum supported Arazzo version: " + err.Error())
-	}
-	if v == nil {
-		panic("minimum supported Arazzo version is nil")
-	}
-	return *v
-}
-
-func MaximumSupportedVersion() version.Version {
-	v, err := version.ParseVersion(Version)
-	if err != nil {
-		panic("failed to parse maximum supported Arazzo version: " + err.Error())
-	}
-	if v == nil {
-		panic("maximum supported Arazzo version is nil")
-	}
-	return *v
-}
+var (
+	MinimumSupportedVersion = version.MustParse("1.0.0")
+	MaximumSupportedVersion = version.MustParse(Version)
+)
 
 // Arazzo is the root object for an Arazzo document.
 type Arazzo struct {
@@ -124,13 +107,13 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 	core := a.GetCore()
 	errs := []error{}
 
-	arazzoVersion, err := version.ParseVersion(a.Arazzo)
+	arazzoVersion, err := version.Parse(a.Arazzo)
 	if err != nil {
 		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("arazzo.version is invalid %s: %s", a.Arazzo, err.Error()), core, core.Arazzo))
 	}
 	if arazzoVersion != nil {
-		if arazzoVersion.GreaterThan(MaximumSupportedVersion()) {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("arazzo.version only Arazzo versions between %s and %s are supported", MinimumSupportedVersion(), MaximumSupportedVersion()), core, core.Arazzo))
+		if arazzoVersion.GreaterThan(*MaximumSupportedVersion) {
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("arazzo.version only Arazzo versions between %s and %s are supported", MinimumSupportedVersion, MaximumSupportedVersion), core, core.Arazzo))
 		}
 	}
 

@@ -675,7 +675,17 @@ func validateNodeKind(resolvedNode *yaml.Node, expectedKind yaml.Kind, parentNam
 		actualKindStr := yml.NodeKindToString(resolvedNode.Kind)
 
 		if actualKindStr == "scalar" {
-			actualKindStr = fmt.Sprintf("`%s`", resolvedNode.Value)
+			// Truncate value to prevent file content disclosure
+			// External references that fail to parse may contain sensitive file content
+			value := resolvedNode.Value
+			maxLen := 7
+			if len(value) < maxLen {
+				maxLen = len(value) / 2
+			}
+			if len(value) > maxLen {
+				value = value[:maxLen] + "..."
+			}
+			actualKindStr = fmt.Sprintf("`%s`", value)
 		}
 
 		return validation.NewValidationError(validation.NewTypeMismatchError(parentName, "expected %s, got %s", expectedType, actualKindStr), resolvedNode)

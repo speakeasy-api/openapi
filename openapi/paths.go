@@ -306,7 +306,7 @@ func (p *PathItem) Validate(ctx context.Context, opts ...validation.Option) []er
 		errs = append(errs, parameter.Validate(ctx, opts...)...)
 	}
 
-	supportsAdditionalOperations, err := version.IsVersionGreaterOrEqual(openapiVersion, Version)
+	supportsAdditionalOperations, err := version.IsGreaterOrEqual(openapiVersion, Version)
 	switch {
 	case err != nil:
 		errs = append(errs, err)

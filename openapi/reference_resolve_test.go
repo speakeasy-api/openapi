@@ -1,10 +1,12 @@
 package openapi
 
 import (
+	"bytes"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1139,4 +1141,124 @@ func TestResolveObject_WithSelf_Success(t *testing.T) {
 	// should result in accessing '/test/api/shared.yaml'
 	assert.Equal(t, 1, mockFS.GetAccessCount("/test/api/shared.yaml"),
 		"shared.yaml should be accessed via path resolved from $self, not from TargetLocation")
+}
+
+func TestSecurityFileDisclosure_WithMockFS(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Create a mock file system with simulated sensitive content
+	mockFS := NewMockVirtualFS()
+	sensitiveContent := []byte(`root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin`)
+
+	mockFS.AddFile("/etc/passwd", sensitiveContent)
+
+	// Schema files can be in any directory (since $self is /etc/passwd - absolute ref is resolved)
+	schemasContent := []byte(`
+User:
+  type: object
+  properties:
+    name:
+      type: string
+`)
+	mockFS.AddFile("/test/api/shared/schemas.yaml", schemasContent)
+
+	// Document with reference that directly points to /etc/passwd
+	yml := `openapi: 3.2.0
+info:
+  title: Test API
+  version: 1.0.0
+components:
+  schemas:
+    User:
+      $ref: "/etc/passwd"
+`
+
+	doc, validationErrs, err := Unmarshal(ctx, bytes.NewBufferString(yml))
+	require.NoError(t, err, "Document should parse")
+	if len(validationErrs) > 0 {
+		t.Logf("Validation errors during unmarshal: %v", validationErrs)
+	}
+
+	// Try to resolve references using the mock FS
+	resolveOpts := ResolveOptions{
+		RootDocument:        doc,
+		TargetLocation:      ".",
+		DisableExternalRefs: false,
+		VirtualFS:           mockFS,
+	}
+
+	// Try to resolve the schema reference
+	if doc.Components != nil && doc.Components.Schemas != nil {
+		for schemaName, schema := range doc.Components.Schemas.All() {
+			t.Logf("Checking schema: %s, IsReference: %v", schemaName, schema.IsReference())
+			if schema.IsReference() {
+				t.Logf("Attempting to resolve reference: %s", schema.GetReference())
+				resolveErrs, resolveErr := schema.Resolve(ctx, resolveOpts)
+
+				// Should fail because /etc/passwd is not valid YAML
+				if resolveErr == nil && len(resolveErrs) == 0 {
+					t.Error("Expected resolution to fail for non-OpenAPI file")
+				}
+
+				// Collect all error messages
+				var allErrors []string
+				if resolveErr != nil {
+					allErrors = append(allErrors, resolveErr.Error())
+					t.Logf("Resolve error: %s", resolveErr.Error())
+				}
+				for _, err := range resolveErrs {
+					if err != nil {
+						allErrors = append(allErrors, err.Error())
+						t.Logf("Validation error: %s", err.Error())
+					}
+				}
+
+				combinedError := strings.Join(allErrors, "\n")
+
+				// Check if our known sensitive content appears in the error
+				sensitivePatterns := []string{
+					"root:x:0:0",
+					"daemon:x:1:1",
+					"/bin/bash",
+					"/usr/sbin/nologin",
+				}
+
+				foundSensitiveContent := false
+				for _, pattern := range sensitivePatterns {
+					if len(combinedError) > 0 && containsString(combinedError, pattern) {
+						t.Errorf("SECURITY ISSUE: Sensitive content leaked in error message. Pattern found: %q", pattern)
+						foundSensitiveContent = true
+						break
+					}
+				}
+
+				if !foundSensitiveContent {
+					t.Logf("PASS: No sensitive content found in error messages")
+				}
+
+				// Verify file was accessed
+				if len(mockFS.GetAccessLog()) > 0 {
+					t.Logf("Files accessed: %v", mockFS.GetAccessLog())
+				}
+			}
+		}
+	}
+}
+
+// Helper function for case-sensitive string containment
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || indexString(s, substr) >= 0)
+}
+
+func indexString(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
 }

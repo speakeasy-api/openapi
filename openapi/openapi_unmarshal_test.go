@@ -137,7 +137,7 @@ info:
   title: Test API
   version: 1.0.0
 paths: {}`,
-			wantErrs: []string{fmt.Sprintf("[1:10] openapi.openapi only OpenAPI versions between %s and %s are supported", openapi.MinimumSupportedVersion(), openapi.MaximumSupportedVersion())},
+			wantErrs: []string{fmt.Sprintf("[1:10] openapi.openapi only OpenAPI versions between %s and %s are supported", openapi.MinimumSupportedVersion, openapi.MaximumSupportedVersion)},
 		},
 	}
 
