@@ -64,6 +64,10 @@ type SecurityScheme struct {
 	Flows *OAuthFlows
 	// OpenIdConnectUrl is a URL to discover OAuth2 configuration values.
 	OpenIdConnectUrl *string
+	// OAuth2MetadataUrl is a URL to the OAuth2 authorization server metadata (RFC8414).
+	OAuth2MetadataUrl *string
+	// Deprecated declares this security scheme to be deprecated.
+	Deprecated *bool
 	// Extensions provides a list of extensions to the SecurityScheme object.
 	Extensions *extensions.Extensions
 }
@@ -134,6 +138,22 @@ func (s *SecurityScheme) GetOpenIdConnectUrl() string {
 	return *s.OpenIdConnectUrl
 }
 
+// GetOAuth2MetadataUrl returns the value of the OAuth2MetadataUrl field. Returns empty string if not set.
+func (s *SecurityScheme) GetOAuth2MetadataUrl() string {
+	if s == nil || s.OAuth2MetadataUrl == nil {
+		return ""
+	}
+	return *s.OAuth2MetadataUrl
+}
+
+// GetDeprecated returns the value of the Deprecated field. Returns false if not set.
+func (s *SecurityScheme) GetDeprecated() bool {
+	if s == nil || s.Deprecated == nil {
+		return false
+	}
+	return *s.Deprecated
+}
+
 // GetExtensions returns the value of the Extensions field. Returns an empty extensions map if not set.
 func (s *SecurityScheme) GetExtensions() *extensions.Extensions {
 	if s == nil || s.Extensions == nil {
@@ -177,6 +197,12 @@ func (s *SecurityScheme) Validate(ctx context.Context, opts ...validation.Option
 					errs = append(errs, validation.NewValueError(validation.NewMissingValueError("securityScheme.flows is required for type=oauth2"), core, core.Flows))
 				} else {
 					errs = append(errs, s.Flows.Validate(ctx, opts...)...)
+				}
+				// Validate oauth2MetadataUrl if present
+				if core.OAuth2MetadataUrl.Present && s.OAuth2MetadataUrl != nil && *s.OAuth2MetadataUrl != "" {
+					if _, err := url.Parse(*s.OAuth2MetadataUrl); err != nil {
+						errs = append(errs, validation.NewValueError(validation.NewValueValidationError("securityScheme.oauth2MetadataUrl is not a valid uri: %s", err), core, core.OAuth2MetadataUrl))
+					}
 				}
 			case SecuritySchemeTypeOpenIDConnect:
 				if !core.OpenIdConnectUrl.Present || *s.OpenIdConnectUrl == "" {
@@ -258,9 +284,25 @@ func (s *SecurityRequirement) Validate(ctx context.Context, opts ...validation.O
 	}
 
 	for securityScheme := range s.Keys() {
-		if openapi.Components == nil || !openapi.Components.SecuritySchemes.Has(securityScheme) {
-			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("securityRequirement scheme %s is not defined in components.securitySchemes", securityScheme), core, core, securityScheme))
+		// Per OpenAPI 3.2 spec: property names that are identical to a component name
+		// MUST be treated as a component name (takes precedence over URI resolution)
+		if openapi.Components != nil && openapi.Components.SecuritySchemes.Has(securityScheme) {
+			continue
 		}
+
+		// If not found as component name, check if it's a valid URI reference
+		// to a Security Scheme Object (OpenAPI 3.2 feature)
+		if _, err := url.Parse(securityScheme); err == nil {
+			// It's a valid URI - in a full implementation, we would try to resolve it
+			// For now, we accept it as valid if it parses as a URI
+			// TODO A complete implementation would need to:
+			// 1. Resolve the URI to a Security Scheme Object
+			// 2. Validate that the resolved object is indeed a Security Scheme
+			continue
+		}
+
+		// Not found as component name and not a valid URI
+		errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("securityRequirement scheme %s is not defined in components.securitySchemes and is not a valid URI reference", securityScheme), core, core, securityScheme))
 	}
 
 	s.Valid = len(errs) == 0 && core.GetValid()
@@ -280,6 +322,8 @@ type OAuthFlows struct {
 	ClientCredentials *OAuthFlow
 	// AuthorizationCode represents configuration fields for the OAuth2 Authorization Code flow.
 	AuthorizationCode *OAuthFlow
+	// DeviceAuthorization represents configuration fields for the OAuth2 Device Authorization flow (RFC8628).
+	DeviceAuthorization *OAuthFlow
 
 	// Extensions provides a list of extensions to the OAuthFlows object.
 	Extensions *extensions.Extensions
@@ -290,10 +334,11 @@ var _ interfaces.Model[core.OAuthFlows] = (*OAuthFlows)(nil)
 type OAuthFlowType string
 
 const (
-	OAuthFlowTypeImplicit          OAuthFlowType = "implicit"
-	OAuthFlowTypePassword          OAuthFlowType = "password"
-	OAuthFlowTypeClientCredentials OAuthFlowType = "clientCredentials"
-	OAuthFlowTypeAuthorizationCode OAuthFlowType = "authorizationCode"
+	OAuthFlowTypeImplicit            OAuthFlowType = "implicit"
+	OAuthFlowTypePassword            OAuthFlowType = "password"
+	OAuthFlowTypeClientCredentials   OAuthFlowType = "clientCredentials"
+	OAuthFlowTypeAuthorizationCode   OAuthFlowType = "authorizationCode"
+	OAuthFlowTypeDeviceAuthorization OAuthFlowType = "deviceAuthorization"
 )
 
 // GetImplicit returns the value of the Implicit field. Returns nil if not set.
@@ -328,6 +373,14 @@ func (o *OAuthFlows) GetAuthorizationCode() *OAuthFlow {
 	return o.AuthorizationCode
 }
 
+// GetDeviceAuthorization returns the value of the DeviceAuthorization field. Returns nil if not set.
+func (o *OAuthFlows) GetDeviceAuthorization() *OAuthFlow {
+	if o == nil {
+		return nil
+	}
+	return o.DeviceAuthorization
+}
+
 // GetExtensions returns the value of the Extensions field. Returns an empty extensions map if not set.
 func (o *OAuthFlows) GetExtensions() *extensions.Extensions {
 	if o == nil || o.Extensions == nil {
@@ -353,6 +406,9 @@ func (o *OAuthFlows) Validate(ctx context.Context, opts ...validation.Option) []
 	if o.AuthorizationCode != nil {
 		errs = append(errs, o.AuthorizationCode.Validate(ctx, append(opts, validation.WithContextObject(pointer.From(OAuthFlowTypeAuthorizationCode)))...)...)
 	}
+	if o.DeviceAuthorization != nil {
+		errs = append(errs, o.DeviceAuthorization.Validate(ctx, append(opts, validation.WithContextObject(pointer.From(OAuthFlowTypeDeviceAuthorization)))...)...)
+	}
 
 	o.Valid = len(errs) == 0 && core.GetValid()
 
@@ -365,6 +421,8 @@ type OAuthFlow struct {
 
 	// AuthorizationUrl is a URL to be used for obtaining authorization.
 	AuthorizationURL *string
+	// DeviceAuthorizationUrl is a URL to be used for obtaining device authorization (RFC8628).
+	DeviceAuthorizationURL *string
 	// TokenUrl is a URL to be used for obtaining access tokens.
 	TokenURL *string
 	// RefreshUrl is a URL to be used for refreshing access tokens.
@@ -383,6 +441,14 @@ func (o *OAuthFlow) GetAuthorizationURL() string {
 		return ""
 	}
 	return *o.AuthorizationURL
+}
+
+// GetDeviceAuthorizationURL returns the value of the DeviceAuthorizationURL field. Returns empty string if not set.
+func (o *OAuthFlow) GetDeviceAuthorizationURL() string {
+	if o == nil || o.DeviceAuthorizationURL == nil {
+		return ""
+	}
+	return *o.DeviceAuthorizationURL
 }
 
 // GetTokenURL returns the value of the TokenURL field. Returns empty string if not set.
@@ -464,6 +530,21 @@ func (o *OAuthFlow) Validate(ctx context.Context, opts ...validation.Option) []e
 		}
 		if !core.TokenURL.Present || *o.TokenURL == "" {
 			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("oAuthFlow.tokenUrl is required for type=authorizationCode"), core, core.TokenURL))
+		} else {
+			if _, err := url.Parse(*o.TokenURL); err != nil {
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("oAuthFlow.tokenUrl is not a valid uri: %s", err), core, core.TokenURL))
+			}
+		}
+	case OAuthFlowTypeDeviceAuthorization:
+		if !core.DeviceAuthorizationURL.Present || *o.DeviceAuthorizationURL == "" {
+			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("oAuthFlow.deviceAuthorizationUrl is required for type=deviceAuthorization"), core, core.DeviceAuthorizationURL))
+		} else {
+			if _, err := url.Parse(*o.DeviceAuthorizationURL); err != nil {
+				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("oAuthFlow.deviceAuthorizationUrl is not a valid uri: %s", err), core, core.DeviceAuthorizationURL))
+			}
+		}
+		if !core.TokenURL.Present || *o.TokenURL == "" {
+			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("oAuthFlow.tokenUrl is required for type=deviceAuthorization"), core, core.TokenURL))
 		} else {
 			if _, err := url.Parse(*o.TokenURL); err != nil {
 				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("oAuthFlow.tokenUrl is not a valid uri: %s", err), core, core.TokenURL))

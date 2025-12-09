@@ -93,6 +93,39 @@ x-custom: value
 x-another: 123
 `,
 		},
+		{
+			name: "oauth2_with_metadata_url",
+			yml: `
+type: oauth2
+flows:
+  authorizationCode:
+    authorizationUrl: https://example.com/oauth/authorize
+    tokenUrl: https://example.com/oauth/token
+    scopes:
+      read: Read access
+oauth2MetadataUrl: https://example.com/.well-known/oauth-authorization-server
+`,
+		},
+		{
+			name: "deprecated_scheme",
+			yml: `
+type: http
+scheme: bearer
+deprecated: true
+`,
+		},
+		{
+			name: "oauth2_device_authorization",
+			yml: `
+type: oauth2
+flows:
+  deviceAuthorization:
+    deviceAuthorizationUrl: https://example.com/oauth/device_authorization
+    tokenUrl: https://example.com/oauth/token
+    scopes:
+      read: Read access
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -186,6 +219,11 @@ authorizationCode:
   scopes:
     read: Read access
     write: Write access
+deviceAuthorization:
+  deviceAuthorizationUrl: https://example.com/oauth/device_authorization
+  tokenUrl: https://example.com/oauth/token
+  scopes:
+    device: Device access
 x-custom: value
 `
 
@@ -208,6 +246,10 @@ x-custom: value
 	require.Equal(t, "https://example.com/oauth/authorize", oauthFlows.GetAuthorizationCode().GetAuthorizationURL())
 	require.Equal(t, "https://example.com/oauth/token", oauthFlows.GetAuthorizationCode().GetTokenURL())
 	require.Equal(t, "https://example.com/oauth/refresh", oauthFlows.GetAuthorizationCode().GetRefreshURL())
+
+	require.NotNil(t, oauthFlows.GetDeviceAuthorization())
+	require.Equal(t, "https://example.com/oauth/device_authorization", oauthFlows.GetDeviceAuthorization().GetDeviceAuthorizationURL())
+	require.Equal(t, "https://example.com/oauth/token", oauthFlows.GetDeviceAuthorization().GetTokenURL())
 
 	ext, ok := oauthFlows.GetExtensions().Get("x-custom")
 	require.True(t, ok)
@@ -271,6 +313,15 @@ tokenUrl: https://example.com/oauth/token
 scopes:
   read: Read access
 x-custom: value
+`,
+		},
+		{
+			name: "device_authorization_flow",
+			yml: `
+deviceAuthorizationUrl: https://example.com/oauth/device_authorization
+tokenUrl: https://example.com/oauth/token
+scopes:
+  read: Read access
 `,
 		},
 	}
