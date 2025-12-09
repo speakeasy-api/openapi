@@ -3,7 +3,7 @@
     <img  width="200px" alt="OpenAPI" src="https://github.com/user-attachments/assets/b9fa9c14-1c6f-4d8b-910f-15e5f962bab6">
   </p>
   <h1 align="center"><b>OpenAPI Parser</b></h1>
-  <p align="center">An API for working with <a href="https://spec.openapis.org/oas/v3.1.1">OpenAPI documents</a> including: read, walk, create, mutate, validate, and upgrade
+  <p align="center">An API for working with <a href="https://spec.openapis.org/oas/v3.2.0">OpenAPI documents</a> including: read, walk, create, mutate, validate, and upgrade
 </p>
   <p align="center">
        <!-- OpenAPI Hub Badge -->
@@ -21,10 +21,10 @@
 
 ## Features
 
-- **Full OpenAPI 3.0.x and 3.1.x Support**: Parse and work with both OpenAPI 3.0.x and 3.1.x documents
+- **Full OpenAPI 3.0.x, 3.1.x, and 3.2.x Support**: Parse and work with OpenAPI 3.0.x, 3.1.x, and 3.2.x documents
 - **Validation**: Built-in validation against the OpenAPI Specification
 - **Walking**: Traverse all elements in an OpenAPI document with a powerful iterator pattern
-- **Upgrading**: Automatically upgrade OpenAPI 3.0.x documents to 3.1.1
+- **Upgrading**: Automatically upgrade OpenAPI 3.0.x and 3.1.x documents to 3.2.0
 - **Mutation**: Modify OpenAPI documents programmatically
 - **JSON Schema Support**: Direct access to JSON Schema functionality
 - **Reference Resolution**: Resolve $ref references within documents
@@ -35,9 +35,10 @@
 ## Supported OpenAPI Versions
 
 - OpenAPI 3.0.0 through 3.0.4
-- OpenAPI 3.1.0 through 3.1.1 (latest)
+- OpenAPI 3.1.0 through 3.1.1
+- OpenAPI 3.2.0
 
-The package can automatically upgrade documents from 3.0.x to 3.1.1, handling the differences in specification between versions.
+The package can automatically upgrade documents from 3.0.x and 3.1.x to 3.2.0, handling the differences in specification between versions.
 
 <!-- START USAGE EXAMPLES -->
 

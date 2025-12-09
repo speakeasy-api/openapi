@@ -267,7 +267,7 @@ components:
 	// Upgrade (no options needed for 3.0.x documents)
 	upgraded, err := openapi.Upgrade(ctx, doc1)
 	require.NoError(t, err, "upgrade should not fail")
-	assert.Equal(t, openapi.Version, doc1.OpenAPI, "upgraded version should be 3.1.1")
+	assert.Equal(t, openapi.Version, doc1.OpenAPI, "upgraded version should be 3.2.0")
 	assert.True(t, upgraded, "upgrade should have been performed")
 
 	// Marshal back
@@ -283,7 +283,7 @@ components:
 	doc2, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(marshalledContent))
 	require.NoError(t, err, "second unmarshal should not fail")
 	require.Empty(t, validationErrs, "second unmarshal should not have validation errors")
-	assert.Equal(t, openapi.Version, doc2.OpenAPI, "second doc version should be 3.1.1")
+	assert.Equal(t, openapi.Version, doc2.OpenAPI, "second doc version should be 3.2.0")
 
 	// Marshal again
 	var buf2 bytes.Buffer

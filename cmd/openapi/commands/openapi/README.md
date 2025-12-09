@@ -50,7 +50,7 @@ This command checks for:
 
 ### `upgrade`
 
-Upgrade an OpenAPI specification to the latest supported version (3.1.1).
+Upgrade an OpenAPI specification to the latest supported version (3.2.0).
 
 ```bash
 # Upgrade to stdout
@@ -64,11 +64,12 @@ openapi spec upgrade -w ./spec.yaml
 
 # Upgrade with specific target version
 openapi spec upgrade --version 3.1.0 ./spec.yaml
+openapi spec upgrade --version 3.2.0 ./spec.yaml
 ```
 
 Features:
 
-- Converts OpenAPI 3.0.x specifications to 3.1.x
+- Converts OpenAPI 3.0.x and 3.1.x specifications to 3.2.0
 - Maintains backward compatibility where possible
 - Updates schema formats and structures
 - Preserves all custom extensions and vendor-specific content
@@ -937,7 +938,7 @@ All commands work with both YAML and JSON input files and preserve the original 
 openapi spec validate ./spec.yaml
 
 # Upgrade if needed
-openapi spec upgrade ./spec.yaml ./spec-v3.1.yaml
+openapi spec upgrade ./spec.yaml ./spec-v3.2.yaml
 
 # Bundle external references
 openapi spec bundle ./spec-v3.1.yaml ./spec-bundled.yaml
