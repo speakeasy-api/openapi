@@ -22,20 +22,30 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed schema31.json
-var schema31JSON string
+// custom file to cover for missing openapi 3.0 json schema
+//
+//go:embed schema30.dialect.json
+var schema30DialectJSON string
 
-//go:embed schema31.base.json
-var schema31BaseJSON string
+// sourced from https://spec.openapis.org/oas/3.1/dialect/2024-11-10.html
+//
+//go:embed schema31.dialect.json
+var schema31DialectJSON string
 
-//go:embed schema30.json
-var schema30JSON string
+// source from https://spec.openapis.org/oas/3.1/meta/2024-11-10.html
+//
+//go:embed schema31.meta.json
+var schema31MetaJSON string
 
-//go:embed schema32.json
-var schema32JSON string
+// sourced from https://spec.openapis.org/oas/3.2/dialect/2025-09-17.html
+//
+//go:embed schema32.dialect.json
+var schema32DialectJSON string
 
-//go:embed schema32.base.json
-var schema32BaseJSON string
+// source from https://spec.openapis.org/oas/3.2/meta/2025-09-17.html
+//
+//go:embed schema32.meta.json
+var schema32MetaJSON string
 
 var (
 	oasSchemaValidator = make(map[string]*jsValidator.Schema)
@@ -43,9 +53,9 @@ var (
 )
 
 const (
-	JSONSchema31SchemaID = "https://spec.openapis.org/oas/3.1/dialect/base"
 	JSONSchema30SchemaID = "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
-	JSONSchema32SchemaID = "https://spec.openapis.org/oas/3.2/dialect/base"
+	JSONSchema31SchemaID = "https://spec.openapis.org/oas/3.1/meta/2024-11-10"
+	JSONSchema32SchemaID = "https://spec.openapis.org/oas/3.2/meta/2025-09-17"
 )
 
 type ParentDocumentVersion struct {
@@ -225,34 +235,34 @@ func initValidation(schema string) *jsValidator.Schema {
 
 	switch schema {
 	case JSONSchema32SchemaID:
-		oasSchemaBase, err := jsValidator.UnmarshalJSON(bytes.NewBufferString(schema32BaseJSON))
+		oasSchemaMeta, err := jsValidator.UnmarshalJSON(bytes.NewBufferString(schema32MetaJSON))
 		if err != nil {
 			panic(err)
 		}
-		if err := c.AddResource("https://spec.openapis.org/oas/3.2/meta/base", oasSchemaBase); err != nil {
+		if err := c.AddResource(JSONSchema32SchemaID, oasSchemaMeta); err != nil {
 			panic(err)
 		}
 
-		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema32JSON))
+		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema32DialectJSON))
 		if err != nil {
 			panic(err)
 		}
 	case JSONSchema31SchemaID:
-		oasSchemaBase, err := jsValidator.UnmarshalJSON(bytes.NewBufferString(schema31BaseJSON))
+		oasSchemaMeta, err := jsValidator.UnmarshalJSON(bytes.NewBufferString(schema31MetaJSON))
 		if err != nil {
 			panic(err)
 		}
-		if err := c.AddResource("https://spec.openapis.org/oas/3.1/meta/base", oasSchemaBase); err != nil {
+		if err := c.AddResource(JSONSchema31SchemaID, oasSchemaMeta); err != nil {
 			panic(err)
 		}
 
-		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema31JSON))
+		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema31DialectJSON))
 		if err != nil {
 			panic(err)
 		}
 	case JSONSchema30SchemaID:
 		var err error
-		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema30JSON))
+		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema30DialectJSON))
 		if err != nil {
 			panic(err)
 		}
