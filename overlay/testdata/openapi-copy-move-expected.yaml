@@ -1,0 +1,88 @@
+openapi: 3.1.0
+info:
+  title: Copy Action Test API
+  version: 1.0.0
+  description: API for testing copy action
+servers:
+  - url: https://api.example.com
+    description: Production server
+paths:
+  /existing:
+    get:
+      summary: Existing endpoint
+      description: This endpoint already exists
+      responses:
+        '200':
+          description: OK
+  /bar:
+    get:
+      summary: Get foo
+      description: Original foo endpoint
+      operationId: getFoo
+      tags:
+        - foo
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+        '404':
+          description: Not found
+    post:
+      summary: Create foo
+      operationId: createFoo
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Created
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+  parameters:
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string

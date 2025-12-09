@@ -1,0 +1,19 @@
+overlay: 1.1.0
+x-speakeasy-jsonpath: rfc9535
+info:
+  title: Version Header Overlay
+  version: 1.0.0
+actions:
+  # First, add X-API-Version header to each operation response
+  - target: $.paths.*.*.responses.*
+    description: Add X-API-Version header to all responses
+    update:
+      headers:
+        XAPIVersion:
+          schema:
+            type: string
+            const: ""
+  # Then, copy the spec version into each X-API-Version header value
+  - target: $.paths.*.*.responses.*.headers.XAPIVersion.schema.const
+    description: Copy spec version to X-API-Version header const value
+    copy: $.info.version

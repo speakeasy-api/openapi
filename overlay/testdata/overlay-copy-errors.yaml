@@ -1,0 +1,10 @@
+overlay: 1.1.0
+x-speakeasy-jsonpath: rfc9535
+info:
+  title: Copy Action Error Cases
+  version: 1.0.0
+actions:
+  # Error: source path doesn't exist
+  - target: $.paths["/existing"]
+    description: Copy from non-existent path
+    copy: $.paths["/nonexistent"]
