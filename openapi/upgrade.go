@@ -31,7 +31,7 @@ func WithUpgradeTargetVersion(version string) Option[UpgradeOptions] {
 	}
 }
 
-// Upgrade upgrades any OpenAPI 3x document to OpenAPI 3.1.1 (the latest version currently supported).
+// Upgrade upgrades any OpenAPI 3x document to OpenAPI 3.2.0 (the latest version currently supported).
 // It currently won't resolve any external references, so only this document itself will be upgraded.
 func Upgrade(ctx context.Context, doc *OpenAPI, opts ...Option[UpgradeOptions]) (bool, error) {
 	if doc == nil {
