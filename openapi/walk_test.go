@@ -632,6 +632,28 @@ func TestWalkMediaType_Success(t *testing.T) {
 				assert.True(t, mt.ItemSchema.IsLeft() || mt.ItemSchema.IsRight(), "ItemSchema should be Left or Right")
 			},
 		},
+		{
+			name:     "media type with prefixEncoding",
+			location: "/paths/~1users/post/responses/203/content/multipart~1mixed",
+			assertMediaType: func(t *testing.T, mt *openapi.MediaType) {
+				t.Helper()
+				assert.NotNil(t, mt.PrefixEncoding, "PrefixEncoding should not be nil")
+				assert.Len(t, mt.PrefixEncoding, 2, "PrefixEncoding should have 2 items")
+				assert.Equal(t, "application/json", mt.PrefixEncoding[0].GetContentTypeValue(), "First prefix encoding should be application/json")
+				assert.Equal(t, "text/plain", mt.PrefixEncoding[1].GetContentTypeValue(), "Second prefix encoding should be text/plain")
+				assert.Nil(t, mt.Encoding, "Encoding should be nil when PrefixEncoding is present")
+			},
+		},
+		{
+			name:     "media type with itemEncoding",
+			location: "/paths/~1users/post/responses/204/content/multipart~1mixed",
+			assertMediaType: func(t *testing.T, mt *openapi.MediaType) {
+				t.Helper()
+				assert.NotNil(t, mt.ItemEncoding, "ItemEncoding should not be nil")
+				assert.Equal(t, "application/json", mt.ItemEncoding.GetContentTypeValue(), "ItemEncoding should be application/json")
+				assert.Nil(t, mt.Encoding, "Encoding should be nil when ItemEncoding is present")
+			},
+		},
 	}
 
 	for _, tt := range tests {

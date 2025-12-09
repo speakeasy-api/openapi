@@ -559,6 +559,16 @@ func walkMediaType(ctx context.Context, mediaType *MediaType, loc []LocationCont
 		return false
 	}
 
+	// Walk through prefixEncoding
+	if !walkPrefixEncodings(ctx, mediaType.PrefixEncoding, append(loc, LocationContext{ParentMatchFunc: mediaTypeMatchFunc, ParentField: "prefixEncoding"}), openAPI, yield) {
+		return false
+	}
+
+	// Walk through itemEncoding
+	if !walkEncoding(ctx, mediaType.ItemEncoding, append(loc, LocationContext{ParentMatchFunc: mediaTypeMatchFunc, ParentField: "itemEncoding"}), openAPI, yield) {
+		return false
+	}
+
 	// Walk through examples
 	if !walkReferencedExamples(ctx, mediaType.Examples, append(loc, LocationContext{ParentMatchFunc: mediaTypeMatchFunc, ParentField: "examples"}), openAPI, yield) {
 		return false
@@ -580,6 +590,26 @@ func walkEncodings(ctx context.Context, encodings *sequencedmap.Map[string, *Enc
 
 	for property, encoding := range encodings.All() {
 		parentLoc.ParentKey = pointer.From(property)
+
+		if !walkEncoding(ctx, encoding, append(loc, parentLoc), openAPI, yield) {
+			return false
+		}
+	}
+	return true
+}
+
+// walkPrefixEncodings walks through prefix encodings (array)
+func walkPrefixEncodings(ctx context.Context, encodings []*Encoding, loc []LocationContext, openAPI *OpenAPI, yield func(WalkItem) bool) bool {
+	if len(encodings) == 0 {
+		return true
+	}
+
+	// Get the last loc so we can set the parent index
+	parentLoc := loc[len(loc)-1]
+	loc = loc[:len(loc)-1]
+
+	for i, encoding := range encodings {
+		parentLoc.ParentIndex = pointer.From(i)
 
 		if !walkEncoding(ctx, encoding, append(loc, parentLoc), openAPI, yield) {
 			return false

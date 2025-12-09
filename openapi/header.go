@@ -139,8 +139,11 @@ func (h *Header) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, h.Schema.Validate(ctx, opts...)...)
 	}
 
-	for _, obj := range h.Content.All() {
-		errs = append(errs, obj.Validate(ctx, opts...)...)
+	for mediaType, obj := range h.Content.All() {
+		// Pass media type context for validation
+		contentOpts := append([]validation.Option{}, opts...)
+		contentOpts = append(contentOpts, validation.WithContextObject(&MediaTypeContext{MediaType: mediaType}))
+		errs = append(errs, obj.Validate(ctx, contentOpts...)...)
 	}
 
 	for _, obj := range h.Examples.All() {

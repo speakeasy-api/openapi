@@ -280,8 +280,11 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter field content must have exactly one entry"), core, core.Content))
 	}
 
-	for _, obj := range p.Content.All() {
-		errs = append(errs, obj.Validate(ctx, opts...)...)
+	for mediaType, obj := range p.Content.All() {
+		// Pass media type context for validation
+		contentOpts := append([]validation.Option{}, opts...)
+		contentOpts = append(contentOpts, validation.WithContextObject(&MediaTypeContext{MediaType: mediaType}))
+		errs = append(errs, obj.Validate(ctx, contentOpts...)...)
 	}
 
 	for _, obj := range p.Examples.All() {
