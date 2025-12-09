@@ -1065,3 +1065,78 @@ func TestReference_ParentLinks(t *testing.T) {
 		}, "SetTopLevelParent on nil reference should not panic")
 	})
 }
+
+func TestResolveObject_WithSelf_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Create mock filesystem to simulate the virtual location implied by $self
+	mockFS := NewMockVirtualFS()
+
+	// Read the shared file that should be resolved relative to $self
+	sharedPath := filepath.Join("testdata", "resolve_test", "shared.yaml")
+	sharedContent, err := os.ReadFile(sharedPath)
+	require.NoError(t, err)
+
+	// The $self is /test/api/openapi.yaml (absolute file path)
+	// So a relative reference ./shared.yaml should resolve to /test/api/shared.yaml
+	mockFS.AddFile("/test/api/shared.yaml", sharedContent)
+
+	// Load the document with $self field
+	testDataPath := filepath.Join("testdata", "resolve_test", "with_self.yaml")
+	file, err := os.Open(testDataPath)
+	require.NoError(t, err)
+	defer file.Close()
+
+	doc, validationErrs, err := Unmarshal(ctx, file)
+	require.NoError(t, err)
+	assert.Empty(t, validationErrs)
+
+	// Verify $self is set correctly
+	require.NotNil(t, doc.Self)
+	assert.Equal(t, "/test/api/openapi.yaml", *doc.Self)
+	assert.Equal(t, "/test/api/openapi.yaml", doc.GetSelf())
+
+	// Setup resolve options - use a filesystem path as TargetLocation
+	// but $self should override it for external reference resolution
+	absPath, err := filepath.Abs(testDataPath)
+	require.NoError(t, err)
+
+	opts := ResolveOptions{
+		TargetLocation: absPath, // Filesystem location (different from $self)
+		RootDocument:   doc,
+		VirtualFS:      mockFS, // Use mock FS to intercept file access
+	}
+
+	// Test resolving the external reference to shared.yaml
+	// The reference is './shared.yaml#/components/parameters/SharedParam'
+	// With $self = /test/api/openapi.yaml
+	// It should resolve to /test/api/shared.yaml#/components/parameters/SharedParam
+	require.NotNil(t, doc.Components)
+	require.NotNil(t, doc.Components.Parameters)
+
+	externalParam, exists := doc.Components.Parameters.Get("ExternalParam")
+	require.True(t, exists, "ExternalParam should exist in components")
+	require.True(t, externalParam.IsReference(), "ExternalParam should be a reference")
+
+	// Resolve the reference - it should use $self as base URI
+	validationErrs, err = externalParam.Resolve(ctx, opts)
+	require.NoError(t, err)
+	assert.Empty(t, validationErrs)
+
+	resolved := externalParam.GetObject()
+	require.NotNil(t, resolved, "Resolved parameter should not be nil")
+
+	// Verify the resolved parameter is the SharedParam from shared.yaml
+	assert.Equal(t, "sharedParam", resolved.GetName())
+	assert.Equal(t, ParameterInQuery, resolved.GetIn())
+	assert.True(t, resolved.GetRequired())
+	assert.Equal(t, "A parameter defined in the shared file", resolved.GetDescription())
+
+	// Verify that the mock FS was accessed with the path resolved from $self
+	// The relative reference './shared.yaml' combined with $self '/test/api/openapi.yaml'
+	// should result in accessing '/test/api/shared.yaml'
+	assert.Equal(t, 1, mockFS.GetAccessCount("/test/api/shared.yaml"),
+		"shared.yaml should be accessed via path resolved from $self, not from TargetLocation")
+}

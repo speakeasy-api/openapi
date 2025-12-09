@@ -525,7 +525,17 @@ func (r *Reference[T, V, C]) resolve(ctx context.Context, opts references.Resolv
 	if !ok {
 		return nil, nil, nil, fmt.Errorf("root document must be *OpenAPI, got %T", opts.RootDocument)
 	}
-	result, validationErrs, err := references.Resolve(ctx, *r.Reference, unmarshaler[T, V, C](rootDoc), opts)
+
+	// Use $self as base URI if present in the target document (OpenAPI 3.2+)
+	// The $self field provides the self-assigned URI of the document per RFC3986 Section 5.1.1
+	resolveOpts := opts
+	if targetDoc, ok := opts.TargetDocument.(*OpenAPI); ok && targetDoc != nil {
+		if self := targetDoc.GetSelf(); self != "" {
+			resolveOpts.TargetLocation = self
+		}
+	}
+
+	result, validationErrs, err := references.Resolve(ctx, *r.Reference, unmarshaler[T, V, C](rootDoc), resolveOpts)
 	if err != nil {
 		return nil, nil, validationErrs, err
 	}

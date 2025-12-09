@@ -1,0 +1,14 @@
+openapi: 3.2.0
+info:
+  title: Shared Components
+  version: 1.0.0
+paths: {}
+components:
+  parameters:
+    SharedParam:
+      name: sharedParam
+      in: query
+      required: true
+      schema:
+        type: string
+      description: A parameter defined in the shared file

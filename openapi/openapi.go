@@ -49,6 +49,9 @@ type OpenAPI struct {
 
 	// OpenAPI is the version of the OpenAPI Specification that this document conforms to.
 	OpenAPI string
+	// Self provides the self-assigned URI of this document, which also serves as its base URI for resolving relative references.
+	// It MUST be in the form of a URI reference as defined by RFC3986.
+	Self *string
 	// Info provides various information about the API and document.
 	Info Info
 	// ExternalDocs provides additional external documentation for this API.
@@ -89,6 +92,14 @@ func (o *OpenAPI) GetOpenAPI() string {
 		return ""
 	}
 	return o.OpenAPI
+}
+
+// GetSelf returns the value of the Self field. Returns empty string if not set.
+func (o *OpenAPI) GetSelf() string {
+	if o == nil || o.Self == nil {
+		return ""
+	}
+	return *o.Self
 }
 
 // GetInfo returns the value of the Info field. Returns nil if not set.
@@ -221,6 +232,12 @@ func (o *OpenAPI) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	if o.Components != nil {
 		errs = append(errs, o.Components.Validate(ctx, opts...)...)
+	}
+
+	if core.Self.Present && o.Self != nil {
+		if _, err := url.Parse(*o.Self); err != nil {
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi.$self is not a valid uri reference: %s", err), core, core.Self))
+		}
 	}
 
 	if core.JSONSchemaDialect.Present && o.JSONSchemaDialect != nil {

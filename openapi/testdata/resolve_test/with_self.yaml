@@ -1,0 +1,18 @@
+openapi: 3.2.0
+$self: /test/api/openapi.yaml
+info:
+  title: Test API with $self
+  version: 1.0.0
+paths: {}
+components:
+  parameters:
+    # Reference to a relative external file - should resolve using $self as base
+    ExternalParam:
+      $ref: "./shared.yaml#/components/parameters/SharedParam"
+  responses:
+    TestResponse:
+      description: Test response
+      content:
+        application/json:
+          schema:
+            type: object
