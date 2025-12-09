@@ -31,12 +31,21 @@ var schema31BaseJSON string
 //go:embed schema30.json
 var schema30JSON string
 
-var oasSchemaValidator = make(map[string]*jsValidator.Schema)
-var defaultPrinter = message.NewPrinter(language.English)
+//go:embed schema32.json
+var schema32JSON string
+
+//go:embed schema32.base.json
+var schema32BaseJSON string
+
+var (
+	oasSchemaValidator = make(map[string]*jsValidator.Schema)
+	defaultPrinter     = message.NewPrinter(language.English)
+)
 
 const (
 	JSONSchema31SchemaID = "https://spec.openapis.org/oas/3.1/dialect/base"
 	JSONSchema30SchemaID = "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+	JSONSchema32SchemaID = "https://spec.openapis.org/oas/3.2/dialect/base"
 )
 
 type ParentDocumentVersion struct {
@@ -76,6 +85,8 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 		switch {
 		case dv.OpenAPI != nil:
 			switch {
+			case strings.HasPrefix(*dv.OpenAPI, "3.2"):
+				schema = JSONSchema32SchemaID
 			case strings.HasPrefix(*dv.OpenAPI, "3.1"):
 				schema = JSONSchema31SchemaID
 			case strings.HasPrefix(*dv.OpenAPI, "3.0"):
@@ -196,8 +207,10 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 	return errs
 }
 
-var validationInitialized = make(map[string]bool)
-var initMutex sync.Mutex
+var (
+	validationInitialized = make(map[string]bool)
+	initMutex             sync.Mutex
+)
 
 func initValidation(schema string) *jsValidator.Schema {
 	initMutex.Lock()
@@ -211,6 +224,19 @@ func initValidation(schema string) *jsValidator.Schema {
 	c := jsValidator.NewCompiler()
 
 	switch schema {
+	case JSONSchema32SchemaID:
+		oasSchemaBase, err := jsValidator.UnmarshalJSON(bytes.NewBufferString(schema32BaseJSON))
+		if err != nil {
+			panic(err)
+		}
+		if err := c.AddResource("https://spec.openapis.org/oas/3.2/meta/base", oasSchemaBase); err != nil {
+			panic(err)
+		}
+
+		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema32JSON))
+		if err != nil {
+			panic(err)
+		}
 	case JSONSchema31SchemaID:
 		oasSchemaBase, err := jsValidator.UnmarshalJSON(bytes.NewBufferString(schema31BaseJSON))
 		if err != nil {

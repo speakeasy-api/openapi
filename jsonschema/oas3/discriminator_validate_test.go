@@ -87,11 +87,13 @@ func TestDiscriminator_Validate_Error(t *testing.T) {
 	}{
 		{
 			name: "missing property name",
-			yml: `
-mapping:
+			yml: `mapping:
   dog: "#/components/schemas/Dog"
 `,
-			wantErrs: []string{"[2:1] discriminator.propertyName is missing"},
+			wantErrs: []string{
+				"[1:1] discriminator.propertyName is missing",
+				"[1:1] discriminator.propertyName is required",
+			},
 		},
 		{
 			name: "empty property name",
