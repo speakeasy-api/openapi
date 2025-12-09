@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
@@ -636,11 +637,13 @@ func joinReferenceChain(chain []string) string {
 		return chain[0]
 	}
 
-	result := chain[0]
+	var result strings.Builder
+	result.WriteString(chain[0])
 	for i := 1; i < len(chain); i++ {
-		result += " -> " + chain[i]
+		result.WriteString(" -> ")
+		result.WriteString(chain[i])
 	}
-	return result
+	return result.String()
 }
 
 func unmarshaler[T any, V interfaces.Validator[T], C marshaller.CoreModeler](_ *OpenAPI) func(context.Context, *yaml.Node, bool) (*Reference[T, V, C], []error, error) {

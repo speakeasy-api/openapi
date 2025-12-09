@@ -187,7 +187,7 @@ func inspectData(data []byte) (OutputFormat, int, IndentationStyle) {
 }
 
 func getGlobalStringStyle(doc *yaml.Node, cfg *Config) {
-	const minSamples = 3
+	const minSamples = 5
 
 	keyStyles := make([]yaml.Style, 0, minSamples)
 	valueStyles := make([]yaml.Style, 0, minSamples)
@@ -253,7 +253,8 @@ func looksLikeNumber(s string) bool {
 	return err == nil
 }
 
-// mostCommonStyle returns the most frequently occurring style from the provided styles
+// mostCommonStyle returns the most frequently occurring style from the provided styles.
+// In case of a tie, it returns the style that appears first in the slice for deterministic behavior.
 func mostCommonStyle(styles []yaml.Style) yaml.Style {
 	if len(styles) == 0 {
 		return 0
@@ -264,10 +265,12 @@ func mostCommonStyle(styles []yaml.Style) yaml.Style {
 		counts[style]++
 	}
 
-	// Find the style with the highest count
+	// Find the style with the highest count by iterating through the original slice.
+	// This ensures deterministic results when there are ties - the first occurrence wins.
 	var maxCount int
 	var mostCommon yaml.Style
-	for style, count := range counts {
+	for _, style := range styles {
+		count := counts[style]
 		if count > maxCount {
 			maxCount = count
 			mostCommon = style

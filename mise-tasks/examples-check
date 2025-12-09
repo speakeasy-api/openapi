@@ -19,7 +19,7 @@ if ! git diff --quiet openapi/README.md arazzo/README.md; then
     git diff openapi/README.md arazzo/README.md
     echo ""
     echo "💡 To fix this, run: mise run update-examples"
-    echo "   Then commit the updated README files."
+    echo "   Then stage/commit the updated README files."
     exit 1
 else
     echo "✅ All examples in README files are up to date!"

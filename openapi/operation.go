@@ -151,6 +151,7 @@ func (o *Operation) GetExtensions() *extensions.Extensions {
 }
 
 // IsDeprecated is an alias for GetDeprecated for backward compatibility.
+//
 // Deprecated: Use GetDeprecated instead for consistency with other models.
 func (o *Operation) IsDeprecated() bool {
 	return o.GetDeprecated()
