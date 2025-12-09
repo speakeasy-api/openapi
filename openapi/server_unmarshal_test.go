@@ -56,6 +56,26 @@ x-test: some-value
 	require.Equal(t, "some-value", ext.Value)
 }
 
+func TestServer_Unmarshal_WithName_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+url: https://api.example.com/v1
+description: Production server
+name: prod
+`
+
+	var server openapi.Server
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &server)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	require.Equal(t, "https://api.example.com/v1", server.GetURL())
+	require.Equal(t, "Production server", server.GetDescription())
+	require.Equal(t, "prod", server.GetName())
+}
+
 func TestServerVariable_Unmarshal_Success(t *testing.T) {
 	t.Parallel()
 

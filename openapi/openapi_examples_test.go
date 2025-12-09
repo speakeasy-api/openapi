@@ -629,6 +629,7 @@ func Example_creating() {
 			{
 				URL:         "https://api.example.com/v1",
 				Description: pointer.From("Production server"),
+				Name:        pointer.From("prod"),
 			},
 		},
 		Paths: paths,
@@ -650,6 +651,7 @@ func Example_creating() {
 	// servers:
 	//   - url: https://api.example.com/v1
 	//     description: Production server
+	//     name: prod
 	// paths:
 	//   /users:
 	//     get:

@@ -540,6 +540,7 @@ doc := &openapi.OpenAPI{
 		{
 			URL:         "https://api.example.com/v1",
 			Description: pointer.From("Production server"),
+			Name:        pointer.From("prod"),
 		},
 	},
 	Paths: paths,
