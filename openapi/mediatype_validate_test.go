@@ -101,6 +101,82 @@ x-test: some-value
 x-custom: custom-data
 `,
 		},
+		{
+			name: "valid media type with itemSchema only",
+			yml: `
+itemSchema:
+  type: object
+  properties:
+    id:
+      type: integer
+    name:
+      type: string
+`,
+		},
+		{
+			name: "valid media type with itemSchema and example",
+			yml: `
+itemSchema:
+  type: string
+example: "hello world"
+`,
+		},
+		{
+			name: "valid media type with itemSchema and examples",
+			yml: `
+itemSchema:
+  $ref: "#/components/schemas/User"
+examples:
+  user1:
+    value:
+      id: 1
+      name: John
+  user2:
+    value:
+      id: 2
+      name: Jane
+`,
+		},
+		{
+			name: "valid media type with prefixEncoding",
+			yml: `
+schema:
+  type: array
+  prefixItems:
+    - type: object
+    - type: string
+prefixEncoding:
+  - contentType: application/json
+  - contentType: text/plain
+`,
+		},
+		{
+			name: "valid media type with itemEncoding",
+			yml: `
+itemSchema:
+  type: object
+  properties:
+    id:
+      type: integer
+itemEncoding:
+  contentType: application/json
+`,
+		},
+		{
+			name: "valid media type with both prefixEncoding and itemEncoding",
+			yml: `
+schema:
+  type: array
+  prefixItems:
+    - type: object
+  items:
+    type: string
+prefixEncoding:
+  - contentType: application/json
+itemEncoding:
+  contentType: text/plain
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -146,6 +222,42 @@ encoding:
 			wantErrs: []string{
 				"[13:17] schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
 				"[13:17] schema.type expected array, got string",
+			},
+		},
+		{
+			name: "encoding and prefixEncoding cannot coexist",
+			yml: `
+schema:
+  type: object
+  properties:
+    file:
+      type: string
+encoding:
+  file:
+    contentType: image/png
+prefixEncoding:
+  - contentType: application/json
+`,
+			wantErrs: []string{
+				"[8:3] encoding field MUST NOT be present when prefixEncoding or itemEncoding is present",
+			},
+		},
+		{
+			name: "encoding and itemEncoding cannot coexist",
+			yml: `
+schema:
+  type: object
+  properties:
+    file:
+      type: string
+encoding:
+  file:
+    contentType: image/png
+itemEncoding:
+  contentType: application/json
+`,
+			wantErrs: []string{
+				"[8:3] encoding field MUST NOT be present when prefixEncoding or itemEncoding is present",
 			},
 		},
 	}

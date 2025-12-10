@@ -27,7 +27,7 @@
     <!-- OpenAPI Hub Badge -->
     <a href="https://www.speakeasy.com/openapi"><img alt="OpenAPI Hub" src="https://www.speakeasy.com/assets/badges/openapi-hub.svg" /></a>
     <!-- OpenAPI Support Badge -->
-    <a href="https://www.speakeasy.com/openapi"><img alt="OpenAPI Support" src="https://img.shields.io/badge/OpenAPI-3.0%20%7C%203.1-85EA2D.svg?style=for-the-badge&logo=openapiinitiative"></a>
+    <a href="https://www.speakeasy.com/openapi"><img alt="OpenAPI Support" src="https://img.shields.io/badge/OpenAPI-3.0%20%7C%203.1%20%7C%203.2-85EA2D.svg?style=for-the-badge&logo=openapiinitiative"></a>
     <!-- Arazzo Support Badge -->
     <img alt="Arazzo Support" src="https://img.shields.io/badge/Arazzo-1.0-purple.svg?style=for-the-badge">
     <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi?tab=doc"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
@@ -68,7 +68,7 @@ The `arazzo` package provides an API for working with Arazzo documents including
 
 ### [openapi](./openapi)
 
-The `openapi` package provides an API for working with OpenAPI documents including reading, creating, mutating, walking, validating and upgrading them. Supports both OpenAPI 3.0.x and 3.1.x specifications.
+The `openapi` package provides an API for working with OpenAPI documents including reading, creating, mutating, walking, validating and upgrading them. Supports OpenAPI 3.0.x, 3.1.x, and 3.2.x specifications.
 
 ### [swagger](./swagger)
 

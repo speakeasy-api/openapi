@@ -96,6 +96,39 @@ x-custom: value
 x-another: 123
 `,
 		},
+		{
+			name: "valid_oauth2_with_metadata_url",
+			yml: `
+type: oauth2
+flows:
+  authorizationCode:
+    authorizationUrl: https://example.com/oauth/authorize
+    tokenUrl: https://example.com/oauth/token
+    scopes:
+      read: Read access
+oauth2MetadataUrl: https://example.com/.well-known/oauth-authorization-server
+`,
+		},
+		{
+			name: "valid_deprecated_scheme",
+			yml: `
+type: http
+scheme: bearer
+deprecated: true
+`,
+		},
+		{
+			name: "valid_oauth2_device_authorization",
+			yml: `
+type: oauth2
+flows:
+  deviceAuthorization:
+    deviceAuthorizationUrl: https://example.com/oauth/device_authorization
+    tokenUrl: https://example.com/oauth/token
+    scopes:
+      read: Read access
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -181,6 +214,20 @@ type: oauth2
 type: openIdConnect
 `,
 			wantErrs: []string{"openIdConnectUrl is required for type=openIdConnect"},
+		},
+		{
+			name: "oauth2_invalid_metadata_url",
+			yml: `
+type: oauth2
+flows:
+  authorizationCode:
+    authorizationUrl: https://example.com/oauth/authorize
+    tokenUrl: https://example.com/oauth/token
+    scopes:
+      read: Read access
+oauth2MetadataUrl: ://invalid-url
+`,
+			wantErrs: []string{"oauth2MetadataUrl is not a valid uri"},
 		},
 	}
 
@@ -292,9 +339,9 @@ func TestSecurityRequirement_Validate_Error(t *testing.T) {
 		{
 			name: "undefined_security_scheme",
 			yml: `
-undefined_scheme: []
+"://invalid uri": []
 `,
-			expectedErr: "securityRequirement scheme undefined_scheme is not defined in components.securitySchemes",
+			expectedErr: "securityRequirement scheme ://invalid uri is not defined in components.securitySchemes and is not a valid URI reference",
 		},
 	}
 
@@ -320,6 +367,101 @@ undefined_scheme: []
 			require.Contains(t, errs[0].Error(), tt.expectedErr)
 		})
 	}
+}
+
+func TestSecurityRequirement_Validate_URIReferences_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		yml  string
+	}{
+		{
+			name: "uri_reference_absolute",
+			yml: `
+https://example.com/security/schemes/oauth2: []
+`,
+		},
+		{
+			name: "uri_reference_relative",
+			yml: `
+./security/oauth2: []
+`,
+		},
+		{
+			name: "uri_reference_with_fragment",
+			yml: `
+https://example.com/api#/components/securitySchemes/oauth2: []
+`,
+		},
+		{
+			name: "mixed_component_and_uri",
+			yml: `
+api_key: []
+https://example.com/security/oauth2:
+  - read
+  - write
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var securityRequirement openapi.SecurityRequirement
+
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &securityRequirement)
+			require.NoError(t, err)
+			require.Empty(t, validationErrs)
+
+			// Create a mock OpenAPI document with one known component
+			openAPIDoc := &openapi.OpenAPI{
+				Components: &openapi.Components{
+					SecuritySchemes: sequencedmap.New(
+						sequencedmap.NewElem("api_key", &openapi.ReferencedSecurityScheme{
+							Object: &openapi.SecurityScheme{Type: openapi.SecuritySchemeTypeAPIKey},
+						}),
+					),
+				},
+			}
+
+			errs := securityRequirement.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
+			require.Empty(t, errs, "Expected no validation errors for valid URI references")
+		})
+	}
+}
+
+func TestSecurityRequirement_Validate_ComponentNamePrecedence_Success(t *testing.T) {
+	t.Parallel()
+
+	// Test that component names take precedence over URI interpretation
+	// per spec: "Property names that are identical to a component name under
+	// the Components Object MUST be treated as a component name"
+	yml := `
+foo: []
+`
+
+	var securityRequirement openapi.SecurityRequirement
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &securityRequirement)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	// Create a mock OpenAPI document where "foo" is both a valid URI segment
+	// and a component name - component name should take precedence
+	openAPIDoc := &openapi.OpenAPI{
+		Components: &openapi.Components{
+			SecuritySchemes: sequencedmap.New(
+				sequencedmap.NewElem("foo", &openapi.ReferencedSecurityScheme{
+					Object: &openapi.SecurityScheme{Type: openapi.SecuritySchemeTypeHTTP},
+				}),
+			),
+		},
+	}
+
+	errs := securityRequirement.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
+	require.Empty(t, errs, "Component name 'foo' should take precedence over URI interpretation")
 }
 
 func TestOAuthFlows_Validate_Success(t *testing.T) {
@@ -392,6 +534,16 @@ implicit:
   scopes:
     read: Read access
 x-custom: value
+`,
+		},
+		{
+			name: "valid_device_authorization_flow",
+			yml: `
+deviceAuthorization:
+  deviceAuthorizationUrl: https://example.com/oauth/device_authorization
+  tokenUrl: https://example.com/oauth/token
+  scopes:
+    read: Read access
 `,
 		},
 	}
@@ -478,6 +630,16 @@ x-custom: value
 `,
 			flowType: openapi.OAuthFlowTypePassword,
 		},
+		{
+			name: "valid_device_authorization_flow",
+			yml: `
+deviceAuthorizationUrl: https://example.com/oauth/device_authorization
+tokenUrl: https://example.com/oauth/token
+scopes:
+  read: Read access
+`,
+			flowType: openapi.OAuthFlowTypeDeviceAuthorization,
+		},
 	}
 
 	for _, tt := range tests {
@@ -557,6 +719,26 @@ tokenUrl: https://example.com/oauth/token
 `,
 			flowType:    openapi.OAuthFlowTypePassword,
 			expectedErr: "scopes is required (empty map is allowed)",
+		},
+		{
+			name: "device_authorization_missing_device_authorization_url",
+			yml: `
+tokenUrl: https://example.com/oauth/token
+scopes:
+  read: Read access
+`,
+			flowType:    openapi.OAuthFlowTypeDeviceAuthorization,
+			expectedErr: "deviceAuthorizationUrl is required for type=deviceAuthorization",
+		},
+		{
+			name: "device_authorization_missing_token_url",
+			yml: `
+deviceAuthorizationUrl: https://example.com/oauth/device_authorization
+scopes:
+  read: Read access
+`,
+			flowType:    openapi.OAuthFlowTypeDeviceAuthorization,
+			expectedErr: "tokenUrl is required for type=deviceAuthorization",
 		},
 	}
 

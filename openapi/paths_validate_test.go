@@ -7,6 +7,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,8 +15,9 @@ func TestPaths_Validate_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		yml  string
+		name           string
+		yml            string
+		openApiVersion string
 	}{
 		{
 			name: "valid_empty_paths",
@@ -85,7 +87,12 @@ x-another: 123
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := paths.Validate(t.Context())
+			openAPIDoc := openapi.NewOpenAPI()
+			if tt.openApiVersion != "" {
+				openAPIDoc.OpenAPI = tt.openApiVersion
+			}
+
+			errs := paths.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -95,8 +102,9 @@ func TestPathItem_Validate_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		yml  string
+		name           string
+		yml            string
+		openApiVersion string
 	}{
 		{
 			name: "valid_get_operation",
@@ -242,6 +250,22 @@ trace:
       description: Trace response
 `,
 		},
+		{
+			name: "valid_additional_operation",
+			yml: `
+additionalOperations:
+  COPY:
+    summary: Copy operation
+    description: Custom COPY operation for the test endpoint
+    operationId: copyTest
+    tags:
+      - test
+    responses:
+      201:
+        description: Created
+    x-test: some-value
+        `,
+		},
 	}
 
 	for _, tt := range tests {
@@ -254,7 +278,12 @@ trace:
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := pathItem.Validate(t.Context())
+			openAPIDoc := openapi.NewOpenAPI()
+			if tt.openApiVersion != "" {
+				openAPIDoc.OpenAPI = tt.openApiVersion
+			}
+
+			errs := pathItem.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 			require.Empty(t, errs, "Expected no validation errors")
 		})
 	}
@@ -264,9 +293,10 @@ func TestPathItem_Validate_Error(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		yml      string
-		wantErrs []string
+		name           string
+		yml            string
+		openApiVersion string
+		wantErrs       []string
 	}{
 		{
 			name: "invalid_server",
@@ -296,6 +326,66 @@ get:
 `,
 			wantErrs: []string{"[3:5] parameter.name is missing"},
 		},
+		{
+			name:           "unexpected_additional_operations",
+			openApiVersion: "3.1.2",
+			yml: `
+additionalOperations:
+  COPY:
+    summary: Copy operation
+    description: Custom COPY operation for the test endpoint
+    operationId: copyTest
+    tags:
+      - test
+    responses:
+      201:
+        description: Created
+    x-test: some-value
+        `,
+			wantErrs: []string{"additionalOperations is not supported in OpenAPI version 3.1.2"},
+		},
+		{
+			name:           "standard_method_in_additional_operations",
+			openApiVersion: "3.2.0",
+			yml: `
+additionalOperations:
+  GET:
+    summary: Get operation
+    description: Custom GET operation for the test endpoint
+    operationId: getTest
+    tags:
+      - test
+    responses:
+      200:
+        description: Successful response
+    x-test: some-value
+        `,
+			wantErrs: []string{"method [GET] is a standard HTTP method and must be defined in its own field"},
+		},
+		{
+			name:           "invalid_openapi_version",
+			openApiVersion: "invalid-version",
+			yml: `
+get:
+  summary: Get resource
+  responses:
+    '200':
+      description: Successful response
+      `,
+			wantErrs: []string{"invalid version invalid-version"},
+		},
+		{
+			name:           "not_using_additional_operations_for_non_standard_method",
+			openApiVersion: "3.2.0",
+			yml: `
+copy:
+  summary: Copy resource
+  responses:
+      '201':
+        description: Resource copied
+      `,
+			wantErrs: []string{"method [copy] is not a standard HTTP method and must be defined in the additionalOperations field"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -310,7 +400,12 @@ get:
 			require.NoError(t, err)
 			allErrors = append(allErrors, validationErrs...)
 
-			validateErrs := pathItem.Validate(t.Context())
+			openAPIDoc := openapi.NewOpenAPI()
+			if tt.openApiVersion != "" {
+				openAPIDoc.OpenAPI = tt.openApiVersion
+			}
+
+			validateErrs := pathItem.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 			allErrors = append(allErrors, validateErrs...)
 
 			require.NotEmpty(t, allErrors, "Expected validation errors")

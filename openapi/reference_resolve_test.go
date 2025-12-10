@@ -1,10 +1,12 @@
 package openapi
 
 import (
+	"bytes"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1064,4 +1066,199 @@ func TestReference_ParentLinks(t *testing.T) {
 			nilRef.SetTopLevelParent(&ReferencedParameter{})
 		}, "SetTopLevelParent on nil reference should not panic")
 	})
+}
+
+func TestResolveObject_WithSelf_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Create mock filesystem to simulate the virtual location implied by $self
+	mockFS := NewMockVirtualFS()
+
+	// Read the shared file that should be resolved relative to $self
+	sharedPath := filepath.Join("testdata", "resolve_test", "shared.yaml")
+	sharedContent, err := os.ReadFile(sharedPath)
+	require.NoError(t, err)
+
+	// The $self is /test/api/openapi.yaml (absolute file path)
+	// So a relative reference ./shared.yaml should resolve to /test/api/shared.yaml
+	mockFS.AddFile("/test/api/shared.yaml", sharedContent)
+
+	// Load the document with $self field
+	testDataPath := filepath.Join("testdata", "resolve_test", "with_self.yaml")
+	file, err := os.Open(testDataPath)
+	require.NoError(t, err)
+	defer file.Close()
+
+	doc, validationErrs, err := Unmarshal(ctx, file)
+	require.NoError(t, err)
+	assert.Empty(t, validationErrs)
+
+	// Verify $self is set correctly
+	require.NotNil(t, doc.Self)
+	assert.Equal(t, "/test/api/openapi.yaml", *doc.Self)
+	assert.Equal(t, "/test/api/openapi.yaml", doc.GetSelf())
+
+	// Setup resolve options - use a filesystem path as TargetLocation
+	// but $self should override it for external reference resolution
+	absPath, err := filepath.Abs(testDataPath)
+	require.NoError(t, err)
+
+	opts := ResolveOptions{
+		TargetLocation: absPath, // Filesystem location (different from $self)
+		RootDocument:   doc,
+		VirtualFS:      mockFS, // Use mock FS to intercept file access
+	}
+
+	// Test resolving the external reference to shared.yaml
+	// The reference is './shared.yaml#/components/parameters/SharedParam'
+	// With $self = /test/api/openapi.yaml
+	// It should resolve to /test/api/shared.yaml#/components/parameters/SharedParam
+	require.NotNil(t, doc.Components)
+	require.NotNil(t, doc.Components.Parameters)
+
+	externalParam, exists := doc.Components.Parameters.Get("ExternalParam")
+	require.True(t, exists, "ExternalParam should exist in components")
+	require.True(t, externalParam.IsReference(), "ExternalParam should be a reference")
+
+	// Resolve the reference - it should use $self as base URI
+	validationErrs, err = externalParam.Resolve(ctx, opts)
+	require.NoError(t, err)
+	assert.Empty(t, validationErrs)
+
+	resolved := externalParam.GetObject()
+	require.NotNil(t, resolved, "Resolved parameter should not be nil")
+
+	// Verify the resolved parameter is the SharedParam from shared.yaml
+	assert.Equal(t, "sharedParam", resolved.GetName())
+	assert.Equal(t, ParameterInQuery, resolved.GetIn())
+	assert.True(t, resolved.GetRequired())
+	assert.Equal(t, "A parameter defined in the shared file", resolved.GetDescription())
+
+	// Verify that the mock FS was accessed with the path resolved from $self
+	// The relative reference './shared.yaml' combined with $self '/test/api/openapi.yaml'
+	// should result in accessing '/test/api/shared.yaml'
+	assert.Equal(t, 1, mockFS.GetAccessCount("/test/api/shared.yaml"),
+		"shared.yaml should be accessed via path resolved from $self, not from TargetLocation")
+}
+
+func TestSecurityFileDisclosure_WithMockFS(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Create a mock file system with simulated sensitive content
+	mockFS := NewMockVirtualFS()
+	sensitiveContent := []byte(`root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin`)
+
+	mockFS.AddFile("/etc/passwd", sensitiveContent)
+
+	// Schema files can be in any directory (since $self is /etc/passwd - absolute ref is resolved)
+	schemasContent := []byte(`
+User:
+  type: object
+  properties:
+    name:
+      type: string
+`)
+	mockFS.AddFile("/test/api/shared/schemas.yaml", schemasContent)
+
+	// Document with reference that directly points to /etc/passwd
+	yml := `openapi: 3.2.0
+info:
+  title: Test API
+  version: 1.0.0
+components:
+  schemas:
+    User:
+      $ref: "/etc/passwd"
+`
+
+	doc, validationErrs, err := Unmarshal(ctx, bytes.NewBufferString(yml))
+	require.NoError(t, err, "Document should parse")
+	if len(validationErrs) > 0 {
+		t.Logf("Validation errors during unmarshal: %v", validationErrs)
+	}
+
+	// Try to resolve references using the mock FS
+	resolveOpts := ResolveOptions{
+		RootDocument:        doc,
+		TargetLocation:      ".",
+		DisableExternalRefs: false,
+		VirtualFS:           mockFS,
+	}
+
+	// Try to resolve the schema reference
+	if doc.Components != nil && doc.Components.Schemas != nil {
+		for schemaName, schema := range doc.Components.Schemas.All() {
+			t.Logf("Checking schema: %s, IsReference: %v", schemaName, schema.IsReference())
+			if schema.IsReference() {
+				t.Logf("Attempting to resolve reference: %s", schema.GetReference())
+				resolveErrs, resolveErr := schema.Resolve(ctx, resolveOpts)
+
+				// Should fail because /etc/passwd is not valid YAML
+				if resolveErr == nil && len(resolveErrs) == 0 {
+					t.Error("Expected resolution to fail for non-OpenAPI file")
+				}
+
+				// Collect all error messages
+				var allErrors []string
+				if resolveErr != nil {
+					allErrors = append(allErrors, resolveErr.Error())
+					t.Logf("Resolve error: %s", resolveErr.Error())
+				}
+				for _, err := range resolveErrs {
+					if err != nil {
+						allErrors = append(allErrors, err.Error())
+						t.Logf("Validation error: %s", err.Error())
+					}
+				}
+
+				combinedError := strings.Join(allErrors, "\n")
+
+				// Check if our known sensitive content appears in the error
+				sensitivePatterns := []string{
+					"root:x:0:0",
+					"daemon:x:1:1",
+					"/bin/bash",
+					"/usr/sbin/nologin",
+				}
+
+				foundSensitiveContent := false
+				for _, pattern := range sensitivePatterns {
+					if len(combinedError) > 0 && containsString(combinedError, pattern) {
+						t.Errorf("SECURITY ISSUE: Sensitive content leaked in error message. Pattern found: %q", pattern)
+						foundSensitiveContent = true
+						break
+					}
+				}
+
+				if !foundSensitiveContent {
+					t.Logf("PASS: No sensitive content found in error messages")
+				}
+
+				// Verify file was accessed
+				if len(mockFS.GetAccessLog()) > 0 {
+					t.Logf("Files accessed: %v", mockFS.GetAccessLog())
+				}
+			}
+		}
+	}
+}
+
+// Helper function for case-sensitive string containment
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || indexString(s, substr) >= 0)
+}
+
+func indexString(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
 }

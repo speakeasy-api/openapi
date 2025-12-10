@@ -232,7 +232,7 @@ exclusiveMaximum: false
 		{
 			name: "boolean exclusiveMinimum with 3.1 $schema should fail",
 			yaml: `
-$schema: "https://spec.openapis.org/oas/3.1/dialect/base"
+$schema: "https://spec.openapis.org/oas/3.1/dialect/2024-11-10"
 type: number
 minimum: 0
 maximum: 100

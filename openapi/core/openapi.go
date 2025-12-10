@@ -11,6 +11,7 @@ type OpenAPI struct {
 	marshaller.CoreModel `model:"openapi"`
 
 	OpenAPI      marshaller.Node[string]                                           `key:"openapi"`
+	Self         marshaller.Node[*string]                                          `key:"$self"`
 	Info         marshaller.Node[Info]                                             `key:"info"`
 	ExternalDocs marshaller.Node[*oas3core.ExternalDocumentation]                  `key:"externalDocs"`
 	Tags         marshaller.Node[[]*Tag]                                           `key:"tags"`

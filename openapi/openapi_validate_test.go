@@ -104,6 +104,28 @@ x-api-version: 2.0
 `,
 		},
 		{
+			name: "valid_with_self_absolute_uri",
+			yml: `
+openapi: 3.2.0
+$self: https://example.com/api/openapi.yaml
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+`,
+		},
+		{
+			name: "valid_with_self_relative_uri",
+			yml: `
+openapi: 3.2.0
+$self: /api/openapi.yaml
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+`,
+		},
+		{
 			name: "valid_complete",
 			yml: `
 openapi: 3.1.0
@@ -185,7 +207,7 @@ info:
   version: 1.0.0
 paths: {}
 `,
-			wantErrs: []string{"only OpenAPI version 3.1.1 and below is supported"},
+			wantErrs: []string{"openapi.openapi only OpenAPI versions between"},
 		},
 		{
 			name: "invalid_info_missing_title",
@@ -245,6 +267,18 @@ externalDocs:
 paths: {}
 `,
 			wantErrs: []string{"[7:3] externalDocumentation.url is missing"},
+		},
+		{
+			name: "invalid_self_not_uri",
+			yml: `
+openapi: 3.2.0
+$self: "ht!tp://invalid-scheme"
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+`,
+			wantErrs: []string{"openapi.$self is not a valid uri reference"},
 		},
 	}
 

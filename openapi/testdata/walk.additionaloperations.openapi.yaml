@@ -1,0 +1,107 @@
+openapi: 3.2.0
+info:
+  title: AdditionalOperations Test API
+  version: 1.0.0
+  description: API for testing additionalOperations walk functionality
+
+paths:
+  /custom/{id}:
+    summary: Custom operations path
+    description: Path with custom HTTP methods in additionalOperations
+    parameters:
+      - name: id
+        in: path
+        description: Resource ID
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getCustomResource
+      summary: Get custom resource
+      description: Standard GET operation
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+    additionalOperations:
+      COPY:
+        operationId: copyCustomResource
+        summary: Copy custom resource
+        description: Custom COPY operation to duplicate a resource
+        tags:
+          - custom
+        parameters:
+          - name: destination
+            in: header
+            description: Destination for copy operation
+            required: true
+            schema:
+              type: string
+        responses:
+          "201":
+            description: Resource copied successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    originalId:
+                      type: string
+                    message:
+                      type: string
+          "400":
+            description: Invalid copy request
+        x-custom: copy-operation-extension
+      PURGE:
+        operationId: purgeCustomResource
+        summary: Purge custom resource
+        description: Custom PURGE operation to completely remove a resource
+        tags:
+          - custom
+        responses:
+          "204":
+            description: Resource purged successfully
+          "404":
+            description: Resource not found
+        x-custom: purge-operation-extension
+    x-custom: custom-path-item-extension
+
+  /standard:
+    get:
+      operationId: getStandardResource
+      summary: Get standard resource
+      description: Standard operation without additionalOperations
+      responses:
+        "200":
+          description: Success
+
+components:
+  schemas:
+    CustomResource:
+      type: object
+      description: Custom resource object
+      properties:
+        id:
+          type: string
+          description: Resource identifier
+        name:
+          type: string
+          description: Resource name
+        data:
+          type: object
+          description: Resource data
+      required:
+        - id
+        - name
+
+x-custom: root-extension

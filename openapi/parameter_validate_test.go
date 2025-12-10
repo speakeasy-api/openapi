@@ -114,6 +114,40 @@ schema:
 description: This parameter is deprecated
 `,
 		},
+		{
+			name: "valid querystring parameter",
+			yml: `
+name: filter
+in: querystring
+content:
+  application/x-www-form-urlencoded:
+    schema:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+description: Filter parameters as query string
+`,
+		},
+		{
+			name: "querystring parameter with JSON content",
+			yml: `
+name: data
+in: querystring
+content:
+  application/json:
+    schema:
+      type: object
+      properties:
+        query:
+          type: string
+        limit:
+          type: integer
+description: JSON data as query string
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -187,7 +221,7 @@ in: invalid
 schema:
   type: string
 `,
-			wantErrs: []string{"[3:5] parameter.in must be one of [query, header, path, cookie]"},
+			wantErrs: []string{"[3:5] parameter.in must be one of [query, querystring, header, path, cookie]"},
 		},
 		{
 			name: "multiple validation errors",
@@ -200,6 +234,56 @@ required: false
 				"[2:7] parameter.name is required",
 				"[4:11] parameter.in=path requires required=true",
 			},
+		},
+		{
+			name: "querystring parameter with schema instead of content",
+			yml: `
+name: filter
+in: querystring
+schema:
+  type: object
+`,
+			wantErrs: []string{
+				"parameter field schema is not allowed for in=querystring",
+				"parameter field content is required for in=querystring",
+			},
+		},
+		{
+			name: "querystring parameter with style",
+			yml: `
+name: filter
+in: querystring
+style: form
+content:
+  application/x-www-form-urlencoded:
+    schema:
+      type: object
+`,
+			wantErrs: []string{"parameter field style is not allowed for in=querystring"},
+		},
+		{
+			name: "querystring parameter missing content",
+			yml: `
+name: filter
+in: querystring
+description: Missing content field
+`,
+			wantErrs: []string{"parameter field content is required for in=querystring"},
+		},
+		{
+			name: "parameter with multiple content entries",
+			yml: `
+name: data
+in: query
+content:
+  application/json:
+    schema:
+      type: object
+  application/xml:
+    schema:
+      type: object
+`,
+			wantErrs: []string{"parameter field content must have exactly one entry"},
 		},
 	}
 

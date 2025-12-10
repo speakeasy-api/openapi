@@ -20,10 +20,15 @@ type Example struct {
 	Summary *string
 	// Description is a description of the example.
 	Description *string
-	// Value is the example value. Mutually exclusive with ExternalValue.
+	// Value is the example value. Mutually exclusive with ExternalValue, DataValue, and SerializedValue.
+	// Deprecated for non-JSON serialization targets: Use DataValue and/or SerializedValue instead.
 	Value values.Value
-	// ExternalValue is a URI to the location of the example value. May be relative to the location of the document. Mutually exclusive with Value.
+	// ExternalValue is a URI to the location of the example value. May be relative to the location of the document. Mutually exclusive with Value and SerializedValue.
 	ExternalValue *string
+	// DataValue is an example of the data structure that MUST be valid according to the relevant Schema Object. If this field is present, Value MUST be absent.
+	DataValue values.Value
+	// SerializedValue is an example of the serialized form of the value, including encoding and escaping. If this field is present, Value and ExternalValue MUST be absent.
+	SerializedValue *string
 	// Extensions provides a list of extensions to the Example object.
 	Extensions *extensions.Extensions
 }
@@ -62,6 +67,22 @@ func (e *Example) GetExternalValue() string {
 	return *e.ExternalValue
 }
 
+// GetDataValue returns the value of the DataValue field. Returns nil if not set.
+func (e *Example) GetDataValue() values.Value {
+	if e == nil {
+		return nil
+	}
+	return e.DataValue
+}
+
+// GetSerializedValue returns the value of the SerializedValue field. Returns empty string if not set.
+func (e *Example) GetSerializedValue() string {
+	if e == nil || e.SerializedValue == nil {
+		return ""
+	}
+	return *e.SerializedValue
+}
+
 // GetExtensions returns the value of the Extensions field. Returns an empty extensions map if not set.
 func (e *Example) GetExtensions() *extensions.Extensions {
 	if e == nil || e.Extensions == nil {
@@ -81,8 +102,24 @@ func (e *Example) Validate(ctx context.Context, opts ...validation.Option) []err
 	core := e.GetCore()
 	errs := []error{}
 
+	// Check mutual exclusivity: value and externalValue
 	if core.Value.Present && core.ExternalValue.Present {
 		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("example.value and externalValue are mutually exclusive"), core, core.Value))
+	}
+
+	// Check mutual exclusivity: dataValue and value
+	if core.DataValue.Present && core.Value.Present {
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("example.dataValue and value are mutually exclusive"), core, core.DataValue))
+	}
+
+	// Check mutual exclusivity: serializedValue and value
+	if core.SerializedValue.Present && core.Value.Present {
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("example.serializedValue and value are mutually exclusive"), core, core.SerializedValue))
+	}
+
+	// Check mutual exclusivity: serializedValue and externalValue
+	if core.SerializedValue.Present && core.ExternalValue.Present {
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("example.serializedValue and externalValue are mutually exclusive"), core, core.SerializedValue))
 	}
 
 	if core.ExternalValue.Present {

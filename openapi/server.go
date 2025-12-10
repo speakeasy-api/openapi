@@ -28,6 +28,8 @@ type Server struct {
 	URL string
 	// A description of the server. May contain CommonMark syntax.
 	Description *string
+	// An optional unique string to refer to the host designated by the URL.
+	Name *string
 	// A map of variables available to be templated into the URL.
 	Variables *sequencedmap.Map[string, *ServerVariable]
 
@@ -51,6 +53,14 @@ func (s *Server) GetDescription() string {
 		return ""
 	}
 	return *s.Description
+}
+
+// GetName returns the value of the Name field. Returns empty string if not set.
+func (s *Server) GetName() string {
+	if s == nil || s.Name == nil {
+		return ""
+	}
+	return *s.Name
 }
 
 // GetVariables returns the value of the Variables field. Returns nil if not set.

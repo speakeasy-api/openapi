@@ -11,9 +11,12 @@ import (
 type MediaType struct {
 	marshaller.CoreModel `model:"mediaType"`
 
-	Schema     marshaller.Node[oascore.JSONSchema]                              `key:"schema"`
-	Encoding   marshaller.Node[*sequencedmap.Map[string, *Encoding]]            `key:"encoding"`
-	Example    marshaller.Node[values.Value]                                    `key:"example"`
-	Examples   marshaller.Node[*sequencedmap.Map[string, *Reference[*Example]]] `key:"examples"`
-	Extensions core.Extensions                                                  `key:"extensions"`
+	Schema         marshaller.Node[oascore.JSONSchema]                              `key:"schema"`
+	ItemSchema     marshaller.Node[oascore.JSONSchema]                              `key:"itemSchema"`
+	Encoding       marshaller.Node[*sequencedmap.Map[string, *Encoding]]            `key:"encoding"`
+	PrefixEncoding marshaller.Node[[]*Encoding]                                     `key:"prefixEncoding"`
+	ItemEncoding   marshaller.Node[*Encoding]                                       `key:"itemEncoding"`
+	Example        marshaller.Node[values.Value]                                    `key:"example"`
+	Examples       marshaller.Node[*sequencedmap.Map[string, *Reference[*Example]]] `key:"examples"`
+	Extensions     core.Extensions                                                  `key:"extensions"`
 }

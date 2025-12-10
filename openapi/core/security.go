@@ -10,15 +10,17 @@ import (
 type SecurityScheme struct {
 	marshaller.CoreModel `model:"securityScheme"`
 
-	Type             marshaller.Node[string]      `key:"type"`
-	Description      marshaller.Node[*string]     `key:"description"`
-	Name             marshaller.Node[*string]     `key:"name"`
-	In               marshaller.Node[*string]     `key:"in"`
-	Scheme           marshaller.Node[*string]     `key:"scheme"`
-	BearerFormat     marshaller.Node[*string]     `key:"bearerFormat"`
-	Flows            marshaller.Node[*OAuthFlows] `key:"flows"`
-	OpenIdConnectUrl marshaller.Node[*string]     `key:"openIdConnectUrl"`
-	Extensions       core.Extensions              `key:"extensions"`
+	Type              marshaller.Node[string]      `key:"type"`
+	Description       marshaller.Node[*string]     `key:"description"`
+	Name              marshaller.Node[*string]     `key:"name"`
+	In                marshaller.Node[*string]     `key:"in"`
+	Scheme            marshaller.Node[*string]     `key:"scheme"`
+	BearerFormat      marshaller.Node[*string]     `key:"bearerFormat"`
+	Flows             marshaller.Node[*OAuthFlows] `key:"flows"`
+	OpenIdConnectUrl  marshaller.Node[*string]     `key:"openIdConnectUrl"`
+	OAuth2MetadataUrl marshaller.Node[*string]     `key:"oauth2MetadataUrl"`
+	Deprecated        marshaller.Node[*bool]       `key:"deprecated"`
+	Extensions        core.Extensions              `key:"extensions"`
 }
 
 type SecurityRequirement struct {
@@ -61,19 +63,21 @@ func (s *SecurityRequirement) GetMapKeyNodeOrRootLine(key string, rootNode *yaml
 type OAuthFlows struct {
 	marshaller.CoreModel `model:"oAuthFlows"`
 
-	Implicit          marshaller.Node[*OAuthFlow] `key:"implicit"`
-	Password          marshaller.Node[*OAuthFlow] `key:"password"`
-	ClientCredentials marshaller.Node[*OAuthFlow] `key:"clientCredentials"`
-	AuthorizationCode marshaller.Node[*OAuthFlow] `key:"authorizationCode"`
-	Extensions        core.Extensions             `key:"extensions"`
+	Implicit            marshaller.Node[*OAuthFlow] `key:"implicit"`
+	Password            marshaller.Node[*OAuthFlow] `key:"password"`
+	ClientCredentials   marshaller.Node[*OAuthFlow] `key:"clientCredentials"`
+	AuthorizationCode   marshaller.Node[*OAuthFlow] `key:"authorizationCode"`
+	DeviceAuthorization marshaller.Node[*OAuthFlow] `key:"deviceAuthorization"`
+	Extensions          core.Extensions             `key:"extensions"`
 }
 
 type OAuthFlow struct {
 	marshaller.CoreModel `model:"oAuthFlow"`
 
-	AuthorizationURL marshaller.Node[*string]                           `key:"authorizationUrl"`
-	TokenURL         marshaller.Node[*string]                           `key:"tokenUrl"`
-	RefreshURL       marshaller.Node[*string]                           `key:"refreshUrl"`
-	Scopes           marshaller.Node[*sequencedmap.Map[string, string]] `key:"scopes"`
-	Extensions       core.Extensions                                    `key:"extensions"`
+	AuthorizationURL       marshaller.Node[*string]                           `key:"authorizationUrl"`
+	DeviceAuthorizationURL marshaller.Node[*string]                           `key:"deviceAuthorizationUrl"`
+	TokenURL               marshaller.Node[*string]                           `key:"tokenUrl"`
+	RefreshURL             marshaller.Node[*string]                           `key:"refreshUrl"`
+	Scopes                 marshaller.Node[*sequencedmap.Map[string, string]] `key:"scopes"`
+	Extensions             core.Extensions                                    `key:"extensions"`
 }

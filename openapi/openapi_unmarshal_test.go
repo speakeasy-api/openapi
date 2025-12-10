@@ -1,6 +1,7 @@
 package openapi_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -121,7 +122,6 @@ paths: {}`,
 			wantErrs: []string{
 				"[1:1] openapi.openapi invalid OpenAPI version : invalid version ",
 				"[1:1] openapi.openapi is missing",
-				"[1:1] openapi.openapi only OpenAPI version 3.1.1 and below is supported",
 			},
 		},
 		{
@@ -137,7 +137,7 @@ info:
   title: Test API
   version: 1.0.0
 paths: {}`,
-			wantErrs: []string{"[1:10] openapi.openapi only OpenAPI version 3.1.1 and below is supported"},
+			wantErrs: []string{fmt.Sprintf("[1:10] openapi.openapi only OpenAPI versions between %s and %s are supported", openapi.MinimumSupportedVersion, openapi.MaximumSupportedVersion)},
 		},
 	}
 

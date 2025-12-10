@@ -105,20 +105,14 @@ paths:
           in: query
           description: Fields to include
           required: false
-          schema:
-            type: string
-            description: Comma-separated list of fields
           content:
-            application/json:
+            multipart/form-data:
               schema:
-                type: string
-                description: JSON string parameter
-              examples:
-                include-example:
-                  summary: Include example
-                  description: Example include parameter
-                  value: "name,email"
-                  x-custom: operation-parameter-example-extension
+                type: object
+                properties:
+                  profileImage:
+                    type: string
+                    format: binary
               encoding:
                 profileImage:
                   contentType: image/png
@@ -130,6 +124,13 @@ paths:
                         description: Rate limit value
                       x-custom: encoding-header-extension
                   x-custom: encoding-extension
+              examples:
+                include-example:
+                  summary: Include example
+                  description: Example include parameter
+                  value:
+                    profileImage: <binary data>
+                  x-custom: operation-parameter-example-extension
               x-custom: operation-parameter-content-extension
           x-custom: operation-parameter-extension
       requestBody:
@@ -324,6 +325,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "202":
+          description: Batch user creation accepted
+          content:
+            application/json:
+              itemSchema:
+                $ref: "#/components/schemas/User"
+              x-custom: batch-create-response-content-extension
+        "203":
+          description: Multipart response with prefix encoding
+          content:
+            multipart/mixed:
+              schema:
+                type: array
+                prefixItems:
+                  - type: object
+                  - type: string
+              prefixEncoding:
+                - contentType: application/json
+                - contentType: text/plain
+              x-custom: prefix-encoding-response-content-extension
+        "204":
+          description: Multipart streaming response with item encoding
+          content:
+            multipart/mixed:
+              itemSchema:
+                type: object
+              itemEncoding:
+                contentType: application/json
+              x-custom: item-encoding-response-content-extension
         "400":
           description: Invalid user data
       x-custom: create-user-operation-extension

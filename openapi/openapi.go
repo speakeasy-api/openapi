@@ -3,11 +3,10 @@ package openapi
 import (
 	"context"
 	"net/url"
-	"slices"
 
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"github.com/speakeasy-api/openapi/internal/utils"
+	"github.com/speakeasy-api/openapi/internal/version"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi/core"
@@ -18,13 +17,12 @@ import (
 
 // Version is the version of the OpenAPI Specification that this package conforms to.
 const (
-	Version      = "3.1.1"
-	VersionMajor = 3
-	VersionMinor = 1
-	VersionPatch = 1
+	Version = "3.2.0"
+)
 
-	Version30XMaxPatch = 4
-	Version31XMaxPatch = 1
+var (
+	MinimumSupportedVersion = version.MustParse("3.0.0")
+	MaximumSupportedVersion = version.MustParse(Version)
 )
 
 // OpenAPI represents an OpenAPI document compatible with the OpenAPI Specification 3.0.X and 3.1.X.
@@ -34,6 +32,9 @@ type OpenAPI struct {
 
 	// OpenAPI is the version of the OpenAPI Specification that this document conforms to.
 	OpenAPI string
+	// Self provides the self-assigned URI of this document, which also serves as its base URI for resolving relative references.
+	// It MUST be in the form of a URI reference as defined by RFC3986.
+	Self *string
 	// Info provides various information about the API and document.
 	Info Info
 	// ExternalDocs provides additional external documentation for this API.
@@ -61,12 +62,27 @@ type OpenAPI struct {
 
 var _ interfaces.Model[core.OpenAPI] = (*OpenAPI)(nil)
 
+// NewOpenAPI creates a new OpenAPI object with version set
+func NewOpenAPI() *OpenAPI {
+	return &OpenAPI{
+		OpenAPI: Version,
+	}
+}
+
 // GetOpenAPI returns the value of the OpenAPI field. Returns empty string if not set.
 func (o *OpenAPI) GetOpenAPI() string {
 	if o == nil {
 		return ""
 	}
 	return o.OpenAPI
+}
+
+// GetSelf returns the value of the Self field. Returns empty string if not set.
+func (o *OpenAPI) GetSelf() string {
+	if o == nil || o.Self == nil {
+		return ""
+	}
+	return *o.Self
 }
 
 // GetInfo returns the value of the Info field. Returns nil if not set.
@@ -161,23 +177,14 @@ func (o *OpenAPI) Validate(ctx context.Context, opts ...validation.Option) []err
 	opts = append(opts, validation.WithContextObject(o))
 	opts = append(opts, validation.WithContextObject(&oas3.ParentDocumentVersion{OpenAPI: pointer.From(o.OpenAPI)}))
 
-	openAPIMajor, openAPIMinor, openAPIPatch, err := utils.ParseVersion(o.OpenAPI)
+	docVersion, err := version.Parse(o.OpenAPI)
 	if err != nil {
 		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi.openapi invalid OpenAPI version %s: %s", o.OpenAPI, err.Error()), core, core.OpenAPI))
 	}
-
-	minorVersionSupported := slices.Contains([]int{0, 1}, openAPIMinor)
-	patchVersionSupported := false
-
-	switch openAPIMinor {
-	case 0:
-		patchVersionSupported = openAPIPatch <= Version30XMaxPatch
-	case 1:
-		patchVersionSupported = openAPIPatch <= Version31XMaxPatch
-	}
-
-	if openAPIMajor != VersionMajor || !minorVersionSupported || !patchVersionSupported {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi.openapi only OpenAPI version %s and below is supported", Version), core, core.OpenAPI))
+	if docVersion != nil {
+		if docVersion.LessThan(*MinimumSupportedVersion) || docVersion.GreaterThan(*MaximumSupportedVersion) {
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi.openapi only OpenAPI versions between %s and %s are supported", MinimumSupportedVersion, MaximumSupportedVersion), core, core.OpenAPI))
+		}
 	}
 
 	errs = append(errs, o.Info.Validate(ctx, opts...)...)
@@ -208,6 +215,12 @@ func (o *OpenAPI) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	if o.Components != nil {
 		errs = append(errs, o.Components.Validate(ctx, opts...)...)
+	}
+
+	if core.Self.Present && o.Self != nil {
+		if _, err := url.Parse(*o.Self); err != nil {
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi.$self is not a valid uri reference: %s", err), core, core.Self))
+		}
 	}
 
 	if core.JSONSchemaDialect.Present && o.JSONSchemaDialect != nil {

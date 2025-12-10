@@ -1,4 +1,4 @@
-openapi: "3.1.1"
+openapi: "3.2.0"
 info:
   title: "My API"
   version: "1.0.0"
@@ -13,10 +13,12 @@ info:
     url: "https://opensource.org/licenses/MIT"
 tags:
   - name: "users"
+    summary: "Users"
     description: "User management operations"
     externalDocs:
       description: "User API documentation"
       url: "https://docs.example.com/users"
+    kind: "nav"
 servers:
   - url: "https://api.example.com/v1"
     description: "Production server"

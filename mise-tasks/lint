@@ -3,7 +3,8 @@ set -euo pipefail
 
 echo "🔍 Running linting checks..."
 
-echo "🧹 Running golangci-lint (includes go vet)..."
+GOLANGCI_VERSION=$(golangci-lint --version | grep -oP 'golangci-lint has version \K[0-9.]+' || echo "unknown")
+echo "🧹 Running golangci-lint v${GOLANGCI_VERSION} (includes go vet)..."
 golangci-lint run
 
 echo "🛡️  Running nilaway..."

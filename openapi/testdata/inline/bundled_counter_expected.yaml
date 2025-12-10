@@ -1,4 +1,4 @@
-openapi: 3.1.0
+openapi: 3.2.0
 info:
   title: Enhanced Test API with Complex References
   version: 1.0.0
@@ -100,6 +100,22 @@ paths:
               examples:
                 posts_example:
                   $ref: "#/components/examples/PostsExample"
+    additionalOperations:
+      COPY:
+        operationId: copyPost
+        summary: Copy post to another location
+        description: Custom COPY operation with external references
+        tags:
+          - posts
+        parameters:
+          - $ref: "#/components/parameters/DestinationParam"
+        requestBody:
+          $ref: "#/components/requestBodies/CopyRequest"
+        responses:
+          "201":
+            $ref: "#/components/responses/CopyResponse"
+          "400":
+            $ref: "#/components/responses/ErrorResponse"
     post:
       tags:
         - posts
@@ -380,6 +396,15 @@ components:
       schema:
         type: string
         format: uuid
+    DestinationParam:
+      name: destination
+      in: header
+      description: Destination for copy operation
+      required: true
+      schema:
+        type: string
+        format: uri
+      example: "https://backup.example.com/resources/"
     ComplexFilterParam:
       name: filter
       in: query
@@ -572,6 +597,44 @@ components:
       required:
         - userId
         - username
+    CompressionConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: false
+        algorithm:
+          type: string
+          enum:
+            - gzip
+            - bzip2
+            - lz4
+            - zstd
+          default: gzip
+        level:
+          type: integer
+          maximum: 9
+          minimum: 1
+          default: 6
+    ResourceMetadata:
+      type: object
+      properties:
+        size:
+          type: integer
+          description: File size in bytes
+        mime_type:
+          type: string
+          description: MIME type of the resource
+        checksum:
+          type: string
+          description: Resource checksum
+        tags:
+          type: array
+          items:
+            type: string
+        custom_properties:
+          type: object
+          additionalProperties: true
     Organization:
       type: object
       properties:
@@ -887,6 +950,34 @@ components:
                 format: email
               profile:
                 $ref: "#/components/schemas/UserProfile"
+    CopyRequest:
+      description: Copy operation request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              source_path:
+                type: string
+                description: Source resource path
+              destination_path:
+                type: string
+                description: Destination resource path
+              options:
+                type: object
+                properties:
+                  preserve_metadata:
+                    type: boolean
+                    default: true
+                  overwrite_existing:
+                    type: boolean
+                    default: false
+                  compression:
+                    $ref: '#/components/schemas/CompressionConfig'
+            required:
+              - source_path
+              - destination_path
+      required: true
   responses:
     UserResponse:
       description: Single user response
@@ -923,6 +1014,35 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    CopyResponse:
+      description: Copy operation result
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              copy_id:
+                type: string
+                format: uuid
+                description: Unique copy operation identifier
+              status:
+                type: string
+                enum:
+                  - queued
+                  - processing
+                  - completed
+              source_path:
+                type: string
+              destination_path:
+                type: string
+              metadata:
+                $ref: '#/components/schemas/ResourceMetadata'
+              created_at:
+                type: string
+                format: date-time
+            required:
+              - copy_id
+              - status
   examples:
     UserExample:
       summary: Example user

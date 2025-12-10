@@ -11,6 +11,7 @@ type Server struct {
 
 	URL         marshaller.Node[string]                                     `key:"url"`
 	Description marshaller.Node[*string]                                    `key:"description"`
+	Name        marshaller.Node[*string]                                    `key:"name"`
 	Variables   marshaller.Node[*sequencedmap.Map[string, *ServerVariable]] `key:"variables"`
 	Extensions  core.Extensions                                             `key:"extensions"`
 }

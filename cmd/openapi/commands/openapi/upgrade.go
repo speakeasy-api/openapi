@@ -13,12 +13,17 @@ import (
 var upgradeCmd = &cobra.Command{
 	Use:   "upgrade <input-file> [output-file]",
 	Short: "Upgrade an OpenAPI specification to the latest supported version",
-	Long: `Upgrade an OpenAPI specification document to the latest supported version (3.1.1).
+	Long: `Upgrade an OpenAPI specification document to the latest supported version (3.2.0).
 
-This command will upgrade OpenAPI documents from:
-- OpenAPI 3.0.x versions to 3.1.1 (always)
-- OpenAPI 3.1.x versions to 3.1.1 (by default)
-- Use --minor-only to only upgrade minor versions (3.0.x to 3.1.1, but skip 3.1.x versions)
+By default, upgrades all versions including patch-level upgrades:
+- 3.0.x → 3.2.0
+- 3.1.x → 3.2.0
+- 3.2.x (e.g., 3.2.0) → 3.2.0 (patch upgrade if newer patch exists)
+
+With --minor-only, only performs cross-minor version upgrades:
+- 3.0.x → 3.2.0 (cross-minor upgrade)
+- 3.1.x → 3.2.0 (cross-minor upgrade)
+- 3.2.x → no change (same minor version, skip patch upgrades)
 
 The upgrade process includes:
 - Updating the OpenAPI version field
@@ -40,7 +45,7 @@ var (
 )
 
 func init() {
-	upgradeCmd.Flags().BoolVar(&minorOnly, "minor-only", false, "only upgrade minor versions (3.0.x to 3.1.1, skip 3.1.x versions)")
+	upgradeCmd.Flags().BoolVar(&minorOnly, "minor-only", false, "only upgrade across minor versions, skip patch-level upgrades within same minor")
 	upgradeCmd.Flags().BoolVarP(&writeInPlace, "write", "w", false, "write result in-place to input file")
 }
 
@@ -59,13 +64,13 @@ func runUpgrade(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	if err := upgradeOpenAPI(ctx, processor, minorOnly); err != nil {
+	if err := upgradeOpenAPI(ctx, processor, !minorOnly); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func upgradeOpenAPI(ctx context.Context, processor *OpenAPIProcessor, minorOnly bool) error {
+func upgradeOpenAPI(ctx context.Context, processor *OpenAPIProcessor, upgradeSameMinorVersion bool) error {
 	// Load the OpenAPI document
 	doc, validationErrors, err := processor.LoadDocument(ctx)
 	if err != nil {
@@ -80,12 +85,12 @@ func upgradeOpenAPI(ctx context.Context, processor *OpenAPIProcessor, minorOnly 
 
 	// Prepare upgrade options
 	var opts []openapi.Option[openapi.UpgradeOptions]
-	if !minorOnly {
-		// By default, upgrade all versions including patch versions (3.1.x to 3.1.1)
-		opts = append(opts, openapi.WithUpgradeSamePatchVersion())
+	if upgradeSameMinorVersion {
+		// By default, upgrade all versions including patch upgrades (e.g., 3.2.0 → 3.2.1)
+		opts = append(opts, openapi.WithUpgradeSameMinorVersion())
 	}
-	// When minorOnly is true, only 3.0.x versions will be upgraded to 3.1.1
-	// 3.1.x versions will be skipped unless they need minor version upgrade
+	// When minorOnly is true, only cross-minor upgrades are performed
+	// Patch upgrades within the same minor version (e.g., 3.2.0 → 3.2.1) are skipped
 
 	// Perform the upgrade
 	originalVersion := doc.OpenAPI

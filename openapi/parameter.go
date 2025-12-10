@@ -28,6 +28,8 @@ func (p ParameterIn) String() string {
 const (
 	// ParameterInQuery represents the location of a parameter that is passed in the query string.
 	ParameterInQuery ParameterIn = "query"
+	// ParameterInQueryString represents the location of a parameter that is passed as the entire query string.
+	ParameterInQueryString ParameterIn = "querystring"
 	// ParameterInHeader represents the location of a parameter that is passed in the header.
 	ParameterInHeader ParameterIn = "header"
 	// ParameterInPath represents the location of a parameter that is passed in the path.
@@ -42,7 +44,7 @@ type Parameter struct {
 
 	// Name is the case sensitive name of the parameter.
 	Name string
-	// In is the location of the parameter. One of "query", "header", "path" or "cookie".
+	// In is the location of the parameter. One of "query", "querystring", "header", "path" or "cookie".
 	In ParameterIn
 	// Description is a brief description of the parameter. May contain CommonMark syntax.
 	Description *string
@@ -127,6 +129,7 @@ func (p *Parameter) GetAllowEmptyValue() bool {
 //   - ParameterInHeader: SerializationStyleSimple
 //   - ParameterInPath: SerializationStyleSimple
 //   - ParameterInCookie: SerializationStyleForm
+//   - ParameterInQueryString: Incompatible with style field
 func (p *Parameter) GetStyle() SerializationStyle {
 	if p == nil || p.Style == nil {
 		switch p.In {
@@ -138,6 +141,10 @@ func (p *Parameter) GetStyle() SerializationStyle {
 			return SerializationStyleSimple
 		case ParameterInCookie:
 			return SerializationStyleForm
+		case ParameterInQueryString:
+			return "" // No style allowed for querystring parameters
+		default:
+			return "" // Unknown type
 		}
 	}
 	return *p.Style
@@ -212,9 +219,9 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("parameter.in is required"), core, core.In))
 	} else {
 		switch p.In {
-		case ParameterInQuery, ParameterInHeader, ParameterInPath, ParameterInCookie:
+		case ParameterInQuery, ParameterInQueryString, ParameterInHeader, ParameterInPath, ParameterInCookie:
 		default:
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.in must be one of [%s]", strings.Join([]string{string(ParameterInQuery), string(ParameterInHeader), string(ParameterInPath), string(ParameterInCookie)}, ", ")), core, core.In))
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.in must be one of [%s]", strings.Join([]string{string(ParameterInQuery), string(ParameterInQueryString), string(ParameterInHeader), string(ParameterInPath), string(ParameterInCookie)}, ", ")), core, core.In))
 		}
 	}
 
@@ -228,6 +235,9 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 
 	if core.Style.Present {
 		switch p.In {
+		case ParameterInQueryString:
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter field style is not allowed for in=querystring"), core, core.Style))
+
 		case ParameterInPath:
 			allowedStyles := []string{string(SerializationStyleSimple), string(SerializationStyleLabel), string(SerializationStyleMatrix)}
 			if !slices.Contains(allowedStyles, string(*p.Style)) {
@@ -252,11 +262,29 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	}
 
 	if core.Schema.Present {
-		errs = append(errs, p.Schema.Validate(ctx, opts...)...)
+		switch p.In {
+		case ParameterInQueryString:
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter field schema is not allowed for in=querystring"), core, core.Schema))
+		default:
+			errs = append(errs, p.Schema.Validate(ctx, opts...)...)
+		}
 	}
 
-	for _, obj := range p.Content.All() {
-		errs = append(errs, obj.Validate(ctx, opts...)...)
+	if !core.Content.Present || p.Content == nil {
+		// Querystring parameters must use content instead of schema
+		if p.In == ParameterInQueryString {
+			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter field content is required for in=querystring"), core, core.Content))
+		}
+	} else if p.Content.Len() != 1 {
+		// If present, content must have exactly one entry
+		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter field content must have exactly one entry"), core, core.Content))
+	}
+
+	for mediaType, obj := range p.Content.All() {
+		// Pass media type context for validation
+		contentOpts := append([]validation.Option{}, opts...)
+		contentOpts = append(contentOpts, validation.WithContextObject(&MediaTypeContext{MediaType: mediaType}))
+		errs = append(errs, obj.Validate(ctx, contentOpts...)...)
 	}
 
 	for _, obj := range p.Examples.All() {

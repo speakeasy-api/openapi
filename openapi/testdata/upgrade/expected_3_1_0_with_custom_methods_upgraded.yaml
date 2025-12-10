@@ -1,0 +1,56 @@
+openapi: 3.2.0
+info:
+  title: Test API with Custom Methods
+  version: 1.0.0
+  description: Test document with non-standard HTTP methods
+paths:
+  /test:
+    get:
+      summary: Standard GET operation
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+    additionalOperations:
+      copy:
+        summary: Custom COPY operation
+        responses:
+          "200":
+            description: Resource copied
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    success:
+                      type: boolean
+      move:
+        summary: Custom MOVE operation
+        responses:
+          "200":
+            description: Resource moved
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    newLocation:
+                      type: string
+  /another:
+    post:
+      summary: Standard POST operation
+      responses:
+        "201":
+          description: Created
+    additionalOperations:
+      purge:
+        summary: Custom PURGE operation
+        responses:
+          "204":
+            description: Purged

@@ -198,8 +198,11 @@ func (r *Response) Validate(ctx context.Context, opts ...validation.Option) []er
 		errs = append(errs, header.Validate(ctx, opts...)...)
 	}
 
-	for _, content := range r.GetContent().All() {
-		errs = append(errs, content.Validate(ctx, opts...)...)
+	for mediaType, content := range r.GetContent().All() {
+		// Pass media type context for validation
+		contentOpts := append([]validation.Option{}, opts...)
+		contentOpts = append(contentOpts, validation.WithContextObject(&MediaTypeContext{MediaType: mediaType}))
+		errs = append(errs, content.Validate(ctx, contentOpts...)...)
 	}
 
 	for _, link := range r.GetLinks().All() {

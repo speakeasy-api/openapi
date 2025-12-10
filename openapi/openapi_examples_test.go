@@ -19,7 +19,7 @@ import (
 	"github.com/speakeasy-api/openapi/yml"
 )
 
-// The below examples should be copied into the README.md file if ever changed
+// The below examples should be copied into the README.md file if ever changed using `mise run update-examples`
 
 // Example_reading demonstrates how to read and parse an OpenAPI document from a file.
 // This includes validation by default and shows how to access document properties.
@@ -47,7 +47,7 @@ func Example_reading() {
 	fmt.Printf("OpenAPI Version: %s\n", doc.OpenAPI)
 	fmt.Printf("API Title: %s\n", doc.Info.Title)
 	fmt.Printf("API Version: %s\n", doc.Info.Version)
-	// Output: OpenAPI Version: 3.1.1
+	// Output: OpenAPI Version: 3.2.0
 	// API Title: Test OpenAPI Document
 	// API Version: 1.0.0
 }
@@ -132,7 +132,7 @@ func Example_marshaling() {
 	}
 
 	fmt.Printf("%s", buf.String())
-	// Output: openapi: 3.1.1
+	// Output: openapi: 3.2.0
 	// info:
 	//   title: Example API
 	//   version: 1.0.0
@@ -265,10 +265,10 @@ func Example_validating() {
 	//   [56:7] schema.examples expected array, got object
 	//   [59:15] schema.properties.name expected one of [boolean, object], got string
 	//   [59:15] schema.properties.name expected one of [boolean, object], got string
-	//   [59:15] schema.properties.name failed to validate either Schema [schema.properties.name expected object, got `string`] or bool [schema.properties.name line 59: cannot unmarshal !!str `string` into bool]
+	//   [59:15] schema.properties.name failed to validate either Schema [schema.properties.name expected object, got `str...`] or bool [schema.properties.name line 59: cannot unmarshal !!str `string` into bool]
 	//   [60:18] schema.properties.example expected one of [boolean, object], got string
 	//   [60:18] schema.properties.example expected one of [boolean, object], got string
-	//   [60:18] schema.properties.example failed to validate either Schema [schema.properties.example expected object, got `John Doe`] or bool [schema.properties.example line 60: cannot unmarshal !!str `John Doe` into bool]
+	//   [60:18] schema.properties.example failed to validate either Schema [schema.properties.example expected object, got `John Do...`] or bool [schema.properties.example line 60: cannot unmarshal !!str `John Doe` into bool]
 	//   [63:9] schema.examples expected sequence, got object
 	//
 	// Fixing validation errors...
@@ -385,8 +385,8 @@ func Example_walking() {
 					fmt.Printf("Found Operation: %s\n", *op.OperationID)
 				}
 				operationCount++
-				// Terminate after finding 2 operations
-				if operationCount >= 2 {
+				// Terminate after finding 3 operations
+				if operationCount >= 3 {
 					return walk.ErrTerminate
 				}
 				return nil
@@ -414,6 +414,7 @@ func Example_walking() {
 	// Found Info: Test OpenAPI Document (version 1.0.0)
 	// Found Schema of type: string
 	// Found Operation: test
+	// Found Operation: copyTest
 	// Found Schema of type: integer
 	// Found Operation: updateUser
 	// Walk terminated early
@@ -628,6 +629,7 @@ func Example_creating() {
 			{
 				URL:         "https://api.example.com/v1",
 				Description: pointer.From("Production server"),
+				Name:        pointer.From("prod"),
 			},
 		},
 		Paths: paths,
@@ -641,7 +643,7 @@ func Example_creating() {
 	}
 
 	fmt.Printf("%s", buf.String())
-	// Output: openapi: 3.1.1
+	// Output: openapi: 3.2.0
 	// info:
 	//   title: My API
 	//   version: 1.0.0
@@ -649,6 +651,7 @@ func Example_creating() {
 	// servers:
 	//   - url: https://api.example.com/v1
 	//     description: Production server
+	//     name: prod
 	// paths:
 	//   /users:
 	//     get:
@@ -765,7 +768,7 @@ func Example_workingWithComponents() {
 	// Output: Found schema component: User
 	//   Type: object
 	// Document with components:
-	// openapi: 3.1.1
+	// openapi: 3.2.0
 	// info:
 	//   title: API with Components
 	//   version: 1.0.0
@@ -944,7 +947,7 @@ func Example_inliningSchema() {
 	// }
 }
 
-// Example_upgrading demonstrates how to upgrade an OpenAPI document from 3.0.x to 3.1.1.
+// Example_upgrading demonstrates how to upgrade an OpenAPI document from 3.0.x to 3.2.0.
 // Shows the automatic conversion of nullable fields, examples, and other version differences.
 func Example_upgrading() {
 	ctx := context.Background()
@@ -954,7 +957,7 @@ func Example_upgrading() {
 info:
   title: Legacy API
   version: 1.0.0
-  description: An API that needs upgrading from 3.0.3 to 3.1.1
+  description: An API that needs upgrading from 3.0.3 to 3.2.0
 paths:
   /users:
     get:
@@ -1009,14 +1012,14 @@ components:
 		panic(err)
 	}
 	fmt.Printf("%s", buf.String())
-	// Output: Upgraded OpenAPI Version: 3.1.1
+	// Output: Upgraded OpenAPI Version: 3.2.0
 	//
 	// After upgrade:
-	// openapi: 3.1.1
+	// openapi: 3.2.0
 	// info:
 	//   title: Legacy API
 	//   version: 1.0.0
-	//   description: An API that needs upgrading from 3.0.3 to 3.1.1
+	//   description: An API that needs upgrading from 3.0.3 to 3.2.0
 	// paths:
 	//   /users:
 	//     get:

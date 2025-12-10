@@ -7,6 +7,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/require"
 )
 
@@ -113,7 +114,7 @@ responses:
 			require.NoError(t, err)
 			require.Empty(t, validationErrs)
 
-			errs := operation.Validate(t.Context())
+			errs := operation.Validate(t.Context(), validation.WithContextObject(openapi.NewOpenAPI()))
 			require.Empty(t, errs, "expected no validation errors")
 			require.True(t, operation.Valid, "expected operation to be valid")
 		})

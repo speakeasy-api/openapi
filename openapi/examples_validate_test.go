@@ -89,6 +89,42 @@ summary: Boolean example
 value: true
 `,
 		},
+		{
+			name: "valid example with dataValue",
+			yml: `
+summary: Data value example
+dataValue:
+  author: A. Writer
+  title: The Newest Book
+`,
+		},
+		{
+			name: "valid example with serializedValue",
+			yml: `
+summary: Serialized value example
+serializedValue: "flag=true"
+`,
+		},
+		{
+			name: "valid example with dataValue and serializedValue",
+			yml: `
+summary: Combined example
+dataValue:
+  author: A. Writer
+  title: An Older Book
+  rating: 4.5
+serializedValue: '{"author":"A. Writer","title":"An Older Book","rating":4.5}'
+`,
+		},
+		{
+			name: "valid example with dataValue and externalValue",
+			yml: `
+dataValue:
+  id: 123
+  name: test
+externalValue: https://example.com/examples/user.json
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -148,6 +184,51 @@ externalValue: ":invalid"
 			wantErrs: []string{
 				"[2:8] example.value and externalValue are mutually exclusive",
 				"[3:16] example.externalValue is not a valid uri: parse \":invalid\": missing protocol scheme",
+			},
+		},
+		{
+			name: "dataValue and value are mutually exclusive",
+			yml: `
+summary: Invalid example
+dataValue:
+  id: 123
+value: "test"
+`,
+			wantErrs: []string{"example.dataValue and value are mutually exclusive"},
+		},
+		{
+			name: "serializedValue and value are mutually exclusive",
+			yml: `
+summary: Invalid example
+serializedValue: "test=123"
+value: "test"
+`,
+			wantErrs: []string{"example.serializedValue and value are mutually exclusive"},
+		},
+		{
+			name: "serializedValue and externalValue are mutually exclusive",
+			yml: `
+summary: Invalid example
+serializedValue: "test=123"
+externalValue: https://example.com/test.json
+`,
+			wantErrs: []string{"example.serializedValue and externalValue are mutually exclusive"},
+		},
+		{
+			name: "multiple mutual exclusivity violations",
+			yml: `
+summary: Invalid example
+dataValue:
+  id: 123
+value: "test"
+serializedValue: "test=123"
+externalValue: https://example.com/test.json
+`,
+			wantErrs: []string{
+				"example.value and externalValue are mutually exclusive",
+				"example.dataValue and value are mutually exclusive",
+				"example.serializedValue and value are mutually exclusive",
+				"example.serializedValue and externalValue are mutually exclusive",
 			},
 		},
 	}

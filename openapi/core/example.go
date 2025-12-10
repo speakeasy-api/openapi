@@ -9,9 +9,11 @@ import (
 type Example struct {
 	marshaller.CoreModel `model:"example"`
 
-	Summary       marshaller.Node[*string]      `key:"summary"`
-	Description   marshaller.Node[*string]      `key:"description"`
-	Value         marshaller.Node[values.Value] `key:"value"`
-	ExternalValue marshaller.Node[*string]      `key:"externalValue"`
-	Extensions    core.Extensions               `key:"extensions"`
+	Summary         marshaller.Node[*string]      `key:"summary"`
+	Description     marshaller.Node[*string]      `key:"description"`
+	Value           marshaller.Node[values.Value] `key:"value"`
+	ExternalValue   marshaller.Node[*string]      `key:"externalValue"`
+	DataValue       marshaller.Node[values.Value] `key:"dataValue"`
+	SerializedValue marshaller.Node[*string]      `key:"serializedValue"`
+	Extensions      core.Extensions               `key:"extensions"`
 }

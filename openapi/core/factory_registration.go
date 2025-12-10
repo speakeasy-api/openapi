@@ -117,4 +117,10 @@ func init() {
 	marshaller.RegisterType(func() *marshaller.Node[[]marshaller.Node[string]] {
 		return &marshaller.Node[[]marshaller.Node[string]]{}
 	})
+	marshaller.RegisterType(func() *marshaller.Node[*Operation] {
+		return &marshaller.Node[*Operation]{}
+	})
+	marshaller.RegisterType(func() *sequencedmap.Map[string, marshaller.Node[*Operation]] {
+		return &sequencedmap.Map[string, marshaller.Node[*Operation]]{}
+	})
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
@@ -525,7 +526,17 @@ func (r *Reference[T, V, C]) resolve(ctx context.Context, opts references.Resolv
 	if !ok {
 		return nil, nil, nil, fmt.Errorf("root document must be *OpenAPI, got %T", opts.RootDocument)
 	}
-	result, validationErrs, err := references.Resolve(ctx, *r.Reference, unmarshaler[T, V, C](rootDoc), opts)
+
+	// Use $self as base URI if present in the target document (OpenAPI 3.2+)
+	// The $self field provides the self-assigned URI of the document per RFC3986 Section 5.1.1
+	resolveOpts := opts
+	if targetDoc, ok := opts.TargetDocument.(*OpenAPI); ok && targetDoc != nil {
+		if self := targetDoc.GetSelf(); self != "" {
+			resolveOpts.TargetLocation = self
+		}
+	}
+
+	result, validationErrs, err := references.Resolve(ctx, *r.Reference, unmarshaler[T, V, C](rootDoc), resolveOpts)
 	if err != nil {
 		return nil, nil, validationErrs, err
 	}
@@ -626,11 +637,13 @@ func joinReferenceChain(chain []string) string {
 		return chain[0]
 	}
 
-	result := chain[0]
+	var result strings.Builder
+	result.WriteString(chain[0])
 	for i := 1; i < len(chain); i++ {
-		result += " -> " + chain[i]
+		result.WriteString(" -> ")
+		result.WriteString(chain[i])
 	}
-	return result
+	return result.String()
 }
 
 func unmarshaler[T any, V interfaces.Validator[T], C marshaller.CoreModeler](_ *OpenAPI) func(context.Context, *yaml.Node, bool) (*Reference[T, V, C], []error, error) {

@@ -22,21 +22,40 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed schema31.json
-var schema31JSON string
+// custom file to cover for missing openapi 3.0 json schema
+//
+//go:embed schema30.dialect.json
+var schema30DialectJSON string
 
-//go:embed schema31.base.json
-var schema31BaseJSON string
+// sourced from https://spec.openapis.org/oas/3.1/dialect/2024-11-10.html
+//
+//go:embed schema31.dialect.json
+var schema31DialectJSON string
 
-//go:embed schema30.json
-var schema30JSON string
+// source from https://spec.openapis.org/oas/3.1/meta/2024-11-10.html
+//
+//go:embed schema31.meta.json
+var schema31MetaJSON string
 
-var oasSchemaValidator = make(map[string]*jsValidator.Schema)
-var defaultPrinter = message.NewPrinter(language.English)
+// sourced from https://spec.openapis.org/oas/3.2/dialect/2025-09-17.html
+//
+//go:embed schema32.dialect.json
+var schema32DialectJSON string
+
+// source from https://spec.openapis.org/oas/3.2/meta/2025-09-17.html
+//
+//go:embed schema32.meta.json
+var schema32MetaJSON string
+
+var (
+	oasSchemaValidator = make(map[string]*jsValidator.Schema)
+	defaultPrinter     = message.NewPrinter(language.English)
+)
 
 const (
-	JSONSchema31SchemaID = "https://spec.openapis.org/oas/3.1/dialect/base"
 	JSONSchema30SchemaID = "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+	JSONSchema31SchemaID = "https://spec.openapis.org/oas/3.1/meta/2024-11-10"
+	JSONSchema32SchemaID = "https://spec.openapis.org/oas/3.2/meta/2025-09-17"
 )
 
 type ParentDocumentVersion struct {
@@ -76,6 +95,8 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 		switch {
 		case dv.OpenAPI != nil:
 			switch {
+			case strings.HasPrefix(*dv.OpenAPI, "3.2"):
+				schema = JSONSchema32SchemaID
 			case strings.HasPrefix(*dv.OpenAPI, "3.1"):
 				schema = JSONSchema31SchemaID
 			case strings.HasPrefix(*dv.OpenAPI, "3.0"):
@@ -196,8 +217,10 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 	return errs
 }
 
-var validationInitialized = make(map[string]bool)
-var initMutex sync.Mutex
+var (
+	validationInitialized = make(map[string]bool)
+	initMutex             sync.Mutex
+)
 
 func initValidation(schema string) *jsValidator.Schema {
 	initMutex.Lock()
@@ -211,22 +234,35 @@ func initValidation(schema string) *jsValidator.Schema {
 	c := jsValidator.NewCompiler()
 
 	switch schema {
-	case JSONSchema31SchemaID:
-		oasSchemaBase, err := jsValidator.UnmarshalJSON(bytes.NewBufferString(schema31BaseJSON))
+	case JSONSchema32SchemaID:
+		oasSchemaMeta, err := jsValidator.UnmarshalJSON(bytes.NewBufferString(schema32MetaJSON))
 		if err != nil {
 			panic(err)
 		}
-		if err := c.AddResource("https://spec.openapis.org/oas/3.1/meta/base", oasSchemaBase); err != nil {
+		if err := c.AddResource(JSONSchema32SchemaID, oasSchemaMeta); err != nil {
 			panic(err)
 		}
 
-		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema31JSON))
+		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema32DialectJSON))
+		if err != nil {
+			panic(err)
+		}
+	case JSONSchema31SchemaID:
+		oasSchemaMeta, err := jsValidator.UnmarshalJSON(bytes.NewBufferString(schema31MetaJSON))
+		if err != nil {
+			panic(err)
+		}
+		if err := c.AddResource(JSONSchema31SchemaID, oasSchemaMeta); err != nil {
+			panic(err)
+		}
+
+		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema31DialectJSON))
 		if err != nil {
 			panic(err)
 		}
 	case JSONSchema30SchemaID:
 		var err error
-		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema30JSON))
+		schemaResource, err = jsValidator.UnmarshalJSON(bytes.NewBufferString(schema30DialectJSON))
 		if err != nil {
 			panic(err)
 		}

@@ -85,7 +85,7 @@ func TestClean_EmptyDocument_Success(t *testing.T) {
 
 	// Test with minimal document (no components)
 	doc := &openapi.OpenAPI{
-		OpenAPI: "3.1.0",
+		OpenAPI: openapi.Version,
 		Info: openapi.Info{
 			Title:   "Empty API",
 			Version: "1.0.0",
@@ -103,7 +103,7 @@ func TestClean_NoComponents_Success(t *testing.T) {
 
 	// Test with document that has no components section
 	doc := &openapi.OpenAPI{
-		OpenAPI: "3.1.0",
+		OpenAPI: openapi.Version,
 		Info: openapi.Info{
 			Title:   "API without components",
 			Version: "1.0.0",

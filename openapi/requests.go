@@ -60,8 +60,11 @@ func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) [
 		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("requestBody.content is required"), core, core.Content))
 	}
 
-	for _, content := range r.Content.All() {
-		errs = append(errs, content.Validate(ctx, opts...)...)
+	for mediaType, content := range r.Content.All() {
+		// Pass media type context for validation
+		contentOpts := append([]validation.Option{}, opts...)
+		contentOpts = append(contentOpts, validation.WithContextObject(&MediaTypeContext{MediaType: mediaType}))
+		errs = append(errs, content.Validate(ctx, contentOpts...)...)
 	}
 
 	r.Valid = len(errs) == 0 && core.GetValid()

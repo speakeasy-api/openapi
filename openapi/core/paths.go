@@ -56,6 +56,8 @@ type PathItem struct {
 	Servers    marshaller.Node[[]*Server]                `key:"servers"`
 	Parameters marshaller.Node[[]*Reference[*Parameter]] `key:"parameters"`
 
+	AdditionalOperations marshaller.Node[*sequencedmap.Map[string, marshaller.Node[*Operation]]] `key:"additionalOperations"`
+
 	Extensions core.Extensions `key:"extensions"`
 }
 

@@ -607,38 +607,92 @@ func TestWalkSchema_Success(t *testing.T) {
 func TestWalkMediaType_Success(t *testing.T) {
 	t.Parallel()
 
-	openAPIDoc, err := loadOpenAPIDocument(t.Context())
-	require.NoError(t, err)
-
-	matchedLocations := []string{}
-	expectedLoc := "/paths/~1users~1{id}/get/requestBody/content/application~1json"
-
-	for item := range openapi.Walk(t.Context(), openAPIDoc) {
-		err := item.Match(openapi.Matcher{
-			MediaType: func(mt *openapi.MediaType) error {
-				mediaTypeLoc := string(item.Location.ToJSONPointer())
-				matchedLocations = append(matchedLocations, mediaTypeLoc)
-
-				if mediaTypeLoc == expectedLoc {
-					assert.NotNil(t, mt.Schema)
-					// Schema could be either Left (direct schema) or Right (reference)
-					// Just verify it exists
-					assert.True(t, mt.Schema.IsLeft() || mt.Schema.IsRight())
-
-					return walk.ErrTerminate
-				}
-
-				return nil
+	tests := []struct {
+		name            string
+		location        string
+		assertMediaType func(t *testing.T, mt *openapi.MediaType)
+	}{
+		{
+			name:     "media type with schema",
+			location: "/paths/~1users~1{id}/get/requestBody/content/application~1json",
+			assertMediaType: func(t *testing.T, mt *openapi.MediaType) {
+				t.Helper()
+				assert.NotNil(t, mt.Schema, "Schema should not be nil")
+				assert.True(t, mt.Schema.IsLeft() || mt.Schema.IsRight(), "Schema should be Left or Right")
+				assert.Nil(t, mt.ItemSchema, "ItemSchema should be nil when Schema is present")
 			},
-		})
-
-		if errors.Is(err, walk.ErrTerminate) {
-			break
-		}
-		require.NoError(t, err)
+		},
+		{
+			name:     "media type with itemSchema",
+			location: "/paths/~1users/post/responses/202/content/application~1json",
+			assertMediaType: func(t *testing.T, mt *openapi.MediaType) {
+				t.Helper()
+				assert.Nil(t, mt.Schema, "Schema should be nil when ItemSchema is present")
+				assert.NotNil(t, mt.ItemSchema, "ItemSchema should not be nil")
+				assert.True(t, mt.ItemSchema.IsLeft() || mt.ItemSchema.IsRight(), "ItemSchema should be Left or Right")
+			},
+		},
+		{
+			name:     "media type with prefixEncoding",
+			location: "/paths/~1users/post/responses/203/content/multipart~1mixed",
+			assertMediaType: func(t *testing.T, mt *openapi.MediaType) {
+				t.Helper()
+				assert.NotNil(t, mt.PrefixEncoding, "PrefixEncoding should not be nil")
+				assert.Len(t, mt.PrefixEncoding, 2, "PrefixEncoding should have 2 items")
+				assert.Equal(t, "application/json", mt.PrefixEncoding[0].GetContentTypeValue(), "First prefix encoding should be application/json")
+				assert.Equal(t, "text/plain", mt.PrefixEncoding[1].GetContentTypeValue(), "Second prefix encoding should be text/plain")
+				assert.Nil(t, mt.Encoding, "Encoding should be nil when PrefixEncoding is present")
+			},
+		},
+		{
+			name:     "media type with itemEncoding",
+			location: "/paths/~1users/post/responses/204/content/multipart~1mixed",
+			assertMediaType: func(t *testing.T, mt *openapi.MediaType) {
+				t.Helper()
+				assert.NotNil(t, mt.ItemEncoding, "ItemEncoding should not be nil")
+				assert.Equal(t, "application/json", mt.ItemEncoding.GetContentTypeValue(), "ItemEncoding should be application/json")
+				assert.Nil(t, mt.Encoding, "Encoding should be nil when ItemEncoding is present")
+			},
+		},
 	}
 
-	assert.Contains(t, matchedLocations, expectedLoc)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+
+			openAPIDoc, err := loadOpenAPIDocument(ctx)
+			require.NoError(t, err)
+
+			matchedLocations := []string{}
+			found := false
+
+			for item := range openapi.Walk(ctx, openAPIDoc) {
+				err := item.Match(openapi.Matcher{
+					MediaType: func(mt *openapi.MediaType) error {
+						mediaTypeLoc := string(item.Location.ToJSONPointer())
+						matchedLocations = append(matchedLocations, mediaTypeLoc)
+
+						if mediaTypeLoc == tt.location {
+							tt.assertMediaType(t, mt)
+							found = true
+							return walk.ErrTerminate
+						}
+
+						return nil
+					},
+				})
+
+				if errors.Is(err, walk.ErrTerminate) {
+					break
+				}
+				require.NoError(t, err)
+			}
+
+			assert.True(t, found, "Should find MediaType at location: %s", tt.location)
+			assert.Contains(t, matchedLocations, tt.location, "Should visit MediaType at location: %s", tt.location)
+		})
+	}
 }
 
 func TestWalkComponents_Success(t *testing.T) {
@@ -1083,4 +1137,68 @@ func TestWalk_Terminate_Success(t *testing.T) {
 	}
 
 	assert.Equal(t, 1, visits, "expected only one visit before terminating")
+}
+
+func TestWalkAdditionalOperations_Success(t *testing.T) {
+	t.Parallel()
+
+	// Load OpenAPI document with additionalOperations
+	f, err := os.Open("testdata/walk.additionaloperations.openapi.yaml")
+	require.NoError(t, err)
+	defer f.Close()
+
+	openAPIDoc, validationErrs, err := openapi.Unmarshal(t.Context(), f)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs, "Document should be valid")
+
+	matchedLocations := []string{}
+	expectedAssertions := map[string]func(*openapi.Operation){
+		"/paths/~1custom~1{id}/get": func(op *openapi.Operation) {
+			assert.Equal(t, "getCustomResource", op.GetOperationID())
+			assert.Equal(t, "Get custom resource", op.GetSummary())
+		},
+		"/paths/~1custom~1{id}/additionalOperations/COPY": func(op *openapi.Operation) {
+			assert.Equal(t, "copyCustomResource", op.GetOperationID())
+			assert.Equal(t, "Copy custom resource", op.GetSummary())
+			assert.Equal(t, "Custom COPY operation to duplicate a resource", op.GetDescription())
+			assert.Contains(t, op.GetTags(), "custom")
+		},
+		"/paths/~1custom~1{id}/additionalOperations/PURGE": func(op *openapi.Operation) {
+			assert.Equal(t, "purgeCustomResource", op.GetOperationID())
+			assert.Equal(t, "Purge custom resource", op.GetSummary())
+			assert.Equal(t, "Custom PURGE operation to completely remove a resource", op.GetDescription())
+			assert.Contains(t, op.GetTags(), "custom")
+		},
+		"/paths/~1standard/get": func(op *openapi.Operation) {
+			assert.Equal(t, "getStandardResource", op.GetOperationID())
+			assert.Equal(t, "Get standard resource", op.GetSummary())
+		},
+	}
+
+	for item := range openapi.Walk(t.Context(), openAPIDoc) {
+		err := item.Match(openapi.Matcher{
+			Operation: func(op *openapi.Operation) error {
+				operationLoc := string(item.Location.ToJSONPointer())
+				matchedLocations = append(matchedLocations, operationLoc)
+
+				if assertFunc, exists := expectedAssertions[operationLoc]; exists {
+					assertFunc(op)
+				}
+
+				return nil
+			},
+		})
+		require.NoError(t, err)
+	}
+
+	// Verify all expected operations were visited
+	for expectedLoc := range expectedAssertions {
+		assert.Contains(t, matchedLocations, expectedLoc, "Should visit operation at location: %s", expectedLoc)
+	}
+
+	// Verify we found both standard and additional operations
+	assert.Contains(t, matchedLocations, "/paths/~1custom~1{id}/get", "Should visit standard GET operation")
+	assert.Contains(t, matchedLocations, "/paths/~1custom~1{id}/additionalOperations/COPY", "Should visit additional COPY operation")
+	assert.Contains(t, matchedLocations, "/paths/~1custom~1{id}/additionalOperations/PURGE", "Should visit additional PURGE operation")
+	assert.Contains(t, matchedLocations, "/paths/~1standard/get", "Should visit standard operation on path without additionalOperations")
 }

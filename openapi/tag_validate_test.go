@@ -7,6 +7,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,6 +58,32 @@ description: Administrative operations
 externalDocs:
   description: Admin documentation
   url: https://admin.example.com/docs
+`,
+		},
+		{
+			name: "valid tag with new 3.2 fields",
+			yml: `
+name: products
+summary: Products
+description: All product-related operations
+parent: catalog
+kind: nav
+`,
+		},
+		{
+			name: "valid tag with registered kind values",
+			yml: `
+name: user-badge
+summary: User Badge
+kind: badge
+`,
+		},
+		{
+			name: "valid tag with custom kind value",
+			yml: `
+name: custom-tag
+summary: Custom Tag
+kind: custom-lifecycle
 `,
 		},
 	}
@@ -169,4 +196,188 @@ externalDocs:
 			}
 		})
 	}
+}
+
+func TestTag_ValidateWithTags_ParentRelationships_Success(t *testing.T) {
+	t.Parallel()
+
+	// Create a hierarchy of tags: catalog -> products -> books
+	catalogTag := &openapi.Tag{Name: "catalog"}
+	productsTag := &openapi.Tag{Name: "products", Parent: &[]string{"catalog"}[0]}
+	booksTag := &openapi.Tag{Name: "books", Parent: &[]string{"products"}[0]}
+	standaloneTag := &openapi.Tag{Name: "standalone"}
+
+	allTags := []*openapi.Tag{catalogTag, productsTag, booksTag, standaloneTag}
+
+	// Create an OpenAPI document with all tags for validation
+	doc := &openapi.OpenAPI{
+		OpenAPI: "3.2.0",
+		Info: openapi.Info{
+			Title:   "Test API",
+			Version: "1.0.0",
+		},
+		Tags: allTags,
+	}
+
+	for _, tag := range allTags {
+		errs := tag.Validate(t.Context(), validation.WithContextObject(doc))
+		require.Empty(t, errs, "expected no validation errors for tag %s", tag.Name)
+	}
+}
+
+func TestTag_ValidateWithTags_ParentNotFound_Error(t *testing.T) {
+	t.Parallel()
+
+	// Create a tag with a non-existent parent
+	tag := &openapi.Tag{Name: "orphan", Parent: &[]string{"nonexistent"}[0]}
+	allTags := []*openapi.Tag{tag}
+
+	// Create an OpenAPI document with all tags for validation
+	doc := &openapi.OpenAPI{
+		OpenAPI: "3.2.0",
+		Info: openapi.Info{
+			Title:   "Test API",
+			Version: "1.0.0",
+		},
+		Tags: allTags,
+	}
+
+	errs := tag.Validate(t.Context(), validation.WithContextObject(doc))
+	require.NotEmpty(t, errs, "expected validation errors")
+
+	found := false
+	for _, err := range errs {
+		if strings.Contains(err.Error(), "parent tag 'nonexistent' does not exist") {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "expected parent not found error")
+}
+
+func TestTag_ValidateWithTags_CircularReference_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		tags []*openapi.Tag
+		desc string
+	}{
+		{
+			name: "direct circular reference",
+			tags: []*openapi.Tag{
+				{Name: "tag1", Parent: &[]string{"tag1"}[0]}, // Self-reference
+			},
+			desc: "tag references itself",
+		},
+		{
+			name: "two-tag circular reference",
+			tags: []*openapi.Tag{
+				{Name: "tag1", Parent: &[]string{"tag2"}[0]},
+				{Name: "tag2", Parent: &[]string{"tag1"}[0]},
+			},
+			desc: "tag1 -> tag2 -> tag1",
+		},
+		{
+			name: "three-tag circular reference",
+			tags: []*openapi.Tag{
+				{Name: "tag1", Parent: &[]string{"tag2"}[0]},
+				{Name: "tag2", Parent: &[]string{"tag3"}[0]},
+				{Name: "tag3", Parent: &[]string{"tag1"}[0]},
+			},
+			desc: "tag1 -> tag2 -> tag3 -> tag1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create an OpenAPI document with all tags for validation
+			doc := &openapi.OpenAPI{
+				OpenAPI: "3.2.0",
+				Info: openapi.Info{
+					Title:   "Test API",
+					Version: "1.0.0",
+				},
+				Tags: tt.tags,
+			}
+
+			// Check each tag that has a parent
+			for _, tag := range tt.tags {
+				if tag.Parent != nil {
+					errs := tag.Validate(t.Context(), validation.WithContextObject(doc))
+					require.NotEmpty(t, errs, "expected validation errors for %s", tt.desc)
+
+					found := false
+					for _, err := range errs {
+						if strings.Contains(err.Error(), "circular parent reference") {
+							found = true
+							break
+						}
+					}
+					require.True(t, found, "expected circular reference error for %s", tt.desc)
+				}
+			}
+		})
+	}
+}
+
+func TestTag_ValidateWithTags_ComplexHierarchy_Success(t *testing.T) {
+	t.Parallel()
+
+	// Create a complex but valid hierarchy
+	// catalog
+	// ├── products
+	// │   ├── books
+	// │   └── cds
+	// └── services
+	//     └── delivery
+
+	catalogTag := &openapi.Tag{Name: "catalog", Kind: &[]string{"nav"}[0]}
+	productsTag := &openapi.Tag{Name: "products", Parent: &[]string{"catalog"}[0], Kind: &[]string{"nav"}[0]}
+	booksTag := &openapi.Tag{Name: "books", Parent: &[]string{"products"}[0], Kind: &[]string{"nav"}[0]}
+	cdsTag := &openapi.Tag{Name: "cds", Parent: &[]string{"products"}[0], Kind: &[]string{"nav"}[0]}
+	servicesTag := &openapi.Tag{Name: "services", Parent: &[]string{"catalog"}[0], Kind: &[]string{"nav"}[0]}
+	deliveryTag := &openapi.Tag{Name: "delivery", Parent: &[]string{"services"}[0], Kind: &[]string{"badge"}[0]}
+
+	allTags := []*openapi.Tag{catalogTag, productsTag, booksTag, cdsTag, servicesTag, deliveryTag}
+
+	// Create an OpenAPI document with all tags for validation
+	doc := &openapi.OpenAPI{
+		OpenAPI: "3.2.0",
+		Info: openapi.Info{
+			Title:   "Test API",
+			Version: "1.0.0",
+		},
+		Tags: allTags,
+	}
+
+	for _, tag := range allTags {
+		errs := tag.Validate(t.Context(), validation.WithContextObject(doc))
+		require.Empty(t, errs, "expected no validation errors for tag %s", tag.Name)
+	}
+}
+
+func TestTagKind_Registry_Success(t *testing.T) {
+	t.Parallel()
+
+	// Test registered kinds
+	registeredKinds := openapi.GetRegisteredTagKinds()
+	require.Len(t, registeredKinds, 3)
+	require.Contains(t, registeredKinds, openapi.TagKindNav)
+	require.Contains(t, registeredKinds, openapi.TagKindBadge)
+	require.Contains(t, registeredKinds, openapi.TagKindAudience)
+
+	// Test kind validation
+	require.True(t, openapi.TagKindNav.IsRegistered())
+	require.True(t, openapi.TagKindBadge.IsRegistered())
+	require.True(t, openapi.TagKindAudience.IsRegistered())
+	require.False(t, openapi.TagKind("custom").IsRegistered())
+
+	// Test descriptions
+	require.NotEmpty(t, openapi.GetTagKindDescription(openapi.TagKindNav))
+	require.NotEmpty(t, openapi.GetTagKindDescription(openapi.TagKindBadge))
+	require.NotEmpty(t, openapi.GetTagKindDescription(openapi.TagKindAudience))
+	require.Contains(t, openapi.GetTagKindDescription("custom"), "not in the official registry")
 }

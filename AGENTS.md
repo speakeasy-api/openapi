@@ -58,6 +58,54 @@ mise test -count=1 ./...
 - **Race Detection**: Automatically enables race detection to catch concurrency issues
 - **Submodule Awareness**: Checks for and warns about uninitialized test submodules
 
+## Git Commit Conventions
+
+**Always use single-line conventional commits.** Do not create multi-line commit messages.
+
+### Commit Message Format
+
+```
+<type>: <description>
+```
+
+### Common Types
+
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation changes
+- `refactor:` - Code refactoring
+- `test:` - Adding or updating tests
+- `chore:` - Maintenance tasks
+- `perf:` - Performance improvements
+
+### Examples
+
+#### ✅ Good: Single-line conventional commits
+
+```bash
+git commit -m "feat: add prefixEncoding and itemEncoding support for OpenAPI 3.2 multipart media types"
+git commit -m "fix: correct validation logic for encoding field mutual exclusivity"
+git commit -m "test: add comprehensive tests for multipart encoding validation"
+git commit -m "refactor: simplify media type context passing in validation"
+```
+
+#### ❌ Bad: Multi-line commits
+
+```bash
+git commit -m "feat: implement prefixEncoding and itemEncoding for OpenAPI 3.2
+
+- Add PrefixEncoding and ItemEncoding fields to MediaType
+- Implement validation for mutual exclusivity
+- Add comprehensive tests"
+```
+
+### Why Single-Line Commits?
+
+1. **Simplicity**: Easy to read in git log and GitHub UI
+2. **Consistency**: All commits follow the same pattern
+3. **Searchability**: Easier to search and filter commits
+4. **Tool Compatibility**: Works better with automated tools and scripts
+
 ## Testing
 
 Follow these testing conventions when writing Go tests in this project. Run newly added or modified test immediately after changes to make sure they work as expected before continuing with more work.
