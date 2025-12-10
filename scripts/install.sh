@@ -104,7 +104,8 @@ get_install_dir() {
     fi
     
     # Fall back to user directory
-    log_info "No write access to $DEFAULT_INSTALL_DIR, using $USER_INSTALL_DIR instead"
+    # Log to stderr so it doesn't interfere with the return value
+    log_info "No write access to $DEFAULT_INSTALL_DIR, using $USER_INSTALL_DIR instead" >&2
     echo "$USER_INSTALL_DIR"
 }
 
