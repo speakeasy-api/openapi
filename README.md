@@ -29,14 +29,13 @@
     <!-- OpenAPI Support Badge -->
     <a href="https://www.speakeasy.com/openapi"><img alt="OpenAPI Support" src="https://img.shields.io/badge/OpenAPI-3.0%20%7C%203.1%20%7C%203.2-85EA2D.svg?style=for-the-badge&logo=openapiinitiative"></a>
     <!-- Overlay Support Badge -->
-    <img alt="Overlay Support" src="https://img.shields.io/badge/Overlay-1.0%20%7C%201.1-orange.svg?style=for-the-badge&logo=openapiinitiative">
+    <a href="https://spec.openapis.org/overlay/latest.html"><img alt="Overlay Support" src="https://img.shields.io/badge/Overlay-1.0%20%7C%201.1-orange.svg?style=for-the-badge&logo=openapiinitiative"></a>
     <!-- Swagger Support Badge -->
-    <img alt="Swagger Support" src="https://img.shields.io/badge/Swagger-2.0-85EA2D.svg?style=for-the-badge&logo=swagger">
+    <a href="https://spec.openapis.org/oas/v2.0.html"><img alt="Swagger Support" src="https://img.shields.io/badge/Swagger-2.0-85EA2D.svg?style=for-the-badge&logo=swagger"></a>
     <!-- Arazzo Support Badge -->
-    <img alt="Arazzo Support" src="https://img.shields.io/badge/Arazzo-1.0-purple.svg?style=for-the-badge">
-    <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi?tab=doc">
+    <a href="https://www.speakeasy.com/openapi/arazzo"><img alt="Arazzo Support" src="https://img.shields.io/badge/Arazzo-1.0-purple.svg?style=for-the-badge"></a>
     <!-- Line Break --><br/>
-    <img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
+    <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
     <!-- Release Version Badge -->
     <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/speakeasy-api/openapi.svg?style=for-the-badge"></a>
     <!-- Go Report Card Badge -->
@@ -49,14 +48,14 @@
     <!-- Go Version Badge -->
     <a href="https://golang.org/"><img alt="Go Version" src="https://img.shields.io/badge/go-1.24.3+-00ADD8.svg?style=for-the-badge&logo=go"></a>
     <!-- Platform Support Badge -->
-    <img alt="Platform Support" src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey.svg?style=for-the-badge">
+    <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Platform Support" src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey.svg?style=for-the-badge"></a>
     <!-- Stars Badge -->
     <a href="https://github.com/speakeasy-api/openapi/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/speakeasy-api/openapi.svg?style=for-the-badge&logo=github"></a>
     <!-- Line Break --><br/>
     <!-- CLI Tool Badge -->
-    <img alt="CLI Tool" src="https://img.shields.io/badge/CLI-Available-brightgreen.svg?style=for-the-badge&logo=terminal">
+    <a href="#cli-tool"><img alt="CLI Tool" src="https://img.shields.io/badge/CLI-Available-brightgreen.svg?style=for-the-badge&logo=terminal"></a>
     <!-- Go Install Badge -->
-    <img alt="Go Install" src="https://img.shields.io/badge/go%20install-ready-00ADD8.svg?style=for-the-badge&logo=go">
+    <a href="#installation"><img alt="Go Install" src="https://img.shields.io/badge/go%20install-ready-00ADD8.svg?style=for-the-badge&logo=go"></a>
     <!-- Line Break --><br/>
     <!-- Built By Speakeasy Badge -->
     <a href="https://speakeasy.com/"><img alt="Built by Speakeasy" src="https://www.speakeasy.com/assets/badges/built-by-speakeasy.svg" /></a>
