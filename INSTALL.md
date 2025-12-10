@@ -53,6 +53,8 @@ Or with wget:
 wget -qO- https://raw.githubusercontent.com/speakeasy-api/openapi/main/scripts/install.sh | bash
 ```
 
+The script automatically detects if you have write permission to `/usr/local/bin`. If not, it installs to `~/.local/bin` instead. No sudo required!
+
 ### Windows (PowerShell)
 
 ```powershell
@@ -268,9 +270,15 @@ The PowerShell script automatically adds the installation directory to your PATH
 
 ### Permission Denied (Linux/macOS)
 
-If you get permission errors when installing to `/usr/local/bin`:
+The installation script automatically detects if you have write permission to `/usr/local/bin` and falls back to `~/.local/bin` if needed. However, if you still encounter permission issues:
 
-**Option 1:** Run with sudo (not recommended for the curl pipe method)
+**Option 1:** Explicitly set a user-writable directory
+
+```bash
+OPENAPI_INSTALL_DIR=$HOME/.local/bin curl -fsSL https://raw.githubusercontent.com/speakeasy-api/openapi/main/scripts/install.sh | bash
+```
+
+**Option 2:** Run with sudo (download and review first)
 
 ```bash
 # Download script first, review it, then run with sudo
@@ -279,13 +287,7 @@ chmod +x install.sh
 sudo ./install.sh
 ```
 
-**Option 2:** Install to a user-writable directory
-
-```bash
-OPENAPI_INSTALL_DIR=$HOME/.local/bin curl -fsSL https://raw.githubusercontent.com/speakeasy-api/openapi/main/scripts/install.sh | bash
-```
-
-Then ensure `$HOME/.local/bin` is in your PATH.
+If installed to `~/.local/bin`, ensure it's in your PATH (see [Command Not Found](#command-not-found-after-installation)).
 
 ### Windows Git Bash Issues
 

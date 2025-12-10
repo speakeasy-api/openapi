@@ -18,7 +18,8 @@ set -e
 
 # Configuration
 REPO="speakeasy-api/openapi"
-INSTALL_DIR="${OPENAPI_INSTALL_DIR:-/usr/local/bin}"
+DEFAULT_INSTALL_DIR="/usr/local/bin"
+USER_INSTALL_DIR="$HOME/.local/bin"
 VERSION="${OPENAPI_VERSION:-latest}"
 BINARY_NAME="openapi"
 
@@ -88,13 +89,34 @@ get_latest_version() {
     echo "$version"
 }
 
+# Determine installation directory
+get_install_dir() {
+    # If user specified a directory, use it
+    if [ -n "$OPENAPI_INSTALL_DIR" ]; then
+        echo "$OPENAPI_INSTALL_DIR"
+        return
+    fi
+    
+    # Try to use /usr/local/bin if we have write access
+    if [ -w "$DEFAULT_INSTALL_DIR" ] || [ -w "$(dirname "$DEFAULT_INSTALL_DIR")" ]; then
+        echo "$DEFAULT_INSTALL_DIR"
+        return
+    fi
+    
+    # Fall back to user directory
+    log_info "No write access to $DEFAULT_INSTALL_DIR, using $USER_INSTALL_DIR instead"
+    echo "$USER_INSTALL_DIR"
+}
+
 # Download and install
 install_cli() {
+    local INSTALL_DIR=$(get_install_dir)
     local os=$(detect_os)
     local arch=$(detect_arch)
     
     log_info "Detected OS: $os"
     log_info "Detected Architecture: $arch"
+    log_info "Installation directory: $INSTALL_DIR"
     
     # Get version
     if [ "$VERSION" = "latest" ]; then
@@ -191,7 +213,10 @@ install_cli() {
         if [ "$os" = "Windows" ]; then
             log_warn "Add $INSTALL_DIR to your PATH environment variable."
         else
-            log_warn "Add $INSTALL_DIR to your PATH or run: export PATH=\"$INSTALL_DIR:\$PATH\""
+            log_warn "Add $INSTALL_DIR to your PATH by adding this to your ~/.bashrc or ~/.zshrc:"
+            log_warn "  export PATH=\"\$PATH:$INSTALL_DIR\""
+            log_warn ""
+            log_warn "Then run: source ~/.bashrc  # or source ~/.zshrc"
         fi
     fi
 }
