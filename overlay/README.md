@@ -1,6 +1,6 @@
 <p align="center">
   <p align="center">
-    <img  width="200px" alt="OpenAPI" src="https://github.com/user-attachments/assets/555a0899-5719-42ee-b4b1-ece8d1d812ea">
+    <img  width="200px" alt="OpenAPI" src="https://github.com/user-attachments/assets/b9fa9c14-1c6f-4d8b-910f-15e5f962bab6">
   </p>
   <h1 align="center"><b>OpenAPI Overlay</b></h1>
   <p align="center">An implementation of the <a href="https://github.com/OAI/Overlay-Specification/blob/3f398c6/versions/1.0.0.md">OpenAPI Overlay Specification</a> for applying modifications to OpenAPI documents
