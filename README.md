@@ -28,10 +28,15 @@
     <a href="https://www.speakeasy.com/openapi"><img alt="OpenAPI Hub" src="https://www.speakeasy.com/assets/badges/openapi-hub.svg" /></a>
     <!-- OpenAPI Support Badge -->
     <a href="https://www.speakeasy.com/openapi"><img alt="OpenAPI Support" src="https://img.shields.io/badge/OpenAPI-3.0%20%7C%203.1%20%7C%203.2-85EA2D.svg?style=for-the-badge&logo=openapiinitiative"></a>
+    <!-- Overlay Support Badge -->
+    <img alt="Overlay Support" src="https://img.shields.io/badge/Overlay-1.0%20%7C%201.1-orange.svg?style=for-the-badge&logo=openapiinitiative">
+    <!-- Swagger Support Badge -->
+    <img alt="Swagger Support" src="https://img.shields.io/badge/Swagger-2.0-85EA2D.svg?style=for-the-badge&logo=swagger">
     <!-- Arazzo Support Badge -->
     <img alt="Arazzo Support" src="https://img.shields.io/badge/Arazzo-1.0-purple.svg?style=for-the-badge">
-    <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi?tab=doc"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
+    <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi?tab=doc">
     <!-- Line Break --><br/>
+    <img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
     <!-- Release Version Badge -->
     <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/speakeasy-api/openapi.svg?style=for-the-badge"></a>
     <!-- Go Report Card Badge -->
@@ -84,17 +89,31 @@ This repository also provides a comprehensive CLI tool for working with OpenAPI 
 
 ### Installation
 
-Install the CLI tool using Homebrew:
+**Homebrew (macOS/Linux):**
 
 ```bash
 brew install openapi
 ```
 
-Install the CLI tool using Go:
+**Go Install:**
 
 ```bash
 go install github.com/speakeasy-api/openapi/cmd/openapi@latest
 ```
+
+**Script Installation:**
+
+Linux/macOS:
+```bash
+curl -fsSL https://raw.githubusercontent.com/speakeasy-api/openapi/main/scripts/install.sh | bash
+```
+
+Windows (PowerShell):
+```powershell
+iwr -useb https://raw.githubusercontent.com/speakeasy-api/openapi/main/scripts/install.ps1 | iex
+```
+
+For manual installation, upgrade instructions, custom installation options, and troubleshooting, see the [detailed installation guide](./INSTALL.md).
 
 ### Usage
 
