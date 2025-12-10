@@ -137,3 +137,94 @@ func Test_ParseVersion_Error(t *testing.T) {
 		})
 	}
 }
+
+func Test_Version_IsOneOf(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		version  Version
+		versions []*Version
+		expected bool
+	}{
+		{
+			name:    "version is in list",
+			version: Version{Major: 1, Minor: 2, Patch: 3},
+			versions: []*Version{
+				{Major: 1, Minor: 0, Patch: 0},
+				{Major: 1, Minor: 2, Patch: 3},
+				{Major: 2, Minor: 0, Patch: 0},
+			},
+			expected: true,
+		},
+		{
+			name:    "version is not in list",
+			version: Version{Major: 1, Minor: 2, Patch: 3},
+			versions: []*Version{
+				{Major: 1, Minor: 0, Patch: 0},
+				{Major: 1, Minor: 2, Patch: 4},
+				{Major: 2, Minor: 0, Patch: 0},
+			},
+			expected: false,
+		},
+		{
+			name:     "empty list",
+			version:  Version{Major: 1, Minor: 2, Patch: 3},
+			versions: []*Version{},
+			expected: false,
+		},
+		{
+			name:     "nil list",
+			version:  Version{Major: 1, Minor: 2, Patch: 3},
+			versions: nil,
+			expected: false,
+		},
+		{
+			name:    "list with nil values",
+			version: Version{Major: 1, Minor: 2, Patch: 3},
+			versions: []*Version{
+				nil,
+				{Major: 1, Minor: 2, Patch: 3},
+				nil,
+			},
+			expected: true,
+		},
+		{
+			name:    "version is first in list",
+			version: Version{Major: 1, Minor: 0, Patch: 0},
+			versions: []*Version{
+				{Major: 1, Minor: 0, Patch: 0},
+				{Major: 1, Minor: 2, Patch: 3},
+				{Major: 2, Minor: 0, Patch: 0},
+			},
+			expected: true,
+		},
+		{
+			name:    "version is last in list",
+			version: Version{Major: 2, Minor: 0, Patch: 0},
+			versions: []*Version{
+				{Major: 1, Minor: 0, Patch: 0},
+				{Major: 1, Minor: 2, Patch: 3},
+				{Major: 2, Minor: 0, Patch: 0},
+			},
+			expected: true,
+		},
+		{
+			name:    "similar but different versions",
+			version: Version{Major: 1, Minor: 2, Patch: 3},
+			versions: []*Version{
+				{Major: 1, Minor: 2, Patch: 2},
+				{Major: 1, Minor: 2, Patch: 4},
+				{Major: 1, Minor: 3, Patch: 3},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.version.IsOneOf(tt.versions)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

@@ -51,11 +51,11 @@ func (v Version) LessThan(other Version) bool {
 }
 
 func (v Version) IsOneOf(versions []*Version) bool {
-	for _, v := range versions {
-		if v == nil {
-			return false
+	for _, ver := range versions {
+		if ver == nil {
+			continue
 		}
-		if v.Equal(*v) {
+		if v.Equal(*ver) {
 			return true
 		}
 	}
