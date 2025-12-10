@@ -1,6 +1,7 @@
 <p align="center">
   <p align="center">
-    <img  width="200px" alt="Arazzo" src="https://github.com/user-attachments/assets/ded936d5-3fd9-439f-925a-a2959735b71a">
+    <img  width="200px" alt="Arazzo" src="https://github.com/user-attachments/assets/9b7ef9b6-ae9a-4e83-9980-2f4361e8bf4c">
+
   </p>
   <h1 align="center"><b>Arazzo Parser</b></h1>
   <p align="center">An API for working with <a href="https://www.speakeasy.com/openapi/arazzo">Arazzo documents</a> including: read, walk, create, mutate, and validate
