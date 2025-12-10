@@ -5,6 +5,26 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/speakeasy-api/openapi/internal/sliceutil"
+	"github.com/speakeasy-api/openapi/internal/version"
+)
+
+var (
+	SupportedVersions = []*version.Version{version.MustParse("1.0.0"), version.MustParse("1.1.0")}
+)
+
+// Errors
+var (
+	ErrOverlayVersionInvalid                   = errors.New("overlay version is invalid")
+	ErrOverlayVersionNotSupported              = fmt.Errorf("overlay version must be one of: %s", strings.Join(sliceutil.Map(SupportedVersions, func(v *version.Version) string { return v.String() }), ", "))
+	ErrOverlayVersionMustBeDefined             = errors.New("overlay version must be defined")
+	ErrOverlayInfoTitleMustBeDefined           = errors.New("overlay info title must be defined")
+	ErrOverlayInfoVersionMustBeDefined         = errors.New("overlay info version must be defined")
+	ErrOverlayExtendsMustBeAValidURL           = errors.New("overlay extends must be a valid URL")
+	ErrOverlayMustDefineAtLeastOneAction       = errors.New("overlay must define at least one action")
+	ErrOverlayActionTargetMustBeDefined        = errors.New("overlay action target must be defined")
+	ErrOverlayActionRemoveAndUpdateCannotBeSet = errors.New("overlay action remove and update cannot be set")
 )
 
 type ValidationErrors []error
@@ -24,17 +44,30 @@ func (v ValidationErrors) Return() error {
 	return nil
 }
 
+func (o *Overlay) ValidateVersion() []error {
+	errs := make(ValidationErrors, 0)
+	overlayVersion, err := version.Parse(o.Version)
+	switch {
+	case err != nil || overlayVersion == nil:
+		errs = append(errs, ErrOverlayVersionInvalid)
+	case !overlayVersion.IsOneOf(SupportedVersions):
+		errs = append(errs, ErrOverlayVersionNotSupported)
+	}
+
+	return errs
+}
+
 func (o *Overlay) Validate() error {
 	errs := make(ValidationErrors, 0)
-	if o.Version != "1.0.0" {
-		errs = append(errs, errors.New("overlay version must be 1.0.0"))
+
+	errs = append(errs, o.ValidateVersion()...)
+
+	if o.Info.Version == "" {
+		errs = append(errs, errors.New("overlay info version must be defined"))
 	}
 
 	if o.Info.Title == "" {
 		errs = append(errs, errors.New("overlay info title must be defined"))
-	}
-	if o.Info.Version == "" {
-		errs = append(errs, errors.New("overlay info version must be defined"))
 	}
 
 	if o.Extends != "" {

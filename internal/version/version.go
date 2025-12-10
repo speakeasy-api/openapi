@@ -50,6 +50,18 @@ func (v Version) LessThan(other Version) bool {
 	return !v.Equal(other) && !v.GreaterThan(other)
 }
 
+func (v Version) IsOneOf(versions []*Version) bool {
+	for _, ver := range versions {
+		if ver == nil {
+			continue
+		}
+		if v.Equal(*ver) {
+			return true
+		}
+	}
+	return false
+}
+
 func Parse(version string) (*Version, error) {
 	parts := strings.Split(version, ".")
 	if len(parts) != 3 {
