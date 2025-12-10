@@ -201,15 +201,19 @@ This repository is maintained by Speakeasy, but we welcome and encourage contrib
 
 ### How to Contribute
 
-1. **Open Issues**: Found a bug or have a feature suggestion? Open an issue to describe what you'd like to see changed.
+1. **Discussions**: Have a feature request or want to discuss the roadmap? Use [GitHub Discussions](https://github.com/speakeasy-api/openapi/discussions) to share your ideas and engage with the community.
 
-2. **Pull Requests**: We welcome pull requests! If you'd like to contribute code:
+2. **Issues**: Found a bug or technical issue? Open a [GitHub Issue](https://github.com/speakeasy-api/openapi/issues) to report it with details about the problem.
+
+3. **Pull Requests**: We welcome pull requests! If you'd like to contribute code:
    - Fork the repository
    - Create a new branch for your feature/fix
    - Submit a PR with a clear description of the changes and any related issues
 
-3. **Feedback**: Share your experience using the packages or suggest improvements.
+4. **Feedback**: Share your experience using the packages or suggest improvements.
 
-All contributions, whether they're bug reports, feature requests, or code changes, help make this project better for everyone.
+**Getting Started**: Look for items tagged with "good first issue" in both [Discussions](https://github.com/speakeasy-api/openapi/discussions) and [Issues](https://github.com/speakeasy-api/openapi/issues) if you want to pick up something to work on.
+
+All contributions, whether they're feature requests, bug reports, or code changes, help make this project better for everyone.
 
 Please ensure your contributions adhere to our coding standards and include appropriate tests where applicable.

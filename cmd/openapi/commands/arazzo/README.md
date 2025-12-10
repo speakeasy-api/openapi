@@ -2,7 +2,7 @@
 
 Commands for working with Arazzo workflow documents.
 
-Arazzo workflows describe sequences of API calls and their dependencies. These commands help you validate and work with Arazzo documents according to the [Arazzo Specification](https://spec.openapis.org/arazzo/v1.0.0).
+Arazzo workflows describe sequences of API calls and their dependencies. These commands help you validate and work with Arazzo documents according to the [Arazzo Specification](https://spec.openapis.org/arazzo/v1.0.1).
 
 ## Table of Contents
 
