@@ -693,3 +693,118 @@ func TestEscapeString_Success(t *testing.T) {
 		})
 	}
 }
+
+func TestJSONPointer_String_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		pointer  JSONPointer
+		expected string
+	}{
+		{
+			name:     "root pointer",
+			pointer:  JSONPointer("/"),
+			expected: "/",
+		},
+		{
+			name:     "simple path",
+			pointer:  JSONPointer("/some/path"),
+			expected: "/some/path",
+		},
+		{
+			name:     "empty string",
+			pointer:  JSONPointer(""),
+			expected: "",
+		},
+		{
+			name:     "path with indices",
+			pointer:  JSONPointer("/a/0/b"),
+			expected: "/a/0/b",
+		},
+		{
+			name:     "escaped characters",
+			pointer:  JSONPointer("/~0/~1"),
+			expected: "/~0/~1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := tt.pointer.String()
+			assert.Equal(t, tt.expected, result, "String() should return the pointer value")
+		})
+	}
+}
+
+func TestPartsToJSONPointer_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		parts    []string
+		expected JSONPointer
+	}{
+		{
+			name:     "empty parts",
+			parts:    []string{},
+			expected: JSONPointer(""),
+		},
+		{
+			name:     "single part",
+			parts:    []string{"a"},
+			expected: JSONPointer("/a"),
+		},
+		{
+			name:     "multiple parts",
+			parts:    []string{"a", "b", "c"},
+			expected: JSONPointer("/a/b/c"),
+		},
+		{
+			name:     "parts with tilde",
+			parts:    []string{"a~b"},
+			expected: JSONPointer("/a~0b"),
+		},
+		{
+			name:     "parts with slash",
+			parts:    []string{"a/b"},
+			expected: JSONPointer("/a~1b"),
+		},
+		{
+			name:     "parts with both special chars",
+			parts:    []string{"a~/b"},
+			expected: JSONPointer("/a~0~1b"),
+		},
+		{
+			name:     "numeric parts",
+			parts:    []string{"0", "1", "2"},
+			expected: JSONPointer("/0/1/2"),
+		},
+		{
+			name:     "mixed parts",
+			parts:    []string{"paths", "/users/{id}", "get"},
+			expected: JSONPointer("/paths/~1users~1{id}/get"),
+		},
+		{
+			name:     "empty string part",
+			parts:    []string{""},
+			expected: JSONPointer("/"),
+		},
+		{
+			name:     "multiple empty parts",
+			parts:    []string{"", ""},
+			expected: JSONPointer("//"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := PartsToJSONPointer(tt.parts)
+			assert.Equal(t, tt.expected, result, "PartsToJSONPointer should produce correct pointer")
+		})
+	}
+}

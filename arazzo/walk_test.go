@@ -7,6 +7,7 @@ import (
 	"github.com/speakeasy-api/openapi/arazzo"
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/pointer"
+	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/walk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -303,4 +304,176 @@ func TestWalk_EmptyArazzo_Success(t *testing.T) {
 	// Should visit at least Arazzo and Info
 	assert.Contains(t, visitedTypes, "Arazzo")
 	assert.Contains(t, visitedTypes, "Info")
+}
+
+func TestWalk_WithComponents_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	// Create an arazzo document with components to exercise component walk functions
+	arazzoDoc := &arazzo.Arazzo{
+		Arazzo: arazzo.Version,
+		Info: arazzo.Info{
+			Title:   "Components Test",
+			Version: "1.0.0",
+		},
+		SourceDescriptions: []*arazzo.SourceDescription{
+			{
+				Name: "api",
+				URL:  "https://api.example.com/openapi.yaml",
+				Type: "openapi",
+			},
+		},
+		Workflows: []*arazzo.Workflow{
+			{
+				WorkflowID: "testWorkflow",
+				Steps: []*arazzo.Step{
+					{
+						StepID:      "step1",
+						OperationID: (*expression.Expression)(pointer.From("getUser")),
+					},
+				},
+			},
+		},
+		Components: &arazzo.Components{
+			Parameters: sequencedmap.New(
+				sequencedmap.NewElem("userId", &arazzo.Parameter{
+					Name: "userId",
+				}),
+			),
+			SuccessActions: sequencedmap.New(
+				sequencedmap.NewElem("logSuccess", &arazzo.SuccessAction{
+					Name: "logSuccess",
+					Type: arazzo.SuccessActionTypeEnd,
+				}),
+			),
+			FailureActions: sequencedmap.New(
+				sequencedmap.NewElem("logFailure", &arazzo.FailureAction{
+					Name: "logFailure",
+					Type: arazzo.FailureActionTypeEnd,
+				}),
+			),
+		},
+	}
+
+	// Track what we've seen during the walk
+	var componentsCount, parameterCount, successActionCount, failureActionCount int
+
+	// Walk the document
+	for item := range arazzo.Walk(ctx, arazzoDoc) {
+		err := item.Match(arazzo.Matcher{
+			Components: func(c *arazzo.Components) error {
+				componentsCount++
+				return nil
+			},
+			Parameter: func(p *arazzo.Parameter) error {
+				parameterCount++
+				assert.Equal(t, "userId", p.Name)
+				return nil
+			},
+			SuccessAction: func(sa *arazzo.SuccessAction) error {
+				successActionCount++
+				assert.Equal(t, "logSuccess", sa.Name)
+				return nil
+			},
+			FailureAction: func(fa *arazzo.FailureAction) error {
+				failureActionCount++
+				assert.Equal(t, "logFailure", fa.Name)
+				return nil
+			},
+		})
+		require.NoError(t, err)
+	}
+
+	// Verify counts
+	assert.Equal(t, 1, componentsCount, "should visit Components once")
+	assert.Equal(t, 1, parameterCount, "should visit Parameter once")
+	assert.Equal(t, 1, successActionCount, "should visit SuccessAction once")
+	assert.Equal(t, 1, failureActionCount, "should visit FailureAction once")
+}
+
+func TestWalk_WithReusableActions_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	// Create an arazzo document with reusable success and failure actions in workflows and steps
+	arazzoDoc := &arazzo.Arazzo{
+		Arazzo: arazzo.Version,
+		Info: arazzo.Info{
+			Title:   "Reusable Actions Test",
+			Version: "1.0.0",
+		},
+		SourceDescriptions: []*arazzo.SourceDescription{
+			{
+				Name: "api",
+				URL:  "https://api.example.com/openapi.yaml",
+				Type: "openapi",
+			},
+		},
+		Workflows: []*arazzo.Workflow{
+			{
+				WorkflowID: "testWorkflow",
+				SuccessActions: []*arazzo.ReusableSuccessAction{
+					{
+						Object: &arazzo.SuccessAction{
+							Name: "workflowSuccess",
+							Type: arazzo.SuccessActionTypeEnd,
+						},
+					},
+				},
+				FailureActions: []*arazzo.ReusableFailureAction{
+					{
+						Object: &arazzo.FailureAction{
+							Name: "workflowFailure",
+							Type: arazzo.FailureActionTypeEnd,
+						},
+					},
+				},
+				Steps: []*arazzo.Step{
+					{
+						StepID:      "step1",
+						OperationID: (*expression.Expression)(pointer.From("getUser")),
+						OnSuccess: []*arazzo.ReusableSuccessAction{
+							{
+								Object: &arazzo.SuccessAction{
+									Name: "stepSuccess",
+									Type: arazzo.SuccessActionTypeEnd,
+								},
+							},
+						},
+						OnFailure: []*arazzo.ReusableFailureAction{
+							{
+								Object: &arazzo.FailureAction{
+									Name: "stepFailure",
+									Type: arazzo.FailureActionTypeEnd,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Track what we've seen during the walk
+	var reusableSuccessCount, reusableFailureCount int
+
+	// Walk the document
+	for item := range arazzo.Walk(ctx, arazzoDoc) {
+		err := item.Match(arazzo.Matcher{
+			ReusableSuccessAction: func(rsa *arazzo.ReusableSuccessAction) error {
+				reusableSuccessCount++
+				return nil
+			},
+			ReusableFailureAction: func(rfa *arazzo.ReusableFailureAction) error {
+				reusableFailureCount++
+				return nil
+			},
+		})
+		require.NoError(t, err)
+	}
+
+	// Verify counts - 1 from workflow level + 1 from step level = 2 each
+	assert.Equal(t, 2, reusableSuccessCount, "should visit ReusableSuccessAction twice")
+	assert.Equal(t, 2, reusableFailureCount, "should visit ReusableFailureAction twice")
 }

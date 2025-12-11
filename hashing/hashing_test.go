@@ -14,6 +14,7 @@ import (
 	"github.com/speakeasy-api/openapi/yml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 type testEnum string
@@ -601,4 +602,221 @@ properties:
 
 	// They should be equal since they represent the same schema
 	assert.Equal(t, hash1, hash2, "identical schemas should have the same hash regardless of field ordering")
+}
+
+func TestHash_YamlNode_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		node     *yaml.Node
+		wantHash string
+	}{
+		{
+			name:     "nil node",
+			node:     nil,
+			wantHash: "cbf29ce484222325", // empty string hash
+		},
+		{
+			name: "scalar string node",
+			node: &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Tag:   "!!str",
+				Value: "hello",
+			},
+			wantHash: "049bf33d4f533213",
+		},
+		{
+			name: "scalar int node",
+			node: &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Tag:   "!!int",
+				Value: "42",
+			},
+			wantHash: "f8aa31eb804642d5",
+		},
+		{
+			name: "scalar without tag",
+			node: &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Value: "test",
+			},
+			wantHash: "6a1b3c98d6cf2e16",
+		},
+		{
+			name: "scalar without value",
+			node: &yaml.Node{
+				Kind: yaml.ScalarNode,
+				Tag:  "!!null",
+			},
+			wantHash: "70dd4271b9b4bf98",
+		},
+		{
+			name: "empty scalar node",
+			node: &yaml.Node{
+				Kind: yaml.ScalarNode,
+			},
+			wantHash: "535a299dfeb2aee1",
+		},
+		{
+			name: "mapping node with children",
+			node: &yaml.Node{
+				Kind: yaml.MappingNode,
+				Tag:  "!!map",
+				Content: []*yaml.Node{
+					{Kind: yaml.ScalarNode, Tag: "!!str", Value: "key"},
+					{Kind: yaml.ScalarNode, Tag: "!!str", Value: "value"},
+				},
+			},
+			wantHash: "8f158417b793a189",
+		},
+		{
+			name: "sequence node with children",
+			node: &yaml.Node{
+				Kind: yaml.SequenceNode,
+				Tag:  "!!seq",
+				Content: []*yaml.Node{
+					{Kind: yaml.ScalarNode, Tag: "!!str", Value: "item1"},
+					{Kind: yaml.ScalarNode, Tag: "!!str", Value: "item2"},
+				},
+			},
+			wantHash: "fac33aff0234a67f",
+		},
+		{
+			name: "document node wrapping scalar",
+			node: &yaml.Node{
+				Kind: yaml.DocumentNode,
+				Content: []*yaml.Node{
+					{Kind: yaml.ScalarNode, Tag: "!!str", Value: "document content"},
+				},
+			},
+			wantHash: "ae29e55a43581ec6",
+		},
+		{
+			name: "deeply nested node",
+			node: &yaml.Node{
+				Kind: yaml.MappingNode,
+				Content: []*yaml.Node{
+					{Kind: yaml.ScalarNode, Value: "outer"},
+					{
+						Kind: yaml.MappingNode,
+						Content: []*yaml.Node{
+							{Kind: yaml.ScalarNode, Value: "inner"},
+							{Kind: yaml.ScalarNode, Value: "value"},
+						},
+					},
+				},
+			},
+			wantHash: "4999ae359f57db96",
+		},
+		{
+			name: "node with positional metadata should produce same hash as without",
+			node: &yaml.Node{
+				Kind:   yaml.ScalarNode,
+				Tag:    "!!str",
+				Value:  "hello",
+				Line:   10,
+				Column: 5,
+				Style:  yaml.DoubleQuotedStyle,
+			},
+			wantHash: "049bf33d4f533213", // Same as basic scalar string "hello"
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			gotHash := Hash(tt.node)
+			assert.Equal(t, tt.wantHash, gotHash, "hash should match expected value")
+		})
+	}
+}
+
+func TestHash_YamlNodeStruct_Success(t *testing.T) {
+	t.Parallel()
+
+	// Test passing yaml.Node as value (not pointer) triggers the struct case
+	tests := []struct {
+		name     string
+		node     yaml.Node
+		wantHash string
+	}{
+		{
+			name: "scalar string node as value",
+			node: yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Tag:   "!!str",
+				Value: "hello",
+			},
+			wantHash: "049bf33d4f533213",
+		},
+		{
+			name: "empty node as value",
+			node: yaml.Node{
+				Kind: yaml.ScalarNode,
+			},
+			wantHash: "535a299dfeb2aee1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			gotHash := Hash(tt.node)
+			assert.Equal(t, tt.wantHash, gotHash, "hash should match expected value")
+		})
+	}
+}
+
+func TestHash_YamlNodeEquivalence_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		left  *yaml.Node
+		right *yaml.Node
+	}{
+		{
+			name: "positional metadata does not affect hash",
+			left: &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Tag:   "!!str",
+				Value: "hello",
+			},
+			right: &yaml.Node{
+				Kind:   yaml.ScalarNode,
+				Tag:    "!!str",
+				Value:  "hello",
+				Line:   100,
+				Column: 50,
+			},
+		},
+		{
+			name: "style does not affect hash",
+			left: &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Tag:   "!!str",
+				Value: "test",
+				Style: yaml.LiteralStyle,
+			},
+			right: &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Tag:   "!!str",
+				Value: "test",
+				Style: yaml.DoubleQuotedStyle,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			leftHash := Hash(tt.left)
+			rightHash := Hash(tt.right)
+			assert.Equal(t, leftHash, rightHash, "equivalent nodes should have same hash")
+		})
+	}
 }

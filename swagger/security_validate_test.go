@@ -213,3 +213,58 @@ tokenUrl: https://example.com/token`,
 		})
 	}
 }
+
+func TestSecurityScheme_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `type: oauth2
+description: OAuth2 authentication
+name: test_name
+in: header
+flow: accessCode
+authorizationUrl: https://example.com/authorize
+tokenUrl: https://example.com/token
+scopes:
+  read: Read access
+  write: Write access
+x-custom: value
+`
+	var securityScheme swagger.SecurityScheme
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &securityScheme)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	require.Equal(t, swagger.SecuritySchemeTypeOAuth2, securityScheme.GetType(), "GetType should return correct value")
+	require.Equal(t, "OAuth2 authentication", securityScheme.GetDescription(), "GetDescription should return correct value")
+	require.Equal(t, "test_name", securityScheme.GetName(), "GetName should return correct value")
+	require.Equal(t, swagger.SecuritySchemeInHeader, securityScheme.GetIn(), "GetIn should return correct value")
+	require.Equal(t, swagger.OAuth2FlowAccessCode, securityScheme.GetFlow(), "GetFlow should return correct value")
+	require.Equal(t, "https://example.com/authorize", securityScheme.GetAuthorizationURL(), "GetAuthorizationURL should return correct value")
+	require.Equal(t, "https://example.com/token", securityScheme.GetTokenURL(), "GetTokenURL should return correct value")
+	require.NotNil(t, securityScheme.GetScopes(), "GetScopes should return non-nil")
+	require.NotNil(t, securityScheme.GetExtensions(), "GetExtensions should return non-nil")
+}
+
+func TestSecurityScheme_Getters_Nil(t *testing.T) {
+	t.Parallel()
+
+	var securityScheme *swagger.SecurityScheme
+
+	require.Empty(t, securityScheme.GetType(), "GetType should return empty for nil")
+	require.Empty(t, securityScheme.GetDescription(), "GetDescription should return empty string for nil")
+	require.Empty(t, securityScheme.GetName(), "GetName should return empty string for nil")
+	require.Empty(t, securityScheme.GetIn(), "GetIn should return empty for nil")
+	require.Empty(t, securityScheme.GetFlow(), "GetFlow should return empty for nil")
+	require.Empty(t, securityScheme.GetAuthorizationURL(), "GetAuthorizationURL should return empty string for nil")
+	require.Empty(t, securityScheme.GetTokenURL(), "GetTokenURL should return empty string for nil")
+	require.Nil(t, securityScheme.GetScopes(), "GetScopes should return nil for nil scheme")
+	require.NotNil(t, securityScheme.GetExtensions(), "GetExtensions should return empty extensions for nil scheme")
+}
+
+func TestSecurityRequirement_NewSecurityRequirement(t *testing.T) {
+	t.Parallel()
+
+	sr := swagger.NewSecurityRequirement()
+	require.NotNil(t, sr, "NewSecurityRequirement should return non-nil")
+}

@@ -40,13 +40,13 @@ go tool cover -func=coverage.out | awk '
     split($1, parts, ":")
     file_func = parts[1] ":" parts[2]
     
-    # Extract coverage percentage
-    gsub(/%/, "", $3)
-    coverage = $3
+    # Extract coverage percentage from last field
+    gsub(/%/, "", $NF)
+    coverage = $NF + 0
     
     # Show functions with 0% coverage
-    if (coverage == "0.0") {
-        printf "| %-70s | %7s%% |\n", file_func, coverage
+    if (coverage == 0) {
+        printf "| %-70s | %7.1f%% |\n", file_func, coverage
     }
 }' | head -30
 
@@ -56,20 +56,20 @@ echo ""
 echo "| File:Function                                                          | Coverage |"
 echo "|------------------------------------------------------------------------|----------|"
 
-# Show functions with low coverage
+# Show functions with low coverage (>0% and <50%)
 go tool cover -func=coverage.out | awk '
 /^github\.com/ && !/total/ {
     # Extract file and function name
     split($1, parts, ":")
     file_func = parts[1] ":" parts[2]
     
-    # Extract coverage percentage
-    gsub(/%/, "", $3)
-    coverage = $3
+    # Extract coverage percentage from last field
+    gsub(/%/, "", $NF)
+    coverage = $NF + 0
     
     # Show functions with less than 50% coverage (but not 0%)
-    if (coverage != "" && coverage > 0 && coverage < 50) {
-        printf "| %-70s | %7s%% |\n", file_func, coverage
+    if (coverage > 0 && coverage < 50) {
+        printf "| %-70s | %7.1f%% |\n", file_func, coverage
     }
 }' | head -30
 
@@ -81,7 +81,7 @@ echo "|---------------------------------------------------------------|---------
 
 # Show packages that need improvement
 go tool cover -func=coverage.out | awk '
-/^github\.com/ {
+/^github\.com/ && !/total/ {
     # Extract package name
     split($1, parts, "/")
     pkg_path = ""
@@ -91,12 +91,9 @@ go tool cover -func=coverage.out | awk '
         if (parts[i+1] ~ /\.go:/) break
     }
     
-    # Extract coverage percentage
-    gsub(/%/, "", $3)
-    coverage = $3
-    
-    # Skip if not a valid coverage line
-    if (coverage == "" || coverage == "total") next
+    # Extract coverage percentage from last field
+    gsub(/%/, "", $NF)
+    coverage = $NF + 0
     
     # Accumulate coverage for each package
     if (pkg_path in pkg_total) {
@@ -115,7 +112,7 @@ END {
             if (avg_coverage > 60) priority = "🟡 Medium"
             if (avg_coverage > 40) priority = "🟠 Medium-High"
             if (avg_coverage == 0) priority = "🚨 Critical"
-            printf "| %-61s | %7s%% | %-14s |\n", pkg, sprintf("%.1f", avg_coverage), priority
+            printf "| %-61s | %7.1f%% | %-14s |\n", pkg, avg_coverage, priority
         }
     }
 }' | sort -k4,4n | head -15
@@ -125,7 +122,7 @@ echo "---"
 echo ""
 
 # Extract and display total coverage at the bottom for visibility
-CURRENT_COV=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}')
+CURRENT_COV=$(go tool cover -func=coverage.out | tail -1 | awk '{print $NF}')
 echo "## 🎯 **TOTAL COVERAGE: \`$CURRENT_COV\`**"
 echo ""
 echo "- 🧪 All tests completed"

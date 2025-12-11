@@ -170,3 +170,155 @@ func TestModel_GetPropertyLine_ComplexModel_Success(t *testing.T) {
 	actual := model.GetPropertyLine("ArrayField")
 	assert.Equal(t, 25, actual, "should return line number for array field")
 }
+
+func TestModel_GetCoreAny_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		setup func() *marshaller.Model[core.TestPrimitiveModel]
+		isNil bool
+	}{
+		{
+			name: "non-nil model returns core",
+			setup: func() *marshaller.Model[core.TestPrimitiveModel] {
+				return &marshaller.Model[core.TestPrimitiveModel]{}
+			},
+			isNil: false,
+		},
+		{
+			name: "nil model returns nil",
+			setup: func() *marshaller.Model[core.TestPrimitiveModel] {
+				return nil
+			},
+			isNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			model := tt.setup()
+			result := model.GetCoreAny()
+			if tt.isNil {
+				assert.Nil(t, result)
+			} else {
+				assert.NotNil(t, result)
+			}
+		})
+	}
+}
+
+func TestModel_GetRootNodeLine_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		setup    func() *marshaller.Model[core.TestPrimitiveModel]
+		expected int
+	}{
+		{
+			name: "nil model returns -1",
+			setup: func() *marshaller.Model[core.TestPrimitiveModel] {
+				return nil
+			},
+			expected: -1,
+		},
+		{
+			name: "model with no root node returns -1",
+			setup: func() *marshaller.Model[core.TestPrimitiveModel] {
+				return &marshaller.Model[core.TestPrimitiveModel]{}
+			},
+			expected: -1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			model := tt.setup()
+			result := model.GetRootNodeLine()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestModel_GetRootNodeColumn_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		setup    func() *marshaller.Model[core.TestPrimitiveModel]
+		expected int
+	}{
+		{
+			name: "nil model returns -1",
+			setup: func() *marshaller.Model[core.TestPrimitiveModel] {
+				return nil
+			},
+			expected: -1,
+		},
+		{
+			name: "model with no root node returns -1",
+			setup: func() *marshaller.Model[core.TestPrimitiveModel] {
+				return &marshaller.Model[core.TestPrimitiveModel]{}
+			},
+			expected: -1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			model := tt.setup()
+			result := model.GetRootNodeColumn()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestModel_Cache_Success(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil model GetCachedReferencedObject returns nil false", func(t *testing.T) {
+		t.Parallel()
+		var model *marshaller.Model[core.TestPrimitiveModel]
+		result, ok := model.GetCachedReferencedObject("key")
+		assert.Nil(t, result)
+		assert.False(t, ok)
+	})
+
+	t.Run("nil model GetCachedReferenceDocument returns nil false", func(t *testing.T) {
+		t.Parallel()
+		var model *marshaller.Model[core.TestPrimitiveModel]
+		result, ok := model.GetCachedReferenceDocument("key")
+		assert.Nil(t, result)
+		assert.False(t, ok)
+	})
+
+	t.Run("model with uninitialized cache returns nil false", func(t *testing.T) {
+		t.Parallel()
+		model := &marshaller.Model[core.TestPrimitiveModel]{}
+		result, ok := model.GetCachedReferencedObject("key")
+		assert.Nil(t, result)
+		assert.False(t, ok)
+	})
+
+	t.Run("InitCache creates caches that work correctly", func(t *testing.T) {
+		t.Parallel()
+		model := &marshaller.Model[core.TestPrimitiveModel]{}
+		model.InitCache()
+
+		// Store and retrieve object
+		model.StoreReferencedObjectInCache("objKey", "testObject")
+		result, ok := model.GetCachedReferencedObject("objKey")
+		assert.True(t, ok)
+		assert.Equal(t, "testObject", result)
+
+		// Store and retrieve document
+		model.StoreReferenceDocumentInCache("docKey", []byte("testDoc"))
+		doc, ok := model.GetCachedReferenceDocument("docKey")
+		assert.True(t, ok)
+		assert.Equal(t, []byte("testDoc"), doc)
+	})
+}

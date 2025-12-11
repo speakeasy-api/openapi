@@ -6,7 +6,17 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
+
+func TestNewResponses_Success(t *testing.T) {
+	t.Parallel()
+
+	responses := NewResponses()
+	require.NotNil(t, responses, "NewResponses should return a non-nil responses")
+	require.NotNil(t, responses.Map, "responses.Map should be initialized")
+	assert.Equal(t, 0, responses.Len(), "newly created responses should be empty")
+}
 
 func TestResponses_GetMapKeyNodeOrRoot_Success(t *testing.T) {
 	t.Parallel()
@@ -132,6 +142,38 @@ func TestResponses_GetMapKeyNodeOrRootLine_Success(t *testing.T) {
 			assert.Equal(t, tt.expectedLine, line, "should return correct line number")
 		})
 	}
+}
+
+func TestResponses_GetMapKeyNodeOrRoot_Uninitialized(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns root when responses is not initialized", func(t *testing.T) {
+		t.Parallel()
+		var responses Responses
+		rootNode := &yaml.Node{Kind: yaml.MappingNode, Line: 1}
+		result := responses.GetMapKeyNodeOrRoot("200", rootNode)
+		assert.Equal(t, rootNode, result, "should return root node when not initialized")
+	})
+
+	t.Run("returns root when RootNode is nil", func(t *testing.T) {
+		t.Parallel()
+		responses := &Responses{}
+		responses.SetValid(true, true)
+		rootNode := &yaml.Node{Kind: yaml.MappingNode, Line: 1}
+		result := responses.GetMapKeyNodeOrRoot("200", rootNode)
+		assert.Equal(t, rootNode, result, "should return root node when RootNode is nil")
+	})
+}
+
+func TestResponses_GetMapKeyNodeOrRootLine_NilNode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns -1 when GetMapKeyNodeOrRoot returns nil", func(t *testing.T) {
+		t.Parallel()
+		var responses Responses
+		line := responses.GetMapKeyNodeOrRootLine("200", nil)
+		assert.Equal(t, -1, line, "should return -1 when node is nil")
+	})
 }
 
 func TestResponses_GetMapKeyNodeOrRootLine_ReturnsRootLine(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	coreExtensions "github.com/speakeasy-api/openapi/extensions/core"
 	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -125,4 +126,55 @@ func getTestModelWithExtensions(ctx context.Context, t *testing.T, data string) 
 	require.NoError(t, err)
 
 	return m
+}
+
+func TestNewElem_Success(t *testing.T) {
+	t.Parallel()
+
+	node := &yaml.Node{Kind: yaml.ScalarNode, Value: "test-value"}
+	elem := extensions.NewElem("x-custom", node)
+
+	assert.NotNil(t, elem)
+	assert.Equal(t, "x-custom", elem.Key)
+	assert.Equal(t, node, elem.Value)
+}
+
+func TestExtensions_GetCore_Success(t *testing.T) {
+	t.Parallel()
+
+	ext := extensions.New()
+	core := ext.GetCore()
+
+	// Core should be nil for newly created extensions
+	assert.Nil(t, core)
+}
+
+func TestExtensions_Populate_Success(t *testing.T) {
+	t.Parallel()
+
+	node := &yaml.Node{Kind: yaml.ScalarNode, Value: "custom-value"}
+
+	source := sequencedmap.New(
+		sequencedmap.NewElem("x-test", marshaller.Node[*yaml.Node]{Value: node}),
+	)
+
+	ext := &extensions.Extensions{}
+	err := ext.Populate(source)
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, ext.Len())
+
+	val, ok := ext.Get("x-test")
+	assert.True(t, ok)
+	assert.Equal(t, node, val)
+}
+
+func TestExtensions_Populate_Error(t *testing.T) {
+	t.Parallel()
+
+	ext := &extensions.Extensions{}
+	err := ext.Populate("invalid source")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expected source to be")
 }

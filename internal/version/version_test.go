@@ -228,3 +228,265 @@ func Test_Version_IsOneOf(t *testing.T) {
 		})
 	}
 }
+
+func Test_Version_String_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		version  Version
+		expected string
+	}{
+		{
+			name:     "standard version",
+			version:  Version{Major: 1, Minor: 2, Patch: 3},
+			expected: "1.2.3",
+		},
+		{
+			name:     "zero version",
+			version:  Version{Major: 0, Minor: 0, Patch: 0},
+			expected: "0.0.0",
+		},
+		{
+			name:     "high version numbers",
+			version:  Version{Major: 10, Minor: 20, Patch: 30},
+			expected: "10.20.30",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.version.String())
+		})
+	}
+}
+
+func Test_Version_GreaterThan_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		a        Version
+		b        Version
+		expected bool
+	}{
+		{
+			name:     "same version returns false",
+			a:        Version{Major: 1, Minor: 2, Patch: 3},
+			b:        Version{Major: 1, Minor: 2, Patch: 3},
+			expected: false,
+		},
+		{
+			name:     "greater major version returns true",
+			a:        Version{Major: 2, Minor: 0, Patch: 0},
+			b:        Version{Major: 1, Minor: 9, Patch: 9},
+			expected: true,
+		},
+		{
+			name:     "lesser major version returns false",
+			a:        Version{Major: 1, Minor: 9, Patch: 9},
+			b:        Version{Major: 2, Minor: 0, Patch: 0},
+			expected: false,
+		},
+		{
+			name:     "greater minor version returns true",
+			a:        Version{Major: 1, Minor: 3, Patch: 0},
+			b:        Version{Major: 1, Minor: 2, Patch: 9},
+			expected: true,
+		},
+		{
+			name:     "lesser minor version returns false",
+			a:        Version{Major: 1, Minor: 2, Patch: 9},
+			b:        Version{Major: 1, Minor: 3, Patch: 0},
+			expected: false,
+		},
+		{
+			name:     "greater patch version returns true",
+			a:        Version{Major: 1, Minor: 2, Patch: 4},
+			b:        Version{Major: 1, Minor: 2, Patch: 3},
+			expected: true,
+		},
+		{
+			name:     "lesser patch version returns false",
+			a:        Version{Major: 1, Minor: 2, Patch: 3},
+			b:        Version{Major: 1, Minor: 2, Patch: 4},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.a.GreaterThan(tt.b))
+		})
+	}
+}
+
+func Test_Version_LessThan_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		a        Version
+		b        Version
+		expected bool
+	}{
+		{
+			name:     "same version returns false",
+			a:        Version{Major: 1, Minor: 2, Patch: 3},
+			b:        Version{Major: 1, Minor: 2, Patch: 3},
+			expected: false,
+		},
+		{
+			name:     "lesser version returns true",
+			a:        Version{Major: 1, Minor: 2, Patch: 3},
+			b:        Version{Major: 2, Minor: 0, Patch: 0},
+			expected: true,
+		},
+		{
+			name:     "greater version returns false",
+			a:        Version{Major: 2, Minor: 0, Patch: 0},
+			b:        Version{Major: 1, Minor: 2, Patch: 3},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.a.LessThan(tt.b))
+		})
+	}
+}
+
+func Test_MustParse_Success(t *testing.T) {
+	t.Parallel()
+
+	v := MustParse("1.2.3")
+	assert.Equal(t, 1, v.Major)
+	assert.Equal(t, 2, v.Minor)
+	assert.Equal(t, 3, v.Patch)
+}
+
+func Test_MustParse_Panic(t *testing.T) {
+	t.Parallel()
+
+	assert.Panics(t, func() {
+		MustParse("invalid")
+	})
+}
+
+func Test_IsGreaterOrEqual_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		a        string
+		b        string
+		expected bool
+	}{
+		{
+			name:     "equal versions returns true",
+			a:        "1.2.3",
+			b:        "1.2.3",
+			expected: true,
+		},
+		{
+			name:     "greater version returns true",
+			a:        "2.0.0",
+			b:        "1.2.3",
+			expected: true,
+		},
+		{
+			name:     "lesser version returns false",
+			a:        "1.2.3",
+			b:        "2.0.0",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := IsGreaterOrEqual(tt.a, tt.b)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func Test_IsGreaterOrEqual_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		a    string
+		b    string
+	}{
+		{
+			name: "invalid first version",
+			a:    "invalid",
+			b:    "1.2.3",
+		},
+		{
+			name: "invalid second version",
+			a:    "1.2.3",
+			b:    "invalid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := IsGreaterOrEqual(tt.a, tt.b)
+			require.Error(t, err)
+		})
+	}
+}
+
+func Test_IsLessThan_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		a        string
+		b        string
+		expected bool
+	}{
+		{
+			name:     "equal versions returns false",
+			a:        "1.2.3",
+			b:        "1.2.3",
+			expected: false,
+		},
+		{
+			name:     "lesser version returns true",
+			a:        "1.2.3",
+			b:        "2.0.0",
+			expected: true,
+		},
+		{
+			name:     "greater version returns false",
+			a:        "2.0.0",
+			b:        "1.2.3",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := IsLessThan(tt.a, tt.b)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func Test_IsLessThan_Error(t *testing.T) {
+	t.Parallel()
+
+	_, err := IsLessThan("invalid", "1.2.3")
+	require.Error(t, err)
+}

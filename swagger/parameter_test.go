@@ -426,3 +426,71 @@ type: object
 		})
 	}
 }
+
+func TestParameter_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+name: userId
+in: path
+description: User identifier
+required: true
+type: string
+schema:
+  type: object
+x-custom: value
+`
+	var param swagger.Parameter
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &param)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	require.Equal(t, "userId", param.GetName(), "GetName should return correct value")
+	require.Equal(t, swagger.ParameterInPath, param.GetIn(), "GetIn should return correct value")
+	require.Equal(t, "User identifier", param.GetDescription(), "GetDescription should return correct value")
+	require.True(t, param.GetRequired(), "GetRequired should return true")
+	require.Equal(t, "string", param.GetType(), "GetType should return correct value")
+	require.NotNil(t, param.GetSchema(), "GetSchema should return non-nil")
+	require.NotNil(t, param.GetExtensions(), "GetExtensions should return non-nil")
+}
+
+func TestParameter_Getters_Nil(t *testing.T) {
+	t.Parallel()
+
+	var param *swagger.Parameter
+
+	require.Empty(t, param.GetName(), "GetName should return empty string for nil")
+	require.Empty(t, param.GetIn(), "GetIn should return empty for nil")
+	require.Empty(t, param.GetDescription(), "GetDescription should return empty string for nil")
+	require.False(t, param.GetRequired(), "GetRequired should return false for nil")
+	require.Empty(t, param.GetType(), "GetType should return empty string for nil")
+	require.Nil(t, param.GetSchema(), "GetSchema should return nil for nil param")
+	require.NotNil(t, param.GetExtensions(), "GetExtensions should return empty extensions for nil param")
+}
+
+func TestItems_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+type: string
+x-custom: value
+`
+	var items swagger.Items
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &items)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	require.Equal(t, "string", items.GetType(), "GetType should return correct value")
+	require.NotNil(t, items.GetExtensions(), "GetExtensions should return non-nil")
+}
+
+func TestItems_Getters_Nil(t *testing.T) {
+	t.Parallel()
+
+	var items *swagger.Items
+
+	require.Empty(t, items.GetType(), "GetType should return empty string for nil")
+	require.NotNil(t, items.GetExtensions(), "GetExtensions should return empty extensions for nil items")
+}

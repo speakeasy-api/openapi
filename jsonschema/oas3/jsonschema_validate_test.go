@@ -85,3 +85,36 @@ type: invalid_type
 		})
 	}
 }
+
+func TestJSONSchemaConcrete_GetExtensions_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		schema      *oas3.JSONSchema[oas3.Concrete]
+		expectEmpty bool
+	}{
+		{
+			name:        "nil schema returns empty extensions",
+			schema:      nil,
+			expectEmpty: true,
+		},
+		{
+			name:        "bool schema returns empty extensions",
+			schema:      oas3.ReferenceableToConcrete(oas3.NewJSONSchemaFromBool(true)),
+			expectEmpty: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := tt.schema.GetExtensions()
+			require.NotNil(t, result)
+			if tt.expectEmpty {
+				assert.Equal(t, 0, result.Len())
+			}
+		})
+	}
+}

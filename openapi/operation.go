@@ -123,6 +123,9 @@ func (o *Operation) GetRequestBody() *ReferencedRequestBody {
 
 // GetResponses returns the value of the Responses field. Returns nil if not set.
 func (o *Operation) GetResponses() *Responses {
+	if o == nil {
+		return nil
+	}
 	return &o.Responses
 }
 

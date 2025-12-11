@@ -209,3 +209,114 @@ description: Array header`,
 		})
 	}
 }
+
+func TestResponses_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `swagger: "2.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      responses:
+        default:
+          description: Default response
+        "200":
+          description: Success response
+        x-custom: value
+`
+	doc, validationErrs, err := swagger.Unmarshal(t.Context(), strings.NewReader(yml))
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "should have no validation errors")
+
+	pathItem, ok := doc.Paths.Get("/users")
+	require.True(t, ok, "path should exist")
+	resp := pathItem.Get().Responses
+
+	require.NotNil(t, resp.GetDefault(), "GetDefault should return non-nil")
+	require.NotNil(t, resp.GetExtensions(), "GetExtensions should return non-nil")
+}
+
+func TestResponses_Getters_Nil(t *testing.T) {
+	t.Parallel()
+
+	var resp *swagger.Responses
+
+	require.Nil(t, resp.GetDefault(), "GetDefault should return nil for nil responses")
+	require.NotNil(t, resp.GetExtensions(), "GetExtensions should return empty extensions for nil responses")
+}
+
+func TestResponses_NewResponses(t *testing.T) {
+	t.Parallel()
+
+	resp := swagger.NewResponses()
+	require.NotNil(t, resp, "NewResponses should return non-nil")
+}
+
+func TestResponse_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `description: Success response
+schema:
+  type: object
+headers:
+  X-Rate-Limit:
+    type: integer
+examples:
+  application/json: {"key": "value"}
+x-custom: value
+`
+	var resp swagger.Response
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &resp)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	require.Equal(t, "Success response", resp.GetDescription(), "GetDescription should return correct value")
+	require.NotNil(t, resp.GetSchema(), "GetSchema should return non-nil")
+	require.NotNil(t, resp.GetHeaders(), "GetHeaders should return non-nil")
+	require.NotNil(t, resp.GetExamples(), "GetExamples should return non-nil")
+	require.NotNil(t, resp.GetExtensions(), "GetExtensions should return non-nil")
+}
+
+func TestResponse_Getters_Nil(t *testing.T) {
+	t.Parallel()
+
+	var resp *swagger.Response
+
+	require.Empty(t, resp.GetDescription(), "GetDescription should return empty string for nil")
+	require.Nil(t, resp.GetSchema(), "GetSchema should return nil for nil response")
+	require.Nil(t, resp.GetHeaders(), "GetHeaders should return nil for nil response")
+	require.Nil(t, resp.GetExamples(), "GetExamples should return nil for nil response")
+	require.NotNil(t, resp.GetExtensions(), "GetExtensions should return empty extensions for nil response")
+}
+
+func TestHeader_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `type: integer
+description: Rate limit header
+x-custom: value
+`
+	var header swagger.Header
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &header)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	require.Equal(t, "Rate limit header", header.GetDescription(), "GetDescription should return correct value")
+	require.Equal(t, "integer", header.GetType(), "GetType should return correct value")
+	require.NotNil(t, header.GetExtensions(), "GetExtensions should return non-nil")
+}
+
+func TestHeader_Getters_Nil(t *testing.T) {
+	t.Parallel()
+
+	var header *swagger.Header
+
+	require.Empty(t, header.GetDescription(), "GetDescription should return empty string for nil")
+	require.Empty(t, header.GetType(), "GetType should return empty string for nil")
+	require.NotNil(t, header.GetExtensions(), "GetExtensions should return empty extensions for nil header")
+}

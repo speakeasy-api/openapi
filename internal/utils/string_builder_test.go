@@ -129,3 +129,47 @@ func BenchmarkStringConcatenation(b *testing.B) {
 		_ = result
 	}
 }
+
+func TestBuildString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		parts    []string
+		expected string
+	}{
+		{
+			name:     "empty parts",
+			parts:    []string{},
+			expected: "",
+		},
+		{
+			name:     "single part",
+			parts:    []string{"hello"},
+			expected: "hello",
+		},
+		{
+			name:     "multiple parts",
+			parts:    []string{"hello", " ", "world"},
+			expected: "hello world",
+		},
+		{
+			name:     "three parts with empty",
+			parts:    []string{"a", "", "b"},
+			expected: "ab",
+		},
+		{
+			name:     "four parts",
+			parts:    []string{"one", "two", "three", "four"},
+			expected: "onetwothreefour",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := BuildString(tt.parts...)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

@@ -437,3 +437,58 @@ description: Empty parameters map
 	errs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
 	require.Empty(t, errs, "Expected no validation errors for empty parameters")
 }
+
+func TestLink_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+operationId: getUserById
+operationRef: '#/paths/~1users~1{id}/get'
+description: Get user by ID
+parameters:
+  id: '$response.body#/id'
+requestBody: '$response.body#/user'
+server:
+  url: https://api.example.com
+x-custom: value
+`
+	var link openapi.Link
+
+	_, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &link)
+	require.NoError(t, err)
+
+	require.Equal(t, "getUserById", link.GetOperationID(), "GetOperationID should return correct value")
+	require.Equal(t, "#/paths/~1users~1{id}/get", link.GetOperationRef(), "GetOperationRef should return correct value")
+	require.Equal(t, "Get user by ID", link.GetDescription(), "GetDescription should return correct value")
+	require.NotNil(t, link.GetParameters(), "GetParameters should return non-nil")
+	require.NotNil(t, link.GetRequestBody(), "GetRequestBody should return non-nil")
+	require.NotNil(t, link.GetServer(), "GetServer should return non-nil")
+	require.NotNil(t, link.GetExtensions(), "GetExtensions should return non-nil")
+	require.Equal(t, "https://api.example.com", link.GetServer().GetURL(), "GetServer should return correct URL")
+}
+
+func TestLink_Getters_NilLink(t *testing.T) {
+	t.Parallel()
+
+	var link *openapi.Link
+
+	require.Empty(t, link.GetOperationID(), "GetOperationID should return empty string for nil")
+	require.Empty(t, link.GetOperationRef(), "GetOperationRef should return empty string for nil")
+	require.Empty(t, link.GetDescription(), "GetDescription should return empty string for nil")
+	require.Nil(t, link.GetParameters(), "GetParameters should return nil for nil link")
+	require.Nil(t, link.GetRequestBody(), "GetRequestBody should return nil for nil link")
+	require.Nil(t, link.GetServer(), "GetServer should return nil for nil link")
+	require.NotNil(t, link.GetExtensions(), "GetExtensions should return empty extensions for nil link")
+}
+
+func TestLink_ResolveOperation(t *testing.T) {
+	t.Parallel()
+
+	link := &openapi.Link{
+		OperationID: pointer.From("getUserById"),
+	}
+
+	op, err := link.ResolveOperation(t.Context())
+	require.NoError(t, err, "ResolveOperation should not error")
+	require.Nil(t, op, "ResolveOperation returns nil for now (TODO)")
+}

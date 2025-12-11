@@ -948,6 +948,42 @@ float64Field: 3.14
 	require.Contains(t, err.Error(), "out parameter cannot be nil", "error should indicate nil out parameter")
 }
 
+func TestDecodeNode_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		yml      string
+		expected string
+	}{
+		{
+			name:     "decode string value",
+			yml:      `"test string"`,
+			expected: "test string",
+		},
+		{
+			name:     "decode unquoted string value",
+			yml:      `test value`,
+			expected: "test value",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			node := parseYAML(t, tt.yml)
+			// Navigate to scalar node (first content of document)
+			scalarNode := node.Content[0]
+
+			var result string
+			validationErrs, err := marshaller.DecodeNode(t.Context(), "test", scalarNode, &result)
+			require.NoError(t, err)
+			require.Empty(t, validationErrs)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 // Helper functions
 func parseYAML(t *testing.T, yml string) *yaml.Node {
 	t.Helper()

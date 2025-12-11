@@ -6,6 +6,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -164,4 +165,102 @@ style: invalidStyle
 			require.Contains(t, errs[0].Error(), tt.expectedErr)
 		})
 	}
+}
+
+func TestEncoding_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		yml               string
+		wantContentType   string
+		wantStyle         openapi.SerializationStyle
+		wantExplode       bool
+		wantAllowReserved bool
+	}{
+		{
+			name: "all fields set",
+			yml: `
+contentType: application/json
+style: form
+explode: true
+allowReserved: true
+`,
+			wantContentType:   "application/json",
+			wantStyle:         openapi.SerializationStyleForm,
+			wantExplode:       true,
+			wantAllowReserved: true,
+		},
+		{
+			name:              "defaults - no style",
+			yml:               `{}`,
+			wantContentType:   "application/octet-stream",
+			wantStyle:         openapi.SerializationStyleForm,
+			wantExplode:       true, // form style defaults to explode=true
+			wantAllowReserved: false,
+		},
+		{
+			name: "non-form style defaults explode to false",
+			yml: `
+style: pipeDelimited
+`,
+			wantContentType:   "application/octet-stream",
+			wantStyle:         openapi.SerializationStylePipeDelimited,
+			wantExplode:       false,
+			wantAllowReserved: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var encoding openapi.Encoding
+			_, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &encoding)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantContentType, encoding.GetContentType(nil), "GetContentType mismatch")
+			assert.Equal(t, tt.wantStyle, encoding.GetStyle(), "GetStyle mismatch")
+			assert.Equal(t, tt.wantExplode, encoding.GetExplode(), "GetExplode mismatch")
+			assert.Equal(t, tt.wantAllowReserved, encoding.GetAllowReserved(), "GetAllowReserved mismatch")
+			assert.NotNil(t, encoding.GetExtensions(), "GetExtensions should never be nil")
+		})
+	}
+}
+
+func TestEncoding_Getters_Nil(t *testing.T) {
+	t.Parallel()
+
+	var encoding *openapi.Encoding = nil
+
+	assert.Equal(t, "application/octet-stream", encoding.GetContentType(nil), "nil encoding GetContentType should return default")
+	assert.Empty(t, encoding.GetContentTypeValue(), "nil encoding GetContentTypeValue should return empty")
+	assert.Equal(t, openapi.SerializationStyleForm, encoding.GetStyle(), "nil encoding GetStyle should return form")
+	assert.True(t, encoding.GetExplode(), "nil encoding GetExplode should return true (form default)")
+	assert.False(t, encoding.GetAllowReserved(), "nil encoding GetAllowReserved should return false")
+	assert.Nil(t, encoding.GetHeaders(), "nil encoding GetHeaders should return nil")
+	assert.NotNil(t, encoding.GetExtensions(), "nil encoding GetExtensions should return empty")
+}
+
+func TestEncoding_GetHeaders_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+contentType: application/json
+headers:
+  X-Rate-Limit:
+    schema:
+      type: integer
+  X-Custom:
+    schema:
+      type: string
+`
+
+	var encoding openapi.Encoding
+	_, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &encoding)
+	require.NoError(t, err)
+
+	headers := encoding.GetHeaders()
+	require.NotNil(t, headers, "GetHeaders should not be nil")
+	assert.Equal(t, 2, headers.Len(), "headers should have two entries")
 }
