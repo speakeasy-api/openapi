@@ -226,6 +226,7 @@ upperCaseBool: FALSE
   "upperCaseBool": false
 }
 `,
+			indentation: 2,
 		},
 	}
 
