@@ -47,10 +47,6 @@ func TestReference_Validate_Success(t *testing.T) {
 			ref:  "#/paths/~1users~1{id}/get/responses/200/content/application~1json/examples/0",
 		},
 		{
-			name: "JSON pointer with escaped characters",
-			ref:  "#/components/schemas/User~1Profile/properties/user~0name",
-		},
-		{
 			name: "file URI",
 			ref:  "file:///path/to/schema.yaml#/User",
 		},
@@ -102,6 +98,41 @@ func TestReference_Validate_Error(t *testing.T) {
 			name:        "malformed URI with invalid characters",
 			ref:         "https://example .com/api.yaml#/User",
 			expectError: "invalid reference URI",
+		},
+		{
+			name:        "empty component name - schemas",
+			ref:         "#/components/schemas/",
+			expectError: "component name cannot be empty",
+		},
+		{
+			name:        "empty component name - parameters",
+			ref:         "#/components/parameters/",
+			expectError: "component name cannot be empty",
+		},
+		{
+			name:        "empty component name - responses",
+			ref:         "#/components/responses/",
+			expectError: "component name cannot be empty",
+		},
+		{
+			name:        "missing component name - schemas",
+			ref:         "#/components/schemas",
+			expectError: "component name cannot be empty",
+		},
+		{
+			name:        "component name with space",
+			ref:         "#/components/schemas/User Schema",
+			expectError: "must match pattern",
+		},
+		{
+			name:        "component name with special characters",
+			ref:         "#/components/schemas/User@Schema",
+			expectError: "must match pattern",
+		},
+		{
+			name:        "component name starting with slash",
+			ref:         "#/components/schemas//UserSchema",
+			expectError: "component name cannot be empty",
 		},
 	}
 
