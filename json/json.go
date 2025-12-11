@@ -368,8 +368,8 @@ func writeJSONScalar(ctx *jsonWriteContext, node *yaml.Node) error {
 		return nil
 
 	case "!!bool":
-		// Booleans
-		ctx.write(node.Value)
+		// Booleans true/True/TRUE to true compatible with JSON
+		ctx.write(strings.ToLower(node.Value))
 		return nil
 
 	case "!!null":
