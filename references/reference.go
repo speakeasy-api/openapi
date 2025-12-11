@@ -4,10 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/jsonpointer"
 )
+
+// componentNameRegex matches valid OpenAPI component names according to the spec.
+// Component names must match: ^[a-zA-Z0-9\.\-_]+$
+var componentNameRegex = regexp.MustCompile(`^[a-zA-Z0-9.\-_]+$`)
 
 type Reference string
 
@@ -65,6 +70,48 @@ func (r Reference) Validate() error {
 		if err := jp.Validate(); err != nil {
 			return fmt.Errorf("invalid reference JSON pointer: %w", err)
 		}
+
+		// Validate OpenAPI component references have valid component names
+		if err := r.validateComponentReference(jp); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateComponentReference validates that component references have valid component names.
+// According to the OpenAPI spec, component names must match: ^[a-zA-Z0-9\.\-_]+$
+func (r Reference) validateComponentReference(jp jsonpointer.JSONPointer) error {
+	jpStr := string(jp)
+
+	// Check if this is a component reference
+	if !strings.HasPrefix(jpStr, "/components/") {
+		return nil
+	}
+
+	// Split the pointer into parts
+	parts := strings.Split(strings.TrimPrefix(jpStr, "/"), "/")
+
+	// parts[0] is "components", parts[1] is the component type (schemas, parameters, etc.)
+	// parts[2] should be the component name
+	if len(parts) < 3 {
+		// Reference ends at component type (e.g., #/components/schemas/)
+		return errors.New("invalid reference: component name cannot be empty")
+	}
+
+	componentName := parts[2]
+	if componentName == "" {
+		return errors.New("invalid reference: component name cannot be empty")
+	}
+
+	// Unescape the component name before validating (JSON pointer escaping: ~0 = ~, ~1 = /)
+	unescapedName := strings.ReplaceAll(componentName, "~1", "/")
+	unescapedName = strings.ReplaceAll(unescapedName, "~0", "~")
+
+	// Validate component name matches the required pattern
+	if !componentNameRegex.MatchString(unescapedName) {
+		return fmt.Errorf("invalid reference: component name %q must match pattern ^[a-zA-Z0-9.\\-_]+$", unescapedName)
 	}
 
 	return nil
