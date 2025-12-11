@@ -221,3 +221,34 @@ type:
 		})
 	}
 }
+
+func TestCriterionTypeUnion_Unmarshal_NilNode_Error(t *testing.T) {
+	t.Parallel()
+
+	var union CriterionTypeUnion
+	_, err := union.Unmarshal(t.Context(), "test", nil)
+	require.Error(t, err, "should return error for nil node")
+	require.Contains(t, err.Error(), "node is nil", "error should mention nil node")
+}
+
+func TestCriterionTypeUnion_Unmarshal_InvalidNodeKind_Error(t *testing.T) {
+	t.Parallel()
+
+	var union CriterionTypeUnion
+	node := &yaml.Node{Kind: yaml.SequenceNode}
+	validationErrs, err := union.Unmarshal(t.Context(), "test", node)
+	require.NoError(t, err, "should not return fatal error")
+	require.NotEmpty(t, validationErrs, "should have validation errors")
+	require.Contains(t, validationErrs[0].Error(), "expected string or object", "error should mention expected types")
+}
+
+func TestCriterionTypeUnion_SyncChanges_Int_Error(t *testing.T) {
+	t.Parallel()
+
+	union := &CriterionTypeUnion{}
+	union.SetValid(true, true)
+
+	_, err := union.SyncChanges(t.Context(), 42, nil)
+	require.Error(t, err, "should return error for int model")
+	require.Contains(t, err.Error(), "expected a struct", "error should mention struct expectation")
+}

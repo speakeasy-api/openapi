@@ -511,3 +511,337 @@ func TestNode_Unmarshal_Int_Success(t *testing.T) {
 		})
 	}
 }
+
+func TestNode_GetKeyNodeOrRoot_Success(t *testing.T) {
+	t.Parallel()
+
+	rootNode := &yaml.Node{Kind: yaml.DocumentNode, Line: 1}
+
+	tests := []struct {
+		name     string
+		node     Node[string]
+		expected *yaml.Node
+	}{
+		{
+			name:     "not present returns root node",
+			node:     Node[string]{Present: false, KeyNode: &yaml.Node{Line: 5}},
+			expected: rootNode,
+		},
+		{
+			name:     "present but nil key node returns root node",
+			node:     Node[string]{Present: true, KeyNode: nil},
+			expected: rootNode,
+		},
+		{
+			name:     "present with key node returns key node",
+			node:     Node[string]{Present: true, KeyNode: &yaml.Node{Line: 10}},
+			expected: &yaml.Node{Line: 10},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.node.GetKeyNodeOrRoot(rootNode)
+			assert.Equal(t, tt.expected.Line, result.Line)
+		})
+	}
+}
+
+func TestNode_GetKeyNodeOrRootLine_Success(t *testing.T) {
+	t.Parallel()
+
+	rootNode := &yaml.Node{Kind: yaml.DocumentNode, Line: 1}
+
+	tests := []struct {
+		name     string
+		node     Node[string]
+		expected int
+	}{
+		{
+			name:     "not present returns root line",
+			node:     Node[string]{Present: false, KeyNode: &yaml.Node{Line: 5}},
+			expected: 1,
+		},
+		{
+			name:     "present with key node returns key line",
+			node:     Node[string]{Present: true, KeyNode: &yaml.Node{Line: 10}},
+			expected: 10,
+		},
+		{
+			name:     "nil root node returns -1",
+			node:     Node[string]{Present: false},
+			expected: -1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var rn *yaml.Node
+			if tt.name != "nil root node returns -1" {
+				rn = rootNode
+			}
+			result := tt.node.GetKeyNodeOrRootLine(rn)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestNode_GetValueNode_Success(t *testing.T) {
+	t.Parallel()
+
+	valueNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "test"}
+	node := Node[string]{ValueNode: valueNode}
+
+	assert.Equal(t, valueNode, node.GetValueNode())
+}
+
+func TestNode_GetValueNodeOrRoot_Success(t *testing.T) {
+	t.Parallel()
+
+	rootNode := &yaml.Node{Kind: yaml.DocumentNode, Line: 1}
+	valueNode := &yaml.Node{Kind: yaml.ScalarNode, Line: 5}
+
+	tests := []struct {
+		name         string
+		node         Node[string]
+		expectedLine int
+	}{
+		{
+			name:         "not present returns root node",
+			node:         Node[string]{Present: false, ValueNode: valueNode},
+			expectedLine: 1,
+		},
+		{
+			name:         "present but nil value node returns root node",
+			node:         Node[string]{Present: true, ValueNode: nil},
+			expectedLine: 1,
+		},
+		{
+			name:         "present with value node returns value node",
+			node:         Node[string]{Present: true, ValueNode: valueNode},
+			expectedLine: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.node.GetValueNodeOrRoot(rootNode)
+			assert.Equal(t, tt.expectedLine, result.Line)
+		})
+	}
+}
+
+func TestNode_GetValueNodeOrRootLine_Success(t *testing.T) {
+	t.Parallel()
+
+	rootNode := &yaml.Node{Kind: yaml.DocumentNode, Line: 1}
+	valueNode := &yaml.Node{Kind: yaml.ScalarNode, Line: 5}
+
+	tests := []struct {
+		name     string
+		node     Node[string]
+		expected int
+	}{
+		{
+			name:     "not present returns root line",
+			node:     Node[string]{Present: false, ValueNode: valueNode},
+			expected: 1,
+		},
+		{
+			name:     "present with value node returns value line",
+			node:     Node[string]{Present: true, ValueNode: valueNode},
+			expected: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.node.GetValueNodeOrRootLine(rootNode)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestNode_GetSliceValueNodeOrRoot_Success(t *testing.T) {
+	t.Parallel()
+
+	rootNode := &yaml.Node{Kind: yaml.DocumentNode, Line: 1}
+	contentNode0 := &yaml.Node{Kind: yaml.ScalarNode, Line: 10, Value: "item0"}
+	contentNode1 := &yaml.Node{Kind: yaml.ScalarNode, Line: 11, Value: "item1"}
+	seqNode := &yaml.Node{
+		Kind:    yaml.SequenceNode,
+		Line:    5,
+		Content: []*yaml.Node{contentNode0, contentNode1},
+	}
+
+	tests := []struct {
+		name         string
+		node         Node[[]string]
+		idx          int
+		expectedLine int
+	}{
+		{
+			name:         "not present returns root node",
+			node:         Node[[]string]{Present: false, ValueNode: seqNode},
+			idx:          0,
+			expectedLine: 1,
+		},
+		{
+			name:         "valid index returns content node",
+			node:         Node[[]string]{Present: true, ValueNode: seqNode},
+			idx:          0,
+			expectedLine: 10,
+		},
+		{
+			name:         "valid index 1 returns content node",
+			node:         Node[[]string]{Present: true, ValueNode: seqNode},
+			idx:          1,
+			expectedLine: 11,
+		},
+		{
+			name:         "negative index returns value node",
+			node:         Node[[]string]{Present: true, ValueNode: seqNode},
+			idx:          -1,
+			expectedLine: 5,
+		},
+		{
+			name:         "out of bounds index returns value node",
+			node:         Node[[]string]{Present: true, ValueNode: seqNode},
+			idx:          10,
+			expectedLine: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.node.GetSliceValueNodeOrRoot(tt.idx, rootNode)
+			assert.Equal(t, tt.expectedLine, result.Line)
+		})
+	}
+}
+
+func TestNode_GetMapKeyNodeOrRoot_Success(t *testing.T) {
+	t.Parallel()
+
+	rootNode := &yaml.Node{Kind: yaml.DocumentNode, Line: 1}
+	keyNode := &yaml.Node{Kind: yaml.ScalarNode, Line: 10, Value: "key1"}
+	valNode := &yaml.Node{Kind: yaml.ScalarNode, Line: 10, Value: "val1"}
+	mapNode := &yaml.Node{
+		Kind:    yaml.MappingNode,
+		Line:    5,
+		Content: []*yaml.Node{keyNode, valNode},
+	}
+
+	tests := []struct {
+		name         string
+		node         Node[map[string]string]
+		key          string
+		expectedLine int
+	}{
+		{
+			name:         "not present returns root node",
+			node:         Node[map[string]string]{Present: false, ValueNode: mapNode},
+			key:          "key1",
+			expectedLine: 1,
+		},
+		{
+			name:         "key found returns key node",
+			node:         Node[map[string]string]{Present: true, ValueNode: mapNode},
+			key:          "key1",
+			expectedLine: 10,
+		},
+		{
+			name:         "key not found returns value node",
+			node:         Node[map[string]string]{Present: true, ValueNode: mapNode},
+			key:          "nonexistent",
+			expectedLine: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.node.GetMapKeyNodeOrRoot(tt.key, rootNode)
+			assert.Equal(t, tt.expectedLine, result.Line)
+		})
+	}
+}
+
+func TestNode_GetMapKeyNodeOrRootLine_Success(t *testing.T) {
+	t.Parallel()
+
+	rootNode := &yaml.Node{Kind: yaml.DocumentNode, Line: 1}
+	keyNode := &yaml.Node{Kind: yaml.ScalarNode, Line: 10, Value: "key1"}
+	valNode := &yaml.Node{Kind: yaml.ScalarNode, Line: 10, Value: "val1"}
+	mapNode := &yaml.Node{
+		Kind:    yaml.MappingNode,
+		Line:    5,
+		Content: []*yaml.Node{keyNode, valNode},
+	}
+
+	node := Node[map[string]string]{Present: true, ValueNode: mapNode}
+
+	assert.Equal(t, 10, node.GetMapKeyNodeOrRootLine("key1", rootNode))
+	assert.Equal(t, 5, node.GetMapKeyNodeOrRootLine("nonexistent", rootNode))
+}
+
+func TestNode_GetMapValueNodeOrRoot_Success(t *testing.T) {
+	t.Parallel()
+
+	rootNode := &yaml.Node{Kind: yaml.DocumentNode, Line: 1}
+	keyNode := &yaml.Node{Kind: yaml.ScalarNode, Line: 10, Value: "key1"}
+	valNode := &yaml.Node{Kind: yaml.ScalarNode, Line: 11, Value: "val1"}
+	mapNode := &yaml.Node{
+		Kind:    yaml.MappingNode,
+		Line:    5,
+		Content: []*yaml.Node{keyNode, valNode},
+	}
+
+	tests := []struct {
+		name         string
+		node         Node[map[string]string]
+		key          string
+		expectedLine int
+	}{
+		{
+			name:         "not present returns root node",
+			node:         Node[map[string]string]{Present: false, ValueNode: mapNode},
+			key:          "key1",
+			expectedLine: 1,
+		},
+		{
+			name:         "key found returns value node",
+			node:         Node[map[string]string]{Present: true, ValueNode: mapNode},
+			key:          "key1",
+			expectedLine: 11,
+		},
+		{
+			name:         "key not found returns value node",
+			node:         Node[map[string]string]{Present: true, ValueNode: mapNode},
+			key:          "nonexistent",
+			expectedLine: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.node.GetMapValueNodeOrRoot(tt.key, rootNode)
+			assert.Equal(t, tt.expectedLine, result.Line)
+		})
+	}
+}
+
+func TestNode_GetNavigableNode_Success(t *testing.T) {
+	t.Parallel()
+
+	node := Node[string]{Value: "test value"}
+	result, err := node.GetNavigableNode()
+	require.NoError(t, err)
+	assert.Equal(t, "test value", result)
+}

@@ -132,6 +132,24 @@ description: A reference to the user example
 			expectValid: false,
 			errorMsg:    "invalid reference JSON pointer",
 		},
+		{
+			name:        "invalid reference - empty component name in schemas",
+			yaml:        `$ref: '#/components/schemas/'`,
+			expectValid: false,
+			errorMsg:    "component name cannot be empty",
+		},
+		{
+			name:        "invalid reference - empty component name in parameters",
+			yaml:        `$ref: '#/components/parameters/'`,
+			expectValid: false,
+			errorMsg:    "component name cannot be empty",
+		},
+		{
+			name:        "invalid reference - empty component name in responses",
+			yaml:        `$ref: '#/components/responses/'`,
+			expectValid: false,
+			errorMsg:    "component name cannot be empty",
+		},
 	}
 
 	for _, tt := range tests {

@@ -9,6 +9,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func TestNewSecurityRequirement_Success(t *testing.T) {
+	t.Parallel()
+
+	secReq := NewSecurityRequirement()
+	require.NotNil(t, secReq, "NewSecurityRequirement should return a non-nil security requirement")
+	require.NotNil(t, secReq.Map, "secReq.Map should be initialized")
+	assert.Equal(t, 0, secReq.Len(), "newly created security requirement should be empty")
+}
+
 func TestSecurityRequirement_GetMapKeyNodeOrRoot_Success(t *testing.T) {
 	t.Parallel()
 
@@ -165,6 +174,38 @@ oauth2:
 			assert.Equal(t, rootNode.Line, line, "should return root node line")
 		})
 	}
+}
+
+func TestSecurityRequirement_GetMapKeyNodeOrRoot_Uninitialized(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns root when security requirement is not initialized", func(t *testing.T) {
+		t.Parallel()
+		var secReq SecurityRequirement
+		rootNode := &yaml.Node{Kind: yaml.MappingNode, Line: 1}
+		result := secReq.GetMapKeyNodeOrRoot("oauth2", rootNode)
+		assert.Equal(t, rootNode, result, "should return root node when not initialized")
+	})
+
+	t.Run("returns root when RootNode is nil", func(t *testing.T) {
+		t.Parallel()
+		secReq := &SecurityRequirement{}
+		secReq.SetValid(true, true)
+		rootNode := &yaml.Node{Kind: yaml.MappingNode, Line: 1}
+		result := secReq.GetMapKeyNodeOrRoot("oauth2", rootNode)
+		assert.Equal(t, rootNode, result, "should return root node when RootNode is nil")
+	})
+}
+
+func TestSecurityRequirement_GetMapKeyNodeOrRootLine_NilNode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns -1 when GetMapKeyNodeOrRoot returns nil", func(t *testing.T) {
+		t.Parallel()
+		var secReq SecurityRequirement
+		line := secReq.GetMapKeyNodeOrRootLine("oauth2", nil)
+		assert.Equal(t, -1, line, "should return -1 when node is nil")
+	})
 }
 
 // Helper function

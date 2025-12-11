@@ -6,7 +6,24 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
+
+func TestNewPaths_Success(t *testing.T) {
+	t.Parallel()
+
+	paths := NewPaths()
+	require.NotNil(t, paths, "NewPaths should return a non-nil paths")
+	require.NotNil(t, paths.Map, "paths.Map should be initialized")
+	assert.Equal(t, 0, paths.Len(), "newly created paths should be empty")
+}
+
+func TestNewPathItem_Success(t *testing.T) {
+	t.Parallel()
+
+	pathItem := NewPathItem()
+	require.NotNil(t, pathItem, "NewPathItem should return a non-nil path item")
+}
 
 func TestPaths_GetMapKeyNodeOrRoot_Success(t *testing.T) {
 	t.Parallel()
@@ -335,4 +352,68 @@ get:
 			assert.Equal(t, rootNode.Line, line, "should return root node line")
 		})
 	}
+}
+
+func TestPaths_GetMapKeyNodeOrRoot_Uninitialized(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns root when paths is not initialized", func(t *testing.T) {
+		t.Parallel()
+		var paths Paths
+		rootNode := &yaml.Node{Kind: yaml.MappingNode, Line: 1}
+		result := paths.GetMapKeyNodeOrRoot("/pets", rootNode)
+		assert.Equal(t, rootNode, result, "should return root node when not initialized")
+	})
+
+	t.Run("returns root when RootNode is nil", func(t *testing.T) {
+		t.Parallel()
+		paths := &Paths{}
+		paths.SetValid(true, true)
+		rootNode := &yaml.Node{Kind: yaml.MappingNode, Line: 1}
+		result := paths.GetMapKeyNodeOrRoot("/pets", rootNode)
+		assert.Equal(t, rootNode, result, "should return root node when RootNode is nil")
+	})
+}
+
+func TestPaths_GetMapKeyNodeOrRootLine_NilNode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns -1 when GetMapKeyNodeOrRoot returns nil", func(t *testing.T) {
+		t.Parallel()
+		var paths Paths
+		line := paths.GetMapKeyNodeOrRootLine("/pets", nil)
+		assert.Equal(t, -1, line, "should return -1 when node is nil")
+	})
+}
+
+func TestPathItem_GetMapKeyNodeOrRoot_Uninitialized(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns root when pathItem is not initialized", func(t *testing.T) {
+		t.Parallel()
+		var pathItem PathItem
+		rootNode := &yaml.Node{Kind: yaml.MappingNode, Line: 1}
+		result := pathItem.GetMapKeyNodeOrRoot("get", rootNode)
+		assert.Equal(t, rootNode, result, "should return root node when not initialized")
+	})
+
+	t.Run("returns root when RootNode is nil", func(t *testing.T) {
+		t.Parallel()
+		pathItem := &PathItem{}
+		pathItem.SetValid(true, true)
+		rootNode := &yaml.Node{Kind: yaml.MappingNode, Line: 1}
+		result := pathItem.GetMapKeyNodeOrRoot("get", rootNode)
+		assert.Equal(t, rootNode, result, "should return root node when RootNode is nil")
+	})
+}
+
+func TestPathItem_GetMapKeyNodeOrRootLine_NilNode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns -1 when GetMapKeyNodeOrRoot returns nil", func(t *testing.T) {
+		t.Parallel()
+		var pathItem PathItem
+		line := pathItem.GetMapKeyNodeOrRootLine("get", nil)
+		assert.Equal(t, -1, line, "should return -1 when node is nil")
+	})
 }

@@ -180,15 +180,16 @@ mapping:
   dog: "#/components/schemas/Dog"
 `
 
-	var discriminator oas3.Discriminator
-	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &discriminator)
-	require.NoError(t, err)
-	require.Empty(t, validationErrs)
-
 	// Test with both 3.1 and 3.2 versions
 	for _, version := range []string{"3.1.0", "3.2.0"} {
 		t.Run("version_"+version, func(t *testing.T) {
 			t.Parallel()
+
+			// Each parallel test needs its own discriminator instance to avoid data races
+			var discriminator oas3.Discriminator
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &discriminator)
+			require.NoError(t, err)
+			require.Empty(t, validationErrs)
 
 			opts := []validation.Option{
 				validation.WithContextObject(&oas3.ParentDocumentVersion{

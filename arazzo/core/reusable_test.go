@@ -55,3 +55,44 @@ func TestReusable_SyncChanges_NonStruct_Error(t *testing.T) {
 	require.Error(t, err, "SyncChanges should fail")
 	assert.Contains(t, err.Error(), "Reusable.SyncChanges expected a struct, got string", "error message should match")
 }
+
+func TestReusable_Unmarshal_NilNode_Error(t *testing.T) {
+	t.Parallel()
+
+	var reusable Reusable[*Parameter]
+	_, err := reusable.Unmarshal(t.Context(), "test", nil)
+	require.Error(t, err, "should return error for nil node")
+	assert.Contains(t, err.Error(), "node is nil", "error should mention nil node")
+}
+
+func TestReusable_Unmarshal_InlinedObject_Success(t *testing.T) {
+	t.Parallel()
+
+	yamlContent := `name: petId
+in: path
+value: "123"`
+
+	var node yaml.Node
+	err := yaml.Unmarshal([]byte(yamlContent), &node)
+	require.NoError(t, err, "unmarshal should succeed")
+
+	var reusable Reusable[*Parameter]
+	validationErrs, err := reusable.Unmarshal(t.Context(), "test", node.Content[0])
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "validation errors should be empty")
+	assert.True(t, reusable.GetValid(), "reusable should be valid")
+	require.NotNil(t, reusable.Object, "Object should not be nil")
+}
+
+func TestReusable_SyncChanges_Int_Error(t *testing.T) {
+	t.Parallel()
+
+	var node yaml.Node
+	err := yaml.Unmarshal([]byte(`reference: '#/test'`), &node)
+	require.NoError(t, err, "unmarshal should succeed")
+
+	reusable := Reusable[*Parameter]{}
+	_, err = reusable.SyncChanges(t.Context(), 42, node.Content[0])
+	require.Error(t, err, "SyncChanges should fail")
+	assert.Contains(t, err.Error(), "expected a struct", "error message should mention struct expectation")
+}

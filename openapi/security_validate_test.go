@@ -758,3 +758,96 @@ scopes:
 		})
 	}
 }
+
+func TestSecurityScheme_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+type: oauth2
+description: OAuth2 authentication
+flows:
+  authorizationCode:
+    authorizationUrl: https://example.com/auth
+    tokenUrl: https://example.com/token
+    scopes:
+      read: Read access
+openIdConnectUrl: https://example.com/.well-known/openid
+oauth2MetadataUrl: https://example.com/.well-known/oauth
+deprecated: true
+x-custom: value
+`
+	var securityScheme openapi.SecurityScheme
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &securityScheme)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	require.Equal(t, openapi.SecuritySchemeTypeOAuth2, securityScheme.GetType(), "GetType should return correct value")
+	require.Equal(t, "OAuth2 authentication", securityScheme.GetDescription(), "GetDescription should return correct value")
+	require.NotNil(t, securityScheme.GetFlows(), "GetFlows should return non-nil")
+	require.Equal(t, "https://example.com/.well-known/openid", securityScheme.GetOpenIdConnectUrl(), "GetOpenIdConnectUrl should return correct value")
+	require.Equal(t, "https://example.com/.well-known/oauth", securityScheme.GetOAuth2MetadataUrl(), "GetOAuth2MetadataUrl should return correct value")
+	require.True(t, securityScheme.GetDeprecated(), "GetDeprecated should return true")
+	require.NotNil(t, securityScheme.GetExtensions(), "GetExtensions should return non-nil")
+}
+
+func TestSecurityScheme_Getters_HTTPScheme(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+type: http
+scheme: bearer
+bearerFormat: JWT
+`
+	var securityScheme openapi.SecurityScheme
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &securityScheme)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	require.Equal(t, "bearer", securityScheme.GetScheme(), "GetScheme should return correct value")
+	require.Equal(t, "JWT", securityScheme.GetBearerFormat(), "GetBearerFormat should return correct value")
+}
+
+func TestSecurityScheme_Getters_Nil(t *testing.T) {
+	t.Parallel()
+
+	var securityScheme *openapi.SecurityScheme
+
+	require.Empty(t, securityScheme.GetType(), "GetType should return empty for nil")
+	require.Empty(t, securityScheme.GetDescription(), "GetDescription should return empty string for nil")
+	require.Empty(t, securityScheme.GetScheme(), "GetScheme should return empty string for nil")
+	require.Empty(t, securityScheme.GetBearerFormat(), "GetBearerFormat should return empty string for nil")
+	require.Nil(t, securityScheme.GetFlows(), "GetFlows should return nil for nil scheme")
+	require.Empty(t, securityScheme.GetOpenIdConnectUrl(), "GetOpenIdConnectUrl should return empty string for nil")
+	require.Empty(t, securityScheme.GetOAuth2MetadataUrl(), "GetOAuth2MetadataUrl should return empty string for nil")
+	require.False(t, securityScheme.GetDeprecated(), "GetDeprecated should return false for nil")
+	require.NotNil(t, securityScheme.GetExtensions(), "GetExtensions should return empty extensions for nil scheme")
+}
+
+func TestOAuthFlows_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+implicit:
+  authorizationUrl: https://example.com/auth
+  scopes:
+    read: Read access
+x-custom: value
+`
+	var flows openapi.OAuthFlows
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &flows)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	require.NotNil(t, flows.GetExtensions(), "GetExtensions should return non-nil")
+}
+
+func TestOAuthFlows_Getters_Nil(t *testing.T) {
+	t.Parallel()
+
+	var flows *openapi.OAuthFlows
+
+	require.NotNil(t, flows.GetExtensions(), "GetExtensions should return empty extensions for nil flows")
+}

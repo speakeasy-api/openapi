@@ -1,6 +1,7 @@
 package yml_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/yml"
@@ -675,6 +676,169 @@ func TestEqualNodes_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result := yml.EqualNodes(tt.nodeA, tt.nodeB)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestTypeToYamlTags_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		typ      reflect.Type
+		expected []string
+	}{
+		{
+			name:     "nil type returns nil",
+			typ:      nil,
+			expected: nil,
+		},
+		{
+			name:     "string type returns str and numeric tags",
+			typ:      reflect.TypeOf(""),
+			expected: []string{"!!bool", "!!float", "!!str", "!!int"},
+		},
+		{
+			name:     "int type returns numeric tags",
+			typ:      reflect.TypeOf(0),
+			expected: []string{"!!float", "!!str", "!!int"},
+		},
+		{
+			name:     "int64 type returns numeric tags",
+			typ:      reflect.TypeOf(int64(0)),
+			expected: []string{"!!float", "!!str", "!!int"},
+		},
+		{
+			name:     "float64 type returns numeric tags",
+			typ:      reflect.TypeOf(float64(0)),
+			expected: []string{"!!float", "!!str", "!!int"},
+		},
+		{
+			name:     "bool type returns bool and str tags",
+			typ:      reflect.TypeOf(true),
+			expected: []string{"!!bool", "!!str"},
+		},
+		{
+			name:     "struct type returns map tag",
+			typ:      reflect.TypeOf(struct{}{}),
+			expected: []string{"!!map"},
+		},
+		{
+			name:     "map type returns map tag",
+			typ:      reflect.TypeOf(map[string]string{}),
+			expected: []string{"!!map"},
+		},
+		{
+			name:     "slice type returns seq tag",
+			typ:      reflect.TypeOf([]string{}),
+			expected: []string{"!!seq"},
+		},
+		{
+			name:     "array type returns seq tag",
+			typ:      reflect.TypeOf([3]string{}),
+			expected: []string{"!!seq"},
+		},
+		{
+			name:     "pointer to string includes null tag",
+			typ:      reflect.TypeOf((*string)(nil)),
+			expected: []string{"!!bool", "!!float", "!!str", "!!int", "!!null"},
+		},
+		{
+			name:     "pointer to int includes null tag",
+			typ:      reflect.TypeOf((*int)(nil)),
+			expected: []string{"!!float", "!!str", "!!int", "!!null"},
+		},
+		{
+			name:     "pointer to bool includes null tag",
+			typ:      reflect.TypeOf((*bool)(nil)),
+			expected: []string{"!!bool", "!!str", "!!null"},
+		},
+		{
+			name:     "pointer to struct includes null tag",
+			typ:      reflect.TypeOf((*struct{})(nil)),
+			expected: []string{"!!map", "!!null"},
+		},
+		{
+			name:     "channel type returns nil",
+			typ:      reflect.TypeOf(make(chan int)),
+			expected: nil,
+		},
+		{
+			name:     "func type returns nil",
+			typ:      reflect.TypeOf(func() {}),
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := yml.TypeToYamlTags(tt.typ)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestNodeTagToString_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		tag      string
+		expected string
+	}{
+		{
+			name:     "str tag",
+			tag:      "!!str",
+			expected: "string",
+		},
+		{
+			name:     "int tag",
+			tag:      "!!int",
+			expected: "int",
+		},
+		{
+			name:     "float tag",
+			tag:      "!!float",
+			expected: "float",
+		},
+		{
+			name:     "bool tag",
+			tag:      "!!bool",
+			expected: "bool",
+		},
+		{
+			name:     "map tag",
+			tag:      "!!map",
+			expected: "object",
+		},
+		{
+			name:     "seq tag",
+			tag:      "!!seq",
+			expected: "sequence",
+		},
+		{
+			name:     "null tag",
+			tag:      "!!null",
+			expected: "null",
+		},
+		{
+			name:     "unknown tag returns as-is",
+			tag:      "!!custom",
+			expected: "!!custom",
+		},
+		{
+			name:     "empty tag returns as-is",
+			tag:      "",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := yml.NodeTagToString(tt.tag)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

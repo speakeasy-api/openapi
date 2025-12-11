@@ -5,8 +5,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/pointer"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -157,6 +160,302 @@ namespace: ":invalid namespace"
 				}
 				require.True(t, found, "expected error message '%s' not found in: %v", expectedErr, errMessages)
 			}
+		})
+	}
+}
+
+func TestXML_GetName_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		xml      *oas3.XML
+		expected string
+	}{
+		{
+			name:     "nil xml returns empty",
+			xml:      nil,
+			expected: "",
+		},
+		{
+			name:     "returns name",
+			xml:      &oas3.XML{Name: pointer.From("element")},
+			expected: "element",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.xml.GetName())
+		})
+	}
+}
+
+func TestXML_GetNamespace_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		xml      *oas3.XML
+		expected string
+	}{
+		{
+			name:     "nil xml returns empty",
+			xml:      nil,
+			expected: "",
+		},
+		{
+			name:     "returns namespace",
+			xml:      &oas3.XML{Namespace: pointer.From("https://example.com")},
+			expected: "https://example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.xml.GetNamespace())
+		})
+	}
+}
+
+func TestXML_GetPrefix_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		xml      *oas3.XML
+		expected string
+	}{
+		{
+			name:     "nil xml returns empty",
+			xml:      nil,
+			expected: "",
+		},
+		{
+			name:     "returns prefix",
+			xml:      &oas3.XML{Prefix: pointer.From("ex")},
+			expected: "ex",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.xml.GetPrefix())
+		})
+	}
+}
+
+func TestXML_GetAttribute_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		xml      *oas3.XML
+		expected bool
+	}{
+		{
+			name:     "nil xml returns false",
+			xml:      nil,
+			expected: false,
+		},
+		{
+			name:     "returns true",
+			xml:      &oas3.XML{Attribute: pointer.From(true)},
+			expected: true,
+		},
+		{
+			name:     "returns false",
+			xml:      &oas3.XML{Attribute: pointer.From(false)},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.xml.GetAttribute())
+		})
+	}
+}
+
+func TestXML_GetWrapped_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		xml      *oas3.XML
+		expected bool
+	}{
+		{
+			name:     "nil xml returns false",
+			xml:      nil,
+			expected: false,
+		},
+		{
+			name:     "returns true",
+			xml:      &oas3.XML{Wrapped: pointer.From(true)},
+			expected: true,
+		},
+		{
+			name:     "returns false",
+			xml:      &oas3.XML{Wrapped: pointer.From(false)},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.xml.GetWrapped())
+		})
+	}
+}
+
+func TestXML_GetExtensions_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		xml         *oas3.XML
+		expectEmpty bool
+	}{
+		{
+			name:        "nil xml returns empty extensions",
+			xml:         nil,
+			expectEmpty: true,
+		},
+		{
+			name:        "nil extensions returns empty extensions",
+			xml:         &oas3.XML{},
+			expectEmpty: true,
+		},
+		{
+			name:        "returns extensions",
+			xml:         &oas3.XML{Extensions: extensions.New()},
+			expectEmpty: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.xml.GetExtensions()
+			assert.NotNil(t, result)
+			if tt.expectEmpty {
+				assert.Equal(t, 0, result.Len())
+			}
+		})
+	}
+}
+
+func TestXML_IsEqual_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		a        *oas3.XML
+		b        *oas3.XML
+		expected bool
+	}{
+		{
+			name:     "both nil returns true",
+			a:        nil,
+			b:        nil,
+			expected: true,
+		},
+		{
+			name:     "a nil b not nil returns false",
+			a:        nil,
+			b:        &oas3.XML{Name: pointer.From("element")},
+			expected: false,
+		},
+		{
+			name:     "a not nil b nil returns false",
+			a:        &oas3.XML{Name: pointer.From("element")},
+			b:        nil,
+			expected: false,
+		},
+		{
+			name:     "equal name returns true",
+			a:        &oas3.XML{Name: pointer.From("element")},
+			b:        &oas3.XML{Name: pointer.From("element")},
+			expected: true,
+		},
+		{
+			name:     "different name returns false",
+			a:        &oas3.XML{Name: pointer.From("element1")},
+			b:        &oas3.XML{Name: pointer.From("element2")},
+			expected: false,
+		},
+		{
+			name:     "equal namespace returns true",
+			a:        &oas3.XML{Namespace: pointer.From("https://example.com")},
+			b:        &oas3.XML{Namespace: pointer.From("https://example.com")},
+			expected: true,
+		},
+		{
+			name:     "different namespace returns false",
+			a:        &oas3.XML{Namespace: pointer.From("https://example1.com")},
+			b:        &oas3.XML{Namespace: pointer.From("https://example2.com")},
+			expected: false,
+		},
+		{
+			name:     "equal prefix returns true",
+			a:        &oas3.XML{Prefix: pointer.From("ex")},
+			b:        &oas3.XML{Prefix: pointer.From("ex")},
+			expected: true,
+		},
+		{
+			name:     "different prefix returns false",
+			a:        &oas3.XML{Prefix: pointer.From("ex1")},
+			b:        &oas3.XML{Prefix: pointer.From("ex2")},
+			expected: false,
+		},
+		{
+			name:     "equal attribute returns true",
+			a:        &oas3.XML{Attribute: pointer.From(true)},
+			b:        &oas3.XML{Attribute: pointer.From(true)},
+			expected: true,
+		},
+		{
+			name:     "different attribute returns false",
+			a:        &oas3.XML{Attribute: pointer.From(true)},
+			b:        &oas3.XML{Attribute: pointer.From(false)},
+			expected: false,
+		},
+		{
+			name:     "equal wrapped returns true",
+			a:        &oas3.XML{Wrapped: pointer.From(true)},
+			b:        &oas3.XML{Wrapped: pointer.From(true)},
+			expected: true,
+		},
+		{
+			name:     "different wrapped returns false",
+			a:        &oas3.XML{Wrapped: pointer.From(true)},
+			b:        &oas3.XML{Wrapped: pointer.From(false)},
+			expected: false,
+		},
+		{
+			name:     "both nil extensions returns true",
+			a:        &oas3.XML{Name: pointer.From("element")},
+			b:        &oas3.XML{Name: pointer.From("element")},
+			expected: true,
+		},
+		{
+			name:     "one nil extensions returns false",
+			a:        &oas3.XML{Name: pointer.From("element"), Extensions: extensions.New()},
+			b:        &oas3.XML{Name: pointer.From("element")},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.a.IsEqual(tt.b))
 		})
 	}
 }

@@ -175,3 +175,35 @@ func TestExternalDocumentation_Validate_Error(t *testing.T) {
 		})
 	}
 }
+
+func TestTag_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `name: users
+description: User operations
+externalDocs:
+  url: https://example.com/docs
+x-custom: value
+`
+	var tag swagger.Tag
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &tag)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	require.Equal(t, "users", tag.GetName(), "GetName should return correct value")
+	require.Equal(t, "User operations", tag.GetDescription(), "GetDescription should return correct value")
+	require.NotNil(t, tag.GetExternalDocs(), "GetExternalDocs should return non-nil")
+	require.NotNil(t, tag.GetExtensions(), "GetExtensions should return non-nil")
+}
+
+func TestTag_Getters_Nil(t *testing.T) {
+	t.Parallel()
+
+	var tag *swagger.Tag
+
+	require.Empty(t, tag.GetName(), "GetName should return empty string for nil")
+	require.Empty(t, tag.GetDescription(), "GetDescription should return empty string for nil")
+	require.Nil(t, tag.GetExternalDocs(), "GetExternalDocs should return nil for nil tag")
+	require.NotNil(t, tag.GetExtensions(), "GetExtensions should return empty extensions for nil tag")
+}

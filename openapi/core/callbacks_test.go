@@ -6,7 +6,17 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
+
+func TestNewCallback_Success(t *testing.T) {
+	t.Parallel()
+
+	callback := NewCallback()
+	require.NotNil(t, callback, "NewCallback should return a non-nil callback")
+	require.NotNil(t, callback.Map, "callback.Map should be initialized")
+	assert.Equal(t, 0, callback.Len(), "newly created callback should be empty")
+}
 
 func TestCallback_GetMapKeyNodeOrRoot_Success(t *testing.T) {
 	t.Parallel()
@@ -175,4 +185,38 @@ func TestCallback_GetMapKeyNodeOrRootLine_ReturnsRootLine(t *testing.T) {
 			assert.Equal(t, rootNode.Line, line, "should return root node line")
 		})
 	}
+}
+
+func TestCallback_GetMapKeyNodeOrRoot_Uninitialized(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns root when callback is not initialized", func(t *testing.T) {
+		t.Parallel()
+		var callback Callback
+		// Don't unmarshal - leave uninitialized
+		rootNode := &yaml.Node{Kind: yaml.MappingNode, Line: 1}
+		result := callback.GetMapKeyNodeOrRoot("anykey", rootNode)
+		assert.Equal(t, rootNode, result, "should return root node when not initialized")
+	})
+
+	t.Run("returns root when RootNode is nil", func(t *testing.T) {
+		t.Parallel()
+		callback := &Callback{}
+		callback.SetValid(true, true) // Mark as initialized but no RootNode
+		rootNode := &yaml.Node{Kind: yaml.MappingNode, Line: 1}
+		result := callback.GetMapKeyNodeOrRoot("anykey", rootNode)
+		assert.Equal(t, rootNode, result, "should return root node when RootNode is nil")
+	})
+}
+
+func TestCallback_GetMapKeyNodeOrRootLine_NilNode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns -1 when GetMapKeyNodeOrRoot returns nil", func(t *testing.T) {
+		t.Parallel()
+		var callback Callback
+		// Pass nil as rootNode - when not initialized, nil is returned
+		line := callback.GetMapKeyNodeOrRootLine("anykey", nil)
+		assert.Equal(t, -1, line, "should return -1 when node is nil")
+	})
 }

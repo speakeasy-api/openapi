@@ -206,7 +206,8 @@ func TestReference_String(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := string(tt.ref)
+			// Test String() method
+			result := tt.ref.String()
 			assert.Equal(t, tt.expected, result)
 		})
 	}

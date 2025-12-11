@@ -157,3 +157,150 @@ description: Header with invalid schema
 		})
 	}
 }
+
+func TestHeader_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		yml          string
+		wantRequired bool
+		wantDeprec   bool
+		wantStyle    openapi.SerializationStyle
+		wantExplode  bool
+		wantDescr    string
+	}{
+		{
+			name: "all fields set",
+			yml: `
+required: true
+deprecated: true
+style: simple
+explode: true
+description: Test header
+schema:
+  type: string
+`,
+			wantRequired: true,
+			wantDeprec:   true,
+			wantStyle:    openapi.SerializationStyleSimple,
+			wantExplode:  true,
+			wantDescr:    "Test header",
+		},
+		{
+			name: "default values",
+			yml: `
+schema:
+  type: string
+`,
+			wantRequired: false,
+			wantDeprec:   false,
+			wantStyle:    openapi.SerializationStyleSimple,
+			wantExplode:  false,
+			wantDescr:    "",
+		},
+		{
+			name: "only required set",
+			yml: `
+required: true
+schema:
+  type: string
+`,
+			wantRequired: true,
+			wantDeprec:   false,
+			wantStyle:    openapi.SerializationStyleSimple,
+			wantExplode:  false,
+			wantDescr:    "",
+		},
+		{
+			name: "only deprecated set",
+			yml: `
+deprecated: true
+schema:
+  type: string
+`,
+			wantRequired: false,
+			wantDeprec:   true,
+			wantStyle:    openapi.SerializationStyleSimple,
+			wantExplode:  false,
+			wantDescr:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var header openapi.Header
+			_, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &header)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantRequired, header.GetRequired(), "GetRequired mismatch")
+			assert.Equal(t, tt.wantDeprec, header.GetDeprecated(), "GetDeprecated mismatch")
+			assert.Equal(t, tt.wantStyle, header.GetStyle(), "GetStyle mismatch")
+			assert.Equal(t, tt.wantExplode, header.GetExplode(), "GetExplode mismatch")
+			assert.Equal(t, tt.wantDescr, header.GetDescription(), "GetDescription mismatch")
+			assert.NotNil(t, header.GetSchema(), "GetSchema should not be nil")
+			assert.NotNil(t, header.GetExtensions(), "GetExtensions should never be nil")
+		})
+	}
+}
+
+func TestHeader_Getters_Nil(t *testing.T) {
+	t.Parallel()
+
+	var header *openapi.Header = nil
+
+	assert.False(t, header.GetRequired(), "nil header GetRequired should return false")
+	assert.False(t, header.GetDeprecated(), "nil header GetDeprecated should return false")
+	assert.Equal(t, openapi.SerializationStyleSimple, header.GetStyle(), "nil header GetStyle should return simple")
+	assert.False(t, header.GetExplode(), "nil header GetExplode should return false")
+	assert.Empty(t, header.GetDescription(), "nil header GetDescription should return empty")
+	assert.Nil(t, header.GetSchema(), "nil header GetSchema should return nil")
+	assert.Nil(t, header.GetContent(), "nil header GetContent should return nil")
+	assert.Nil(t, header.GetExample(), "nil header GetExample should return nil")
+	assert.Nil(t, header.GetExamples(), "nil header GetExamples should return nil")
+	assert.NotNil(t, header.GetExtensions(), "nil header GetExtensions should return empty")
+}
+
+func TestHeader_GetContent_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+content:
+  application/json:
+    schema:
+      type: object
+description: Header with content
+`
+
+	var header openapi.Header
+	_, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &header)
+	require.NoError(t, err)
+
+	content := header.GetContent()
+	require.NotNil(t, content, "GetContent should not be nil")
+	assert.Equal(t, 1, content.Len(), "content should have one entry")
+}
+
+func TestHeader_GetExamples_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+schema:
+  type: string
+examples:
+  example1:
+    value: "test1"
+  example2:
+    value: "test2"
+`
+
+	var header openapi.Header
+	_, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &header)
+	require.NoError(t, err)
+
+	examples := header.GetExamples()
+	require.NotNil(t, examples, "GetExamples should not be nil")
+	assert.Equal(t, 2, examples.Len(), "examples should have two entries")
+}

@@ -762,3 +762,55 @@ func TestGetConfigFromDoc_WithNumericStrings_Success(t *testing.T) {
 		})
 	}
 }
+
+func TestIndentationStyle_ToIndent_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		style    yml.IndentationStyle
+		expected string
+	}{
+		{
+			name:     "space style returns space character",
+			style:    yml.IndentationStyleSpace,
+			expected: " ",
+		},
+		{
+			name:     "tab style returns tab character",
+			style:    yml.IndentationStyleTab,
+			expected: "\t",
+		},
+		{
+			name:     "unknown style returns empty string",
+			style:    yml.IndentationStyle("unknown"),
+			expected: "",
+		},
+		{
+			name:     "empty style returns empty string",
+			style:    yml.IndentationStyle(""),
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := tt.style.ToIndent()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGetDefaultConfig_Success(t *testing.T) {
+	t.Parallel()
+
+	config := yml.GetDefaultConfig()
+
+	require.NotNil(t, config, "GetDefaultConfig should not return nil")
+	assert.Equal(t, 2, config.Indentation, "default indentation should be 2")
+	assert.Equal(t, yml.IndentationStyleSpace, config.IndentationStyle, "default indentation style should be space")
+	assert.Equal(t, yml.OutputFormatYAML, config.OutputFormat, "default output format should be YAML")
+	assert.Equal(t, yaml.Style(0), config.KeyStringStyle, "default key string style should be 0")
+	assert.Equal(t, yaml.Style(0), config.ValueStringStyle, "default value string style should be 0")
+}
