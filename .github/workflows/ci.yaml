@@ -207,6 +207,12 @@ jobs:
             coverage.html
             coverage-summary.md
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.out
+
   # Build jobs (run in parallel)
   build-ubuntu:
     name: Build (Ubuntu)
