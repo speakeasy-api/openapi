@@ -214,6 +214,19 @@ production:
 `,
 			indentation: 2,
 		},
+		{
+			name: "booleans",
+			yamlInput: `lowerCaseBool: true
+mixedCaseBool: True
+upperCaseBool: FALSE
+`,
+			expectedJSON: `{
+  "lowerCaseBool": true,
+  "mixedCaseBool": true,
+  "upperCaseBool": false
+}
+`,
+		},
 	}
 
 	for _, tt := range tests {
