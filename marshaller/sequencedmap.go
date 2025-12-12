@@ -35,6 +35,41 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 
 	target.Init()
 
+	// Pre-scan for duplicate keys to detect them before concurrent processing
+	type keyInfo struct {
+		firstLine int
+		lastIndex int
+	}
+	seenKeys := make(map[string]*keyInfo)
+	indicesToSkip := make(map[int]bool)
+	var duplicateKeyErrs []error
+
+	for i := 0; i < len(resolvedNode.Content); i += 2 {
+		keyNode := resolvedNode.Content[i]
+		resolvedKeyNode := yml.ResolveAlias(keyNode)
+		if resolvedKeyNode == nil {
+			continue
+		}
+		key := resolvedKeyNode.Value
+
+		if existing, ok := seenKeys[key]; ok {
+			// This is a duplicate key - mark the previous occurrence for skipping
+			indicesToSkip[existing.lastIndex] = true
+			// Create validation error for the earlier occurrence
+			duplicateKeyErrs = append(duplicateKeyErrs, validation.NewValidationError(
+				validation.NewValueValidationError("mapping key %q at line %d is a duplicate; previous definition at line %d", key, keyNode.Line, existing.firstLine),
+				keyNode,
+			))
+			// Update to point to current (last) occurrence
+			existing.lastIndex = i / 2
+		} else {
+			seenKeys[key] = &keyInfo{
+				firstLine: keyNode.Line,
+				lastIndex: i / 2,
+			}
+		}
+	}
+
 	g, ctx := errgroup.WithContext(ctx)
 
 	numJobs := len(resolvedNode.Content) / 2
@@ -49,6 +84,11 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 
 	for i := 0; i < len(resolvedNode.Content); i += 2 {
 		g.Go(func() error {
+			// Skip duplicate keys (all but the last occurrence)
+			if indicesToSkip[i/2] {
+				return nil
+			}
+
 			keyNode := resolvedNode.Content[i]
 			valueNode := resolvedNode.Content[i+1]
 
@@ -96,13 +136,20 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 		return nil, err
 	}
 
-	for _, keyPair := range valuesToSet {
+	for i, keyPair := range valuesToSet {
+		// Skip entries that were marked as duplicates
+		if indicesToSkip[i] {
+			continue
+		}
 		if err := target.SetUntyped(keyPair.key, keyPair.value); err != nil {
 			return nil, err
 		}
 	}
 
 	var allValidationErrs []error
+
+	// Add duplicate key validation errors first
+	allValidationErrs = append(allValidationErrs, duplicateKeyErrs...)
 
 	for _, jobValidationErrs := range jobsValidationErrs {
 		allValidationErrs = append(allValidationErrs, jobValidationErrs...)

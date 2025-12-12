@@ -349,6 +349,35 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 		}
 	}
 
+	// Pre-scan for duplicate keys and determine which indices to skip
+	// For duplicate keys, we only process the last occurrence (YAML spec behavior)
+	// and report earlier occurrences as validation errors
+	type keyInfo struct {
+		firstLine int // line of first occurrence
+		lastIndex int // index of last occurrence (the one we'll process)
+	}
+	seenKeys := make(map[string]*keyInfo)
+	indicesToSkip := make(map[int]bool) // indices that are duplicates (not the last occurrence)
+	var duplicateKeyErrs []error
+
+	for i := 0; i < len(resolvedNode.Content); i += 2 {
+		keyNode := resolvedNode.Content[i]
+		key := keyNode.Value
+		if info, exists := seenKeys[key]; exists {
+			// This is a duplicate - mark the previous last occurrence for skipping
+			indicesToSkip[info.lastIndex] = true
+			// Create validation error for the earlier occurrence
+			duplicateKeyErrs = append(duplicateKeyErrs, validation.NewValidationError(
+				validation.NewValueValidationError("mapping key %q at line %d is a duplicate; previous definition at line %d", key, keyNode.Line, info.firstLine),
+				keyNode,
+			))
+			// Update to track this as the new last occurrence
+			info.lastIndex = i / 2
+		} else {
+			seenKeys[key] = &keyInfo{firstLine: keyNode.Line, lastIndex: i / 2}
+		}
+	}
+
 	// Process YAML nodes and validate required fields in one pass
 	foundRequiredFields := sync.Map{}
 
@@ -376,6 +405,11 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 
 	for i := 0; i < len(resolvedNode.Content); i += 2 {
 		g.Go(func() error {
+			// Skip duplicate keys (all but the last occurrence)
+			if indicesToSkip[i/2] {
+				return nil
+			}
+
 			keyNode := resolvedNode.Content[i]
 			valueNode := resolvedNode.Content[i+1]
 
@@ -439,6 +473,9 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 	}
 
 	var validationErrs []error
+
+	// Add duplicate key validation errors first
+	validationErrs = append(validationErrs, duplicateKeyErrs...)
 
 	for _, jobValidationErrs := range jobValidationErrs {
 		validationErrs = append(validationErrs, jobValidationErrs...)
