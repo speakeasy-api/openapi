@@ -228,6 +228,53 @@ upperCaseBool: FALSE
 `,
 			indentation: 2,
 		},
+		{
+			name:      "integer with leading zeros",
+			yamlInput: `bankCode: 009911`,
+			expectedJSON: `{
+  "bankCode": "009911"
+}
+`,
+			indentation: 2,
+		},
+		{
+			name: "multiple integers with leading zeros",
+			yamlInput: `identifiers:
+  bankCode: 009911
+  sortCode: 001234`,
+			expectedJSON: `{
+  "identifiers": {
+    "bankCode": "009911",
+    "sortCode": "001234"
+  }
+}
+`,
+			indentation: 2,
+		},
+		{
+			name:      "integers with leading zeros in array",
+			yamlInput: `codes: [009911, 001234, 005678]`,
+			expectedJSON: `{
+  "codes": ["009911", "001234", "005678"]
+}
+`,
+			indentation: 2,
+		},
+		{
+			name:      "octal-like integer value",
+			yamlInput: `value: 0777`,
+			expectedJSON: `{
+  "value": "0777"
+}
+`,
+			indentation: 2,
+		},
+		{
+			name:         "quoted string with leading zeros preserved",
+			yamlInput:    `bankCode: "009911"`,
+			expectedJSON: `{"bankCode":"009911"}` + "\n",
+			indentation:  0,
+		},
 	}
 
 	for _, tt := range tests {
