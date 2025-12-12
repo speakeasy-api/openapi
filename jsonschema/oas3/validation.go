@@ -80,6 +80,15 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	dv := validation.GetContextObject[ParentDocumentVersion](o)
 
+	var errs []error
+
+	// Validate reference string if present
+	if js.IsReference() {
+		if err := js.GetRef().Validate(); err != nil {
+			errs = append(errs, validation.NewValidationError(err, js.GetCore().Ref.GetKeyNodeOrRoot(js.GetRootNode())))
+		}
+	}
+
 	var schema string
 	if js.Schema != nil {
 		switch *js.Schema {
@@ -131,16 +140,13 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 		}
 	}
 
-	var errs []error
 	err = oasSchemaValidator.Validate(jsAny)
 	if err != nil {
 		var validationErr *jsValidator.ValidationError
 		if errors.As(err, &validationErr) {
-			errs = getRootCauses(validationErr, *core)
+			errs = append(errs, getRootCauses(validationErr, *core)...)
 		} else {
-			errs = []error{
-				validation.NewValidationError(validation.NewValueValidationError("schema invalid: %s", err.Error()), core.RootNode),
-			}
+			errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("schema invalid: %s", err.Error()), core.RootNode))
 		}
 	}
 

@@ -22,7 +22,7 @@ type JoinConflictStrategy int
 const (
 	// JoinConflictCounter uses counter-based suffixes like User_1, User_2 for conflicts
 	JoinConflictCounter JoinConflictStrategy = iota
-	// JoinConflictFilePath uses file path-based naming like file_path_somefile_yaml~User
+	// JoinConflictFilePath uses file path-based naming like file_path_somefile_yaml__User
 	JoinConflictFilePath
 )
 
@@ -188,7 +188,6 @@ func initializeUsedNames(doc *OpenAPI, usedComponentNames map[string]bool, compo
 			usedPathNames[path] = true
 		}
 	}
-
 }
 
 // joinSingleDocument joins a single document into the result document
@@ -359,7 +358,6 @@ func joinWebhooks(result, src *OpenAPI) {
 		// For webhooks, we append all - no conflict resolution needed as they're named
 		result.Webhooks.Set(name, webhook)
 	}
-
 }
 
 // joinComponents joins components from source document into result with conflict resolution
@@ -422,7 +420,6 @@ func joinSchemas(resultComponents, srcComponents *Components, srcPath string, st
 			componentHashes[name] = schemaHash
 		}
 	}
-
 }
 
 // joinOtherComponents joins non-schema components with conflict resolution
@@ -678,7 +675,7 @@ func generateJoinComponentName(originalName, filePath string, strategy JoinConfl
 	}
 }
 
-// generateJoinFilePathBasedName creates names like "some_path_external_yaml~User"
+// generateJoinFilePathBasedName creates names like "some_path_external_yaml__User"
 func generateJoinFilePathBasedName(originalName, filePath string, usedNames map[string]bool) string {
 	// Convert file path to safe component name
 	cleanPath := filepath.Clean(filePath)
@@ -693,7 +690,7 @@ func generateJoinFilePathBasedName(originalName, filePath string, usedNames map[
 	// Replace path separators and unsafe characters with underscores
 	safeFileName := regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(cleanPath, "_")
 
-	componentName := safeFileName + "~" + originalName
+	componentName := safeFileName + "__" + originalName
 
 	// Ensure uniqueness
 	originalComponentName := componentName

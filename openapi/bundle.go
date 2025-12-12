@@ -23,7 +23,7 @@ type BundleNamingStrategy int
 const (
 	// BundleNamingCounter uses counter-based suffixes like User_1, User_2 for conflicts
 	BundleNamingCounter BundleNamingStrategy = iota
-	// BundleNamingFilePath uses file path-based naming like file_path_somefile_yaml~User
+	// BundleNamingFilePath uses file path-based naming like file_path_somefile_yaml__User
 	BundleNamingFilePath
 )
 
@@ -85,7 +85,7 @@ type BundleOptions struct {
 //	            "content": {
 //	              "application/json": {
 //	                "schema": {
-//	                  "$ref": "#/components/schemas/external_api_yaml~User"
+//	                  "$ref": "#/components/schemas/external_api_yaml__User"
 //	                }
 //	              }
 //	            }
@@ -96,7 +96,7 @@ type BundleOptions struct {
 //	  },
 //	  "components": {
 //	    "schemas": {
-//	      "external_api_yaml~User": {
+//	      "external_api_yaml__User": {
 //	        "type": "object",
 //	        "properties": {
 //	          "id": {"type": "string"},
@@ -843,7 +843,7 @@ func generateFilePathBasedNameWithConflictResolution(ref string, usedNames map[s
 	return generateFilePathBasedName(ref, usedNames, targetLocation)
 }
 
-// generateFilePathBasedName creates names like "some_path_external_yaml~User" or "some_path_external_yaml" for top-level refs
+// generateFilePathBasedName creates names like "some_path_external_yaml__User" or "some_path_external_yaml" for top-level refs
 func generateFilePathBasedName(ref string, usedNames map[string]bool, targetLocation string) (string, error) {
 	// Parse the reference to extract file path and fragment using references package
 	reference := references.Reference(ref)
@@ -885,7 +885,7 @@ func generateFilePathBasedName(ref string, usedNames map[string]bool, targetLoca
 		// Clean up fragment (remove leading slash and convert path separators)
 		cleanFragment := strings.TrimPrefix(fragment, "/")
 		cleanFragment = strings.ReplaceAll(cleanFragment, "/", "_")
-		componentName = safeFileName + "~" + cleanFragment
+		componentName = safeFileName + "__" + cleanFragment
 	}
 
 	// Ensure uniqueness

@@ -508,6 +508,48 @@ required: ["name", "email"]
 `,
 			wantErrs: []string{"[2:1] schema. additional properties '$ref' not allowed"},
 		},
+		{
+			name: "empty component name in $ref",
+			yml: `
+$ref: "#/components/schemas/"
+`,
+			wantErrs: []string{"[2:1] invalid reference: component name cannot be empty"},
+		},
+		{
+			name: "missing component name in $ref",
+			yml: `
+$ref: "#/components/schemas"
+`,
+			wantErrs: []string{"[2:1] invalid reference: component name cannot be empty"},
+		},
+		{
+			name: "component name with invalid characters in $ref",
+			yml: `
+$ref: "#/components/schemas/User@Schema"
+`,
+			wantErrs: []string{`[2:1] invalid reference: component name "User@Schema" must match pattern ^[a-zA-Z0-9.\-_]+$`},
+		},
+		{
+			name: "component name with space in $ref",
+			yml: `
+$ref: "#/components/schemas/User Schema"
+`,
+			wantErrs: []string{`[2:1] invalid reference: component name "User Schema" must match pattern ^[a-zA-Z0-9.\-_]+$`},
+		},
+		{
+			name: "invalid JSON pointer - missing leading slash in $ref",
+			yml: `
+$ref: "#components/schemas/User"
+`,
+			wantErrs: []string{"[2:1] invalid reference JSON pointer: validation error -- jsonpointer must start with /: components/schemas/User"},
+		},
+		{
+			name: "empty JSON pointer in $ref",
+			yml: `
+$ref: "#"
+`,
+			wantErrs: []string{"[2:1] invalid reference JSON pointer: empty"},
+		},
 	}
 
 	for _, tt := range tests {
