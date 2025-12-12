@@ -410,7 +410,7 @@ openapi spec bundle --naming filepath ./spec.yaml ./bundled.yaml
 
 **Naming Strategies:**
 
-- `filepath` (default): Uses file path-based naming like `external_api_yaml~User` for conflicts
+- `filepath` (default): Uses file path-based naming like `external_api_yaml__User` for conflicts
 - `counter`: Uses counter-based suffixes like `User_1`, `User_2` for conflicts
 
 What bundling does:

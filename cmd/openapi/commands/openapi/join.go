@@ -30,7 +30,7 @@ This command merges OpenAPI specifications by:
 
 The join operation supports two conflict resolution strategies:
 • counter: Uses counter-based suffixes like User_1, User_2 for conflicts
-• filepath: Uses file path-based naming like second_yaml~User
+• filepath: Uses file path-based naming like second_yaml__User
 
 Smart conflict handling:
 • Components: Identical components are merged, conflicts are renamed

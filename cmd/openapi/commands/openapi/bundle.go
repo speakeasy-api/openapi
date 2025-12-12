@@ -28,7 +28,7 @@ This operation is useful when you want to:
 
 The bundle command supports two naming strategies:
 • counter: Uses counter-based suffixes like User_1, User_2 for conflicts
-• filepath: Uses file path-based naming like external_api_yaml~User
+• filepath: Uses file path-based naming like external_api_yaml__User
 
 Examples:
   # Bundle to stdout (pipe-friendly)
