@@ -362,8 +362,25 @@ func writeJSONScalar(ctx *jsonWriteContext, node *yaml.Node) error {
 		ctx.write(quoteJSONString(node.Value))
 		return nil
 
-	case "!!int", "!!float":
-		// Numbers - write as-is
+	case "!!int":
+		// Check for invalid JSON number formats (e.g., leading zeros)
+		// In YAML, "009911" might be parsed as int, but JSON doesn't allow leading zeros
+		// Treat such values as strings to preserve them correctly
+		if hasInvalidJSONNumberFormat(node.Value) {
+			ctx.write(quoteJSONString(node.Value))
+			return nil
+		}
+		ctx.write(node.Value)
+		return nil
+
+	case "!!float":
+		// Check for invalid JSON number formats (e.g., leading zeros)
+		// YAML may tag values like "009911" as float, but they're invalid in JSON
+		// Treat such values as strings to preserve them correctly
+		if hasInvalidJSONNumberFormat(node.Value) {
+			ctx.write(quoteJSONString(node.Value))
+			return nil
+		}
 		ctx.write(node.Value)
 		return nil
 
@@ -382,6 +399,31 @@ func writeJSONScalar(ctx *jsonWriteContext, node *yaml.Node) error {
 		ctx.write(quoteJSONString(node.Value))
 		return nil
 	}
+}
+
+// hasInvalidJSONNumberFormat checks if a numeric string would be invalid in JSON.
+// JSON numbers cannot have leading zeros (except for "0" itself or "0.x" floats).
+func hasInvalidJSONNumberFormat(value string) bool {
+	if len(value) < 2 {
+		return false
+	}
+
+	// Handle negative numbers
+	start := 0
+	if value[0] == '-' || value[0] == '+' {
+		start = 1
+		if len(value) < 2 {
+			return false
+		}
+	}
+
+	// Check for leading zero followed by more digits (invalid in JSON)
+	// "0" alone is valid, "0.x" is valid, but "00", "01", "007" etc. are not
+	if value[start] == '0' && len(value) > start+1 && value[start+1] >= '0' && value[start+1] <= '9' {
+		return true
+	}
+
+	return false
 }
 
 // resolveMergeKeys processes YAML merge keys (<<) and returns content with merged values
