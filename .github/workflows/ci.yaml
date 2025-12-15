@@ -73,7 +73,7 @@ jobs:
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
       - name: Cache downloaded test files
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/speakeasy-api_arazzo
           key: arazzo-test-files-${{ steps.date.outputs.date }}
@@ -126,7 +126,7 @@ jobs:
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
       - name: Cache downloaded test files
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/speakeasy-api_arazzo
           key: arazzo-test-files-${{ steps.date.outputs.date }}
@@ -199,7 +199,7 @@ jobs:
           ./.github/scripts/format-coverage.sh coverage.out "$CURRENT_COV" "$MAIN_COV" > coverage-summary.md
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-report
           path: |
