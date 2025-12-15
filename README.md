@@ -104,12 +104,12 @@ go install github.com/speakeasy-api/openapi/cmd/openapi@latest
 
 Linux/macOS:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/speakeasy-api/openapi/main/scripts/install.sh | bash
+curl -fsSL https://go.speakeasy.com/openapi.sh | bash
 ```
 
 Windows (PowerShell):
 ```powershell
-iwr -useb https://raw.githubusercontent.com/speakeasy-api/openapi/main/scripts/install.ps1 | iex
+iwr -useb https://go.speakeasy.com/openapi.ps1 | iex
 ```
 
 For manual installation, upgrade instructions, custom installation options, and troubleshooting, see the [detailed installation guide](./INSTALL.md).
