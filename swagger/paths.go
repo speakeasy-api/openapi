@@ -2,6 +2,7 @@ package swagger
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/extensions"
@@ -48,7 +49,9 @@ func (p *Paths) Validate(ctx context.Context, opts ...validation.Option) []error
 		if !strings.HasPrefix(path, "/") {
 			pathKeyNode := c.GetMapKeyNodeOrRoot(path, c.RootNode)
 			errs = append(errs, validation.NewValidationError(
-				validation.NewValueValidationError("path '%s' must begin with a slash '/'", path),
+				validation.SeverityError,
+				validation.RuleValidationInvalidSyntax,
+				fmt.Errorf("path '%s' must begin with a slash '/'", path),
 				pathKeyNode))
 		}
 		errs = append(errs, pathItem.Validate(ctx, opts...)...)

@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 
@@ -104,27 +105,27 @@ func (e *Example) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	// Check mutual exclusivity: value and externalValue
 	if core.Value.Present && core.ExternalValue.Present {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("example.value and externalValue are mutually exclusive"), core, core.Value))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("example.value and example.externalValue are mutually exclusive"), core, core.Value))
 	}
 
 	// Check mutual exclusivity: dataValue and value
 	if core.DataValue.Present && core.Value.Present {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("example.dataValue and value are mutually exclusive"), core, core.DataValue))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("example.dataValue and example.value are mutually exclusive"), core, core.DataValue))
 	}
 
 	// Check mutual exclusivity: serializedValue and value
 	if core.SerializedValue.Present && core.Value.Present {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("example.serializedValue and value are mutually exclusive"), core, core.SerializedValue))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("example.serializedValue and example.value are mutually exclusive"), core, core.SerializedValue))
 	}
 
 	// Check mutual exclusivity: serializedValue and externalValue
 	if core.SerializedValue.Present && core.ExternalValue.Present {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("example.serializedValue and externalValue are mutually exclusive"), core, core.SerializedValue))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("example.serializedValue and example.externalValue are mutually exclusive"), core, core.SerializedValue))
 	}
 
 	if core.ExternalValue.Present {
 		if _, err := url.Parse(*e.ExternalValue); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(fmt.Sprintf("example.externalValue is not a valid uri: %s", err)), core, core.ExternalValue))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("example.externalValue is not a valid uri: %w", err), core, core.ExternalValue))
 		}
 	}
 

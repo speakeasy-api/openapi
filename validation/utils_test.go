@@ -337,4 +337,137 @@ func TestSortValidationErrors_EdgeCases_Success(t *testing.T) {
 		assert.Equal(t, "error with negative column", err1.UnderlyingError.Error())
 		assert.Equal(t, "error with positive line", err2.UnderlyingError.Error())
 	})
+
+	t.Run("same line and column sorted by error message", func(t *testing.T) {
+		t.Parallel()
+
+		errors := []error{
+			&Error{
+				UnderlyingError: stderrors.New("zzz error"),
+				Node:            &yaml.Node{Line: 5, Column: 10},
+			},
+			&Error{
+				UnderlyingError: stderrors.New("aaa error"),
+				Node:            &yaml.Node{Line: 5, Column: 10},
+			},
+			&Error{
+				UnderlyingError: stderrors.New("mmm error"),
+				Node:            &yaml.Node{Line: 5, Column: 10},
+			},
+		}
+
+		SortValidationErrors(errors)
+
+		var err0, err1, err2 *Error
+		require.ErrorAs(t, errors[0], &err0)
+		require.ErrorAs(t, errors[1], &err1)
+		require.ErrorAs(t, errors[2], &err2)
+		assert.Equal(t, "aaa error", err0.UnderlyingError.Error())
+		assert.Equal(t, "mmm error", err1.UnderlyingError.Error())
+		assert.Equal(t, "zzz error", err2.UnderlyingError.Error())
+	})
+
+	t.Run("same line column and identical error message", func(t *testing.T) {
+		t.Parallel()
+
+		errors := []error{
+			&Error{
+				UnderlyingError: stderrors.New("same error"),
+				Node:            &yaml.Node{Line: 5, Column: 10},
+				Severity:        SeverityError,
+			},
+			&Error{
+				UnderlyingError: stderrors.New("same error"),
+				Node:            &yaml.Node{Line: 5, Column: 10},
+				Severity:        SeverityWarning,
+			},
+		}
+
+		SortValidationErrors(errors)
+
+		// Both have same message so order should remain stable
+		var err0, err1 *Error
+		require.ErrorAs(t, errors[0], &err0)
+		require.ErrorAs(t, errors[1], &err1)
+		// Both should have the same message
+		assert.Equal(t, "same error", err0.UnderlyingError.Error())
+		assert.Equal(t, "same error", err1.UnderlyingError.Error())
+		// Stable sort means first stays first
+		assert.Equal(t, SeverityError, err0.Severity)
+		assert.Equal(t, SeverityWarning, err1.Severity)
+	})
+
+	t.Run("interleaved regular and validation errors forces all comparison branches", func(t *testing.T) {
+		t.Parallel()
+
+		// Interleave regular and validation errors to force the sorting algorithm
+		// to compare them in both directions (a=regular/b=validation AND a=validation/b=regular)
+		errors := []error{
+			stderrors.New("regular error 1"),
+			&Error{
+				UnderlyingError: stderrors.New("validation error 1"),
+				Node:            &yaml.Node{Line: 10, Column: 5},
+			},
+			stderrors.New("regular error 2"),
+			&Error{
+				UnderlyingError: stderrors.New("validation error 2"),
+				Node:            &yaml.Node{Line: 5, Column: 3},
+			},
+			stderrors.New("regular error 3"),
+			&Error{
+				UnderlyingError: stderrors.New("validation error 3"),
+				Node:            &yaml.Node{Line: 15, Column: 7},
+			},
+			stderrors.New("regular error 4"),
+		}
+
+		SortValidationErrors(errors)
+
+		// Validation errors should come first, sorted by line number
+		var validationErr0, validationErr1, validationErr2 *Error
+		require.ErrorAs(t, errors[0], &validationErr0)
+		require.ErrorAs(t, errors[1], &validationErr1)
+		require.ErrorAs(t, errors[2], &validationErr2)
+		assert.Equal(t, 5, validationErr0.Node.Line, "first validation error should be line 5")
+		assert.Equal(t, 10, validationErr1.Node.Line, "second validation error should be line 10")
+		assert.Equal(t, 15, validationErr2.Node.Line, "third validation error should be line 15")
+
+		// Regular errors should follow, preserving stable order
+		var notValidation *Error
+		assert.False(t, stderrors.As(errors[3], &notValidation), "index 3 should be regular error")
+		assert.False(t, stderrors.As(errors[4], &notValidation), "index 4 should be regular error")
+		assert.False(t, stderrors.As(errors[5], &notValidation), "index 5 should be regular error")
+		assert.False(t, stderrors.As(errors[6], &notValidation), "index 6 should be regular error")
+	})
+
+	t.Run("validation errors first then regular errors forces bIsValidationErr", func(t *testing.T) {
+		t.Parallel()
+
+		// Start with validation errors, then regular errors
+		// The merge sort should compare elements in the opposite direction during some phase
+		errors := []error{
+			&Error{
+				UnderlyingError: stderrors.New("validation error 1"),
+				Node:            &yaml.Node{Line: 20, Column: 10},
+			},
+			&Error{
+				UnderlyingError: stderrors.New("validation error 2"),
+				Node:            &yaml.Node{Line: 10, Column: 5},
+			},
+			stderrors.New("regular error 1"),
+			stderrors.New("regular error 2"),
+		}
+
+		SortValidationErrors(errors)
+
+		// Validation errors should come first, sorted by line
+		var validationErr0, validationErr1 *Error
+		require.ErrorAs(t, errors[0], &validationErr0)
+		require.ErrorAs(t, errors[1], &validationErr1)
+		assert.Equal(t, 10, validationErr0.Node.Line)
+		assert.Equal(t, 20, validationErr1.Node.Line)
+		// Regular errors follow
+		assert.Equal(t, "regular error 1", errors[2].Error())
+		assert.Equal(t, "regular error 2", errors[3].Error())
+	})
 }

@@ -2,6 +2,7 @@ package swagger
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 
 	"github.com/speakeasy-api/openapi/extensions"
@@ -55,12 +56,12 @@ func (e *ExternalDocumentation) Validate(ctx context.Context, opts ...validation
 	errs := []error{}
 
 	if c.URL.Present && e.URL == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("externalDocs.url is required"), c, c.URL))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("externalDocs.url is required"), c, c.URL))
 	}
 
 	if c.URL.Present {
 		if _, err := url.Parse(e.URL); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("externalDocs.url is not a valid uri: %s", err), c, c.URL))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("externalDocs.url is not a valid uri: %w", err), c, c.URL))
 		}
 	}
 

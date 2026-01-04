@@ -413,7 +413,7 @@ func (r *Reference[T, V, C]) Validate(ctx context.Context, opts ...validation.Op
 
 	if core.Reference.Present {
 		if err := r.Reference.Validate(); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("reference.$ref is invalid: %s", err.Error()), core, core.Reference))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("reference.$ref is invalid: %w", err), core, core.Reference))
 		}
 	} else if r.Object != nil {
 		// Use the validator interface V to validate the object

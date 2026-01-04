@@ -117,7 +117,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[2:1] callback expression is invalid: expression is not valid, must begin with $: request.body#/webhookUrl"},
+			wantErrs: []string{"[2:1] warning validation-invalid-format callback expression is invalid: expression is not valid, must begin with $: request.body#/webhookUrl"},
 		},
 		{
 			name: "invalid_expression_unknown_type",
@@ -129,7 +129,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[2:1] callback expression is invalid: expression is not valid, must begin with one of [url, method, statusCode, request, response, inputs, outputs, steps, workflows, sourceDescriptions, components]: {$unknown.body#/webhookUrl}"},
+			wantErrs: []string{"[2:1] warning validation-invalid-format callback expression is invalid: expression is not valid, must begin with one of [url, method, statusCode, request, response, inputs, outputs, steps, workflows, sourceDescriptions, components]: {$unknown.body#/webhookUrl}"},
 		},
 		{
 			name: "invalid_expression_url_with_extra_parts",
@@ -141,7 +141,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[2:1] callback expression is invalid: expression is not valid, extra characters after $url: {$url.extra}"},
+			wantErrs: []string{"[2:1] warning validation-invalid-format callback expression is invalid: expression is not valid, extra characters after $url: {$url.extra}"},
 		},
 		{
 			name: "invalid_expression_request_without_reference",
@@ -153,7 +153,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[2:1] callback expression is invalid: expression is not valid, expected one of [header, query, path, body] after $request: {$request}"},
+			wantErrs: []string{"[2:1] warning validation-invalid-format callback expression is invalid: expression is not valid, expected one of [header, query, path, body] after $request: {$request}"},
 		},
 		{
 			name: "invalid_expression_request_unknown_reference",
@@ -165,7 +165,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[2:1] callback expression is invalid: expression is not valid, expected one of [header, query, path, body] after $request: {$request.unknown}"},
+			wantErrs: []string{"[2:1] warning validation-invalid-format callback expression is invalid: expression is not valid, expected one of [header, query, path, body] after $request: {$request.unknown}"},
 		},
 		{
 			name: "invalid_expression_request_header_missing_token",
@@ -177,7 +177,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[2:1] callback expression is invalid: expression is not valid, expected token after $request.header: {$request.header}"},
+			wantErrs: []string{"[2:1] warning validation-invalid-format callback expression is invalid: expression is not valid, expected token after $request.header: {$request.header}"},
 		},
 		{
 			name: "invalid_expression_request_header_invalid_token",
@@ -189,7 +189,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[2:1] callback expression is invalid: header reference must be a valid token [^[!#$%&'*+\\-.^_`|~\\dA-Za-z]+$]: {$request.header.some@header}"},
+			wantErrs: []string{"[2:1] warning validation-invalid-format callback expression is invalid: header reference must be a valid token [^[!#$%&'*+\\-.^_`|~\\dA-Za-z]+$]: {$request.header.some@header}"},
 		},
 		{
 			name: "invalid_expression_request_query_missing_name",
@@ -201,7 +201,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[2:1] callback expression is invalid: expression is not valid, expected name after $request.query: {$request.query}"},
+			wantErrs: []string{"[2:1] warning validation-invalid-format callback expression is invalid: expression is not valid, expected name after $request.query: {$request.query}"},
 		},
 		{
 			name: "invalid_expression_request_path_missing_name",
@@ -213,7 +213,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[2:1] callback expression is invalid: expression is not valid, expected name after $request.path: {$request.path}"},
+			wantErrs: []string{"[2:1] warning validation-invalid-format callback expression is invalid: expression is not valid, expected name after $request.path: {$request.path}"},
 		},
 		{
 			name: "invalid_expression_request_body_with_extra_parts",
@@ -225,7 +225,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[2:1] callback expression is invalid: expression is not valid, only json pointers are allowed after $request.body: {$request.body.extra}"},
+			wantErrs: []string{"[2:1] warning validation-invalid-format callback expression is invalid: expression is not valid, only json pointers are allowed after $request.body: {$request.body.extra}"},
 		},
 		{
 			name: "invalid_expression_invalid_json_pointer",
@@ -237,7 +237,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[2:1] callback expression is invalid: validation error -- jsonpointer must start with /: some/path}"},
+			wantErrs: []string{"[2:1] warning validation-invalid-format callback expression is invalid: validation error -- jsonpointer must start with /: some/path}"},
 		},
 		{
 			name: "invalid_nested_pathitem_invalid_server",
@@ -251,7 +251,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[4:7] server.url is missing"},
+			wantErrs: []string{"[4:7] error validation-required-field server.url is required"},
 		},
 	}
 

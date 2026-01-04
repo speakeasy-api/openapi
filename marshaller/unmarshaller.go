@@ -307,7 +307,7 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 
 	if resolvedNode.Kind != yaml.MappingNode {
 		return []error{
-			validation.NewValidationError(validation.NewTypeMismatchError(parentName, "expected object, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+			validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, "expected object, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
 		}, nil
 	}
 
@@ -368,7 +368,9 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 			indicesToSkip[info.lastIndex] = true
 			// Create validation error for the earlier occurrence
 			duplicateKeyErrs = append(duplicateKeyErrs, validation.NewValidationError(
-				validation.NewValueValidationError("mapping key %q at line %d is a duplicate; previous definition at line %d", key, keyNode.Line, info.firstLine),
+				validation.SeverityWarning,
+				validation.RuleValidationDuplicateKey,
+				fmt.Errorf("mapping key %q at line %d is a duplicate; previous definition at line %d", key, keyNode.Line, info.firstLine),
 				keyNode,
 			))
 			// Update to track this as the new last occurrence
@@ -489,7 +491,7 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 	// Check for missing required fields using cached required field info
 	for tag := range fieldMap.RequiredFields {
 		if _, ok := foundRequiredFields.Load(tag); !ok {
-			validationErrs = append(validationErrs, validation.NewValidationError(validation.NewMissingFieldError("%s.%s is missing", modelTag, tag), resolvedNode))
+			validationErrs = append(validationErrs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("%s.%s is required", modelTag, tag), resolvedNode))
 		}
 	}
 
@@ -532,7 +534,7 @@ func decodeNode(_ context.Context, parentName string, node *yaml.Node, out any) 
 	// Check if this is a type mismatch error
 	if yamlTypeErr := asTypeMismatchError(err); yamlTypeErr != nil {
 		// Convert type mismatch to validation error
-		validationErr := validation.NewValidationError(validation.NewTypeMismatchError(parentName, strings.Join(yamlTypeErr.Errors, ", ")), resolvedNode)
+		validationErr := validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, strings.Join(yamlTypeErr.Errors, ", ")), resolvedNode)
 		return []error{validationErr}, nil //nolint:nilerr
 	}
 
@@ -678,7 +680,7 @@ func isMapType(out reflect.Value) bool {
 // validateNodeKind checks if the node kind matches the expected kind and returns appropriate error
 func validateNodeKind(resolvedNode *yaml.Node, expectedKind yaml.Kind, parentName string, reflectType reflect.Type, expectedType string) error {
 	if resolvedNode == nil {
-		return validation.NewValidationError(validation.NewTypeMismatchError(parentName, "expected %s, got nil", yml.NodeKindToString(expectedKind)), nil)
+		return validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, "expected %s, got nil", yml.NodeKindToString(expectedKind)), nil)
 	}
 
 	// Check if the node kind matches
@@ -725,11 +727,11 @@ func validateNodeKind(resolvedNode *yaml.Node, expectedKind yaml.Kind, parentNam
 			actualKindStr = fmt.Sprintf("`%s`", value)
 		}
 
-		return validation.NewValidationError(validation.NewTypeMismatchError(parentName, "expected %s, got %s", expectedType, actualKindStr), resolvedNode)
+		return validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, "expected %s, got %s", expectedType, actualKindStr), resolvedNode)
 	}
 
 	if !tagMatches {
-		return validation.NewValidationError(validation.NewTypeMismatchError(parentName, "expected %s, got %s", expectedType, yml.NodeTagToString(resolvedNode.Tag)), resolvedNode)
+		return validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, "expected %s, got %s", expectedType, yml.NodeTagToString(resolvedNode.Tag)), resolvedNode)
 	}
 	return nil
 }
