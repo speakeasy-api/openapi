@@ -1214,3 +1214,54 @@ func TestJSONSchema_GetTopLevelReference(t *testing.T) {
 		assert.Equal(t, refTopLevel, entry.Schema)
 	})
 }
+
+// Test GetReferenceChain with circular reference (regression test for infinite loop bug)
+func TestJSONSchema_GetReferenceChain_CircularReference(t *testing.T) {
+	t.Parallel()
+
+	t.Run("circular parent chain terminates without infinite loop", func(t *testing.T) {
+		t.Parallel()
+		// Create a circular reference: A -> B -> A
+		// This simulates a self-referential schema like:
+		// Node:
+		//   properties:
+		//     next:
+		//       $ref: "#/components/schemas/Node"
+
+		schemaA := createSchemaWithRef("#/components/schemas/Node")
+		schemaB := createSchemaWithRef("#/components/schemas/Node")
+		childSchema := createSimpleSchema()
+
+		// Create circular parent chain: childSchema -> schemaB -> schemaA -> schemaB (circular)
+		schemaA.SetParent(schemaB)
+		schemaB.SetParent(schemaA)
+		childSchema.SetParent(schemaB)
+
+		// This should NOT hang or infinite loop - it should detect the cycle and return
+		chain := childSchema.GetReferenceChain()
+
+		// Chain should contain both schemas (visited before cycle detected)
+		// The exact length depends on when the cycle is detected, but it should be finite
+		assert.NotNil(t, chain, "chain should not be nil even with circular references")
+		assert.LessOrEqual(t, len(chain), 2, "chain should be bounded, not infinite")
+	})
+
+	t.Run("self-referential parent terminates without infinite loop", func(t *testing.T) {
+		t.Parallel()
+		// Create a self-referential schema: A -> A
+		schemaA := createSchemaWithRef("#/components/schemas/Self")
+		childSchema := createSimpleSchema()
+
+		// Schema A's parent is itself
+		schemaA.SetParent(schemaA)
+		childSchema.SetParent(schemaA)
+
+		// This should NOT hang or infinite loop
+		chain := childSchema.GetReferenceChain()
+
+		// Chain should contain exactly one entry (schemaA visited once before cycle detected)
+		assert.NotNil(t, chain, "chain should not be nil even with self-reference")
+		assert.Len(t, chain, 1, "chain should contain exactly one entry for self-referential parent")
+		assert.Equal(t, "#/components/schemas/Self", string(chain[0].Reference))
+	})
+}
