@@ -1055,3 +1055,162 @@ func TestJSONSchema_ParentLinks(t *testing.T) {
 		}, "SetTopLevelParent on nil schema should not panic")
 	})
 }
+
+// Test GetReferenceChain method
+func TestJSONSchema_GetReferenceChain(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil schema returns nil", func(t *testing.T) {
+		t.Parallel()
+		var nilSchema *JSONSchema[Referenceable]
+		assert.Nil(t, nilSchema.GetReferenceChain(), "nil schema GetReferenceChain should return nil")
+	})
+
+	t.Run("schema with nil parent returns nil", func(t *testing.T) {
+		t.Parallel()
+		schema := createSimpleSchema()
+		assert.Nil(t, schema.GetReferenceChain(), "schema with nil parent should return nil from GetReferenceChain")
+	})
+
+	t.Run("schema with non-reference parent returns empty chain", func(t *testing.T) {
+		t.Parallel()
+		// Create parent that is NOT a reference (just a regular schema)
+		nonRefParent := createSimpleSchema()
+
+		// Create child with parent set
+		childSchema := createSimpleSchema()
+		childSchema.SetParent(nonRefParent)
+
+		// Chain should be empty (not nil) since parent exists but isn't a reference
+		chain := childSchema.GetReferenceChain()
+		assert.Empty(t, chain, "schema with non-reference parent should return empty chain")
+	})
+
+	t.Run("schema with reference parent returns single-entry chain", func(t *testing.T) {
+		t.Parallel()
+		// Create parent that IS a reference
+		refParent := createSchemaWithRef("#/components/schemas/Parent")
+
+		// Create child with parent set
+		childSchema := createSimpleSchema()
+		childSchema.SetParent(refParent)
+
+		chain := childSchema.GetReferenceChain()
+		require.Len(t, chain, 1, "schema with reference parent should return single-entry chain")
+		assert.Equal(t, "#/components/schemas/Parent", string(chain[0].Reference))
+		assert.Equal(t, refParent, chain[0].Schema)
+	})
+
+	t.Run("schema with mixed parent chain filters non-references", func(t *testing.T) {
+		t.Parallel()
+		// Create a chain: refGrandparent -> nonRefParent -> child
+		// Only refGrandparent should appear in the chain
+
+		refGrandparent := createSchemaWithRef("#/components/schemas/Grandparent")
+		nonRefParent := createSimpleSchema()
+		childSchema := createSimpleSchema()
+
+		// Set up the chain
+		nonRefParent.SetParent(refGrandparent)
+		childSchema.SetParent(nonRefParent)
+
+		chain := childSchema.GetReferenceChain()
+		require.Len(t, chain, 1, "chain should only include reference parents")
+		assert.Equal(t, "#/components/schemas/Grandparent", string(chain[0].Reference))
+	})
+
+	t.Run("schema with multiple reference ancestors returns full chain", func(t *testing.T) {
+		t.Parallel()
+		// Create a chain: refGrandparent -> refParent -> child
+
+		refGrandparent := createSchemaWithRef("#/components/schemas/Grandparent")
+		refParent := createSchemaWithRef("#/components/schemas/Parent")
+		childSchema := createSimpleSchema()
+
+		// Set up the chain
+		refParent.SetParent(refGrandparent)
+		childSchema.SetParent(refParent)
+
+		chain := childSchema.GetReferenceChain()
+		require.Len(t, chain, 2, "chain should include both reference ancestors")
+		// Chain is outer -> inner order (grandparent first, parent last)
+		assert.Equal(t, "#/components/schemas/Grandparent", string(chain[0].Reference))
+		assert.Equal(t, "#/components/schemas/Parent", string(chain[1].Reference))
+	})
+}
+
+// Test GetImmediateReference method
+func TestJSONSchema_GetImmediateReference(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil schema returns nil", func(t *testing.T) {
+		t.Parallel()
+		var nilSchema *JSONSchema[Referenceable]
+		assert.Nil(t, nilSchema.GetImmediateReference(), "nil schema GetImmediateReference should return nil")
+	})
+
+	t.Run("schema with nil parent returns nil", func(t *testing.T) {
+		t.Parallel()
+		schema := createSimpleSchema()
+		assert.Nil(t, schema.GetImmediateReference(), "schema with nil parent should return nil")
+	})
+
+	t.Run("schema with non-reference parent returns nil", func(t *testing.T) {
+		t.Parallel()
+		nonRefParent := createSimpleSchema()
+		childSchema := createSimpleSchema()
+		childSchema.SetParent(nonRefParent)
+
+		assert.Nil(t, childSchema.GetImmediateReference(), "schema with non-reference parent should return nil")
+	})
+
+	t.Run("schema with reference parent returns entry", func(t *testing.T) {
+		t.Parallel()
+		refParent := createSchemaWithRef("#/components/schemas/Parent")
+		childSchema := createSimpleSchema()
+		childSchema.SetParent(refParent)
+
+		entry := childSchema.GetImmediateReference()
+		require.NotNil(t, entry, "should return entry for reference parent")
+		assert.Equal(t, "#/components/schemas/Parent", string(entry.Reference))
+		assert.Equal(t, refParent, entry.Schema)
+	})
+}
+
+// Test GetTopLevelReference method
+func TestJSONSchema_GetTopLevelReference(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil schema returns nil", func(t *testing.T) {
+		t.Parallel()
+		var nilSchema *JSONSchema[Referenceable]
+		assert.Nil(t, nilSchema.GetTopLevelReference(), "nil schema GetTopLevelReference should return nil")
+	})
+
+	t.Run("schema with nil topLevelParent returns nil", func(t *testing.T) {
+		t.Parallel()
+		schema := createSimpleSchema()
+		assert.Nil(t, schema.GetTopLevelReference(), "schema with nil topLevelParent should return nil")
+	})
+
+	t.Run("schema with non-reference topLevelParent returns nil", func(t *testing.T) {
+		t.Parallel()
+		nonRefTopLevel := createSimpleSchema()
+		childSchema := createSimpleSchema()
+		childSchema.SetTopLevelParent(nonRefTopLevel)
+
+		assert.Nil(t, childSchema.GetTopLevelReference(), "schema with non-reference topLevelParent should return nil")
+	})
+
+	t.Run("schema with reference topLevelParent returns entry", func(t *testing.T) {
+		t.Parallel()
+		refTopLevel := createSchemaWithRef("#/components/schemas/TopLevel")
+		childSchema := createSimpleSchema()
+		childSchema.SetTopLevelParent(refTopLevel)
+
+		entry := childSchema.GetTopLevelReference()
+		require.NotNil(t, entry, "should return entry for reference topLevelParent")
+		assert.Equal(t, "#/components/schemas/TopLevel", string(entry.Reference))
+		assert.Equal(t, refTopLevel, entry.Schema)
+	})
+}
