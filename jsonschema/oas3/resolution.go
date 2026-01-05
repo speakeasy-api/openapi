@@ -194,10 +194,17 @@ func (j *JSONSchema[T]) GetReferenceChain() []*ReferenceChainEntry {
 	}
 
 	var chain []*ReferenceChainEntry
+	visited := make(map[*JSONSchema[Referenceable]]bool)
 
 	// Walk from the immediate parent up to the top-level
 	current := j.parent
 	for current != nil {
+		// Detect circular reference in parent chain - stop if we've seen this schema before
+		if visited[current] {
+			break
+		}
+		visited[current] = true
+
 		if current.IsReference() {
 			entry := &ReferenceChainEntry{
 				Schema:    current,
