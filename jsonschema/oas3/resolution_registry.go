@@ -200,13 +200,17 @@ func setupRemoteSchemaRegistry(ctx context.Context, schema *JSONSchemaReferencea
 		return
 	}
 
-	// Check if this schema already has access to a registry via its owning document
-	// This happens when we're resolving a fragment from a document that was already set up
+	// Check if this schema already has a properly configured registry
+	// This happens when we're resolving a fragment from a document that was already set up.
+	// We check if the registry has a non-empty document base URI, which indicates it was
+	// explicitly configured (not just lazily created during unmarshalling).
 	if schema.GetSchema() != nil {
 		if existingRegistry := schema.GetSchema().GetSchemaRegistry(); existingRegistry != nil {
-			// Already has a registry set up - don't create a new one
-			// This preserves anchors and $ids from the whole document
-			return
+			if existingRegistry.GetDocumentBaseURI() != "" {
+				// Already has a properly configured registry - don't overwrite
+				// This preserves anchors and $ids from the whole document
+				return
+			}
 		}
 	}
 
