@@ -58,9 +58,14 @@ type OpenAPI struct {
 
 	// Extensions provides a list of extensions to the OpenAPI document.
 	Extensions *extensions.Extensions
+
+	// schemaRegistry stores $id and $anchor mappings for schemas in this document.
+	// Used for efficient resolution of $id and $anchor references.
+	schemaRegistry oas3.SchemaRegistry
 }
 
 var _ interfaces.Model[core.OpenAPI] = (*OpenAPI)(nil)
+var _ oas3.SchemaRegistryProvider = (*OpenAPI)(nil)
 
 // NewOpenAPI creates a new OpenAPI object with version set
 func NewOpenAPI() *OpenAPI {
@@ -163,6 +168,41 @@ func (o *OpenAPI) GetJSONSchemaDialect() string {
 		return ""
 	}
 	return *o.JSONSchemaDialect
+}
+
+// GetSchemaRegistry returns the schema registry for this document.
+// The registry stores $id and $anchor mappings for efficient schema resolution.
+// If the registry has not been initialized, it creates one with the document's base URI.
+func (o *OpenAPI) GetSchemaRegistry() oas3.SchemaRegistry {
+	if o == nil {
+		return nil
+	}
+
+	// Lazily initialize the registry if needed
+	if o.schemaRegistry == nil {
+		o.schemaRegistry = oas3.NewSchemaRegistry(o.GetDocumentBaseURI())
+	}
+
+	return o.schemaRegistry
+}
+
+// GetDocumentBaseURI returns the base URI for this document.
+// This is used as the default base for resolving relative $id and $ref values.
+// Returns the value of the $self field if set, otherwise empty string.
+func (o *OpenAPI) GetDocumentBaseURI() string {
+	if o == nil {
+		return ""
+	}
+	return o.GetSelf()
+}
+
+// SetSchemaRegistry sets the schema registry for this document.
+// This is primarily used during unmarshalling to set a pre-created registry.
+func (o *OpenAPI) SetSchemaRegistry(registry oas3.SchemaRegistry) {
+	if o == nil {
+		return
+	}
+	o.schemaRegistry = registry
 }
 
 // Validate will validate the OpenAPI object against the OpenAPI Specification.

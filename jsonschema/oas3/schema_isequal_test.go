@@ -140,6 +140,16 @@ func TestSchema_IsEqual_Success(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "schemas with same $id should be equal",
+			schema1: &Schema{
+				ID: pointer.From("https://example.com/schemas/user"),
+			},
+			schema2: &Schema{
+				ID: pointer.From("https://example.com/schemas/user"),
+			},
+			expected: true,
+		},
+		{
 			name: "schemas with same external docs should be equal",
 			schema1: &Schema{
 				ExternalDocs: &ExternalDocumentation{
@@ -294,6 +304,24 @@ func TestSchema_IsEqual_Error(t *testing.T) {
 				ExternalDocs: &ExternalDocumentation{
 					URL: "https://example.com/docs",
 				},
+			},
+			schema2:  &Schema{},
+			expected: false,
+		},
+		{
+			name: "schemas with different $id should not be equal",
+			schema1: &Schema{
+				ID: pointer.From("https://example.com/schemas/user"),
+			},
+			schema2: &Schema{
+				ID: pointer.From("https://example.com/schemas/product"),
+			},
+			expected: false,
+		},
+		{
+			name: "schema with $id vs schema without $id should not be equal",
+			schema1: &Schema{
+				ID: pointer.From("https://example.com/schemas/user"),
 			},
 			schema2:  &Schema{},
 			expected: false,

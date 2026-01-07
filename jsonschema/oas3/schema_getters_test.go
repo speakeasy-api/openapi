@@ -377,6 +377,20 @@ func TestSchema_GetAnchor_Success(t *testing.T) {
 	assert.Equal(t, anchor, schemaWithAnchor.GetAnchor())
 }
 
+func TestSchema_GetID_Success(t *testing.T) {
+	t.Parallel()
+
+	nilSchema := (*oas3.Schema)(nil)
+	assert.Empty(t, nilSchema.GetID())
+
+	emptySchema := &oas3.Schema{}
+	assert.Empty(t, emptySchema.GetID())
+
+	id := "https://example.com/schemas/user"
+	schemaWithID := &oas3.Schema{ID: &id}
+	assert.Equal(t, id, schemaWithID.GetID())
+}
+
 func TestSchema_GetMultipleOf_Success(t *testing.T) {
 	t.Parallel()
 

@@ -18,6 +18,7 @@ type: object
 title: Comprehensive User Schema
 description: A comprehensive schema representing a user with all possible properties
 $anchor: user-schema
+$id: "https://example.com/schemas/user"
 $schema: "https://json-schema.org/draft/2020-12/schema"
 format: object
 pattern: "^user_"
@@ -172,9 +173,12 @@ x-metadata:
 	require.Equal(t, "object", schema.GetFormat())
 	require.Equal(t, "^user_", schema.GetPattern())
 
-	// Test anchor and schema
+	// Test anchor, $id, and schema
 	require.NotNil(t, schema.Anchor)
 	require.Equal(t, "user-schema", *schema.Anchor)
+	require.NotNil(t, schema.ID)
+	require.Equal(t, "https://example.com/schemas/user", *schema.ID)
+	require.Equal(t, "https://example.com/schemas/user", schema.GetID())
 	require.NotNil(t, schema.Schema)
 	require.Equal(t, "https://json-schema.org/draft/2020-12/schema", *schema.Schema)
 

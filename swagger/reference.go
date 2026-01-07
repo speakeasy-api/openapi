@@ -131,7 +131,7 @@ func (r *Reference[T, V, C]) Populate(source any) error {
 	if s.Reference.Present {
 		r.Reference = pointer.From(references.Reference(*s.Reference.Value))
 	} else {
-		if err := marshaller.Populate(s.Object, &r.Object); err != nil {
+		if err := marshaller.PopulateWithContext(s.Object, &r.Object, nil); err != nil {
 			return err
 		}
 	}

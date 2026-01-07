@@ -10,27 +10,40 @@ import (
 
 // Pre-computed reflection types for performance
 var (
-	nodeAccessorType         = reflect.TypeOf((*NodeAccessor)(nil)).Elem()
-	populatorType            = reflect.TypeOf((*Populator)(nil)).Elem()
-	parentAwarePopulatorType = reflect.TypeOf((*ParentAwarePopulator)(nil)).Elem()
-	sequencedMapType         = reflect.TypeOf((*interfaces.SequencedMapInterface)(nil)).Elem()
-	coreModelerType          = reflect.TypeOf((*CoreModeler)(nil)).Elem()
-	yamlNodePtrType          = reflect.TypeOf((*yaml.Node)(nil))
-	yamlNodeType             = reflect.TypeOf(yaml.Node{})
-	yamlNodePtrPtrType       = reflect.TypeOf((**yaml.Node)(nil))
-	populatorValueTag        = "populatorValue"
-	populatorValueTrue       = "true"
+	nodeAccessorType          = reflect.TypeOf((*NodeAccessor)(nil)).Elem()
+	populatorType             = reflect.TypeOf((*Populator)(nil)).Elem()
+	contextAwarePopulatorType = reflect.TypeOf((*ContextAwarePopulator)(nil)).Elem()
+	sequencedMapType          = reflect.TypeOf((*interfaces.SequencedMapInterface)(nil)).Elem()
+	coreModelerType           = reflect.TypeOf((*CoreModeler)(nil)).Elem()
+	yamlNodePtrType           = reflect.TypeOf((*yaml.Node)(nil))
+	yamlNodeType              = reflect.TypeOf(yaml.Node{})
+	yamlNodePtrPtrType        = reflect.TypeOf((**yaml.Node)(nil))
+	populatorValueTag         = "populatorValue"
+	populatorValueTrue        = "true"
 )
 
+// Populator is the basic population interface for simple types that don't need context.
 type Populator interface {
 	Populate(source any) error
 }
 
-type ParentAwarePopulator interface {
-	PopulateWithParent(source any, parent any) error
+// PopulationContext carries context through the population chain.
+// Parent changes at each level of the tree, while OwningDocument stays constant.
+type PopulationContext struct {
+	Parent         any // Immediate parent (changes at each level)
+	OwningDocument any // Root document (stays constant throughout population)
 }
 
-func Populate(source any, target any) error {
+// ContextAwarePopulator receives full population context including parent and owning document.
+// This is the preferred interface for types that need parent tracking or document-level context.
+type ContextAwarePopulator interface {
+	PopulateWithContext(source any, ctx *PopulationContext) error
+}
+
+// PopulateWithContext populates target from source with full population context.
+// The context carries both the immediate parent and the owning document.
+// Pass nil for ctx when no context is needed.
+func PopulateWithContext(source any, target any, ctx *PopulationContext) error {
 	t := reflect.ValueOf(target)
 
 	if t.Kind() == reflect.Ptr && t.IsNil() {
@@ -64,47 +77,12 @@ func Populate(source any, target any) error {
 		}
 	}
 
-	return populateValueWithParent(source, t, nil)
+	return populateValue(source, t, ctx)
 }
 
-func PopulateWithParent(source any, target any, parent any) error {
-	t := reflect.ValueOf(target)
-
-	if t.Kind() == reflect.Ptr && t.IsNil() {
-		t.Set(CreateInstance(t.Type().Elem()))
-	}
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	s := reflect.ValueOf(source)
-	if s.Type().Implements(nodeAccessorType) {
-		source = source.(NodeAccessor).GetValue()
-	}
-
-	// Special case for yaml.Node conversion (similar to unmarshaller.go:216-223)
-	switch {
-	case t.Type() == yamlNodePtrType:
-		if node, ok := source.(yaml.Node); ok {
-			t.Set(reflect.ValueOf(&node))
-			return nil
-		}
-	case t.Type() == yamlNodeType:
-		if node, ok := source.(*yaml.Node); ok {
-			t.Set(reflect.ValueOf(*node))
-			return nil
-		}
-	case t.Type() == yamlNodePtrPtrType:
-		if node, ok := source.(*yaml.Node); ok {
-			t.Set(reflect.ValueOf(&node))
-			return nil
-		}
-	}
-
-	return populateValueWithParent(source, t, parent)
-}
-
-func PopulateModel(source any, target any) error {
+// PopulateModelWithContext populates a model from a core source, propagating context to nested fields.
+// This is used to ensure owning document and parent references are passed through to nested schemas.
+func PopulateModelWithContext(source any, target any, ctx *PopulationContext) error {
 	s := reflect.ValueOf(source)
 	t := reflect.ValueOf(target)
 
@@ -155,7 +133,7 @@ func PopulateModel(source any, target any) error {
 		if field.Anonymous {
 			if targetSeqMap := getSequencedMapInterface(tField); targetSeqMap != nil {
 				sourceForPopulation := getSourceForPopulation(s.Field(i), fieldInt)
-				if err := populateSequencedMap(sourceForPopulation, targetSeqMap, target); err != nil {
+				if err := populateSequencedMap(sourceForPopulation, targetSeqMap, ctx); err != nil {
 					return err
 				}
 			}
@@ -202,7 +180,7 @@ func PopulateModel(source any, target any) error {
 			nodeValue = nodeAccessor.GetValue()
 		}
 
-		if err := populateValueWithParent(nodeValue, tField, target); err != nil {
+		if err := populateValue(nodeValue, tField, ctx); err != nil {
 			return err
 		}
 	}
@@ -210,7 +188,8 @@ func PopulateModel(source any, target any) error {
 	return nil
 }
 
-func populateValueWithParent(source any, target reflect.Value, parent any) error {
+// populateValue populates a value with full population context.
+func populateValue(source any, target reflect.Value, ctx *PopulationContext) error {
 	value := reflect.ValueOf(source)
 
 	// Handle nil source early - when source is nil, reflect.ValueOf returns a zero Value
@@ -223,7 +202,7 @@ func populateValueWithParent(source any, target reflect.Value, parent any) error
 	valueType := value.Type()
 	valueKind := value.Kind()
 
-	// Skip NodeAccessor check if already extracted in Populate()
+	// Skip NodeAccessor check if already extracted in PopulateWithContext()
 	if valueType.Implements(nodeAccessorType) {
 		source = source.(NodeAccessor).GetValue()
 		value = reflect.ValueOf(source)
@@ -250,21 +229,25 @@ func populateValueWithParent(source any, target reflect.Value, parent any) error
 	}
 
 	targetType := target.Type()
-	if targetType.Implements(parentAwarePopulatorType) {
-		return target.Interface().(ParentAwarePopulator).PopulateWithParent(value.Interface(), parent)
+
+	// Check for ContextAwarePopulator first (preferred)
+	if targetType.Implements(contextAwarePopulatorType) {
+		return target.Interface().(ContextAwarePopulator).PopulateWithContext(value.Interface(), ctx)
 	}
+
+	// Fall back to basic Populator
 	if targetType.Implements(populatorType) {
 		return target.Interface().(Populator).Populate(value.Interface())
 	}
 
 	// Check if target is a sequenced map and handle it specially
 	if targetType.Implements(sequencedMapType) && !isEmbeddedSequencedMapType(value.Type()) {
-		return populateSequencedMap(value.Interface(), target.Interface().(interfaces.SequencedMapInterface), parent)
+		return populateSequencedMap(value.Interface(), target.Interface().(interfaces.SequencedMapInterface), ctx)
 	}
 
 	// Check if target implements CoreSetter interface
 	if coreSetter, ok := target.Interface().(CoreSetter); ok {
-		if err := PopulateModel(value.Interface(), target.Interface()); err != nil {
+		if err := PopulateModelWithContext(value.Interface(), target.Interface(), ctx); err != nil {
 			return err
 		}
 
@@ -297,7 +280,18 @@ func populateValueWithParent(source any, target reflect.Value, parent any) error
 				}
 			}
 
-			if err := populateValueWithParent(elementValue, target.Index(i), target.Interface()); err != nil {
+			// Create context preserving the structural parent from the incoming context.
+			// IMPORTANT: We must NOT use target.Interface() (the slice) as Parent.
+			// For schemas in allOf/anyOf/oneOf/prefixItems, the structural parent is the
+			// Schema containing the array field, not the array itself. This ensures
+			// enclosingSchema is set correctly for relative $id resolution.
+			elementCtx := &PopulationContext{}
+			if ctx != nil {
+				elementCtx.Parent = ctx.Parent // Preserve structural parent
+				elementCtx.OwningDocument = ctx.OwningDocument
+			}
+
+			if err := populateValue(elementValue, target.Index(i), elementCtx); err != nil {
 				return err
 			}
 		}
