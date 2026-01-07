@@ -135,6 +135,21 @@ func (s *JSONSchema[Referenceable]) resolveExternalRefWithFragment(ctx context.C
 		return nil, validationErrs, fmt.Errorf("fragment not found: %s", jp)
 	}
 
+	// IMPORTANT: Ensure the navigated target has access to the parent document's registry.
+	// When navigateJSONPointer unmarshals a YAML node, the resulting schema doesn't have
+	// owningDocument set, so it can't find anchors registered in the parent document.
+	// We need to connect it to the parent document's registry.
+	if target.GetSchema() != nil && externalDoc.GetSchema() != nil {
+		// Get the registry from the external document and set it on the target
+		if registry := externalDoc.GetSchemaRegistry(); registry != nil {
+			target.SetSchemaRegistry(registry)
+		}
+		// Set the owning document so nested references can find the registry
+		target.GetSchema().SetOwningDocument(externalDoc)
+		// Also set the effective base URI so relative references resolve correctly
+		target.GetSchema().SetEffectiveBaseURI(baseURI)
+	}
+
 	return &references.ResolveResult[JSONSchemaReferenceable]{
 		Object:            target,
 		AbsoluteReference: baseURI,
