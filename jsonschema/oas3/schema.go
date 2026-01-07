@@ -42,6 +42,7 @@ type Schema struct {
 	UnevaluatedProperties *JSONSchema[Referenceable]
 	Items                 *JSONSchema[Referenceable]
 	Anchor                *string
+	ID                    *string
 	Not                   *JSONSchema[Referenceable]
 	Properties            *sequencedmap.Map[string, *JSONSchema[Referenceable]]
 	Defs                  *sequencedmap.Map[string, *JSONSchema[Referenceable]]
@@ -78,6 +79,15 @@ type Schema struct {
 	// These are set when the schema was populated as a child of another schema.
 	// Used for circular reference detection during resolution.
 	parent *JSONSchema[Referenceable] // Immediate parent schema in the hierarchy
+
+	// owningDocument stores a reference to the owning document (e.g., OpenAPI document).
+	// This is used to access the SchemaRegistry for $id and $anchor resolution.
+	// The document must implement SchemaRegistryProvider to enable $id and $anchor lookups.
+	owningDocument SchemaRegistryProvider
+
+	// effectiveBaseURI is the computed base URI for this schema, used for resolving
+	// relative $id values and $anchor references in nested schemas.
+	effectiveBaseURI string
 }
 
 // ShallowCopy creates a shallow copy of the Schema.
@@ -106,6 +116,7 @@ func (s *Schema) ShallowCopy() *Schema {
 		UnevaluatedProperties: s.UnevaluatedProperties,
 		Items:                 s.Items,
 		Anchor:                s.Anchor,
+		ID:                    s.ID,
 		Not:                   s.Not,
 		Title:                 s.Title,
 		MultipleOf:            s.MultipleOf,
@@ -134,6 +145,8 @@ func (s *Schema) ShallowCopy() *Schema {
 		XML:                   s.XML,
 		Extensions:            s.Extensions,
 		parent:                s.parent,
+		owningDocument:        s.owningDocument,
+		effectiveBaseURI:      s.effectiveBaseURI,
 	}
 
 	// Shallow copy slices - create new slice but reference same elements
@@ -382,6 +395,15 @@ func (s *Schema) GetAnchor() string {
 		return ""
 	}
 	return *s.Anchor
+}
+
+// GetID returns the value of the ID field ($id keyword). Returns empty string if not set.
+// The $id keyword identifies a schema resource with its canonical URI.
+func (s *Schema) GetID() string {
+	if s == nil || s.ID == nil {
+		return ""
+	}
+	return *s.ID
 }
 
 // GetNot returns the value of the Not field. Returns nil if not set.
@@ -749,6 +771,9 @@ func (s *Schema) IsEqual(other *Schema) bool {
 	if !reflect.DeepEqual(s.Anchor, other.Anchor) {
 		return false
 	}
+	if !reflect.DeepEqual(s.ID, other.ID) {
+		return false
+	}
 	if !reflect.DeepEqual(s.Title, other.Title) {
 		return false
 	}
@@ -896,13 +921,19 @@ func (s *Schema) SetParent(parent *JSONSchema[Referenceable]) {
 	s.parent = parent
 }
 
-// PopulateWithParent implements the ParentAwarePopulator interface to establish parent relationships during population
-func (s *Schema) PopulateWithParent(source any, parent any) error {
-	// If we have a parent that is a JSONSchema, establish the parent relationship
-	if parent != nil {
-		if parentSchema, ok := parent.(*JSONSchema[Referenceable]); ok {
+// PopulateWithContext implements the ContextAwarePopulator interface for full context-aware population.
+// This method receives the owning document and can register the schema with the document's registry.
+func (s *Schema) PopulateWithContext(source any, ctx *marshaller.PopulationContext) error {
+	// Extract parent JSONSchema if available
+	if ctx != nil && ctx.Parent != nil {
+		if parentSchema, ok := ctx.Parent.(*JSONSchema[Referenceable]); ok {
 			s.SetParent(parentSchema)
 		}
+	}
+
+	// Store owning document reference
+	if ctx != nil && ctx.OwningDocument != nil {
+		s.SetOwningDocument(ctx.OwningDocument)
 	}
 
 	var coreSchema *core.Schema
@@ -912,17 +943,136 @@ func (s *Schema) PopulateWithParent(source any, parent any) error {
 	case core.Schema:
 		coreSchema = &src
 	default:
-		return fmt.Errorf("expected *core.Reference[C] or core.Reference[C], got %T", source)
+		return fmt.Errorf("expected *core.Schema or core.Schema, got %T", source)
 	}
 
-	// First, perform the standard population
-	if err := marshaller.PopulateModel(source, s); err != nil {
-		return err
+	// CRITICAL: Extract $id and $anchor from core BEFORE populating children
+	// This allows us to compute effective base URI before children try to access it
+	if coreSchema.ID.Present && coreSchema.ID.Value != nil {
+		s.ID = coreSchema.ID.Value
 	}
+	if coreSchema.Anchor.Present && coreSchema.Anchor.Value != nil {
+		s.Anchor = coreSchema.Anchor.Value
+	}
+
+	// CRITICAL: Compute and register effective base URI BEFORE populating children
+	// This ensures parent's effective base URI is available when children try to resolve relative $ids
+	s.registerWithRegistry(ctx)
 
 	s.SetCore(coreSchema)
 
+	// Create context for nested schemas - pass THIS Schema as parent
+	// so that child JSONSchemas can store it as their enclosingSchema
+	// This allows children to access our effective base URI for relative $id resolution
+	nestedCtx := &marshaller.PopulationContext{
+		Parent:         s, // Pass the Schema so children can access our effective base URI
+		OwningDocument: s.owningDocument,
+	}
+
+	// Perform the standard population with context propagation
+	if err := marshaller.PopulateModelWithContext(source, s, nestedCtx); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// registerWithRegistry computes the effective base URI and registers the schema with the registry.
+// This uses s.owningDocument directly (already typed as SchemaRegistryProvider) rather than
+// type-asserting from context - SetOwningDocument handles that conversion.
+func (s *Schema) registerWithRegistry(_ *marshaller.PopulationContext) {
+	// Use s.owningDocument directly - it's already strongly typed as SchemaRegistryProvider
+	// SetOwningDocument was called earlier in PopulateWithContext to handle the type assertion
+	if s.owningDocument == nil {
+		return
+	}
+
+	registry := s.owningDocument.GetSchemaRegistry()
+	if registry == nil {
+		return
+	}
+
+	// Get the containing JSONSchema from parent - this was set in PopulateWithContext
+	// We need to use the actual JSONSchema from the document tree, not create a new wrapper
+	containingJS := s.parent
+	if containingJS == nil {
+		return
+	}
+
+	// Determine parent's effective base URI by traversing the enclosingSchema chain
+	// This is critical for relative $id resolution:
+	// - containingJS is the JSONSchema that wraps THIS Schema
+	// - containingJS.GetEnclosingSchema() is the Schema that contains containingJS as a field
+	// - That enclosing Schema's effective base URI is what we need for relative $id resolution
+	var parentBaseURI string
+	if enclosingSchema := containingJS.GetEnclosingSchema(); enclosingSchema != nil {
+		// Get the effective base URI from the enclosing schema (the parent in the document tree)
+		parentBaseURI = enclosingSchema.GetEffectiveBaseURI()
+	}
+
+	// Register the actual JSONSchema from the document tree
+	if err := registry.RegisterSchema(containingJS, parentBaseURI); err != nil {
+		// Log error but don't fail population
+		return
+	}
+
+	// Store the effective base URI from the registry
+	s.effectiveBaseURI = registry.GetBaseURI(containingJS)
+}
+
+// GetOwningDocument returns the owning document (e.g., OpenAPI document) for this schema.
+// Returns nil if no owning document is set.
+// The owning document implements SchemaRegistryProvider to enable $id and $anchor resolution.
+func (s *Schema) GetOwningDocument() SchemaRegistryProvider {
+	if s == nil {
+		return nil
+	}
+	return s.owningDocument
+}
+
+// SetOwningDocument sets the owning document reference for this schema.
+// The document must implement SchemaRegistryProvider; if not, the owning document is set to nil.
+func (s *Schema) SetOwningDocument(doc any) {
+	if s == nil {
+		return
+	}
+	if doc == nil {
+		s.owningDocument = nil
+		return
+	}
+	// Type assert to SchemaRegistryProvider - only store if it implements the interface
+	if provider, ok := doc.(SchemaRegistryProvider); ok {
+		s.owningDocument = provider
+	}
+	// If doc doesn't implement SchemaRegistryProvider, owningDocument remains unchanged
+	// This silently ignores non-SchemaRegistryProvider types to maintain backward compatibility
+}
+
+// GetEffectiveBaseURI returns the computed base URI for this schema.
+// This is the URI against which relative references should be resolved.
+// If not computed, returns an empty string.
+func (s *Schema) GetEffectiveBaseURI() string {
+	if s == nil {
+		return ""
+	}
+	return s.effectiveBaseURI
+}
+
+// SetEffectiveBaseURI sets the effective base URI for this schema.
+func (s *Schema) SetEffectiveBaseURI(uri string) {
+	if s == nil {
+		return
+	}
+	s.effectiveBaseURI = uri
+}
+
+// GetSchemaRegistry returns the schema registry from the owning document.
+// Returns nil if no owning document is set or if it doesn't provide a registry.
+func (s *Schema) GetSchemaRegistry() SchemaRegistry {
+	if s == nil || s.owningDocument == nil {
+		return nil
+	}
+	return s.owningDocument.GetSchemaRegistry()
 }
 
 // Helper functions for equality comparison

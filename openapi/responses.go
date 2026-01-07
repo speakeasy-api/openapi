@@ -76,7 +76,7 @@ func (r *Responses) Populate(source any) error {
 		for key, value := range s.AllUntyped() {
 			statusCode := key.(string)
 			referencedResponse := &ReferencedResponse{}
-			if err := marshaller.Populate(value, referencedResponse); err != nil {
+			if err := marshaller.PopulateWithContext(value, referencedResponse, nil); err != nil {
 				return err
 			}
 			r.Set(statusCode, referencedResponse)
@@ -85,7 +85,7 @@ func (r *Responses) Populate(source any) error {
 
 	if s.Default.Present {
 		r.Default = &ReferencedResponse{}
-		if err := marshaller.Populate(s.Default.Value, r.Default); err != nil {
+		if err := marshaller.PopulateWithContext(s.Default.Value, r.Default, nil); err != nil {
 			return err
 		}
 	}

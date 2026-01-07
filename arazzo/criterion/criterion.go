@@ -147,7 +147,7 @@ func (c *CriterionTypeUnion) Populate(source any) error {
 		c.Type = &typ
 	} else if coreCriterionTypeUnion.ExpressionType != nil {
 		c.ExpressionType = &CriterionExpressionType{}
-		if err := marshaller.Populate(*coreCriterionTypeUnion.ExpressionType, c.ExpressionType); err != nil {
+		if err := marshaller.PopulateWithContext(*coreCriterionTypeUnion.ExpressionType, c.ExpressionType, nil); err != nil {
 			return err
 		}
 	}

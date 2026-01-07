@@ -114,7 +114,7 @@ func getTestModelWithExtensions(ctx context.Context, t *testing.T, data string) 
 	require.Empty(t, validationErrs)
 
 	m := &ModelWithExtensions{}
-	err = marshaller.Populate(c, m)
+	err = marshaller.PopulateWithContext(c, m, nil)
 	require.NoError(t, err)
 
 	return m

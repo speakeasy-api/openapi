@@ -33,7 +33,7 @@ x-custom: "extension value"
 
 	// Test population to high-level model
 	var highModel tests.TestPrimitiveHighModel
-	err = marshaller.Populate(coreModel, &highModel)
+	err = marshaller.PopulateWithContext(coreModel, &highModel, nil)
 	require.NoError(t, err)
 
 	// Verify all fields were populated correctly
@@ -73,7 +73,7 @@ float64Field: 3.14
 
 	// Test population to high-level model
 	var highModel tests.TestPrimitiveHighModel
-	err = marshaller.Populate(coreModel, &highModel)
+	err = marshaller.PopulateWithContext(coreModel, &highModel, nil)
 	require.NoError(t, err)
 
 	// Verify required fields were populated
@@ -131,7 +131,7 @@ x-extension: "ext value"
 
 	// Test population to high-level model
 	var highModel tests.TestComplexHighModel
-	err = marshaller.Populate(coreModel, &highModel)
+	err = marshaller.PopulateWithContext(coreModel, &highModel, nil)
 	require.NoError(t, err)
 
 	// Verify nested model population
@@ -207,7 +207,7 @@ requiredRawNode: "raw node value"
 
 	// Test population to high-level model
 	var highModel tests.TestRequiredNilableHighModel
-	err = marshaller.Populate(coreModel, &highModel)
+	err = marshaller.PopulateWithContext(coreModel, &highModel, nil)
 	require.NoError(t, err)
 
 	// Verify required fields were populated
@@ -259,7 +259,7 @@ optionalPtr: "optional pointer value"
 
 	// Test population to high-level model
 	var highModel tests.TestRequiredPointerHighModel
-	err = marshaller.Populate(coreModel, &highModel)
+	err = marshaller.PopulateWithContext(coreModel, &highModel, nil)
 	require.NoError(t, err)
 
 	// Verify required pointer field
@@ -294,7 +294,7 @@ float64PtrField: null
 
 	// Test population to high-level model
 	var highModel tests.TestPrimitiveHighModel
-	err = marshaller.Populate(coreModel, &highModel)
+	err = marshaller.PopulateWithContext(coreModel, &highModel, nil)
 	require.NoError(t, err)
 
 	// Verify required fields are populated
@@ -337,7 +337,7 @@ x-extension: "ext value"
 
 	// Test population to high-level model
 	var highModel tests.TestEmbeddedMapWithFieldsHighModel
-	err = marshaller.Populate(coreModel, &highModel)
+	err = marshaller.PopulateWithContext(coreModel, &highModel, nil)
 	require.NoError(t, err)
 
 	// Debug: Check if core model has embedded map populated
@@ -389,7 +389,7 @@ dynamicKey3: "value3"
 
 	// Test population to high-level model
 	var highModel tests.TestEmbeddedMapHighModel
-	err = marshaller.Populate(coreModel, &highModel)
+	err = marshaller.PopulateWithContext(coreModel, &highModel, nil)
 	require.NoError(t, err)
 
 	// Verify embedded map was populated
@@ -443,7 +443,7 @@ x-extension: "ext value"
 
 	// Test population to high-level model
 	var highModel tests.TestValidationHighModel
-	err = marshaller.Populate(coreModel, &highModel)
+	err = marshaller.PopulateWithContext(coreModel, &highModel, nil)
 	require.NoError(t, err)
 
 	// Verify required fields
@@ -535,7 +535,7 @@ put:
 	// Now try to populate high-level model with HTTPMethod keys
 	// This should now succeed with our fix!
 	var highModel tests.TestTypeConversionHighModel
-	err = marshaller.Populate(coreModel, &highModel)
+	err = marshaller.PopulateWithContext(coreModel, &highModel, nil)
 
 	// This should now succeed with key type conversion
 	require.NoError(t, err, "Population should succeed with key type conversion")
@@ -589,7 +589,7 @@ httpMethodField: "post"
 
 	// Now try to populate high-level model (HTTPMethod field)
 	var highModel tests.TestTypeConversionHighModel
-	err = marshaller.Populate(coreModel, &highModel)
+	err = marshaller.PopulateWithContext(coreModel, &highModel, nil)
 
 	if err != nil {
 		t.Logf("Field conversion error: %v", err)
@@ -601,5 +601,172 @@ httpMethodField: "post"
 		require.NotNil(t, highModel.HTTPMethodField)
 		require.Equal(t, tests.HTTPMethodPost, *highModel.HTTPMethodField)
 		t.Logf("Field conversion successful: %v -> %v", "post", *highModel.HTTPMethodField)
+	}
+}
+
+// TestPopulation_WithContext_Success tests the new PopulateWithContext function
+// that supports passing owning document context through the population chain.
+func TestPopulation_WithContext_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+stringField: "test string"
+boolField: true
+intField: 42
+float64Field: 3.14
+`
+
+	// First unmarshal to core model
+	var coreModel core.TestPrimitiveModel
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+	require.True(t, coreModel.Valid)
+
+	// Create a context with an owning document
+	owningDoc := "test-owning-document"
+	ctx := &marshaller.PopulationContext{
+		Parent:         nil,
+		OwningDocument: owningDoc,
+	}
+
+	// Test population with context
+	var highModel tests.TestPrimitiveHighModel
+	err = marshaller.PopulateWithContext(coreModel, &highModel, ctx)
+	require.NoError(t, err)
+
+	// Verify fields were populated correctly
+	require.Equal(t, "test string", highModel.StringField)
+	require.True(t, highModel.BoolField)
+	require.Equal(t, 42, highModel.IntField)
+	require.InDelta(t, 3.14, highModel.Float64Field, 0.001)
+}
+
+// TestPopulation_WithContext_NilContext_Success tests that PopulateWithContext
+// works correctly when context is nil (backward compatible).
+func TestPopulation_WithContext_NilContext_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+stringField: "test string"
+boolField: true
+intField: 42
+float64Field: 3.14
+`
+
+	// First unmarshal to core model
+	var coreModel core.TestPrimitiveModel
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+	require.True(t, coreModel.Valid)
+
+	// Test population with nil context
+	var highModel tests.TestPrimitiveHighModel
+	err = marshaller.PopulateWithContext(coreModel, &highModel, nil)
+	require.NoError(t, err)
+
+	// Verify fields were populated correctly
+	require.Equal(t, "test string", highModel.StringField)
+	require.True(t, highModel.BoolField)
+	require.Equal(t, 42, highModel.IntField)
+	require.InDelta(t, 3.14, highModel.Float64Field, 0.001)
+}
+
+// TestPopulation_WithContext_ComplexTypes_Success tests PopulateWithContext
+// with complex nested types to ensure context is passed through correctly.
+func TestPopulation_WithContext_ComplexTypes_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+nestedModelValue:
+  stringField: "value model"
+  boolField: false
+  intField: 200
+  float64Field: 4.56
+nestedModel:
+  stringField: "nested value"
+  boolField: true
+  intField: 100
+  float64Field: 1.23
+arrayField:
+  - "item1"
+  - "item2"
+eitherModelOrPrimitive: 789
+`
+
+	// First unmarshal to core model
+	var coreModel core.TestComplexModel
+	validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, yml), &coreModel)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+	require.True(t, coreModel.Valid)
+
+	// Create a context with an owning document
+	owningDoc := map[string]string{"type": "test-document"}
+	ctx := &marshaller.PopulationContext{
+		Parent:         nil,
+		OwningDocument: owningDoc,
+	}
+
+	// Test population with context
+	var highModel tests.TestComplexHighModel
+	err = marshaller.PopulateWithContext(coreModel, &highModel, ctx)
+	require.NoError(t, err)
+
+	// Verify nested model population
+	require.NotNil(t, highModel.NestedModel)
+	require.Equal(t, "nested value", highModel.NestedModel.StringField)
+	require.True(t, highModel.NestedModel.BoolField)
+
+	// Verify array field population
+	require.Len(t, highModel.ArrayField, 2)
+	require.Equal(t, "item1", highModel.ArrayField[0])
+	require.Equal(t, "item2", highModel.ArrayField[1])
+}
+
+// TestPopulationContext_Struct tests that PopulationContext struct works correctly.
+func TestPopulationContext_Struct(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		parent         any
+		owningDocument any
+	}{
+		{
+			name:           "both nil",
+			parent:         nil,
+			owningDocument: nil,
+		},
+		{
+			name:           "parent only",
+			parent:         "parent-value",
+			owningDocument: nil,
+		},
+		{
+			name:           "owning document only",
+			parent:         nil,
+			owningDocument: "owning-doc-value",
+		},
+		{
+			name:           "both set",
+			parent:         "parent-value",
+			owningDocument: "owning-doc-value",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := &marshaller.PopulationContext{
+				Parent:         tt.parent,
+				OwningDocument: tt.owningDocument,
+			}
+
+			require.Equal(t, tt.parent, ctx.Parent)
+			require.Equal(t, tt.owningDocument, ctx.OwningDocument)
+		})
 	}
 }

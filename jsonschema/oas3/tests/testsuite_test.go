@@ -39,48 +39,14 @@ type Test struct {
 // Blacklisted test files that we don't support or want to skip
 // TODO work on improving support for these files
 var blacklistedFiles = map[string]string{
-	// Anchor resolution edge cases
-	"optional/anchor.json": "contains edge cases for anchor resolution",
-	"anchor.json":          "contains edge cases for anchor resolution",
-
-	// Unknown keyword and ID edge cases
+	// Unknown keyword edge cases
 	"optional/unknownKeyword.json": "contains edge cases for unknown keyword handling",
-	"optional/id.json":             "contains edge cases for ID resolution",
 }
 
 // Blacklisted test cases within specific files
 // Key format: "filename:case_number"
 // TODO work on improving support for these test cases
 var blacklistedTestCases = map[string]string{
-	// Remote reference tests that require $id base URI change support
-	"refRemote.json:2":  "requires anchor resolution support",
-	"refRemote.json:4":  "requires $id base URI change support",
-	"refRemote.json:5":  "requires $id base URI change support",
-	"refRemote.json:6":  "requires $id base URI change support",
-	"refRemote.json:7":  "requires $id base URI change support",
-	"refRemote.json:8":  "requires external reference resolution",
-	"refRemote.json:9":  "requires anchor resolution support",
-	"refRemote.json:10": "requires $id base URI change support",
-	"refRemote.json:13": "requires nested absolute reference resolution",
-	"refRemote.json:14": "requires detached anchor resolution support",
-
-	// ref.json tests that require advanced reference resolution features
-	"ref.json:11": "requires external reference resolution with $id",
-	"ref.json:15": "requires relative URI resolution with $id",
-	"ref.json:16": "requires absolute URI resolution with $id",
-	"ref.json:17": "requires complex $id resolution chain",
-	"ref.json:18": "requires $id evaluation before $ref",
-	"ref.json:19": "requires $id and $anchor evaluation before $ref",
-	"ref.json:20": "requires $id evaluation before $ref on nested schemas",
-	"ref.json:21": "requires URN scheme support",
-	"ref.json:26": "requires URN scheme with JSON pointer",
-	"ref.json:27": "requires URN scheme with anchor",
-	"ref.json:28": "requires URN scheme with nested references",
-	"ref.json:29": "requires conditional schema reference resolution",
-	"ref.json:30": "requires conditional schema reference resolution",
-	"ref.json:31": "requires conditional schema reference resolution",
-	"ref.json:32": "requires absolute path reference resolution",
-
 	// dynamicRef.json tests - all failing due to lack of dynamic reference support
 	"dynamicRef.json:0":  "requires dynamic reference resolution support",
 	"dynamicRef.json:2":  "requires dynamic reference resolution support",
@@ -202,8 +168,8 @@ func TestJSONSchemaTestSuite_RoundTrip(t *testing.T) {
 			continue
 		}
 
-		wg.Add(1)
 		t.Run(testFile, func(t *testing.T) {
+			wg.Add(1)
 			defer wg.Done()
 			t.Parallel()
 			fileCases, fileSkipped, filePassed, fileFailed := runRoundTripTestFile(t, filepath.Join(testSuiteDir, testFile))

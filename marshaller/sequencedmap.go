@@ -159,7 +159,7 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 }
 
 // populateSequencedMap populates a target sequenced map from a source sequenced map
-func populateSequencedMap(source any, target interfaces.SequencedMapInterface, parent any) error {
+func populateSequencedMap(source any, target interfaces.SequencedMapInterface, ctx *PopulationContext) error {
 	if source == nil {
 		return nil
 	}
@@ -204,7 +204,7 @@ func populateSequencedMap(source any, target interfaces.SequencedMapInterface, p
 			targetValue = CreateInstance(valueType).Interface()
 		}
 
-		if err := PopulateWithParent(value, targetValue, parent); err != nil {
+		if err := PopulateWithContext(value, targetValue, ctx); err != nil {
 			return err
 		}
 

@@ -92,7 +92,8 @@ func (e *EitherValue[L, LCore, R, RCore]) RightValue() R {
 	return *e.Right
 }
 
-func (e *EitherValue[L, LCore, R, RCore]) PopulateWithParent(source any, parent any) error {
+// PopulateWithContext populates the EitherValue with full population context.
+func (e *EitherValue[L, LCore, R, RCore]) PopulateWithContext(source any, ctx *marshaller.PopulationContext) error {
 	var ec *core.EitherValue[LCore, RCore]
 	switch v := source.(type) {
 	case *core.EitherValue[LCore, RCore]:
@@ -107,14 +108,15 @@ func (e *EitherValue[L, LCore, R, RCore]) PopulateWithParent(source any, parent 
 	e.SetCoreAny(ec)
 
 	if ec.IsLeft {
-		if err := marshaller.PopulateWithParent(ec.Left, &e.Left, parent); err != nil {
+		if err := marshaller.PopulateWithContext(ec.Left, &e.Left, ctx); err != nil {
 			return fmt.Errorf("failed to populate left: %w", err)
 		}
 
 		return nil
 	}
 
-	if err := marshaller.Populate(ec.Right, &e.Right); err != nil {
+	// Right value (typically bool for JSONSchema) doesn't need context
+	if err := marshaller.PopulateWithContext(ec.Right, &e.Right, nil); err != nil {
 		return fmt.Errorf("failed to populate right: %w", err)
 	}
 

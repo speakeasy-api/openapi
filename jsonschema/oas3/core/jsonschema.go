@@ -35,6 +35,7 @@ type Schema struct {
 	UnevaluatedProperties marshaller.Node[JSONSchema]                                             `key:"unevaluatedProperties"`
 	Items                 marshaller.Node[JSONSchema]                                             `key:"items"`
 	Anchor                marshaller.Node[*string]                                                `key:"$anchor"`
+	ID                    marshaller.Node[*string]                                                `key:"$id"`
 	Not                   marshaller.Node[JSONSchema]                                             `key:"not"`
 	Properties            marshaller.Node[*sequencedmap.Map[string, JSONSchema]]                  `key:"properties"`
 	Defs                  marshaller.Node[*sequencedmap.Map[string, JSONSchema]]                  `key:"$defs"`

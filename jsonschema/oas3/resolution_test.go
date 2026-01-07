@@ -643,7 +643,7 @@ $ref: "circular1.yaml"
 		assert.True(t, strings.Contains(err.Error(), "circular reference detected") || strings.Contains(err.Error(), "file not found"))
 	})
 
-	t.Run("self-referencing schema", func(t *testing.T) {
+	t.Run("self-referencing schema resolves to root", func(t *testing.T) {
 		t.Parallel()
 		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/simple_schema.yaml")
 		require.NoError(t, err)
@@ -657,12 +657,11 @@ $ref: "circular1.yaml"
 
 		validationErrs, err := schema.Resolve(t.Context(), opts)
 
-		require.Error(t, err)
-		assert.Nil(t, validationErrs)
-		// Accept various error types including target type mismatches
-		assert.True(t, strings.Contains(err.Error(), "circular reference detected") ||
-			strings.Contains(err.Error(), "target is not") ||
-			strings.Contains(err.Error(), "file not found"))
+		// Self-referencing schemas with $ref: "#" are valid in JSON Schema
+		// and should resolve successfully to the root document
+		require.NoError(t, err)
+		assert.Empty(t, validationErrs)
+		require.NotNil(t, schema.GetResolvedSchema())
 	})
 }
 
@@ -1264,4 +1263,827 @@ func TestJSONSchema_GetReferenceChain_CircularReference(t *testing.T) {
 		assert.Len(t, chain, 1, "chain should contain exactly one entry for self-referential parent")
 		assert.Equal(t, "#/components/schemas/Self", string(chain[0].Reference))
 	})
+}
+
+// Test resolution with $id as base URI
+func TestJSONSchema_Resolve_WithID_Success(t *testing.T) {
+	t.Parallel()
+
+	t.Run("$id provides base URI for relative reference resolution", func(t *testing.T) {
+		t.Parallel()
+
+		// Create mock filesystem with schemas
+		mockFS := NewMockVirtualFS()
+
+		// Add a schema at the URL path that $id specifies
+		mockFS.AddFile("api/v3/schemas/components/name.json", `{
+		"type": "string",
+		"description": "A name field resolved via $id base URI"
+}`)
+
+		// Add a schema with $id that points to a different base URL
+		// The reference "./components/name.json" should resolve relative to $id
+		mockFS.AddFile("testdata/pet.json", `{
+		"$id": "https://example.com/api/v3/schemas/pet.json",
+		"type": "object",
+		"properties": {
+		  "name": {
+		    "$ref": "./components/name.json"
+		  }
+		}
+}`)
+
+		// Create HTTP client to handle the resolution from $id base URI
+		httpClient := NewMockHTTPClient()
+		httpClient.AddResponse("https://example.com/api/v3/schemas/components/name.json", `{
+		"type": "string",
+		"description": "A name field resolved via $id base URI"
+}`, 200)
+
+		// Create resolution target
+		root := NewMockResolutionTarget()
+
+		// Create a schema with a reference to pet.json
+		schema := createSchemaWithRef("pet.json")
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   root,
+			VirtualFS:      mockFS,
+			HTTPClient:     httpClient,
+		}
+
+		validationErrs, err := schema.Resolve(t.Context(), opts)
+
+		require.NoError(t, err)
+		assert.Empty(t, validationErrs)
+
+		// Get the resolved schema (pet.json)
+		resolved := schema.GetResolvedSchema()
+		require.NotNil(t, resolved)
+		require.True(t, resolved.IsSchema())
+
+		// Verify the pet schema has properties
+		petSchema := resolved.GetSchema()
+		require.NotNil(t, petSchema)
+		assert.Equal(t, "https://example.com/api/v3/schemas/pet.json", petSchema.GetID())
+
+		// Get the properties
+		properties := petSchema.GetProperties()
+		require.NotNil(t, properties)
+
+		// Get the name property which has a $ref
+		nameProperty, exists := properties.Get("name")
+		require.True(t, exists, "name property should exist")
+		require.NotNil(t, nameProperty)
+
+		// The name property should be a reference, resolve it
+		if nameProperty.IsReference() {
+			// Create new resolve options with the updated base from $id
+			nameOpts := ResolveOptions{
+				TargetLocation: "https://example.com/api/v3/schemas/pet.json",
+				RootDocument:   root,
+				VirtualFS:      mockFS,
+				HTTPClient:     httpClient,
+			}
+
+			validationErrs, err := nameProperty.Resolve(t.Context(), nameOpts)
+			require.NoError(t, err)
+			assert.Empty(t, validationErrs)
+
+			nameResolved := nameProperty.GetResolvedSchema()
+			require.NotNil(t, nameResolved)
+			require.True(t, nameResolved.IsSchema())
+
+			// Verify it resolved to the correct schema
+			nameSchema := nameResolved.GetSchema()
+			assert.Equal(t, "A name field resolved via $id base URI", nameSchema.GetDescription())
+		}
+	})
+
+	t.Run("$id with URL used as base for local reference", func(t *testing.T) {
+		t.Parallel()
+
+		// Create mock filesystem
+		mockFS := NewMockVirtualFS()
+
+		// Add a schema file with $id and definitions
+		mockFS.AddFile("testdata/definitions.json", `{
+		"$id": "https://example.com/schemas/definitions.json",
+		"type": "object",
+		"definitions": {
+		  "Address": {
+		    "type": "object",
+		    "properties": {
+		      "street": { "type": "string" },
+		      "city": { "type": "string" }
+		    }
+		  }
+		},
+		"properties": {
+		  "homeAddress": {
+		    "$ref": "#/definitions/Address"
+		  }
+		}
+}`)
+
+		// Create resolution target
+		root := NewMockResolutionTarget()
+
+		// Create a schema with a reference
+		schema := createSchemaWithRef("definitions.json")
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   root,
+			VirtualFS:      mockFS,
+		}
+
+		validationErrs, err := schema.Resolve(t.Context(), opts)
+
+		require.NoError(t, err)
+		assert.Empty(t, validationErrs)
+
+		// Get the resolved schema
+		resolved := schema.GetResolvedSchema()
+		require.NotNil(t, resolved)
+		require.True(t, resolved.IsSchema())
+
+		// Verify $id was parsed
+		defSchema := resolved.GetSchema()
+		require.NotNil(t, defSchema)
+		assert.Equal(t, "https://example.com/schemas/definitions.json", defSchema.GetID())
+	})
+
+	t.Run("schema without $id uses target location as base", func(t *testing.T) {
+		t.Parallel()
+
+		// Create mock filesystem
+		mockFS := NewMockVirtualFS()
+
+		// Add a schema without $id
+		mockFS.AddFile("testdata/schemas/user.json", `{
+		"type": "object",
+		"properties": {
+		  "name": { "type": "string" }
+		}
+}`)
+
+		// Add a schema that references user.json
+		mockFS.AddFile("testdata/schemas/order.json", `{
+		"type": "object",
+		"properties": {
+		  "user": {
+		    "$ref": "user.json"
+		  }
+		}
+}`)
+
+		// Create resolution target
+		root := NewMockResolutionTarget()
+
+		// Create a schema with a reference
+		schema := createSchemaWithRef("schemas/order.json")
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   root,
+			VirtualFS:      mockFS,
+		}
+
+		validationErrs, err := schema.Resolve(t.Context(), opts)
+
+		require.NoError(t, err)
+		assert.Empty(t, validationErrs)
+
+		// Get the resolved schema
+		resolved := schema.GetResolvedSchema()
+		require.NotNil(t, resolved)
+		require.True(t, resolved.IsSchema())
+
+		// Verify no $id (should return empty string)
+		orderSchema := resolved.GetSchema()
+		require.NotNil(t, orderSchema)
+		assert.Empty(t, orderSchema.GetID())
+	})
+}
+
+func TestJSONSchema_Resolve_WithAnchor_Success(t *testing.T) {
+	t.Parallel()
+
+	t.Run("$anchor resolves to schema in same document", func(t *testing.T) {
+		t.Parallel()
+
+		// Create mock filesystem with a schema that has $anchor references
+		mockFS := NewMockVirtualFS()
+
+		// Schema with $anchor definitions that can be referenced
+		mockFS.AddFile("testdata/schema.json", `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$defs": {
+		  "foo": {
+		    "$anchor": "foo",
+		    "type": "string"
+		  }
+		},
+		"properties": {
+		  "name": {
+		    "$ref": "#foo"
+		  }
+		}
+}`)
+
+		// Create resolution target
+		root := NewMockResolutionTarget()
+
+		// Create a schema with a reference
+		schema := createSchemaWithRef("schema.json")
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   root,
+			VirtualFS:      mockFS,
+		}
+
+		validationErrs, err := schema.Resolve(t.Context(), opts)
+
+		require.NoError(t, err)
+		assert.Empty(t, validationErrs)
+
+		// Get the resolved schema
+		resolved := schema.GetResolvedSchema()
+		require.NotNil(t, resolved)
+		require.True(t, resolved.IsSchema())
+	})
+
+	t.Run("$anchor with absolute URI in same document", func(t *testing.T) {
+		t.Parallel()
+
+		// Create mock filesystem with a schema that uses absolute URI with anchor
+		mockFS := NewMockVirtualFS()
+
+		mockFS.AddFile("testdata/schema.json", `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id": "https://example.com/schemas/root.json",
+		"$defs": {
+		  "A": {
+		    "$anchor": "foo",
+		    "type": "integer"
+		  }
+		},
+		"properties": {
+		  "value": {
+		    "$ref": "https://example.com/schemas/root.json#foo"
+		  }
+		}
+}`)
+
+		// Create resolution target
+		root := NewMockResolutionTarget()
+
+		// Create a schema with a reference
+		schema := createSchemaWithRef("schema.json")
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   root,
+			VirtualFS:      mockFS,
+		}
+
+		validationErrs, err := schema.Resolve(t.Context(), opts)
+
+		require.NoError(t, err)
+		assert.Empty(t, validationErrs)
+
+		// Get the resolved schema
+		resolved := schema.GetResolvedSchema()
+		require.NotNil(t, resolved)
+		require.True(t, resolved.IsSchema())
+	})
+
+	t.Run("$anchor with base URI change in subschema", func(t *testing.T) {
+		t.Parallel()
+
+		// Create mock filesystem
+		mockFS := NewMockVirtualFS()
+
+		mockFS.AddFile("testdata/schema.json", `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id": "https://example.com/root.json",
+		"$defs": {
+		  "A": {
+		    "$id": "https://example.com/nested.json",
+		    "$anchor": "bar",
+		    "type": "string"
+		  },
+		  "B": {
+		    "$anchor": "bar",
+		    "type": "integer"
+		  }
+		},
+		"properties": {
+		  "strVal": {
+		    "$ref": "https://example.com/nested.json#bar"
+		  },
+		  "intVal": {
+		    "$ref": "#bar"
+		  }
+		}
+}`)
+
+		// Create resolution target
+		root := NewMockResolutionTarget()
+
+		// Create a schema with a reference
+		schema := createSchemaWithRef("schema.json")
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   root,
+			VirtualFS:      mockFS,
+		}
+
+		validationErrs, err := schema.Resolve(t.Context(), opts)
+
+		require.NoError(t, err)
+		assert.Empty(t, validationErrs)
+
+		// Get the resolved schema
+		resolved := schema.GetResolvedSchema()
+		require.NotNil(t, resolved)
+		require.True(t, resolved.IsSchema())
+	})
+}
+
+func TestJSONSchema_GetReferenceResolutionInfo_Success(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns nil for non-reference", func(t *testing.T) {
+		t.Parallel()
+
+		schema := NewJSONSchemaFromSchema[Referenceable](&Schema{
+			Type: NewTypeFromArray([]SchemaType{SchemaTypeString}),
+		})
+
+		info := schema.GetReferenceResolutionInfo()
+		assert.Nil(t, info, "should return nil for non-reference")
+	})
+
+	t.Run("returns nil for nil schema", func(t *testing.T) {
+		t.Parallel()
+
+		var schema *JSONSchema[Referenceable]
+		info := schema.GetReferenceResolutionInfo()
+		assert.Nil(t, info, "should return nil for nil schema")
+	})
+
+	t.Run("returns info after resolution", func(t *testing.T) {
+		t.Parallel()
+
+		// Create mock filesystem
+		mockFS := NewMockVirtualFS()
+
+		mockFS.AddFile("testdata/user.json", `{
+		"type": "object",
+		"properties": {
+		  "name": { "type": "string" }
+		}
+}`)
+
+		root := NewMockResolutionTarget()
+		schema := createSchemaWithRef("user.json")
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   root,
+			VirtualFS:      mockFS,
+		}
+
+		_, err := schema.Resolve(t.Context(), opts)
+		require.NoError(t, err)
+
+		info := schema.GetReferenceResolutionInfo()
+		require.NotNil(t, info, "should return info after resolution")
+		assert.NotNil(t, info.Object, "should have resolved object")
+	})
+}
+
+func TestJoinReferenceChain_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		chain    []string
+		expected string
+	}{
+		{
+			name:     "empty chain",
+			chain:    []string{},
+			expected: "",
+		},
+		{
+			name:     "single element",
+			chain:    []string{"#/components/schemas/User"},
+			expected: "#/components/schemas/User",
+		},
+		{
+			name:     "two elements",
+			chain:    []string{"#/components/schemas/User", "#/components/schemas/Address"},
+			expected: "#/components/schemas/User -> #/components/schemas/Address",
+		},
+		{
+			name:     "three elements",
+			chain:    []string{"A", "B", "C"},
+			expected: "A -> B -> C",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := joinReferenceChain(tt.chain)
+			assert.Equal(t, tt.expected, result, "join result should match expected")
+		})
+	}
+}
+
+// MockSchemaRegistryProvider implements SchemaRegistryProvider for testing
+type MockSchemaRegistryProvider struct {
+	*MockResolutionTarget
+	registry SchemaRegistry
+	baseURI  string
+}
+
+func NewMockSchemaRegistryProvider() *MockSchemaRegistryProvider {
+	registry := NewSchemaRegistry("")
+	return &MockSchemaRegistryProvider{
+		MockResolutionTarget: NewMockResolutionTarget(),
+		registry:             registry,
+		baseURI:              "",
+	}
+}
+
+func (m *MockSchemaRegistryProvider) GetSchemaRegistry() SchemaRegistry {
+	return m.registry
+}
+
+func (m *MockSchemaRegistryProvider) GetDocumentBaseURI() string {
+	return m.baseURI
+}
+
+func TestTryResolveViaRegistry_Success(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns nil when no registry available", func(t *testing.T) {
+		t.Parallel()
+
+		schema := createSchemaWithRef("#foo")
+		ref := schema.GetRef()
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   NewMockResolutionTarget(), // No registry provider
+		}
+
+		result := schema.tryResolveViaRegistry(t.Context(), ref, opts)
+		assert.Nil(t, result, "should return nil when no registry available")
+	})
+
+	t.Run("returns nil for empty reference", func(t *testing.T) {
+		t.Parallel()
+
+		schema := createSchemaWithRef("")
+		ref := schema.GetRef()
+
+		provider := NewMockSchemaRegistryProvider()
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   provider,
+		}
+
+		result := schema.tryResolveViaRegistry(t.Context(), ref, opts)
+		assert.Nil(t, result, "should return nil for empty reference")
+	})
+
+	t.Run("resolves $anchor reference from registry", func(t *testing.T) {
+		t.Parallel()
+
+		provider := NewMockSchemaRegistryProvider()
+
+		// Create a target schema with $anchor set
+		anchor := "foo"
+		targetSchema := NewJSONSchemaFromSchema[Referenceable](&Schema{
+			Type:   NewTypeFromArray([]SchemaType{SchemaTypeString}),
+			Anchor: &anchor,
+		})
+
+		// Register the schema (it will pick up the anchor from the schema)
+		err := provider.registry.RegisterSchema(targetSchema, "https://example.com/root.json")
+		require.NoError(t, err)
+
+		// Create a schema that references the anchor
+		schema := createSchemaWithRef("#foo")
+		ref := schema.GetRef()
+
+		// Set effective base URI on the schema
+		innerSchema := schema.GetSchema()
+		innerSchema.effectiveBaseURI = "https://example.com/root.json"
+
+		opts := ResolveOptions{
+			TargetLocation: "https://example.com/root.json",
+			RootDocument:   provider,
+		}
+
+		result := schema.tryResolveViaRegistry(t.Context(), ref, opts)
+		require.NotNil(t, result, "should resolve anchor reference")
+		assert.Equal(t, targetSchema, result.Object, "should resolve to registered schema")
+	})
+
+	t.Run("resolves $id reference from registry", func(t *testing.T) {
+		t.Parallel()
+
+		provider := NewMockSchemaRegistryProvider()
+
+		// Create a target schema with $id set
+		targetSchema := NewJSONSchemaFromSchema[Referenceable](&Schema{
+			Type: NewTypeFromArray([]SchemaType{SchemaTypeString}),
+			ID:   ptr("https://example.com/schemas/user.json"),
+		})
+
+		// Register the schema with its $id
+		err := provider.registry.RegisterSchema(targetSchema, "")
+		require.NoError(t, err)
+
+		// Create a schema that references the $id
+		schema := createSchemaWithRef("https://example.com/schemas/user.json")
+		ref := schema.GetRef()
+
+		opts := ResolveOptions{
+			TargetLocation: "https://example.com/root.json",
+			RootDocument:   provider,
+		}
+
+		result := schema.tryResolveViaRegistry(t.Context(), ref, opts)
+		require.NotNil(t, result, "should resolve $id reference")
+		assert.Equal(t, targetSchema, result.Object, "should resolve to registered schema")
+	})
+
+	t.Run("resolves relative $id reference from registry", func(t *testing.T) {
+		t.Parallel()
+
+		provider := NewMockSchemaRegistryProvider()
+
+		// Create a target schema with $id set
+		targetSchema := NewJSONSchemaFromSchema[Referenceable](&Schema{
+			Type: NewTypeFromArray([]SchemaType{SchemaTypeString}),
+			ID:   ptr("https://example.com/schemas/user.json"),
+		})
+
+		// Register the schema
+		err := provider.registry.RegisterSchema(targetSchema, "")
+		require.NoError(t, err)
+
+		// Create a schema that references with a relative URI
+		schema := createSchemaWithRef("user.json")
+		ref := schema.GetRef()
+
+		// Set effective base URI on the schema
+		innerSchema := schema.GetSchema()
+		innerSchema.effectiveBaseURI = "https://example.com/schemas/"
+
+		opts := ResolveOptions{
+			TargetLocation: "https://example.com/schemas/root.json",
+			RootDocument:   provider,
+		}
+
+		result := schema.tryResolveViaRegistry(t.Context(), ref, opts)
+		require.NotNil(t, result, "should resolve relative $id reference")
+		assert.Equal(t, targetSchema, result.Object, "should resolve to registered schema")
+	})
+
+	t.Run("resolves anchor with document base URI fallback", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a registry with a document base URI
+		registry := NewSchemaRegistry("https://example.com/doc.json")
+		provider := &MockSchemaRegistryProvider{
+			MockResolutionTarget: NewMockResolutionTarget(),
+			registry:             registry,
+			baseURI:              "https://example.com/doc.json",
+		}
+
+		// Create a target schema with $anchor set
+		anchor := "bar"
+		targetSchema := NewJSONSchemaFromSchema[Referenceable](&Schema{
+			Type:   NewTypeFromArray([]SchemaType{SchemaTypeString}),
+			Anchor: &anchor,
+		})
+
+		// Register the schema under document base URI
+		err := registry.RegisterSchema(targetSchema, "https://example.com/doc.json")
+		require.NoError(t, err)
+
+		// Create a schema that references the anchor
+		schema := createSchemaWithRef("#bar")
+		ref := schema.GetRef()
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   provider,
+		}
+
+		result := schema.tryResolveViaRegistry(t.Context(), ref, opts)
+		require.NotNil(t, result, "should resolve anchor with document base URI")
+		assert.Equal(t, targetSchema, result.Object, "should resolve to registered schema")
+	})
+}
+
+// ptr is a helper to create a pointer to a string
+func ptr(s string) *string {
+	return &s
+}
+
+func TestGetEffectiveBaseURI_Success(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns schema's effective base URI", func(t *testing.T) {
+		t.Parallel()
+
+		schema := createSimpleSchema()
+		innerSchema := schema.GetSchema()
+		innerSchema.effectiveBaseURI = "https://example.com/schema.json"
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   NewMockResolutionTarget(),
+		}
+
+		result := schema.getEffectiveBaseURI(opts)
+		assert.Equal(t, "https://example.com/schema.json", result)
+	})
+
+	t.Run("returns cached absolute reference", func(t *testing.T) {
+		t.Parallel()
+
+		schema := createSchemaWithRef("#foo")
+		schema.referenceResolutionCache = &references.ResolveResult[JSONSchema[Referenceable]]{
+			AbsoluteReference: "https://example.com/cached.json",
+		}
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   NewMockResolutionTarget(),
+		}
+
+		result := schema.getEffectiveBaseURI(opts)
+		assert.Equal(t, "https://example.com/cached.json", result)
+	})
+
+	t.Run("returns target location as fallback", func(t *testing.T) {
+		t.Parallel()
+
+		schema := createSimpleSchema()
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   NewMockResolutionTarget(),
+		}
+
+		result := schema.getEffectiveBaseURI(opts)
+		assert.Equal(t, "testdata/root.json", result)
+	})
+
+	t.Run("returns document base URI from provider", func(t *testing.T) {
+		t.Parallel()
+
+		schema := createSimpleSchema()
+
+		provider := NewMockSchemaRegistryProvider()
+		provider.baseURI = "https://example.com/document.json"
+
+		opts := ResolveOptions{
+			TargetLocation: "", // Empty target location
+			RootDocument:   provider,
+		}
+
+		result := schema.getEffectiveBaseURI(opts)
+		assert.Equal(t, "https://example.com/document.json", result)
+	})
+}
+
+func TestGetSchemaRegistry_Success(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns registry from root document", func(t *testing.T) {
+		t.Parallel()
+
+		provider := NewMockSchemaRegistryProvider()
+		schema := createSimpleSchema()
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   provider,
+		}
+
+		result := schema.getSchemaRegistry(opts)
+		assert.NotNil(t, result, "should return registry from root document")
+		assert.Equal(t, provider.registry, result)
+	})
+
+	t.Run("returns registry from target document", func(t *testing.T) {
+		t.Parallel()
+
+		provider := NewMockSchemaRegistryProvider()
+		schema := createSimpleSchema()
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   NewMockResolutionTarget(), // No registry
+			TargetDocument: provider,                  // Has registry
+		}
+
+		result := schema.getSchemaRegistry(opts)
+		assert.NotNil(t, result, "should return registry from target document")
+		assert.Equal(t, provider.registry, result)
+	})
+
+	t.Run("returns registry from schema's owning document", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a provider that implements SchemaRegistryProvider
+		provider := NewMockSchemaRegistryProvider()
+
+		// Create schema and set its owning document
+		schema := createSimpleSchema()
+		schema.GetSchema().SetOwningDocument(provider)
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   NewMockResolutionTarget(), // No registry
+		}
+
+		result := schema.getSchemaRegistry(opts)
+		assert.NotNil(t, result, "should return registry from schema")
+		assert.Equal(t, provider.registry, result)
+	})
+
+	t.Run("returns nil when no registry available", func(t *testing.T) {
+		t.Parallel()
+
+		schema := createSimpleSchema()
+
+		opts := ResolveOptions{
+			TargetLocation: "testdata/root.json",
+			RootDocument:   NewMockResolutionTarget(),
+		}
+
+		result := schema.getSchemaRegistry(opts)
+		assert.Nil(t, result, "should return nil when no registry available")
+	})
+}
+
+func TestGetParentJSONPointer_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "root slash",
+			input:    "/",
+			expected: "",
+		},
+		{
+			name:     "single segment",
+			input:    "/properties",
+			expected: "",
+		},
+		{
+			name:     "two segments",
+			input:    "/properties/name",
+			expected: "/properties",
+		},
+		{
+			name:     "three segments",
+			input:    "/properties/nested/inner",
+			expected: "/properties/nested",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := getParentJSONPointer(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

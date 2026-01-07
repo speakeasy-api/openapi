@@ -2,13 +2,11 @@ package oas3
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"unsafe"
 
 	"github.com/speakeasy-api/openapi/internal/utils"
-	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/references"
 	"gopkg.in/yaml.v3"
@@ -167,90 +165,6 @@ func (r *JSONSchema[Referenceable]) GetReferenceResolutionInfo() *references.Res
 	return r.referenceResolutionCache
 }
 
-// ReferenceChainEntry represents a step in the reference resolution chain.
-// Each entry contains the schema that holds the reference and the reference itself.
-type ReferenceChainEntry struct {
-	// Schema is the JSONSchema node that contains the $ref.
-	// This is the schema that was resolved to get to the next step in the chain.
-	Schema *JSONSchema[Referenceable]
-
-	// Reference is the $ref value from the schema (e.g., "#/components/schemas/User").
-	Reference references.Reference
-}
-
-// GetReferenceChain returns the chain of references that were followed to resolve this schema.
-// The chain is ordered from the outermost reference (top-level parent) to the innermost (immediate parent).
-// Returns nil if this schema was not resolved via references.
-//
-// Example: If a response schema references Schema1, which references SchemaShared,
-// calling GetReferenceChain() on the resolved SchemaShared would return:
-//   - [0]: response schema with reference "#/components/schemas/Schema1"
-//   - [1]: Schema1 with reference "#/components/schemas/SchemaShared"
-//
-// This allows tracking which schemas first referenced nested schemas during iteration.
-func (j *JSONSchema[T]) GetReferenceChain() []*ReferenceChainEntry {
-	if j == nil || j.parent == nil {
-		return nil
-	}
-
-	var chain []*ReferenceChainEntry
-	visited := make(map[*JSONSchema[Referenceable]]bool)
-
-	// Walk from the immediate parent up to the top-level
-	current := j.parent
-	for current != nil {
-		// Detect circular reference in parent chain - stop if we've seen this schema before
-		if visited[current] {
-			break
-		}
-		visited[current] = true
-
-		if current.IsReference() {
-			entry := &ReferenceChainEntry{
-				Schema:    current,
-				Reference: current.GetRef(),
-			}
-			// Prepend to get topLevel first (outer -> inner order)
-			chain = append([]*ReferenceChainEntry{entry}, chain...)
-		}
-
-		// Move to the parent of current
-		current = current.GetParent()
-	}
-
-	return chain
-}
-
-// GetImmediateReference returns the immediate parent reference that resolved to this schema.
-// Returns nil if this schema was not resolved via a reference.
-//
-// This is a convenience method equivalent to getting the last element of GetReferenceChain().
-func (j *JSONSchema[T]) GetImmediateReference() *ReferenceChainEntry {
-	if j == nil || j.parent == nil || !j.parent.IsReference() {
-		return nil
-	}
-
-	return &ReferenceChainEntry{
-		Schema:    j.parent,
-		Reference: j.parent.GetRef(),
-	}
-}
-
-// GetTopLevelReference returns the outermost (first) reference in the chain that led to this schema.
-// Returns nil if this schema was not resolved via a reference.
-//
-// This is a convenience method equivalent to getting the first element of GetReferenceChain().
-func (j *JSONSchema[T]) GetTopLevelReference() *ReferenceChainEntry {
-	if j == nil || j.topLevelParent == nil || !j.topLevelParent.IsReference() {
-		return nil
-	}
-
-	return &ReferenceChainEntry{
-		Schema:    j.topLevelParent,
-		Reference: j.topLevelParent.GetRef(),
-	}
-}
-
 func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references.ResolveOptions, referenceChain []string) ([]string, []error, error) {
 	if !s.IsReference() {
 		return referenceChain, nil, nil
@@ -273,25 +187,47 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 	// Get the absolute reference string for tracking using the extracted logic
 	ref := s.GetRef()
 
-	absRefResult, err := references.ResolveAbsoluteReference(ref, opts.TargetLocation)
+	// Determine the effective base URI for this schema
+	// This accounts for nested $id values that change the base URI for relative references
+	effectiveBase := s.getEffectiveBaseURI(opts)
+
+	// Try to resolve via registry first ($id and $anchor lookups)
+	if result := s.tryResolveViaRegistry(ctx, ref, opts); result != nil {
+		// Compute absolute reference for circular detection
+		// Use the result's AbsoluteReference combined with any anchor/fragment
+		absRef := result.AbsoluteReference
+		if anchor := ExtractAnchor(string(ref)); anchor != "" {
+			absRef = absRef + "#" + anchor
+		} else if jp := ref.GetJSONPointer(); jp != "" {
+			absRef = absRef + "#" + string(jp)
+		}
+
+		// Check for circular reference by looking for the current reference in the chain
+		for _, chainRef := range referenceChain {
+			if chainRef == absRef {
+				// Build circular reference error message showing the full chain
+				chainWithCurrent := referenceChain
+				chainWithCurrent = append(chainWithCurrent, absRef)
+				s.circularErrorFound = true
+				return nil, nil, fmt.Errorf("circular reference detected: %s", joinReferenceChain(chainWithCurrent))
+			}
+		}
+
+		// Add this reference to the chain
+		newChain := referenceChain
+		newChain = append(newChain, absRef)
+
+		s.referenceResolutionCache = result
+		return newChain, nil, nil
+	}
+
+	absRefResult, err := references.ResolveAbsoluteReference(ref, effectiveBase)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	jsonPtr := string(ref.GetJSONPointer())
 	absRef := utils.BuildAbsoluteReference(absRefResult.AbsoluteReference, jsonPtr)
-
-	// Special case: detect self-referencing schemas (references to root document)
-	// This catches cases like "#" which reference the root document itself
-	// Only consider it circular if this schema has no parent (i.e., it's at the root level)
-	if ref.GetURI() == "" && ref.GetJSONPointer() == "" {
-		// Check if this schema has a parent - if it does, then referencing "#" is legitimate
-		// If it has no parent, then it's the root schema referencing itself, which is circular
-		if s.GetParent() == nil && s.GetTopLevelParent() == nil {
-			s.circularErrorFound = true
-			return nil, nil, errors.New("circular reference detected: self-referencing schema")
-		}
-	}
 
 	// Check for circular reference by looking for the current reference in the chain
 	for _, chainRef := range referenceChain {
@@ -311,24 +247,62 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 	var result *references.ResolveResult[JSONSchemaReferenceable]
 	var validationErrs []error
 
-	// Check if this is a $defs reference and handle it specially
-	if strings.HasPrefix(string(ref.GetJSONPointer()), "/$defs/") {
-		result, validationErrs, err = s.resolveDefsReference(ctx, ref, opts)
-	} else {
+	// Create resolve opts with the effective base URI
+	// This ensures relative references are resolved against the correct base (from $id chain)
+	resolveOpts := opts
+	if effectiveBase != "" && effectiveBase != opts.TargetLocation {
+		resolveOpts.TargetLocation = effectiveBase
+	}
+
+	// Determine resolution strategy based on reference type
+	switch {
+	case strings.HasPrefix(string(ref.GetJSONPointer()), "/$defs/"):
+		// Check if this is a $defs reference and handle it specially
+		result, validationErrs, err = s.resolveDefsReference(ctx, ref, resolveOpts)
+	case ref.IsAnchorReference() && ref.GetURI() != "":
+		// Handle external anchor references specially - fetch the document first, then resolve the anchor
+		result, validationErrs, err = s.resolveExternalAnchorReference(ctx, ref, resolveOpts)
+	case ref.GetURI() != "" && ref.GetJSONPointer() != "":
+		// Handle external references with JSON pointer fragments
+		// We need to fetch the whole document, set up its registry, then navigate to the fragment
+		result, validationErrs, err = s.resolveExternalRefWithFragment(ctx, ref, resolveOpts)
+	default:
 		// Resolve as JSONSchema to handle both Schema and boolean cases
-		result, validationErrs, err = references.Resolve(ctx, ref, unmarshaler, opts)
+		result, validationErrs, err = references.Resolve(ctx, ref, unmarshaler, resolveOpts)
 	}
 	if err != nil {
 		return nil, validationErrs, err
 	}
 
 	schema := result.Object
+
+	// Use $id as base URI if present in the resolved schema (JSON Schema spec)
+	// The $id keyword identifies a schema resource with its canonical URI
+	// and serves as the base URI for relative references within that schema
+	baseURI := result.AbsoluteReference
+	if !schema.IsBool() && schema.GetSchema() != nil {
+		if schemaID := schema.GetSchema().GetID(); schemaID != "" {
+			baseURI = schemaID
+		}
+	}
+
+	// Set up the schema registry for remote schemas
+	// This enables $id and $anchor resolution within the fetched document
+	setupRemoteSchemaRegistry(ctx, schema, baseURI)
+
 	for item := range Walk(ctx, schema) {
 		_ = item.Match(SchemaMatcher{
 			Schema: func(js *JSONSchemaReferenceable) error {
 				if js.IsReference() {
+					// Check if this schema has its own $id, which would override the parent's base URI
+					localBaseURI := baseURI
+					if !js.IsBool() && js.GetSchema() != nil {
+						if jsID := js.GetSchema().GetID(); jsID != "" {
+							localBaseURI = jsID
+						}
+					}
 					js.referenceResolutionCache = &references.ResolveResult[JSONSchemaReferenceable]{
-						AbsoluteReference: result.AbsoluteReference,
+						AbsoluteReference: localBaseURI,
 						ResolvedDocument:  result.ResolvedDocument,
 					}
 				}
@@ -398,112 +372,6 @@ func resolveJSONSchemaWithTracking(ctx context.Context, schema *JSONSchema[Refer
 	}
 
 	return validationErrs, nil
-}
-
-// resolveDefsReference handles special resolution for $defs references
-// It uses the standard references.Resolve infrastructure but adjusts the target document for $defs resolution
-func (s *JSONSchema[Referenceable]) resolveDefsReference(ctx context.Context, ref references.Reference, opts references.ResolveOptions) (*references.ResolveResult[JSONSchemaReferenceable], []error, error) {
-	jp := ref.GetJSONPointer()
-
-	// Validate this is a $defs reference
-	if !strings.HasPrefix(jp.String(), "/$defs/") {
-		return nil, nil, fmt.Errorf("not a $defs reference: %s", ref)
-	}
-
-	// First, try to resolve using the standard references.Resolve with the target document
-	// This handles external $defs, caching, and all standard resolution features
-	result, validationErrs, err := references.Resolve(ctx, ref, unmarshaler, opts)
-	if err == nil {
-		return result, validationErrs, nil
-	}
-
-	// If standard resolution failed and we have a parent, try resolving with the parent as target
-	if parent := s.GetParent(); parent != nil {
-		parentOpts := opts
-		parentOpts.TargetDocument = parent
-		parentOpts.TargetLocation = opts.TargetLocation // Keep the same location for caching
-
-		result, validationErrs, err := references.Resolve(ctx, ref, unmarshaler, parentOpts)
-		if err == nil {
-			return result, validationErrs, nil
-		}
-	}
-
-	// Fallback: try JSON pointer navigation when no parent chain exists
-	if s.GetParent() == nil && s.GetTopLevelParent() == nil {
-		result, validationErrs, err := s.tryResolveDefsUsingJSONPointerNavigation(ctx, ref, opts)
-		if err == nil && result != nil {
-			return result, validationErrs, nil
-		}
-	}
-
-	return nil, nil, fmt.Errorf("definition not found: %s", ref)
-}
-
-type GetRootNoder interface {
-	GetRootNode() *yaml.Node
-}
-
-// tryResolveDefsUsingJSONPointerNavigation attempts to resolve $defs by walking up the JSON pointer structure
-// This is used when there's no parent chain available
-func (s *JSONSchema[Referenceable]) tryResolveDefsUsingJSONPointerNavigation(ctx context.Context, ref references.Reference, opts references.ResolveOptions) (*references.ResolveResult[JSONSchemaReferenceable], []error, error) {
-	// When we don't have a parent chain, we need to find our location in the document
-	// and walk up the JSON pointer chain to find parent schemas
-
-	// Get the top-level root node from the target document
-	var topLevelRootNode *yaml.Node
-	if targetDoc, ok := opts.TargetDocument.(GetRootNoder); ok {
-		topLevelRootNode = targetDoc.GetRootNode()
-	}
-
-	if topLevelRootNode == nil {
-		return nil, nil, nil
-	}
-
-	// Get our JSON pointer location within the document using the CoreModel
-	ourJSONPtr := s.GetCore().GetJSONPointer(topLevelRootNode)
-	if ourJSONPtr == "" {
-		return nil, nil, nil
-	}
-
-	// Walk up the parent JSON pointers
-	parentJSONPtr := getParentJSONPointer(ourJSONPtr)
-	for parentJSONPtr != "" {
-		// Get the parent target using JSON pointer
-		parentTarget, err := jsonpointer.GetTarget(opts.TargetDocument, jsonpointer.JSONPointer(parentJSONPtr), jsonpointer.WithStructTags("key"))
-		if err == nil {
-			parentOpts := opts
-			parentOpts.TargetDocument = parentTarget
-			parentOpts.TargetLocation = opts.TargetLocation // Keep the same location for caching
-
-			result, validationErrs, err := references.Resolve(ctx, ref, unmarshaler, parentOpts)
-			if err == nil {
-				return result, validationErrs, nil
-			}
-		}
-
-		// Move up to the next parent
-		parentJSONPtr = getParentJSONPointer(parentJSONPtr)
-	}
-
-	return nil, nil, fmt.Errorf("definition not found: %s", ref)
-}
-
-// getParentJSONPointer returns the parent JSON pointer by removing the last segment
-// e.g., "/properties/nested/properties/inner" -> "/properties/nested/properties"
-// Returns empty string when reaching the root
-func getParentJSONPointer(jsonPtr string) string {
-	if jsonPtr == "" || jsonPtr == "/" {
-		return ""
-	}
-
-	// Find the last slash
-	lastSlash := strings.LastIndex(jsonPtr, "/")
-	if lastSlash <= 0 {
-		return ""
-	}
-
-	return jsonPtr[:lastSlash]
 }
 
 func unmarshaler(ctx context.Context, node *yaml.Node, skipValidation bool) (*JSONSchema[Referenceable], []error, error) {

@@ -73,7 +73,7 @@ func UnmarshalNode[T any](ctx context.Context, parentName string, node *yaml.Nod
 		return nil, err
 	}
 
-	if err := Populate(*core, out); err != nil {
+	if err := PopulateWithContext(*core, out, nil); err != nil {
 		return nil, err
 	}
 

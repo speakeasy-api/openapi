@@ -67,6 +67,14 @@ func (r Reference) Validate() error {
 			return errors.New("invalid reference JSON pointer: empty")
 		}
 
+		// Check if this is an anchor reference (doesn't start with /)
+		// JSON Schema $anchor references like "#foo" use plain names, not JSON pointers
+		// These are valid and shouldn't be validated as JSON pointers
+		if r.IsAnchorReference() {
+			// Anchor references are valid if they have a non-empty fragment
+			return nil
+		}
+
 		if err := jp.Validate(); err != nil {
 			return fmt.Errorf("invalid reference JSON pointer: %w", err)
 		}
@@ -78,6 +86,38 @@ func (r Reference) Validate() error {
 	}
 
 	return nil
+}
+
+// IsAnchorReference returns true if this reference uses an anchor fragment
+// (e.g., "#foo") rather than a JSON pointer (e.g., "#/path/to/schema").
+// Anchor references are plain identifiers that:
+// - Don't start with "/" (which would make them JSON pointers)
+// - Don't contain "/" (which would make them look like malformed JSON pointers)
+// Valid anchor names match the pattern: [A-Za-z_][A-Za-z0-9._-]*
+func (r Reference) IsAnchorReference() bool {
+	if !r.HasJSONPointer() {
+		return false
+	}
+	jp := r.GetJSONPointer()
+	fragment := string(jp)
+
+	// Empty fragment is not an anchor
+	if fragment == "" {
+		return false
+	}
+
+	// If it starts with "/" it's a JSON pointer, not an anchor
+	if strings.HasPrefix(fragment, "/") {
+		return false
+	}
+
+	// If it contains "/" it looks like a malformed JSON pointer, not an anchor
+	// Valid anchors are simple identifiers like "foo", "bar123", "my_anchor"
+	if strings.Contains(fragment, "/") {
+		return false
+	}
+
+	return true
 }
 
 // validateComponentReference validates that component references have valid component names.

@@ -112,7 +112,7 @@ func UnmarshalExtensionModel[H any, L any](ctx context.Context, e *Extensions, e
 
 	var mV H
 
-	if err := marshaller.Populate(*c, &mV); err != nil {
+	if err := marshaller.PopulateWithContext(*c, &mV, nil); err != nil {
 		return nil, err
 	}
 	*m = mV
