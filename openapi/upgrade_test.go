@@ -67,6 +67,14 @@ func TestUpgrade_Success(t *testing.T) {
 			description:   "3.1.0 with custom HTTP methods should migrate to additionalOperations",
 			targetVersion: "3.2.0",
 		},
+		{
+			name:          "upgrade_3_1_0_to_3_2_0_yaml",
+			inputFile:     "testdata/upgrade/3_1_0.yaml",
+			expectedFile:  "testdata/upgrade/expected_3_2_0_upgraded.yaml",
+			options:       []openapi.Option[openapi.UpgradeOptions]{openapi.WithUpgradeTargetVersion("3.2.0")},
+			description:   "3.1.0 should upgrade to 3.2.0 with schema transformations",
+			targetVersion: "3.2.0",
+		},
 	}
 
 	for _, tt := range tests {
