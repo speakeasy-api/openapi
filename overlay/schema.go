@@ -6,6 +6,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Version constants for the Overlay specification
+const (
+	// LatestVersion is the latest supported overlay version
+	LatestVersion = "1.1.0"
+	// Version100 is the Overlay 1.0.0 version
+	Version100 = "1.0.0"
+	// Version110 is the Overlay 1.1.0 version
+	Version110 = "1.1.0"
+)
+
+// JSONPath implementation constants
+const (
+	// JSONPathRFC9535 enables RFC 9535 JSONPath implementation
+	JSONPathRFC9535 = "rfc9535"
+	// JSONPathLegacy enables legacy yamlpath implementation (for backward compatibility)
+	JSONPathLegacy = "legacy"
+)
+
 // Extensible provides a place for extensions to be added to components of the
 // Overlay configuration. These are  a map from x-* extension fields to their values.
 type Extensions map[string]any
@@ -14,10 +32,12 @@ type Extensions map[string]any
 type Overlay struct {
 	Extensions `yaml:"-,inline"`
 
-	// Version is the version of the overlay configuration. This is only ever expected to be 1.0.0
+	// Version is the version of the overlay configuration (1.0.0 or 1.1.0)
 	Version string `yaml:"overlay"`
 
-	// JSONPathVersion should be set to rfc9535, and is used for backwards compatibility purposes
+	// JSONPathVersion controls the JSONPath implementation used.
+	// For version 1.0.0: default is legacy, use "rfc9535" to opt-in to RFC 9535
+	// For version 1.1.0: default is RFC 9535, use "legacy" to opt-out
 	JSONPathVersion string `yaml:"x-speakeasy-jsonpath,omitempty"`
 
 	// Info describes the metadata for the overlay.
@@ -47,6 +67,9 @@ type Info struct {
 
 	// Version is the version of the overlay.
 	Version string `yaml:"version"`
+
+	// Description is an optional description of the overlay (new in Overlay 1.1.0).
+	Description string `yaml:"description,omitempty"`
 }
 
 type Action struct {

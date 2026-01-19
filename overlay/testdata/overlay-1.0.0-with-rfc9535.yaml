@@ -1,0 +1,8 @@
+overlay: 1.0.0
+x-speakeasy-jsonpath: rfc9535
+info:
+  title: Version 1.0.0 Overlay with RFC 9535
+  version: 1.0.0
+actions:
+  - target: $.info.title
+    update: Updated Title
