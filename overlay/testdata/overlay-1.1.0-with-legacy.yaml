@@ -1,0 +1,9 @@
+overlay: 1.1.0
+x-speakeasy-jsonpath: legacy
+info:
+  title: Version 1.1.0 Overlay with Legacy JSONPath
+  version: 1.0.0
+  description: This overlay opts out of RFC 9535 for legacy compatibility
+actions:
+  - target: $.info.title
+    update: Updated Title

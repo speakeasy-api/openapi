@@ -2,6 +2,9 @@
 coverage.out
 coverage.html
 
+# Plans directory (agent working files)
+plans/
+
 # VSCode settings (user-specific)
 .vscode/*
 !.vscode/settings.example.json

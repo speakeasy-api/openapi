@@ -1,0 +1,13 @@
+overlay: 1.1.0
+info:
+  title: Version 1.1.0 Overlay
+  version: 1.0.0
+  description: |
+    This overlay demonstrates the new description field in Overlay 1.1.0.
+    It can contain multiple lines and provides context about the overlay's purpose.
+actions:
+  - target: $.info.title
+    update: Updated Title
+  - target: $.components.schemas.NewSchema
+    copy: $.components.schemas.ExistingSchema
+    description: Copy an existing schema to a new location
