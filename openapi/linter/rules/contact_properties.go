@@ -81,7 +81,7 @@ func (r *ContactPropertiesRule) Run(ctx context.Context, docInfo *linter.Documen
 		errs = append(errs, validation.NewValidationError(
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleContactProperties,
-			fmt.Errorf("`contact` section must contain a `email`"),
+			fmt.Errorf("`contact` section must contain an `email`"),
 			contact.GetCore().GetRootNode(),
 		))
 	}
