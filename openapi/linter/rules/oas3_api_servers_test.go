@@ -203,6 +203,109 @@ servers:
 	}
 }
 
+func TestOAS3APIServersRule_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		yaml          string
+		shouldError   bool
+		expectedError string
+	}{
+		{
+			name: "server with scheme-only URL (no host or path)",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+servers:
+  - url: "http://"
+`,
+			shouldError:   true,
+			expectedError: "is not valid: no hostname or path provided",
+		},
+		{
+			name: "server with template variables in path",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/{version}
+    variables:
+      version:
+        default: v1
+`,
+			shouldError: false,
+		},
+		{
+			name: "server with multiple template variables",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+servers:
+  - url: https://{environment}.example.com/{version}
+    variables:
+      environment:
+        default: api
+      version:
+        default: v1
+`,
+			shouldError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+
+			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
+			require.NoError(t, err, "unmarshal should succeed")
+
+			rule := &rules.OAS3APIServersRule{}
+			config := &linter.RuleConfig{}
+
+			idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+				RootDocument:   doc,
+				TargetDocument: doc,
+				TargetLocation: "test.yaml",
+			})
+			docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
+
+			errs := rule.Run(ctx, docInfo, config)
+
+			if tt.shouldError {
+				require.NotEmpty(t, errs, "should have lint errors")
+				assert.Contains(t, errs[0].Error(), tt.expectedError)
+			} else {
+				assert.Empty(t, errs, "should have no lint errors")
+			}
+		})
+	}
+}
+
+func TestOAS3APIServersRule_NilInputs(t *testing.T) {
+	t.Parallel()
+
+	rule := &rules.OAS3APIServersRule{}
+	config := &linter.RuleConfig{}
+	ctx := t.Context()
+
+	// Test with nil docInfo
+	errs := rule.Run(ctx, nil, config)
+	assert.Empty(t, errs)
+
+	// Test with nil document
+	var nilDoc *openapi.OpenAPI
+	errs = rule.Run(ctx, linter.NewDocumentInfoWithIndex(nilDoc, "test.yaml", nil), config)
+	assert.Empty(t, errs)
+}
+
 func TestOAS3APIServersRule_RuleMetadata(t *testing.T) {
 	t.Parallel()
 

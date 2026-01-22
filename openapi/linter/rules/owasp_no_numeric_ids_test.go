@@ -319,6 +319,103 @@ paths:
 	}
 }
 
+func TestOwaspNoNumericIDsRule_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		yaml string
+	}{
+		{
+			name: "productId ending with lowercase id",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /products/{productid}:
+    get:
+      parameters:
+        - name: productid
+          in: path
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+`,
+		},
+		{
+			name: "parameter with no schema",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /users/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+      responses:
+        '200':
+          description: Success
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+
+			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
+			require.NoError(t, err)
+
+			rule := &rules.OwaspNoNumericIDsRule{}
+			config := &linter.RuleConfig{}
+
+			// Build index for the rule
+			idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+				RootDocument:   doc,
+				TargetDocument: doc,
+				TargetLocation: "test.yaml",
+			})
+			docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
+
+			// Should not panic
+			errs := rule.Run(ctx, docInfo, config)
+			// productid ends with "id" so it should trigger the rule
+			if strings.Contains(tt.name, "productId") {
+				assert.Len(t, errs, 1)
+				assert.Contains(t, errs[0].Error(), "productid")
+			} else {
+				// parameter with no schema should not error
+				assert.Empty(t, errs)
+			}
+		})
+	}
+}
+
+func TestOwaspNoNumericIDsRule_NilInputs(t *testing.T) {
+	t.Parallel()
+
+	rule := &rules.OwaspNoNumericIDsRule{}
+	config := &linter.RuleConfig{}
+	ctx := t.Context()
+
+	// Test with nil docInfo
+	errs := rule.Run(ctx, nil, config)
+	assert.Empty(t, errs)
+
+	// Test with nil document
+	var nilDoc *openapi.OpenAPI
+	errs = rule.Run(ctx, linter.NewDocumentInfoWithIndex(nilDoc, "test.yaml", nil), config)
+	assert.Empty(t, errs)
+}
+
 func TestOwaspNoNumericIDsRule_RuleMetadata(t *testing.T) {
 	t.Parallel()
 

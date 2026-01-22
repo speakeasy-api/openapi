@@ -213,6 +213,88 @@ paths: {}
 	}
 }
 
+func TestOwaspSecurityHostsHttpsOAS3Rule_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		yaml string
+	}{
+		{
+			name: "server with empty url",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+servers:
+  - url: ""
+    description: Empty URL
+paths: {}
+`,
+		},
+		{
+			name: "server with variables in https url",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+servers:
+  - url: https://{environment}.example.com
+    variables:
+      environment:
+        default: api
+paths: {}
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+
+			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
+			require.NoError(t, err)
+
+			rule := &rules.OwaspSecurityHostsHttpsOAS3Rule{}
+			config := &linter.RuleConfig{}
+
+			// Build index for the rule
+			idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+				RootDocument:   doc,
+				TargetDocument: doc,
+				TargetLocation: "test.yaml",
+			})
+			docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
+
+			// Should not panic
+			errs := rule.Run(ctx, docInfo, config)
+
+			// Empty URL should be skipped, variables in https URL should be valid
+			assert.Empty(t, errs)
+		})
+	}
+}
+
+func TestOwaspSecurityHostsHttpsOAS3Rule_NilInputs(t *testing.T) {
+	t.Parallel()
+
+	rule := &rules.OwaspSecurityHostsHttpsOAS3Rule{}
+	config := &linter.RuleConfig{}
+	ctx := t.Context()
+
+	// Test with nil docInfo
+	errs := rule.Run(ctx, nil, config)
+	assert.Empty(t, errs)
+
+	// Test with nil document
+	var nilDoc *openapi.OpenAPI
+	errs = rule.Run(ctx, linter.NewDocumentInfoWithIndex(nilDoc, "test.yaml", nil), config)
+	assert.Empty(t, errs)
+}
+
 func TestOwaspSecurityHostsHttpsOAS3Rule_RuleMetadata(t *testing.T) {
 	t.Parallel()
 
