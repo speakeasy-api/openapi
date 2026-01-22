@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -100,6 +101,10 @@ var standardHttpMethods = []HTTPMethod{
 
 func (m HTTPMethod) Is(method string) bool {
 	return strings.EqualFold(string(m), method)
+}
+
+func (m HTTPMethod) String() string {
+	return string(m)
 }
 
 func IsStandardMethod(s string) bool {
@@ -316,20 +321,20 @@ func (p *PathItem) Validate(ctx context.Context, opts ...validation.Option) []er
 			for methodName, op := range p.AdditionalOperations.All() {
 				errs = append(errs, op.Validate(ctx, opts...)...)
 				if IsStandardMethod(strings.ToLower(methodName)) {
-					errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("method [%s] is a standard HTTP method and must be defined in its own field", methodName), core, core.AdditionalOperations, methodName))
+					errs = append(errs, validation.NewMapKeyError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("pathItem.additionalOperations method [%s] is a standardized HTTP method and must be defined in its own field", methodName), core, core.AdditionalOperations, methodName))
 				}
 			}
 		}
 
 		for methodName := range p.Keys() {
 			if !IsStandardMethod(strings.ToLower(string(methodName))) {
-				errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("method [%s] is not a standard HTTP method and must be defined in the additionalOperations field", methodName), core, core, string(methodName)))
+				errs = append(errs, validation.NewMapKeyError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("pathItem method [%s] is not a standardized HTTP method and must be listed under additionalOperations", methodName), core, core, methodName.String()))
 			}
 		}
 
 	case !supportsAdditionalOperations:
 		if core.AdditionalOperations.Present {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("additionalOperations is not supported in OpenAPI version %s", openapiVersion), core, core.AdditionalOperations))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationSupportedVersion, fmt.Errorf("pathItem.additionalOperations is not supported in OpenAPI version %s", openapiVersion), core, core.AdditionalOperations))
 		}
 	}
 

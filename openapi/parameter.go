@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -212,51 +213,51 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	errs := []error{}
 
 	if core.Name.Present && p.Name == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("parameter.name is required"), core, core.Name))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.name is required"), core, core.Name))
 	}
 
 	if core.In.Present && p.In == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("parameter.in is required"), core, core.In))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.in is required"), core, core.In))
 	} else {
 		switch p.In {
 		case ParameterInQuery, ParameterInQueryString, ParameterInHeader, ParameterInPath, ParameterInCookie:
 		default:
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.in must be one of [%s]", strings.Join([]string{string(ParameterInQuery), string(ParameterInQueryString), string(ParameterInHeader), string(ParameterInPath), string(ParameterInCookie)}, ", ")), core, core.In))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.in must be one of [%s]", strings.Join([]string{string(ParameterInQuery), string(ParameterInQueryString), string(ParameterInHeader), string(ParameterInPath), string(ParameterInCookie)}, ", ")), core, core.In))
 		}
 	}
 
 	if p.In == ParameterInPath && (!core.Required.Present || !*p.Required) {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.in=path requires required=true"), core, core.Required))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.in=path requires required=true"), core, core.Required))
 	}
 
 	if core.AllowEmptyValue.Present && p.In != ParameterInQuery {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.allowEmptyValue is only valid for in=query"), core, core.AllowEmptyValue))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("parameter.allowEmptyValue is only valid for in=query"), core, core.AllowEmptyValue))
 	}
 
 	if core.Style.Present {
 		switch p.In {
 		case ParameterInQueryString:
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter field style is not allowed for in=querystring"), core, core.Style))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("parameter field style is not allowed for in=querystring"), core, core.Style))
 
 		case ParameterInPath:
 			allowedStyles := []string{string(SerializationStyleSimple), string(SerializationStyleLabel), string(SerializationStyleMatrix)}
 			if !slices.Contains(allowedStyles, string(*p.Style)) {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.style must be one of [%s] for in=path", strings.Join(allowedStyles, ", ")), core, core.Style))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.style must be one of [%s] for in=path", strings.Join(allowedStyles, ", ")), core, core.Style))
 			}
 		case ParameterInQuery:
 			allowedStyles := []string{string(SerializationStyleForm), string(SerializationStyleSpaceDelimited), string(SerializationStylePipeDelimited), string(SerializationStyleDeepObject)}
 			if !slices.Contains(allowedStyles, string(*p.Style)) {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.style must be one of [%s] for in=query", strings.Join(allowedStyles, ", ")), core, core.Style))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.style must be one of [%s] for in=query", strings.Join(allowedStyles, ", ")), core, core.Style))
 			}
 		case ParameterInHeader:
 			allowedStyles := []string{string(SerializationStyleSimple)}
 			if !slices.Contains(allowedStyles, string(*p.Style)) {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.style must be one of [%s] for in=header", strings.Join(allowedStyles, ", ")), core, core.Style))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.style must be one of [%s] for in=header", strings.Join(allowedStyles, ", ")), core, core.Style))
 			}
 		case ParameterInCookie:
 			allowedStyles := []string{string(SerializationStyleForm)}
 			if !slices.Contains(allowedStyles, string(*p.Style)) {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.style must be one of [%s] for in=cookie", strings.Join(allowedStyles, ", ")), core, core.Style))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.style must be one of [%s] for in=cookie", strings.Join(allowedStyles, ", ")), core, core.Style))
 			}
 		}
 	}
@@ -264,7 +265,7 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	if core.Schema.Present {
 		switch p.In {
 		case ParameterInQueryString:
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter field schema is not allowed for in=querystring"), core, core.Schema))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("parameter.schema is not allowed for in=querystring"), core, core.Schema))
 		default:
 			errs = append(errs, p.Schema.Validate(ctx, opts...)...)
 		}
@@ -273,11 +274,11 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	if !core.Content.Present || p.Content == nil {
 		// Querystring parameters must use content instead of schema
 		if p.In == ParameterInQueryString {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter field content is required for in=querystring"), core, core.Content))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.content is required for in=querystring"), core, core.Content))
 		}
 	} else if p.Content.Len() != 1 {
 		// If present, content must have exactly one entry
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter field content must have exactly one entry"), core, core.Content))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("parameter.content must have exactly one entry"), core, core.Content))
 	}
 
 	for mediaType, obj := range p.Content.All() {

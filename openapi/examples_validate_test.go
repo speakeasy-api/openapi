@@ -157,14 +157,14 @@ func TestExample_Validate_Error(t *testing.T) {
 summary: Example with invalid URL
 externalValue: ":invalid"
 `,
-			wantErrs: []string{"[3:16] example.externalValue is not a valid uri: parse \":invalid\": missing protocol scheme"},
+			wantErrs: []string{"[3:16] error validation-invalid-format example.externalValue is not a valid uri: parse \":invalid\": missing protocol scheme"},
 		},
 		{
 			name: "invalid external value URL with spaces",
 			yml: `
 externalValue: ":invalid url"
 `,
-			wantErrs: []string{"[2:16] example.externalValue is not a valid uri: parse \":invalid url\": missing protocol scheme"},
+			wantErrs: []string{"[2:16] error validation-invalid-format example.externalValue is not a valid uri: parse \":invalid url\": missing protocol scheme"},
 		},
 		{
 			name: "both value and external value provided",
@@ -173,7 +173,7 @@ summary: Invalid example
 value: "test"
 externalValue: "https://example.com/test.json"
 `,
-			wantErrs: []string{"[3:8] example.value and externalValue are mutually exclusive"},
+			wantErrs: []string{"[3:8] error validation-mutually-exclusive-fields example.value and example.externalValue are mutually exclusive"},
 		},
 		{
 			name: "multiple validation errors",
@@ -182,8 +182,8 @@ value: "test"
 externalValue: ":invalid"
 `,
 			wantErrs: []string{
-				"[2:8] example.value and externalValue are mutually exclusive",
-				"[3:16] example.externalValue is not a valid uri: parse \":invalid\": missing protocol scheme",
+				"[2:8] error validation-mutually-exclusive-fields example.value and example.externalValue are mutually exclusive",
+				"[3:16] error validation-invalid-format example.externalValue is not a valid uri: parse \":invalid\": missing protocol scheme",
 			},
 		},
 		{
@@ -194,7 +194,7 @@ dataValue:
   id: 123
 value: "test"
 `,
-			wantErrs: []string{"example.dataValue and value are mutually exclusive"},
+			wantErrs: []string{"error validation-mutually-exclusive-fields example.dataValue and example.value are mutually exclusive"},
 		},
 		{
 			name: "serializedValue and value are mutually exclusive",
@@ -203,7 +203,7 @@ summary: Invalid example
 serializedValue: "test=123"
 value: "test"
 `,
-			wantErrs: []string{"example.serializedValue and value are mutually exclusive"},
+			wantErrs: []string{"error validation-mutually-exclusive-fields example.serializedValue and example.value are mutually exclusive"},
 		},
 		{
 			name: "serializedValue and externalValue are mutually exclusive",
@@ -212,23 +212,23 @@ summary: Invalid example
 serializedValue: "test=123"
 externalValue: https://example.com/test.json
 `,
-			wantErrs: []string{"example.serializedValue and externalValue are mutually exclusive"},
+			wantErrs: []string{"error validation-mutually-exclusive-fields example.serializedValue and example.externalValue are mutually exclusive"},
 		},
 		{
 			name: "multiple mutual exclusivity violations",
 			yml: `
 summary: Invalid example
 dataValue:
-  id: 123
+   id: 123
 value: "test"
 serializedValue: "test=123"
 externalValue: https://example.com/test.json
 `,
 			wantErrs: []string{
-				"example.value and externalValue are mutually exclusive",
-				"example.dataValue and value are mutually exclusive",
-				"example.serializedValue and value are mutually exclusive",
-				"example.serializedValue and externalValue are mutually exclusive",
+				"error validation-mutually-exclusive-fields example.value and example.externalValue are mutually exclusive",
+				"error validation-mutually-exclusive-fields example.dataValue and example.value are mutually exclusive",
+				"error validation-mutually-exclusive-fields example.serializedValue and example.value are mutually exclusive",
+				"error validation-mutually-exclusive-fields example.serializedValue and example.externalValue are mutually exclusive",
 			},
 		},
 	}

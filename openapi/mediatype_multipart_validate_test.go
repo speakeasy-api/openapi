@@ -108,14 +108,14 @@ func TestMediaType_MultipartValidation_Error(t *testing.T) {
 			yml: `
 description: Test response
 content:
-  application/json:
-    schema:
-      type: array
-    prefixEncoding:
-      - contentType: application/json
+   application/json:
+     schema:
+       type: array
+     prefixEncoding:
+       - contentType: application/json
 `,
 			wantErrs: []string{
-				"prefixEncoding field SHALL only apply when the media type is multipart",
+				"error validation-allowed-values mediaType.prefixEncoding is only valid when the media type is multipart",
 			},
 		},
 		{
@@ -123,14 +123,14 @@ content:
 			yml: `
 description: Test response
 content:
-  application/json:
-    itemSchema:
-      type: object
-    itemEncoding:
-      contentType: application/json
+   application/json:
+     itemSchema:
+       type: object
+     itemEncoding:
+       contentType: application/json
 `,
 			wantErrs: []string{
-				"itemEncoding field SHALL only apply when the media type is multipart",
+				"error validation-allowed-values mediaType.itemEncoding is only valid when the media type is multipart",
 			},
 		},
 		{
@@ -138,18 +138,18 @@ content:
 			yml: `
 description: Test response
 content:
-  application/json:
-    schema:
-      type: object
-      properties:
-        file:
-          type: string
-    encoding:
-      file:
-        contentType: image/png
+   application/json:
+     schema:
+       type: object
+       properties:
+         file:
+           type: string
+     encoding:
+       file:
+         contentType: image/png
 `,
 			wantErrs: []string{
-				"encoding field SHALL only apply when the media type is multipart or application/x-www-form-urlencoded",
+				"error validation-allowed-values mediaType.encoding is only valid when the media type is multipart or application/x-www-form-urlencoded",
 			},
 		},
 	}

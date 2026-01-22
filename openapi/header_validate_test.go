@@ -128,8 +128,8 @@ schema:
 description: Header with invalid schema
 `,
 			wantErrs: []string{
-				"[3:9] schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
-				"[3:9] schema.type expected array, got string",
+				"[3:9] error validation-invalid-schema schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"[3:9] error validation-type-mismatch schema.type expected array, got string",
 			},
 		},
 	}

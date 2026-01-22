@@ -392,7 +392,7 @@ func TestResolve_Errors(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, validationErrs)
 		require.NotNil(t, result)
-		assert.Equal(t, ".", result.AbsoluteReference)
+		assert.Equal(t, ".", result.AbsoluteDocumentPath)
 	})
 
 	t.Run("missing root document", func(t *testing.T) {
@@ -788,15 +788,15 @@ func TestResolve_AbsoluteVsRelativeReferenceHandling(t *testing.T) {
 			require.NotNil(t, result.Object)
 
 			// Verify the absolute reference is what we expect
-			assert.Equal(t, tt.expectedAbsoluteRef, result.AbsoluteReference, tt.description)
+			assert.Equal(t, tt.expectedAbsoluteRef, result.AbsoluteDocumentPath, tt.description)
 
 			// Verify the behavior matches our expectation about absolute vs relative
 			if tt.isAbsolute {
 				// For absolute references, the result should be exactly the same as the original URI
-				assert.Equal(t, tt.referenceURI, result.AbsoluteReference, "Absolute reference should remain unchanged")
+				assert.Equal(t, tt.referenceURI, result.AbsoluteDocumentPath, "Absolute reference should remain unchanged")
 			} else {
 				// For relative references, the result should be different from the original URI
-				assert.NotEqual(t, tt.referenceURI, result.AbsoluteReference, "Relative reference should be resolved")
+				assert.NotEqual(t, tt.referenceURI, result.AbsoluteDocumentPath, "Relative reference should be resolved")
 			}
 		})
 	}
@@ -838,7 +838,7 @@ func TestResolve_RootDocumentDifferentFromTargetDocument(t *testing.T) {
 		assert.Nil(t, validationErrs)
 		require.NotNil(t, result)
 		require.NotNil(t, result.Object)
-		assert.Equal(t, "/project/api/schemas/user.yaml", result.AbsoluteReference)
+		assert.Equal(t, "/project/api/schemas/user.yaml", result.AbsoluteDocumentPath)
 
 		// Verify the cache was stored in the ROOT document, not the target document
 		cachedData, exists := rootDoc.GetCachedReferenceDocument("/project/api/schemas/user.yaml")
@@ -878,7 +878,7 @@ func TestResolve_RootDocumentDifferentFromTargetDocument(t *testing.T) {
 		assert.Nil(t, validationErrs)
 		require.NotNil(t, result)
 		require.NotNil(t, result.Object)
-		assert.Equal(t, "https://external.com/schemas/common.yaml", result.AbsoluteReference)
+		assert.Equal(t, "https://external.com/schemas/common.yaml", result.AbsoluteDocumentPath)
 
 		// Verify the cache was stored in the ROOT document, not the target document
 		cachedData, exists := rootDoc.GetCachedReferenceDocument("https://external.com/schemas/common.yaml")
@@ -920,7 +920,7 @@ func TestResolve_RootDocumentDifferentFromTargetDocument(t *testing.T) {
 		assert.Nil(t, validationErrs)
 		require.NotNil(t, result)
 		require.NotNil(t, result.Object)
-		assert.Equal(t, "/project/api/schemas/cached.yaml", result.AbsoluteReference)
+		assert.Equal(t, "/project/api/schemas/cached.yaml", result.AbsoluteDocumentPath)
 
 		// Verify the cache from root document was used (not the file system)
 		retrievedCache, exists := rootDoc.GetCachedReferenceDocument("/project/api/schemas/cached.yaml")
@@ -953,7 +953,7 @@ func TestResolve_RootDocumentDifferentFromTargetDocument(t *testing.T) {
 		require.NotNil(t, result)
 		require.NotNil(t, result.Object)
 		assert.Equal(t, "nested-string", result.Object.StringField)
-		assert.Equal(t, "/project/external.yaml", result.AbsoluteReference)
+		assert.Equal(t, "/project/external.yaml", result.AbsoluteDocumentPath)
 
 		// Verify that the resolved document is the target document
 		assert.Equal(t, targetDoc, result.ResolvedDocument)

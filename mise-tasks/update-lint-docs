@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Update Lint Docs - Automatically update lint rule documentation in READMEs
+# This script uses a Go program to generate a rules table from registered linter rules
+# and updates the corresponding README.md files between the lint rules tags.
+
+echo "🔄 Updating lint rules in README files..."
+
+echo "🚀 Running update-lint-docs tool..."
+go run ./cmd/update-lint-docs
+
+echo ""
+echo "📋 Summary:"
+echo "  • Updated openapi/linter/README.md with rules from the OpenAPI linter registry"
+echo ""
+echo "💡 Rule documentation is automatically generated from the Rule interface methods."
+echo "   To update the docs, modify the rule's Description(), Link(), etc. methods and re-run this task."

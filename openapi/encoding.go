@@ -128,7 +128,7 @@ func (e *Encoding) Validate(ctx context.Context, opts ...validation.Option) []er
 		for _, mediaType := range mediaTypes {
 			_, _, err := mime.ParseMediaType(mediaType)
 			if err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError(fmt.Sprintf("encoding.contentType %s is not a valid media type: %s", mediaType, err)), core, core.ContentType))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("encoding.contentType %s is not a valid media type: %w", mediaType, err), core, core.ContentType))
 			}
 		}
 	}
@@ -140,7 +140,7 @@ func (e *Encoding) Validate(ctx context.Context, opts ...validation.Option) []er
 	if core.Style.Present {
 		allowedStyles := []string{string(SerializationStyleForm), string(SerializationStyleSpaceDelimited), string(SerializationStylePipeDelimited), string(SerializationStyleDeepObject)}
 		if !slices.Contains(allowedStyles, string(*e.Style)) {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(fmt.Sprintf("encoding.style must be one of [%s]", strings.Join(allowedStyles, ", "))), core, core.Style))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("encoding.style must be one of [%s]", strings.Join(allowedStyles, ", ")), core, core.Style))
 		}
 	}
 

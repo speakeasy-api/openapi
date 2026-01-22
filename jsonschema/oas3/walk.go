@@ -65,7 +65,7 @@ func walkSchema(ctx context.Context, schema *JSONSchema[Referenceable], loc walk
 	}
 
 	if schema.IsSchema() {
-		js := schema.Left
+		js := schema.GetSchema()
 
 		// Walk through allOf schemas
 		for i, schema := range js.AllOf {

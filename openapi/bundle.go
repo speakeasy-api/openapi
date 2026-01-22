@@ -299,7 +299,7 @@ func bundleSchema(ctx context.Context, schema *oas3.JSONSchema[oas3.Referenceabl
 		if err := bundleObject(ctx, resolvedRefSchema, namingStrategy, references.ResolveOptions{
 			RootDocument:   opts.RootDocument,
 			TargetDocument: targetDocInfo.ResolvedDocument,
-			TargetLocation: targetDocInfo.AbsoluteReference,
+			TargetLocation: targetDocInfo.AbsoluteDocumentPath,
 		}, componentStorage); err != nil {
 			return fmt.Errorf("failed to bundle nested references in %s: %w", ref, err)
 		}
@@ -702,12 +702,12 @@ func bundleGenericReference[T any, V interfaces.Validator[T], C marshaller.CoreM
 		if targetDocInfo == nil {
 			return fmt.Errorf("failed to get resolution info for %s reference %s", componentType, refStr)
 		}
-		componentStorage.componentLocations[componentType+"/"+componentName] = targetDocInfo.AbsoluteReference
+		componentStorage.componentLocations[componentType+"/"+componentName] = targetDocInfo.AbsoluteDocumentPath
 
 		if err := bundleObject(ctx, bundledRef, namingStrategy, references.ResolveOptions{
 			RootDocument:   opts.RootDocument,
 			TargetDocument: targetDocInfo.ResolvedDocument,
-			TargetLocation: targetDocInfo.AbsoluteReference,
+			TargetLocation: targetDocInfo.AbsoluteDocumentPath,
 		}, componentStorage); err != nil {
 			return fmt.Errorf("failed to bundle nested references in %s: %w", ref.GetReference(), err)
 		}
@@ -736,7 +736,7 @@ func getFinalAbsoluteRef[T any, V interfaces.Validator[T], C marshaller.CoreMode
 		nextRefInfo := resInfo.Object.GetReferenceResolutionInfo()
 		if nextRefInfo != nil {
 			// Build the absolute reference from the final resolution
-			finalRef := nextRefInfo.AbsoluteReference
+			finalRef := nextRefInfo.AbsoluteDocumentPath
 			if nextRefInfo.Object != nil && nextRefInfo.Object.Reference != nil {
 				// Add the fragment from the chained reference
 				fragment := string(nextRefInfo.Object.Reference.GetJSONPointer())

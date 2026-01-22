@@ -11,7 +11,6 @@ OpenAPI Overlays provide a way to modify OpenAPI and Arazzo specifications witho
   - [`apply`](#apply)
   - [`validate`](#validate)
   - [`compare`](#compare)
-  - [`upgrade`](#upgrade)
 - [What are OpenAPI Overlays?](#what-are-openapi-overlays)
   - [Example Overlay](#example-overlay)
 - [Common Use Cases](#common-use-cases)
@@ -86,40 +85,6 @@ Features:
 - Generates overlay operations for all changes
 - Provides diagnostic output showing detected changes
 - Creates overlay files that can recreate the transformation
-
-### `upgrade`
-
-Upgrade an Overlay document to the latest supported version (1.1.0).
-
-```bash
-# Preview upgrade (output to stdout)
-openapi overlay upgrade my-overlay.yaml
-
-# Upgrade and save to new file
-openapi overlay upgrade my-overlay.yaml upgraded-overlay.yaml
-
-# Upgrade in-place
-openapi overlay upgrade -w my-overlay.yaml
-```
-
-Features:
-
-- Updates the Overlay version field from 1.0.0 to 1.1.0
-- Enables RFC 9535 JSONPath as the default implementation
-- Clears redundant `x-speakeasy-jsonpath: rfc9535` (now default in 1.1.0)
-- All existing actions remain valid and functional
-- Validates overlay before and after upgrade
-
-Version Differences:
-
-| Version | Default JSONPath | Setting                                      |
-| ------- | ---------------- | -------------------------------------------- |
-| 1.0.0   | Legacy yamlpath  | `x-speakeasy-jsonpath: rfc9535` for RFC 9535 |
-| 1.1.0+  | RFC 9535         | `x-speakeasy-jsonpath: legacy` for legacy    |
-
-Options:
-
-- `-w, --write`: Write result in-place to input file
 
 ## What are OpenAPI Overlays?
 

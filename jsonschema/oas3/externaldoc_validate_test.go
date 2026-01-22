@@ -86,7 +86,7 @@ func TestExternalDoc_Validate_Error(t *testing.T) {
 			yml: `
 description: Some documentation
 `,
-			wantErrs: []string{"[2:1] externalDocumentation.url is missing"},
+			wantErrs: []string{"[2:1] error validation-required-field externalDocumentation.url is required"},
 		},
 		{
 			name: "empty URL",
@@ -94,7 +94,7 @@ description: Some documentation
 description: Some documentation
 url: ""
 `,
-			wantErrs: []string{"[3:6] externalDocumentation.url is required"},
+			wantErrs: []string{"[3:6] error validation-required-field externalDocumentation.url is required"},
 		},
 		{
 			name: "invalid URL format",

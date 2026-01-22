@@ -2,6 +2,8 @@ package swagger
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/extensions"
@@ -168,11 +170,11 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	errs := []error{}
 
 	if c.Name.Present && p.Name == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("parameter.name is required"), c, c.Name))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.name is required"), c, c.Name))
 	}
 
 	if c.In.Present && p.In == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("parameter.in is required"), c, c.In))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.in is required"), c, c.In))
 	} else if c.In.Present {
 		errs = append(errs, p.validateIn(c)...)
 		errs = append(errs, p.validateParameterType(ctx, c, opts...)...)
@@ -180,7 +182,7 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 
 	// allowEmptyValue only valid for query or formData
 	if c.AllowEmptyValue.Present && p.In != ParameterInQuery && p.In != ParameterInFormData {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.allowEmptyValue is only valid for in=query or in=formData"), c, c.AllowEmptyValue))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("parameter.allowEmptyValue is only valid for in=query or in=formData"), c, c.AllowEmptyValue))
 	}
 
 	// Validate items if present
@@ -195,7 +197,9 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 			opCore := operation.GetCore()
 			if !opCore.Consumes.Present || len(operation.Consumes) == 0 {
 				errs = append(errs, validation.NewValueError(
-					validation.NewValueValidationError("parameter with type=file requires operation to have consumes defined"),
+					validation.SeverityError,
+					validation.RuleValidationRequiredField,
+					errors.New("parameter with type=file requires operation to have consumes defined"),
 					c, c.Type))
 			} else {
 				hasValidConsumes := false
@@ -207,7 +211,9 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 				}
 				if !hasValidConsumes {
 					errs = append(errs, validation.NewValueError(
-						validation.NewValueValidationError("parameter with type=file requires operation consumes to be 'multipart/form-data' or 'application/x-www-form-urlencoded'"),
+						validation.SeverityError,
+						validation.RuleValidationAllowedValues,
+						errors.New("parameter with type=file requires operation consumes to be 'multipart/form-data' or 'application/x-www-form-urlencoded'"),
 						c, c.Type))
 				}
 			}
@@ -231,7 +237,7 @@ func (p *Parameter) validateIn(c *core.Parameter) []error {
 		}
 	}
 	if !valid {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.in must be one of [%s]", strings.Join([]string{string(ParameterInQuery), string(ParameterInHeader), string(ParameterInPath), string(ParameterInFormData), string(ParameterInBody)}, ", ")), c, c.In))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.in must be one of [%s]", strings.Join([]string{string(ParameterInQuery), string(ParameterInHeader), string(ParameterInPath), string(ParameterInFormData), string(ParameterInBody)}, ", ")), c, c.In))
 	}
 
 	return errs
@@ -242,13 +248,13 @@ func (p *Parameter) validateParameterType(ctx context.Context, c *core.Parameter
 
 	// Path parameters must be required
 	if p.In == ParameterInPath && (!c.Required.Present || !p.GetRequired()) {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.in=path requires required=true"), c, c.Required))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.in=path requires required=true"), c, c.Required))
 	}
 
 	// Body parameters require schema
 	if p.In == ParameterInBody {
 		if !c.Schema.Present {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("parameter.schema is required for in=body"), c, c.Schema))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.schema is required for in=body"), c, c.Schema))
 			return errs
 		}
 		errs = append(errs, p.Schema.Validate(ctx, opts...)...)
@@ -257,12 +263,12 @@ func (p *Parameter) validateParameterType(ctx context.Context, c *core.Parameter
 
 	// Non-body parameters require type
 	if !c.Type.Present {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("parameter.type is required for non-body parameters"), c, c.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.type is required for non-body parameters"), c, c.Type))
 		return errs
 	}
 
 	if c.Type.Present && (p.Type == nil || *p.Type == "") {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("parameter.type is required for non-body parameters"), c, c.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.type is required for non-body parameters"), c, c.Type))
 		return errs
 	}
 
@@ -276,24 +282,26 @@ func (p *Parameter) validateParameterType(ctx context.Context, c *core.Parameter
 			}
 		}
 		if !valid {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.type must be one of [%s]", strings.Join(validTypes, ", ")), c, c.Type))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.type must be one of [%s]", strings.Join(validTypes, ", ")), c, c.Type))
 		}
 
 		// File type only allowed for formData
 		if *p.Type == "file" && p.In != ParameterInFormData {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("parameter.type=file requires in=formData"), c, c.Type))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("parameter.type=file requires in=formData"), c, c.Type))
 		}
 
 		// Array type requires items
 		if *p.Type == "array" && !c.Items.Present {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("parameter.items is required when type=array"), c, c.Items))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.items is required when type=array"), c, c.Items))
 		}
 
 		// Validate collectionFormat=multi only for query or formData
 		if p.CollectionFormat != nil && *p.CollectionFormat == CollectionFormatMulti {
 			if p.In != ParameterInQuery && p.In != ParameterInFormData {
 				errs = append(errs, validation.NewValueError(
-					validation.NewValueValidationError("collectionFormat='multi' is only valid for in=query or in=formData"),
+					validation.SeverityError,
+					validation.RuleValidationAllowedValues,
+					errors.New("collectionFormat='multi' is only valid for in=query or in=formData"),
 					c, c.CollectionFormat))
 			}
 		}
@@ -369,7 +377,7 @@ func (i *Items) Validate(ctx context.Context, opts ...validation.Option) []error
 	errs := []error{}
 
 	if c.Type.Present && i.Type == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("items.type is required"), c, c.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("items.type is required"), c, c.Type))
 	} else if c.Type.Present {
 		validTypes := []string{"string", "number", "integer", "boolean", "array"}
 		valid := false
@@ -380,12 +388,12 @@ func (i *Items) Validate(ctx context.Context, opts ...validation.Option) []error
 			}
 		}
 		if !valid {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("items.type must be one of [%s]", strings.Join(validTypes, ", ")), c, c.Type))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("items.type must be one of [%s]", strings.Join(validTypes, ", ")), c, c.Type))
 		}
 
 		// Array type requires items
 		if i.Type == "array" && !c.Items.Present {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("items.items is required when type=array"), c, c.Items))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("items.items is required when type=array"), c, c.Items))
 		}
 	}
 

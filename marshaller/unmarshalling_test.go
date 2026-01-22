@@ -153,10 +153,10 @@ func TestUnmarshal_PrimitiveTypes_Error(t *testing.T) {
 stringPtrField: "optional field"
 `,
 			wantErrs: []string{
-				"[2:1] testPrimitiveModel.boolField is missing",
-				"[2:1] testPrimitiveModel.float64Field is missing",
-				"[2:1] testPrimitiveModel.intField is missing",
-				"[2:1] testPrimitiveModel.stringField is missing",
+				"[2:1] error validation-required-field testPrimitiveModel.boolField is required",
+				"[2:1] error validation-required-field testPrimitiveModel.float64Field is required",
+				"[2:1] error validation-required-field testPrimitiveModel.intField is required",
+				"[2:1] error validation-required-field testPrimitiveModel.stringField is required",
 			},
 		},
 		{
@@ -167,7 +167,7 @@ boolField: true
 intField: 42
 float64Field: 3.14
 `,
-			wantErrs: []string{"[2:14] testPrimitiveModel.stringField expected string, got sequence"},
+			wantErrs: []string{"[2:14] error validation-type-mismatch testPrimitiveModel.stringField expected string, got sequence"},
 		},
 		{
 			name: "type mismatch - bool field gets string",
@@ -177,7 +177,7 @@ boolField: "not a bool"
 intField: 42
 float64Field: 3.14
 `,
-			wantErrs: []string{"[3:12] testPrimitiveModel.boolField line 3: cannot unmarshal !!str `not a bool` into bool"},
+			wantErrs: []string{"[3:12] error validation-type-mismatch testPrimitiveModel.boolField line 3: cannot unmarshal !!str `not a bool` into bool"},
 		},
 		{
 			name: "type mismatch - int field gets string",
@@ -187,7 +187,7 @@ boolField: true
 intField: "not an int"
 float64Field: 3.14
 `,
-			wantErrs: []string{"[4:11] testPrimitiveModel.intField line 4: cannot unmarshal !!str `not an int` into int"},
+			wantErrs: []string{"[4:11] error validation-type-mismatch testPrimitiveModel.intField line 4: cannot unmarshal !!str `not an int` into int"},
 		},
 		{
 			name: "type mismatch - float field gets string",
@@ -197,7 +197,7 @@ boolField: true
 intField: 42
 float64Field: "not a float"
 `,
-			wantErrs: []string{"[5:15] testPrimitiveModel.float64Field line 5: cannot unmarshal !!str `not a f...` into float64"},
+			wantErrs: []string{"[5:15] error validation-type-mismatch testPrimitiveModel.float64Field line 5: cannot unmarshal !!str `not a f...` into float64"},
 		},
 		{
 			name: "multiple validation errors",
@@ -206,10 +206,10 @@ boolField: "not a bool"
 intField: "not an int"
 `,
 			wantErrs: []string{
-				"[2:1] testPrimitiveModel.float64Field is missing",
-				"[2:1] testPrimitiveModel.stringField is missing",
-				"[2:12] testPrimitiveModel.boolField line 2: cannot unmarshal !!str `not a bool` into bool",
-				"[3:11] testPrimitiveModel.intField line 3: cannot unmarshal !!str `not an int` into int",
+				"[2:1] error validation-required-field testPrimitiveModel.float64Field is required",
+				"[2:1] error validation-required-field testPrimitiveModel.stringField is required",
+				"[2:12] error validation-type-mismatch testPrimitiveModel.boolField line 2: cannot unmarshal !!str `not a bool` into bool",
+				"[3:11] error validation-type-mismatch testPrimitiveModel.intField line 3: cannot unmarshal !!str `not an int` into int",
 			},
 		},
 	}
@@ -358,9 +358,9 @@ nestedModel:
   # missing required stringField, boolField, float64Field
 `,
 			wantErrs: []string{
-				"[8:3] testPrimitiveModel.stringField is missing",
-				"[8:3] testPrimitiveModel.boolField is missing",
-				"[8:3] testPrimitiveModel.float64Field is missing",
+				"[8:3] error validation-required-field testPrimitiveModel.stringField is required",
+				"[8:3] error validation-required-field testPrimitiveModel.boolField is required",
+				"[8:3] error validation-required-field testPrimitiveModel.float64Field is required",
 			},
 		},
 		{
@@ -374,7 +374,7 @@ nestedModelValue:
 nestedModel:
   - "this should be an object"
 `,
-			wantErrs: []string{"[8:3] testComplexModel.nestedModel expected object, got sequence"},
+			wantErrs: []string{"[8:3] error validation-type-mismatch testComplexModel.nestedModel expected object, got sequence"},
 		},
 		{
 			name: "type mismatch - array field gets object",
@@ -387,7 +387,7 @@ nestedModelValue:
 arrayField:
   key: "this should be an array"
 `,
-			wantErrs: []string{"[8:3] testComplexModel.arrayField expected sequence, got object"},
+			wantErrs: []string{"[8:3] error validation-type-mismatch testComplexModel.arrayField expected sequence, got object"},
 		},
 		{
 			name: "deeply nested validation error",
@@ -407,7 +407,7 @@ structArrayField:
     float64Field: 4.56
     # missing required stringField in second element
 `,
-			wantErrs: []string{"[12:5] testPrimitiveModel.stringField is missing"},
+			wantErrs: []string{"[12:5] error validation-required-field testPrimitiveModel.stringField is required"},
 		},
 	}
 
@@ -658,7 +658,7 @@ func TestUnmarshal_RequiredPointer_Error(t *testing.T) {
 			yml: `
 optionalPtr: "only optional set"
 `,
-			wantErrs: []string{"[2:1] testRequiredPointerModel.requiredPtr is missing"},
+			wantErrs: []string{"[2:1] error validation-required-field testRequiredPointerModel.requiredPtr is required"},
 		},
 		{
 			name: "required pointer field with null value should be valid",
@@ -768,12 +768,12 @@ func TestUnmarshal_RequiredNilableTypes_Error(t *testing.T) {
 optionalPtr: "only optional set"
 `,
 			wantErrs: []string{
-				"[2:1] testRequiredNilableModel.requiredEither is missing",
-				"[2:1] testRequiredNilableModel.requiredMap is missing",
-				"[2:1] testRequiredNilableModel.requiredPtr is missing",
-				"[2:1] testRequiredNilableModel.requiredRawNode is missing",
-				"[2:1] testRequiredNilableModel.requiredSlice is missing",
-				"[2:1] testRequiredNilableModel.requiredStruct is missing",
+				"[2:1] error validation-required-field testRequiredNilableModel.requiredEither is required",
+				"[2:1] error validation-required-field testRequiredNilableModel.requiredMap is required",
+				"[2:1] error validation-required-field testRequiredNilableModel.requiredPtr is required",
+				"[2:1] error validation-required-field testRequiredNilableModel.requiredRawNode is required",
+				"[2:1] error validation-required-field testRequiredNilableModel.requiredSlice is required",
+				"[2:1] error validation-required-field testRequiredNilableModel.requiredStruct is required",
 			},
 		},
 		{
@@ -784,10 +784,10 @@ requiredSlice: ["item1"]
 # missing requiredMap, requiredStruct, requiredEither, requiredRawNode
 `,
 			wantErrs: []string{
-				"[2:1] testRequiredNilableModel.requiredEither is missing",
-				"[2:1] testRequiredNilableModel.requiredMap is missing",
-				"[2:1] testRequiredNilableModel.requiredRawNode is missing",
-				"[2:1] testRequiredNilableModel.requiredStruct is missing",
+				"[2:1] error validation-required-field testRequiredNilableModel.requiredEither is required",
+				"[2:1] error validation-required-field testRequiredNilableModel.requiredMap is required",
+				"[2:1] error validation-required-field testRequiredNilableModel.requiredRawNode is required",
+				"[2:1] error validation-required-field testRequiredNilableModel.requiredStruct is required",
 			},
 		},
 		{
@@ -804,10 +804,10 @@ requiredEither: "string value"
 requiredRawNode: "raw value"
 `,
 			wantErrs: []string{
-				"[8:3] testPrimitiveModel.boolField is missing",
-				"[8:3] testPrimitiveModel.float64Field is missing",
-				"[8:3] testPrimitiveModel.intField is missing",
-				"[8:3] testPrimitiveModel.stringField is missing",
+				"[8:3] error validation-required-field testPrimitiveModel.boolField is required",
+				"[8:3] error validation-required-field testPrimitiveModel.float64Field is required",
+				"[8:3] error validation-required-field testPrimitiveModel.intField is required",
+				"[8:3] error validation-required-field testPrimitiveModel.stringField is required",
 			},
 		},
 	}

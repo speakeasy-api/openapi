@@ -53,8 +53,10 @@ type Unmarshal[T any] func(ctx context.Context, node *yaml.Node, skipValidation 
 type ResolveResult[T any] struct {
 	// Object is the resolved object
 	Object *T
+	// AbsoluteDocumentPath is the absolute reference that was resolved
+	AbsoluteDocumentPath string
 	// AbsoluteReference is the absolute reference that was resolved
-	AbsoluteReference string
+	AbsoluteReference Reference
 	// ResolvedDocument is the document that was resolved against (for chaining resolutions)
 	ResolvedDocument any
 }
@@ -103,10 +105,10 @@ func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T]
 		return nil, nil, err
 	}
 
-	absRef := result.AbsoluteReference
+	absDocPath := result.AbsoluteReference
 	finalClassification := result.Classification
 
-	absRefWithJP := utils.BuildAbsoluteReference(absRef, string(jp))
+	absRefWithJP := utils.BuildAbsoluteReference(absDocPath, string(jp))
 
 	// Try and get the object from the cache as we should avoid recreating it if possible
 	var obj *T
@@ -119,9 +121,10 @@ func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T]
 	if uri == "" {
 		if coOK {
 			return &ResolveResult[T]{
-				Object:            obj,
-				AbsoluteReference: absRef,
-				ResolvedDocument:  opts.TargetDocument,
+				Object:               obj,
+				AbsoluteDocumentPath: absDocPath,
+				AbsoluteReference:    Reference(absRefWithJP),
+				ResolvedDocument:     opts.TargetDocument,
 			}, nil, nil
 		}
 
@@ -134,41 +137,44 @@ func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T]
 		opts.RootDocument.StoreReferencedObjectInCache(absRefWithJP, obj)
 
 		return &ResolveResult[T]{
-			Object:            obj,
-			AbsoluteReference: opts.TargetLocation,
-			ResolvedDocument:  opts.TargetDocument,
+			Object:               obj,
+			AbsoluteDocumentPath: opts.TargetLocation,
+			AbsoluteReference:    Reference(utils.BuildAbsoluteReference(opts.TargetLocation, string(jp))),
+			ResolvedDocument:     opts.TargetDocument,
 		}, validationErrs, nil
 	} else if opts.DisableExternalRefs {
 		return nil, nil, errors.New("external reference not allowed")
 	}
 
-	cd, cdOK := opts.RootDocument.GetCachedReferenceDocument(absRef)
+	cd, cdOK := opts.RootDocument.GetCachedReferenceDocument(absDocPath)
 
 	if coOK && cdOK {
 		return &ResolveResult[T]{
-			Object:            obj,
-			AbsoluteReference: absRef,
-			ResolvedDocument:  cd,
+			Object:               obj,
+			AbsoluteDocumentPath: absDocPath,
+			AbsoluteReference:    Reference(absRefWithJP),
+			ResolvedDocument:     cd,
 		}, nil, nil
 	}
 
 	// If we have a cached document, try and resolve against it
 	if cdOK {
-		obj, resolvedDoc, validationErrs, err := resolveAgainstData(ctx, absRef, bytes.NewReader(cd), jp, unmarshaler, opts)
+		obj, resolvedDoc, validationErrs, err := resolveAgainstData(ctx, absDocPath, bytes.NewReader(cd), jp, unmarshaler, opts)
 		if err != nil {
 			return nil, validationErrs, err
 		}
 		return &ResolveResult[T]{
-			Object:            obj,
-			AbsoluteReference: absRef,
-			ResolvedDocument:  resolvedDoc,
+			Object:               obj,
+			AbsoluteDocumentPath: absDocPath,
+			AbsoluteReference:    Reference(absRefWithJP),
+			ResolvedDocument:     resolvedDoc,
 		}, validationErrs, nil
 	}
 
 	// Otherwise resolve the reference
 	switch finalClassification.Type {
 	case utils.ReferenceTypeURL:
-		obj, resolvedDoc, validationErrs, err := resolveAgainstURL(ctx, absRef, jp, unmarshaler, opts)
+		obj, resolvedDoc, validationErrs, err := resolveAgainstURL(ctx, absDocPath, jp, unmarshaler, opts)
 		if err != nil {
 			return nil, validationErrs, err
 		}
@@ -177,12 +183,13 @@ func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T]
 		opts.RootDocument.StoreReferencedObjectInCache(absRefWithJP, obj)
 
 		return &ResolveResult[T]{
-			Object:            obj,
-			AbsoluteReference: absRef,
-			ResolvedDocument:  resolvedDoc,
+			Object:               obj,
+			AbsoluteDocumentPath: absDocPath,
+			AbsoluteReference:    Reference(absRefWithJP),
+			ResolvedDocument:     resolvedDoc,
 		}, validationErrs, nil
 	case utils.ReferenceTypeFilePath:
-		obj, resolvedDoc, validationErrs, err := resolveAgainstFilePath(ctx, absRef, jp, unmarshaler, opts)
+		obj, resolvedDoc, validationErrs, err := resolveAgainstFilePath(ctx, absDocPath, jp, unmarshaler, opts)
 		if err != nil {
 			return nil, validationErrs, err
 		}
@@ -191,9 +198,10 @@ func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T]
 		opts.RootDocument.StoreReferencedObjectInCache(absRefWithJP, obj)
 
 		return &ResolveResult[T]{
-			Object:            obj,
-			AbsoluteReference: absRef,
-			ResolvedDocument:  resolvedDoc,
+			Object:               obj,
+			AbsoluteDocumentPath: absDocPath,
+			AbsoluteReference:    Reference(absRefWithJP),
+			ResolvedDocument:     resolvedDoc,
 		}, validationErrs, nil
 	default:
 		return nil, nil, fmt.Errorf("unsupported reference type: %d", finalClassification.Type)

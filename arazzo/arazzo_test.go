@@ -300,11 +300,11 @@ sourceDescriptions:
 		column          int
 		underlyingError error
 	}{
-		{line: 1, column: 1, underlyingError: validation.NewMissingFieldError("arazzo.workflows is missing")},
-		{line: 1, column: 9, underlyingError: validation.NewValueValidationError("arazzo.version only Arazzo versions between 1.0.0 and 1.0.1 are supported")},
-		{line: 4, column: 3, underlyingError: validation.NewMissingFieldError("info.version is missing")},
-		{line: 6, column: 5, underlyingError: validation.NewMissingFieldError("sourceDescription.url is missing")},
-		{line: 7, column: 11, underlyingError: validation.NewValueValidationError("sourceDescription.type must be one of [openapi, arazzo]")},
+		{line: 1, column: 1, underlyingError: errors.New("arazzo.workflows is required")},
+		{line: 1, column: 9, underlyingError: errors.New("arazzo.version only Arazzo versions between 1.0.0 and 1.0.1 are supported")},
+		{line: 4, column: 3, underlyingError: errors.New("info.version is required")},
+		{line: 6, column: 5, underlyingError: errors.New("sourceDescription.url is required")},
+		{line: 7, column: 11, underlyingError: errors.New("sourceDescription.type must be one of [openapi, arazzo]")},
 	}
 
 	require.Len(t, validationErrs, len(expectedErrors), "number of validation errors should match")
@@ -546,8 +546,8 @@ var stressTests = []struct {
 		args: args{
 			location: "https://raw.githubusercontent.com/Redocly/museum-openapi-example/2770b2b2e59832d245c7b0eb0badf6568d7efb53/arazzo/museum-api.arazzo.yaml",
 			validationIgnores: []string{
-				"[71:24] invalid jsonpath expression: Error at line 1, column 7: unexpected token when parsing segment",  // legit invalid RFC 9535 syntax
-				"[107:24] invalid jsonpath expression: Error at line 1, column 7: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
+				"[71:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 7: unexpected token when parsing segment",  // legit invalid RFC 9535 syntax
+				"[107:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 7: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
 			},
 		},
 		wantTitle: "Redocly Museum API Test Workflow",
@@ -564,7 +564,7 @@ var stressTests = []struct {
 		args: args{
 			location: "https://raw.githubusercontent.com/Redocly/warp-single-sidebar/b78fc09da52d7755e92e1bc8f990edd37421cbde/apis/arazzo.yaml",
 			validationIgnores: []string{
-				"[63:24] invalid jsonpath expression: Error at line 1, column 12: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
+				"[63:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 12: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
 			},
 		},
 		wantTitle: "Warp API",
@@ -605,10 +605,10 @@ var stressTests = []struct {
 		args: args{
 			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/23852b8b0d13ab1e3288a57a990611ffed45ab5d/examples/1.0.0/oauth.arazzo.yaml",
 			validationIgnores: []string{
-				"[65:24] invalid jsonpath expression: Error at line 1, column 15: unexpected token when parsing segment",  // legit invalid RFC 9535 syntax
-				"[105:24] invalid jsonpath expression: Error at line 1, column 15: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
-				"[155:24] invalid jsonpath expression: Error at line 1, column 15: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
-				"[175:24] invalid jsonpath expression: Error at line 1, column 15: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
+				"[65:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 15: unexpected token when parsing segment",  // legit invalid RFC 9535 syntax
+				"[105:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 15: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
+				"[155:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 15: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
+				"[175:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 15: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
 			},
 		},
 		wantTitle: "Example OAuth service",
@@ -632,7 +632,7 @@ var stressTests = []struct {
 		args: args{
 			location: "https://raw.githubusercontent.com/frankkilcommins/simple-spectral-arazzo-GA/4ec8856f1cf21c0f77597c715c150ef3e2772a89/apis/OnlineStore.arazzo.yaml",
 			validationIgnores: []string{
-				"info.title is missing", // legit issue
+				"info.title is required", // legit issue
 				"operationId must be a valid expression if there are multiple OpenAPI source descriptions", // legit issue
 				"$responses.body.menuItems[0].subcategories[0].id",                                         // legit issue
 			},
@@ -645,9 +645,9 @@ var stressTests = []struct {
 		args: args{
 			location: "https://raw.githubusercontent.com/leidenheit/itarazzo-library/3b335e1c4293444add52b5f2476420e2d871b1a5/src/test/resources/test.arazzo.yaml",
 			validationIgnores: []string{
-				"expression is not valid, must begin with $: <root><id>4711</id><name>Chocolate</name></root>",          // legit issue
-				"[32:24] invalid jsonpath expression: Error at line 1, column 0: unexpected token",                      // unsupported version: draft-goessner-dispatch-jsonpath-00
-				"[36:24] invalid jsonpath expression: Error at line 1, column 5: unexpected token when parsing segment", // unsupported version: draft-goessner-dispatch-jsonpath-00
+				"expression is not valid, must begin with $: <root><id>4711</id><name>Chocolate</name></root>",                                          // legit issue
+				"[32:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 0: unexpected token",                      // unsupported version: draft-goessner-dispatch-jsonpath-00
+				"[36:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 5: unexpected token when parsing segment", // unsupported version: draft-goessner-dispatch-jsonpath-00
 			},
 		},
 		wantTitle: "A cookie eating workflow",
@@ -659,9 +659,9 @@ var stressTests = []struct {
 			validationIgnores: []string{
 				"jsonpointer must start with /: $.status", // legit issues TODO: improve the error returned as it is wrong
 				"jsonpointer must start with /: $.id",     // legit issues TODO: improve the error returned as it is wrong
-				"[81:24] invalid jsonpath expression: Error at line 1, column 7: unexpected token when parsing segment",  // unsupported version: draft-goessner-dispatch-jsonpath-00
-				"[110:24] invalid jsonpath expression: Error at line 1, column 5: unexpected token when parsing segment", // unsupported version: draft-goessner-dispatch-jsonpath-00
-				"[114:24] invalid jsonpath expression: Error at line 1, column 9: unexpected token when parsing segment", // unsupported version: draft-goessner-dispatch-jsonpath-00
+				"[81:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 7: unexpected token when parsing segment",  // unsupported version: draft-goessner-dispatch-jsonpath-00
+				"[110:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 5: unexpected token when parsing segment", // unsupported version: draft-goessner-dispatch-jsonpath-00
+				"[114:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 9: unexpected token when parsing segment", // unsupported version: draft-goessner-dispatch-jsonpath-00
 			},
 		},
 		wantTitle: "PetStore - Example of Workflows",
@@ -671,7 +671,7 @@ var stressTests = []struct {
 		args: args{
 			location: "https://raw.githubusercontent.com/ritza-co/e2e-testing-arazzo/c0615c3708a1e4c0fcaeb79edae78ddc4eb5ba82/arazzo.yaml",
 			validationIgnores: []string{
-				"[42:24] invalid jsonpath expression: Error at line 1, column 8: unexpected token", // legit invalid RFC 9535 syntax
+				"[42:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 8: unexpected token", // legit invalid RFC 9535 syntax
 			},
 		},
 		wantTitle: "Build-a-Bot Workflow",
