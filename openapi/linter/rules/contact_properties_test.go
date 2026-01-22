@@ -111,7 +111,7 @@ info:
     url: https://www.example.com/support
 paths: {}
 `,
-			expectedError: "[7:5] warning style-contact-properties `contact` section must contain a `email`",
+			expectedError: "[7:5] warning style-contact-properties `contact` section must contain an `email`",
 		},
 		{
 			name: "contact missing all properties",
