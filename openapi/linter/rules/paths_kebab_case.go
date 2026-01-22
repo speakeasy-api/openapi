@@ -44,7 +44,11 @@ var variableRegex = regexp.MustCompile(`^\{(\w.*)}\.?.*$`)
 
 // checkPathKebabCase returns non-kebab-case segments in the path
 func checkPathKebabCase(path string) []string {
-	segments := strings.Split(path, "/")[1:] // skip first empty segment
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 {
+		return nil
+	}
+	segments := parts[1:] // skip first empty segment
 	var invalidSegments []string
 
 	for _, seg := range segments {

@@ -80,8 +80,8 @@ func (l *Linter[T]) runRules(ctx context.Context, docInfo *DocumentInfo[T], opts
 					// Match against rule's supported versions
 					// Support both "3.1" and "3.1.0" formats
 					if ruleVersion == *opts.VersionFilter ||
-					   (len(*opts.VersionFilter) > len(ruleVersion) &&
-					    (*opts.VersionFilter)[:len(ruleVersion)] == ruleVersion) {
+						(len(*opts.VersionFilter) > len(ruleVersion) &&
+							(*opts.VersionFilter)[:len(ruleVersion)] == ruleVersion) {
 						versionMatches = true
 						break
 					}

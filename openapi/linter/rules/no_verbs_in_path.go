@@ -54,7 +54,11 @@ var httpVerbs = map[string]bool{
 
 // checkPathForVerbs returns the first segment containing an HTTP verb, or empty string
 func checkPathForVerbs(path string) string {
-	segments := strings.Split(path, "/")[1:] // skip first empty segment
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	segments := parts[1:] // skip first empty segment
 	for _, seg := range segments {
 		segLower := strings.ToLower(seg)
 		// Check if the segment is exactly a verb

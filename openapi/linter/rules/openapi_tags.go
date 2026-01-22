@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -49,7 +49,7 @@ func (r *OpenAPITagsRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[
 		return []error{validation.NewValidationError(
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleOpenAPITags,
-			fmt.Errorf("OpenAPI object must have a non-empty tags array"),
+			errors.New("OpenAPI object must have a non-empty tags array"),
 			doc.GetCore().GetRootNode(),
 		)}
 	}

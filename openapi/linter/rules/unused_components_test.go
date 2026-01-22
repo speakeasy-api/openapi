@@ -246,11 +246,11 @@ components:
 		case "/external.yaml":
 			w.Header().Set("Content-Type", "application/yaml")
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(fmt.Sprintf(externalYaml, server.URL, server.URL)))
+			_, _ = fmt.Fprintf(w, externalYaml, server.URL, server.URL)
 		case "/main.yaml":
 			w.Header().Set("Content-Type", "application/yaml")
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(fmt.Sprintf(mainYaml, server.URL)))
+			_, _ = fmt.Fprintf(w, mainYaml, server.URL)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}

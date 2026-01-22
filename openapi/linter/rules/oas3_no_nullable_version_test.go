@@ -18,10 +18,10 @@ func TestOAS3NoNullableRule_VersionFiltering(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		yaml          string
-		expectErrors  bool
-		description   string
+		name         string
+		yaml         string
+		expectErrors bool
+		description  string
 	}{
 		{
 			name: "OpenAPI 3.1.0 - rule should run and detect violation",

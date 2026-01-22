@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -54,7 +54,7 @@ func (r *NoRefSiblingsRule) Run(ctx context.Context, docInfo *linter.DocumentInf
 			errs = append(errs, validation.NewValidationError(
 				config.GetSeverity(r.DefaultSeverity()),
 				RuleStyleNoRefSiblings,
-				fmt.Errorf("schema contains $ref with sibling properties, which is not allowed in OAS 3.0.x"),
+				errors.New("schema contains $ref with sibling properties, which is not allowed in OAS 3.0.x"),
 				schema.GetCore().GetRootNode(),
 			))
 		}

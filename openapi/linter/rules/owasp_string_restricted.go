@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -73,7 +73,7 @@ func (r *OwaspStringRestrictedRule) Run(ctx context.Context, docInfo *linter.Doc
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					RuleOwaspStringRestricted,
-					fmt.Errorf("schema of type 'string' must specify format, const, enum, or pattern to restrict content"),
+					errors.New("schema of type 'string' must specify format, const, enum, or pattern to restrict content"),
 					rootNode,
 				))
 			}

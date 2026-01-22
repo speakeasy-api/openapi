@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -58,7 +58,7 @@ func (r *OAS3NoNullableRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					RuleOAS3NoNullable,
-					fmt.Errorf("the `nullable` keyword is not supported in OpenAPI 3.1 - use type: [actualType, 'null'] instead"),
+					errors.New("the `nullable` keyword is not supported in OpenAPI 3.1 - use type: [actualType, 'null'] instead"),
 					rootNode,
 				))
 			}

@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strconv"
 
 	"github.com/speakeasy-api/openapi/linter"
@@ -67,7 +67,7 @@ func (r *OperationErrorResponseRule) Run(ctx context.Context, docInfo *linter.Do
 			errs = append(errs, validation.NewValidationError(
 				config.GetSeverity(r.DefaultSeverity()),
 				RuleStyleOperationErrorResponse,
-				fmt.Errorf("operation must define at least one 4xx error response"),
+				errors.New("operation must define at least one 4xx error response"),
 				responsesNode,
 			))
 		}

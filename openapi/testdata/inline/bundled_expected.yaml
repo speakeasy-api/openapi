@@ -108,7 +108,7 @@ paths:
         tags:
           - posts
         parameters:
-          - $ref: "#/components/parameters/DestinationParam"
+          - $ref: '#/components/parameters/DestinationParam'
         requestBody:
           $ref: "#/components/requestBodies/CopyRequest"
         responses:
@@ -300,8 +300,8 @@ paths:
       tags: [external]
       summary: Test external parameter with complex reference chain
       parameters:
-        - $ref: "#/components/parameters/ComplexFilterParam"
-        - $ref: "#/components/parameters/PaginationParam"
+        - $ref: '#/components/parameters/ComplexFilterParam'
+        - $ref: '#/components/parameters/PaginationParam'
       responses:
         "200":
           description: Filtered results

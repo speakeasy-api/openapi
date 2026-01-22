@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -56,7 +57,7 @@ func runExplore(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(operations) == 0 {
-		return fmt.Errorf("no operations found in the OpenAPI document")
+		return errors.New("no operations found in the OpenAPI document")
 	}
 
 	// Get document info for display
@@ -95,7 +96,7 @@ func loadOpenAPIDocument(ctx context.Context, file string) (*openapi.OpenAPI, er
 		return nil, fmt.Errorf("failed to unmarshal OpenAPI document: %w", err)
 	}
 	if doc == nil {
-		return nil, fmt.Errorf("failed to parse OpenAPI document: document is nil")
+		return nil, errors.New("failed to parse OpenAPI document: document is nil")
 	}
 
 	// Report validation errors as warnings but continue

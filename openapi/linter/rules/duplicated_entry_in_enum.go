@@ -100,13 +100,13 @@ func nodeToString(node *yaml.Node) string {
 	case "!!null":
 		return "null"
 	case "!!str":
-		return fmt.Sprintf("string:%s", node.Value)
+		return "string:" + node.Value
 	case "!!int":
-		return fmt.Sprintf("int:%s", node.Value)
+		return "int:" + node.Value
 	case "!!float":
-		return fmt.Sprintf("float:%s", node.Value)
+		return "float:" + node.Value
 	case "!!bool":
-		return fmt.Sprintf("bool:%s", node.Value)
+		return "bool:" + node.Value
 	default:
 		return node.Value
 	}

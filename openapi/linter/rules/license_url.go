@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -52,7 +52,7 @@ func (r *LicenseURLRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*
 		errs = append(errs, validation.NewValidationError(
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleLicenseURL,
-			fmt.Errorf("license should contain a URL"),
+			errors.New("license should contain a URL"),
 			license.GetCore().GetRootNode(),
 		))
 	}

@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -81,7 +81,7 @@ func (r *OwaspIntegerLimitRule) Run(ctx context.Context, docInfo *linter.Documen
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					RuleOwaspIntegerLimit,
-					fmt.Errorf("schema of type 'integer' must specify minimum and maximum (or exclusiveMinimum and exclusiveMaximum)"),
+					errors.New("schema of type 'integer' must specify minimum and maximum (or exclusiveMinimum and exclusiveMaximum)"),
 					rootNode,
 				))
 			}

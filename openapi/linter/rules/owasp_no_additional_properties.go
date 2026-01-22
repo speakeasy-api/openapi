@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -90,7 +90,7 @@ func (r *OwaspNoAdditionalPropertiesRule) Run(ctx context.Context, docInfo *lint
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					RuleOwaspNoAdditionalProperties,
-					fmt.Errorf("additionalProperties should not be set to true or define a schema - set to false or omit it"),
+					errors.New("additionalProperties should not be set to true or define a schema - set to false or omit it"),
 					rootNode,
 				))
 			}

@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -68,7 +68,7 @@ func (r *OwaspIntegerFormatRule) Run(ctx context.Context, docInfo *linter.Docume
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					RuleOwaspIntegerFormat,
-					fmt.Errorf("schema of type 'integer' must specify format as 'int32' or 'int64'"),
+					errors.New("schema of type 'integer' must specify format as 'int32' or 'int64'"),
 					rootNode,
 				))
 			}

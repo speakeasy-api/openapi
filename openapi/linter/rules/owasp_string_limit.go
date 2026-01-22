@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -72,7 +72,7 @@ func (r *OwaspStringLimitRule) Run(ctx context.Context, docInfo *linter.Document
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					RuleOwaspStringLimit,
-					fmt.Errorf("schema of type 'string' must specify maxLength, const, or enum to prevent unbounded data"),
+					errors.New("schema of type 'string' must specify maxLength, const, or enum to prevent unbounded data"),
 					rootNode,
 				))
 			}

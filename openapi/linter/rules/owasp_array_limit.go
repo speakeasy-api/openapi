@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -68,7 +68,7 @@ func (r *OwaspArrayLimitRule) Run(ctx context.Context, docInfo *linter.DocumentI
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					RuleOwaspArrayLimit,
-					fmt.Errorf("schema of type array must specify maxItems"),
+					errors.New("schema of type array must specify maxItems"),
 					rootNode,
 				))
 			}

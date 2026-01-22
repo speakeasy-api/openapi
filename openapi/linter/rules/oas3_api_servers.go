@@ -2,6 +2,7 @@ package rules
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -57,7 +58,7 @@ func (r *OAS3APIServersRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 		errs = append(errs, validation.NewValidationError(
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleOAS3APIServers,
-			fmt.Errorf("no servers defined for the specification"),
+			errors.New("no servers defined for the specification"),
 			rootNode,
 		))
 		return errs
@@ -80,7 +81,7 @@ func (r *OAS3APIServersRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 			errs = append(errs, validation.NewValidationError(
 				config.GetSeverity(r.DefaultSeverity()),
 				RuleStyleOAS3APIServers,
-				fmt.Errorf("server definition is missing a URL"),
+				errors.New("server definition is missing a URL"),
 				errNode,
 			))
 			i++

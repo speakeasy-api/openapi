@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/linter"
@@ -45,7 +45,9 @@ func (r *OAS3ExampleMissingRule) Run(ctx context.Context, docInfo *linter.Docume
 	schemasWithExamplesElsewhere := make(map[*oas3.JSONSchemaReferenceable]bool)
 
 	// Collect schemas from parameters with examples
-	allParameters := append(docInfo.Index.InlineParameters, docInfo.Index.ComponentParameters...)
+	allParameters := make([]*openapi.IndexNode[*openapi.ReferencedParameter], 0, len(docInfo.Index.InlineParameters)+len(docInfo.Index.ComponentParameters))
+	allParameters = append(allParameters, docInfo.Index.InlineParameters...)
+	allParameters = append(allParameters, docInfo.Index.ComponentParameters...)
 	for _, paramNode := range allParameters {
 		param := paramNode.Node
 		if param == nil {
@@ -65,7 +67,9 @@ func (r *OAS3ExampleMissingRule) Run(ctx context.Context, docInfo *linter.Docume
 	}
 
 	// Collect schemas from headers with examples
-	allHeaders := append(docInfo.Index.InlineHeaders, docInfo.Index.ComponentHeaders...)
+	allHeaders := make([]*openapi.IndexNode[*openapi.ReferencedHeader], 0, len(docInfo.Index.InlineHeaders)+len(docInfo.Index.ComponentHeaders))
+	allHeaders = append(allHeaders, docInfo.Index.InlineHeaders...)
+	allHeaders = append(allHeaders, docInfo.Index.ComponentHeaders...)
 	for _, headerNode := range allHeaders {
 		header := headerNode.Node
 		if header == nil {
@@ -146,7 +150,7 @@ func (r *OAS3ExampleMissingRule) Run(ctx context.Context, docInfo *linter.Docume
 			errs = append(errs, validation.NewValidationError(
 				config.GetSeverity(r.DefaultSeverity()),
 				RuleOAS3ExampleMissing,
-				fmt.Errorf("schema is missing `example` or `examples`"),
+				errors.New("schema is missing `example` or `examples`"),
 				rootNode,
 			))
 		}
@@ -178,7 +182,7 @@ func (r *OAS3ExampleMissingRule) Run(ctx context.Context, docInfo *linter.Docume
 			errs = append(errs, validation.NewValidationError(
 				config.GetSeverity(r.DefaultSeverity()),
 				RuleOAS3ExampleMissing,
-				fmt.Errorf("parameter is missing `example` or `examples`"),
+				errors.New("parameter is missing `example` or `examples`"),
 				rootNode,
 			))
 		}
@@ -210,7 +214,7 @@ func (r *OAS3ExampleMissingRule) Run(ctx context.Context, docInfo *linter.Docume
 			errs = append(errs, validation.NewValidationError(
 				config.GetSeverity(r.DefaultSeverity()),
 				RuleOAS3ExampleMissing,
-				fmt.Errorf("header is missing `example` or `examples`"),
+				errors.New("header is missing `example` or `examples`"),
 				rootNode,
 			))
 		}
@@ -237,7 +241,7 @@ func (r *OAS3ExampleMissingRule) Run(ctx context.Context, docInfo *linter.Docume
 			errs = append(errs, validation.NewValidationError(
 				config.GetSeverity(r.DefaultSeverity()),
 				RuleOAS3ExampleMissing,
-				fmt.Errorf("media type is missing `example` or `examples`"),
+				errors.New("media type is missing `example` or `examples`"),
 				rootNode,
 			))
 		}

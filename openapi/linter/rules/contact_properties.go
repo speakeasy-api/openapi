@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -63,7 +63,7 @@ func (r *ContactPropertiesRule) Run(ctx context.Context, docInfo *linter.Documen
 		errs = append(errs, validation.NewValidationError(
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleContactProperties,
-			fmt.Errorf("`contact` section must contain a `name`"),
+			errors.New("`contact` section must contain a `name`"),
 			contact.GetCore().GetRootNode(),
 		))
 	}
@@ -72,7 +72,7 @@ func (r *ContactPropertiesRule) Run(ctx context.Context, docInfo *linter.Documen
 		errs = append(errs, validation.NewValidationError(
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleContactProperties,
-			fmt.Errorf("`contact` section must contain a `url`"),
+			errors.New("`contact` section must contain a `url`"),
 			contact.GetCore().GetRootNode(),
 		))
 	}
@@ -81,7 +81,7 @@ func (r *ContactPropertiesRule) Run(ctx context.Context, docInfo *linter.Documen
 		errs = append(errs, validation.NewValidationError(
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleContactProperties,
-			fmt.Errorf("`contact` section must contain an `email`"),
+			errors.New("`contact` section must contain an `email`"),
 			contact.GetCore().GetRootNode(),
 		))
 	}

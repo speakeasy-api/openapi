@@ -10,6 +10,7 @@ import (
 	"github.com/speakeasy-api/openapi/yml"
 )
 
+//nolint:gosec
 const RuleOwaspNoAPIKeysInURL = "owasp-no-api-keys-in-url"
 
 type OwaspNoAPIKeysInURLRule struct{}

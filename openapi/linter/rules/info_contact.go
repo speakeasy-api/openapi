@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -47,7 +47,7 @@ func (r *InfoContactRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[
 		errs = append(errs, validation.NewValidationError(
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleInfoContact,
-			fmt.Errorf("info section is missing contact details"),
+			errors.New("info section is missing contact details"),
 			info.GetCore().GetRootNode(),
 		))
 	}

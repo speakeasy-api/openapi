@@ -154,8 +154,8 @@ type Index struct {
 	OAuthFlows     []*IndexNode[*OAuthFlows]         // All OAuth flows containers
 	OAuthFlowItems []*IndexNode[*OAuthFlow]          // Individual OAuth flow objects (implicit, password, clientCredentials, authorizationCode)
 
-	DescriptionNodes         []*IndexNode[Descriptioner]         // All nodes that have a Description field
-	SummaryNodes             []*IndexNode[Summarizer]            // All nodes that have a Summary field
+	DescriptionNodes           []*IndexNode[Descriptioner]         // All nodes that have a Description field
+	SummaryNodes               []*IndexNode[Summarizer]            // All nodes that have a Summary field
 	DescriptionAndSummaryNodes []*IndexNode[DescriptionAndSummary] // All nodes that have both Description and Summary fields
 
 	validationErrs []error

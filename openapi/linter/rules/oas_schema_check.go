@@ -2,6 +2,7 @@ package rules
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -119,7 +120,7 @@ func (r *OASSchemaCheckRule) validateString(ctx context.Context, schema *oas3.Sc
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("`minLength` should be a non-negative number"),
+					errors.New("`minLength` should be a non-negative number"),
 					rootNode,
 				))
 			}
@@ -133,7 +134,7 @@ func (r *OASSchemaCheckRule) validateString(ctx context.Context, schema *oas3.Sc
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("`maxLength` should be a non-negative number"),
+					errors.New("`maxLength` should be a non-negative number"),
 					rootNode,
 				))
 			}
@@ -144,7 +145,7 @@ func (r *OASSchemaCheckRule) validateString(ctx context.Context, schema *oas3.Sc
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						r.ID(),
-						fmt.Errorf("`maxLength` should be greater than or equal to `minLength`"),
+						errors.New("`maxLength` should be greater than or equal to `minLength`"),
 						rootNode,
 					))
 				}
@@ -160,7 +161,7 @@ func (r *OASSchemaCheckRule) validateString(ctx context.Context, schema *oas3.Sc
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("schema `pattern` should be a valid regular expression"),
+					errors.New("schema `pattern` should be a valid regular expression"),
 					rootNode,
 				))
 			}
@@ -184,7 +185,7 @@ func (r *OASSchemaCheckRule) validateNumber(ctx context.Context, schema *oas3.Sc
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("`multipleOf` should be a number greater than `0`"),
+					errors.New("`multipleOf` should be a number greater than `0`"),
 					rootNode,
 				))
 			}
@@ -199,7 +200,7 @@ func (r *OASSchemaCheckRule) validateNumber(ctx context.Context, schema *oas3.Sc
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						r.ID(),
-						fmt.Errorf("`maximum` should be a number greater than or equal to `minimum`"),
+						errors.New("`maximum` should be a number greater than or equal to `minimum`"),
 						rootNode,
 					))
 				}
@@ -217,7 +218,7 @@ func (r *OASSchemaCheckRule) validateNumber(ctx context.Context, schema *oas3.Sc
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("`exclusiveMaximum` should be greater than or equal to `exclusiveMinimum`"),
+					errors.New("`exclusiveMaximum` should be greater than or equal to `exclusiveMinimum`"),
 					rootNode,
 				))
 			}
@@ -241,7 +242,7 @@ func (r *OASSchemaCheckRule) validateArray(ctx context.Context, schema *oas3.Sch
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("`minItems` should be a non-negative number"),
+					errors.New("`minItems` should be a non-negative number"),
 					rootNode,
 				))
 			}
@@ -255,7 +256,7 @@ func (r *OASSchemaCheckRule) validateArray(ctx context.Context, schema *oas3.Sch
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("`maxItems` should be a non-negative number"),
+					errors.New("`maxItems` should be a non-negative number"),
 					rootNode,
 				))
 			}
@@ -266,7 +267,7 @@ func (r *OASSchemaCheckRule) validateArray(ctx context.Context, schema *oas3.Sch
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						r.ID(),
-						fmt.Errorf("`maxItems` should be greater than or equal to `minItems`"),
+						errors.New("`maxItems` should be greater than or equal to `minItems`"),
 						rootNode,
 					))
 				}
@@ -281,7 +282,7 @@ func (r *OASSchemaCheckRule) validateArray(ctx context.Context, schema *oas3.Sch
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("`minContains` should be a non-negative number"),
+					errors.New("`minContains` should be a non-negative number"),
 					rootNode,
 				))
 			}
@@ -295,7 +296,7 @@ func (r *OASSchemaCheckRule) validateArray(ctx context.Context, schema *oas3.Sch
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("`maxContains` should be a non-negative number"),
+					errors.New("`maxContains` should be a non-negative number"),
 					rootNode,
 				))
 			}
@@ -306,7 +307,7 @@ func (r *OASSchemaCheckRule) validateArray(ctx context.Context, schema *oas3.Sch
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						r.ID(),
-						fmt.Errorf("`maxContains` should be greater than or equal to `minContains`"),
+						errors.New("`maxContains` should be greater than or equal to `minContains`"),
 						rootNode,
 					))
 				}
@@ -331,7 +332,7 @@ func (r *OASSchemaCheckRule) validateObject(ctx context.Context, schema *oas3.Sc
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("`minProperties` should be a non-negative number"),
+					errors.New("`minProperties` should be a non-negative number"),
 					rootNode,
 				))
 			}
@@ -345,7 +346,7 @@ func (r *OASSchemaCheckRule) validateObject(ctx context.Context, schema *oas3.Sc
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("`maxProperties` should be a non-negative number"),
+					errors.New("`maxProperties` should be a non-negative number"),
 					rootNode,
 				))
 			}
@@ -356,7 +357,7 @@ func (r *OASSchemaCheckRule) validateObject(ctx context.Context, schema *oas3.Sc
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						r.ID(),
-						fmt.Errorf("`maxProperties` should be greater than or equal to `minProperties`"),
+						errors.New("`maxProperties` should be greater than or equal to `minProperties`"),
 						rootNode,
 					))
 				}
@@ -378,7 +379,7 @@ func (r *OASSchemaCheckRule) validateObject(ctx context.Context, schema *oas3.Sc
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("object contains `required` fields but no `properties`"),
+					errors.New("object contains `required` fields but no `properties`"),
 					rootNode,
 				))
 			}
@@ -432,7 +433,7 @@ func (r *OASSchemaCheckRule) validateNull(ctx context.Context, schema *oas3.Sche
 	return r.checkTypeMismatchedConstraints(ctx, schema, refSchema, "null", docInfo, config)
 }
 
-func (r *OASSchemaCheckRule) checkTypeMismatchedConstraints(ctx context.Context, schema *oas3.Schema, refSchema *oas3.JSONSchemaReferenceable, schemaType string, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
+func (r *OASSchemaCheckRule) checkTypeMismatchedConstraints(_ context.Context, schema *oas3.Schema, refSchema *oas3.JSONSchemaReferenceable, schemaType string, _ *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
 	var errs []error
 	coreSchema := schema.GetCore()
 
@@ -643,7 +644,7 @@ func (r *OASSchemaCheckRule) checkPolymorphicProperty(schema *oas3.Schema, prope
 	return false
 }
 
-func (r *OASSchemaCheckRule) validateConst(ctx context.Context, schema *oas3.Schema, refSchema *oas3.JSONSchemaReferenceable, schemaTypes []oas3.SchemaType, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
+func (r *OASSchemaCheckRule) validateConst(_ context.Context, schema *oas3.Schema, refSchema *oas3.JSONSchemaReferenceable, schemaTypes []oas3.SchemaType, _ *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
 	var errs []error
 	coreSchema := schema.GetCore()
 
@@ -685,13 +686,13 @@ func (r *OASSchemaCheckRule) validateConst(ctx context.Context, schema *oas3.Sch
 	return errs
 }
 
-func (r *OASSchemaCheckRule) validateEnumConst(ctx context.Context, schema *oas3.Schema, refSchema *oas3.JSONSchemaReferenceable, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
+func (r *OASSchemaCheckRule) validateEnumConst(_ context.Context, schema *oas3.Schema, refSchema *oas3.JSONSchemaReferenceable, _ *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
 	var errs []error
 
 	enumValues := schema.Enum
 	constValue := schema.Const
 
-	if enumValues == nil || len(enumValues) == 0 || constValue == nil {
+	if len(enumValues) == 0 || constValue == nil {
 		return errs
 	}
 
@@ -721,7 +722,7 @@ func (r *OASSchemaCheckRule) validateEnumConst(ctx context.Context, schema *oas3
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("schema uses both `enum` with single value and `const` - consider using only `const`"),
+					errors.New("schema uses both `enum` with single value and `const` - consider using only `const`"),
 					rootNode,
 				))
 			}
@@ -730,7 +731,7 @@ func (r *OASSchemaCheckRule) validateEnumConst(ctx context.Context, schema *oas3
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					r.ID(),
-					fmt.Errorf("schema uses both `enum` and `const` - this is likely an oversight as `const` restricts to a single value"),
+					errors.New("schema uses both `enum` and `const` - this is likely an oversight as `const` restricts to a single value"),
 					rootNode,
 				))
 			}
@@ -786,7 +787,7 @@ func (r *OASSchemaCheckRule) isFloatWhole(value string) bool {
 	return true
 }
 
-func (r *OASSchemaCheckRule) validateDiscriminator(ctx context.Context, schema *oas3.Schema, refSchema *oas3.JSONSchemaReferenceable, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
+func (r *OASSchemaCheckRule) validateDiscriminator(_ context.Context, schema *oas3.Schema, refSchema *oas3.JSONSchemaReferenceable, _ *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
 	var errs []error
 
 	discriminator := schema.Discriminator
@@ -802,7 +803,7 @@ func (r *OASSchemaCheckRule) validateDiscriminator(ctx context.Context, schema *
 			errs = append(errs, validation.NewValidationError(
 				config.GetSeverity(r.DefaultSeverity()),
 				r.ID(),
-				fmt.Errorf("discriminator object is missing required `propertyName` field"),
+				errors.New("discriminator object is missing required `propertyName` field"),
 				rootNode,
 			))
 		}

@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -47,7 +47,7 @@ func (r *InfoDescriptionRule) Run(ctx context.Context, docInfo *linter.DocumentI
 		errs = append(errs, validation.NewValidationError(
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleInfoDescription,
-			fmt.Errorf("info section is missing a description"),
+			errors.New("info section is missing a description"),
 			info.GetCore().GetRootNode(),
 		))
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/yml"
 )
 
+//nolint:gosec
 const RuleOwaspNoCredentialsInURL = "owasp-no-credentials-in-url"
 
 // credentialPattern matches parameter names that look like credentials

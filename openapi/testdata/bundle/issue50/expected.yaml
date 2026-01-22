@@ -28,7 +28,7 @@ paths:
         "500":
           $ref: "#/components/responses/internal-server-error"
       parameters:
-        - $ref: "#/components/parameters/X-Idempotency-Key"
+        - $ref: '#/components/parameters/X-Idempotency-Key'
 components:
   securitySchemes:
     bearerAuth:

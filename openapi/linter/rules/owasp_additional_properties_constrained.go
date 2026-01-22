@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -92,7 +92,7 @@ func (r *OwaspAdditionalPropertiesConstrainedRule) Run(ctx context.Context, docI
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						RuleOwaspAdditionalPropertiesConstrained,
-						fmt.Errorf("schema should define maxProperties when additionalProperties is set to true or a schema"),
+						errors.New("schema should define maxProperties when additionalProperties is set to true or a schema"),
 						rootNode,
 					))
 				}
