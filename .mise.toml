@@ -1,5 +1,5 @@
 [tools]
-go = "1.25.5"
+go = "1.24.3"
 gotestsum = "latest"
 
 [tasks.setup-vscode-symlinks]
@@ -13,7 +13,7 @@ run = [
 postinstall = [
   "ln -sf ./AGENTS.md ./CLAUDE.md",
   "git submodule update --init --recursive",
-  "mise exec go@1.25.5 -- go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2",
+  "mise exec go@1.24.3 -- go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.7.2",
   "mise run setup-vscode-symlinks",
   "go install go.uber.org/nilaway/cmd/nilaway@8ad05f0",
 ]
