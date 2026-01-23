@@ -220,6 +220,19 @@ $CLI overlay compare overlay/testdata/openapi.yaml overlay/testdata/openapi-over
 echo "  ✓ Validating generated overlay..."
 $CLI overlay validate dist/test/test-overlay-generated.yaml > /dev/null
 
+# Test overlay commands with flags
+echo "  ✓ Testing overlay validate with --overlay flag..."
+$CLI overlay validate --overlay overlay/testdata/overlay.yaml > /dev/null
+
+echo "  ✓ Testing overlay apply with --overlay and --schema flags..."
+$CLI overlay apply --overlay overlay/testdata/overlay.yaml --schema overlay/testdata/openapi.yaml > dist/test/test-overlayed-flags.yaml
+
+echo "  ✓ Testing overlay compare with --before and --after flags..."
+$CLI overlay compare --before overlay/testdata/openapi.yaml --after overlay/testdata/openapi-overlayed.yaml > dist/test/test-overlay-generated-flags.yaml
+
+echo "  ✓ Validating overlay generated with flags..."
+$CLI overlay validate --overlay dist/test/test-overlay-generated-flags.yaml > /dev/null
+
 # Test error cases - commands that should fail
 echo "  ✓ Testing error cases..."
 
