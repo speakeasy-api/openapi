@@ -95,7 +95,7 @@ type: [string, number]
 	// Verify type array was unmarshaled
 	require.NotNil(t, target.Left.Value.Type.Value, "Type should be set")
 	assert.True(t, target.Left.Value.Type.Value.IsLeft, "Type should be Left type (array)")
-	assert.Equal(t, 2, len(target.Left.Value.Type.Value.Left.Value), "Should have 2 types")
+	assert.Len(t, target.Left.Value.Type.Value.Left.Value, 2, "Should have 2 types")
 }
 
 func TestJSONSchema_Unmarshal_PropertiesWithAdditionalProperties_Success(t *testing.T) {
