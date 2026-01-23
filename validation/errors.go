@@ -68,6 +68,10 @@ func (e Error) Unwrap() error {
 	return e.UnderlyingError
 }
 
+func (e Error) GetNode() *yaml.Node {
+	return e.Node
+}
+
 func (e Error) GetLineNumber() int {
 	if e.Node == nil {
 		return -1
