@@ -29,13 +29,18 @@ OpenAPI Overlays provide a way to modify OpenAPI and Arazzo specifications witho
 Apply an overlay to an OpenAPI specification.
 
 ```bash
-# Apply overlay to a specification
+# Apply overlay to a specification (positional arguments)
+openapi overlay apply overlay.yaml spec.yaml
+
+# Apply overlay to a specification (flags)
 openapi overlay apply --overlay overlay.yaml --schema spec.yaml
 
 # Apply overlay with output to file
 openapi overlay apply --overlay overlay.yaml --schema spec.yaml --out modified-spec.yaml
 
 # Apply overlay when overlay has extends key set
+openapi overlay apply overlay.yaml
+# or
 openapi overlay apply --overlay overlay.yaml
 ```
 
@@ -45,17 +50,21 @@ Features:
 - Supports all OpenAPI Overlay Specification operations
 - Handles complex nested modifications
 - Preserves original document structure where not modified
+- Supports both positional arguments and explicit flags
 
 ### `validate`
 
 Validate an overlay file for compliance with the OpenAPI Overlay Specification.
 
 ```bash
-# Validate an overlay file
+# Validate an overlay file (positional argument)
+openapi overlay validate overlay.yaml
+
+# Validate an overlay file (flag)
 openapi overlay validate --overlay overlay.yaml
 
 # Validate with verbose output
-openapi overlay validate -v --overlay overlay.yaml
+openapi overlay validate -v overlay.yaml
 ```
 
 This command checks for:
@@ -72,11 +81,14 @@ Note: This validates the overlay file structure itself, not whether it will appl
 Generate an OpenAPI Overlay specification from two input files.
 
 ```bash
-# Generate overlay from two specifications
-openapi overlay compare --before spec1.yaml --after spec2.yaml --out overlay.yaml
+# Generate overlay from two specifications (positional arguments)
+openapi overlay compare spec1.yaml spec2.yaml
 
-# Generate overlay with console output
+# Generate overlay from two specifications (flags)
 openapi overlay compare --before spec1.yaml --after spec2.yaml
+
+# Generate overlay with output to file
+openapi overlay compare --before spec1.yaml --after spec2.yaml --out overlay.yaml
 ```
 
 Features:
@@ -85,6 +97,7 @@ Features:
 - Generates overlay operations for all changes
 - Provides diagnostic output showing detected changes
 - Creates overlay files that can recreate the transformation
+- Supports both positional arguments and explicit flags
 
 ## What are OpenAPI Overlays?
 
@@ -137,9 +150,24 @@ All commands support these common options:
 
 - `-h, --help`: Show help for the command
 - `-v, --verbose`: Enable verbose output (global flag)
-- `--overlay`: Path to the overlay file
-- `--schema`: Path to the OpenAPI specification (for apply command)
-- `--out`: Output file path (optional, defaults to stdout)
+
+Command-specific flags:
+
+**apply command:**
+
+- `--overlay`: Path to the overlay file (alternative to positional argument)
+- `--schema`: Path to the OpenAPI specification (alternative to positional argument)
+- `-o, --out`: Output file path (optional, defaults to stdout)
+
+**validate command:**
+
+- `--overlay`: Path to the overlay file (alternative to positional argument)
+
+**compare command:**
+
+- `--before`: Path to the first (before) specification file (alternative to positional argument)
+- `--after`: Path to the second (after) specification file (alternative to positional argument)
+- `-o, --out`: Output file path (optional, defaults to stdout)
 
 ## Output Formats
 
@@ -150,24 +178,33 @@ All commands work with both YAML and JSON input files, but always output YAML at
 ### Basic Workflow
 
 ```bash
-# Create an overlay by comparing two specs
+# Create an overlay by comparing two specs (using flags)
 openapi overlay compare --before original.yaml --after modified.yaml --out changes.overlay.yaml
 
-# Validate the generated overlay
-openapi overlay validate --overlay changes.overlay.yaml
+# Or using positional arguments
+openapi overlay compare original.yaml modified.yaml --out changes.overlay.yaml
 
-# Apply the overlay to the original spec
+# Validate the generated overlay
+openapi overlay validate changes.overlay.yaml
+
+# Apply the overlay to the original spec (using flags)
 openapi overlay apply --overlay changes.overlay.yaml --schema original.yaml --out final.yaml
+
+# Or using positional arguments
+openapi overlay apply changes.overlay.yaml original.yaml --out final.yaml
 ```
 
 ### Environment-Specific Modifications
 
 ```bash
-# Apply production overlay
+# Apply production overlay (using flags)
 openapi overlay apply --overlay prod.overlay.yaml --schema base-spec.yaml --out prod-spec.yaml
 
+# Or using positional arguments
+openapi overlay apply prod.overlay.yaml base-spec.yaml --out prod-spec.yaml
+
 # Apply development overlay
-openapi overlay apply --overlay dev.overlay.yaml --schema base-spec.yaml --out dev-spec.yaml
+openapi overlay apply dev.overlay.yaml base-spec.yaml --out dev-spec.yaml
 ```
 
 ### Integration with Other Commands
@@ -175,5 +212,5 @@ openapi overlay apply --overlay dev.overlay.yaml --schema base-spec.yaml --out d
 ```bash
 # Validate base spec, apply overlay, then validate result
 openapi spec validate ./base-spec.yaml
-openapi overlay apply --overlay ./modifications.yaml --schema ./base-spec.yaml --out ./modified-spec.yaml
+openapi overlay apply ./modifications.yaml ./base-spec.yaml --out ./modified-spec.yaml
 openapi spec validate ./modified-spec.yaml
