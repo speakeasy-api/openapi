@@ -9,6 +9,7 @@ import (
 // init registers all JSON Schema core types with the marshaller factory system
 func init() {
 	// Register all JSON Schema core types
+	marshaller.RegisterType(func() *Schema { return &Schema{} })
 	marshaller.RegisterType(func() *Discriminator { return &Discriminator{} })
 	marshaller.RegisterType(func() *ExternalDocumentation { return &ExternalDocumentation{} })
 	marshaller.RegisterType(func() *XML { return &XML{} })

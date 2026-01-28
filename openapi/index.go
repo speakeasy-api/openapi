@@ -115,32 +115,39 @@ type Index struct {
 
 	InlineParameters    []*IndexNode[*ReferencedParameter] // Parameters defined inline in operations/path items
 	ComponentParameters []*IndexNode[*ReferencedParameter] // Parameters in /components/parameters/
+	ExternalParameters  []*IndexNode[*ReferencedParameter] // Top-level Parameters in external documents
 	ParameterReferences []*IndexNode[*ReferencedParameter] // All Parameter $ref pointers
 
 	Responses []*IndexNode[*Responses] // All Responses containers (operation.responses)
 
 	InlineResponses    []*IndexNode[*ReferencedResponse] // Responses defined inline in operations
 	ComponentResponses []*IndexNode[*ReferencedResponse] // Responses in /components/responses/
+	ExternalResponses  []*IndexNode[*ReferencedResponse] // Top-level Responses in external documents
 	ResponseReferences []*IndexNode[*ReferencedResponse] // All Response $ref pointers
 
 	InlineRequestBodies    []*IndexNode[*ReferencedRequestBody] // RequestBodies defined inline in operations
 	ComponentRequestBodies []*IndexNode[*ReferencedRequestBody] // RequestBodies in /components/requestBodies/
+	ExternalRequestBodies  []*IndexNode[*ReferencedRequestBody] // Top-level RequestBodies in external documents
 	RequestBodyReferences  []*IndexNode[*ReferencedRequestBody] // All RequestBody $ref pointers
 
 	InlineHeaders    []*IndexNode[*ReferencedHeader] // Headers defined inline
 	ComponentHeaders []*IndexNode[*ReferencedHeader] // Headers in /components/headers/
+	ExternalHeaders  []*IndexNode[*ReferencedHeader] // Top-level Headers in external documents
 	HeaderReferences []*IndexNode[*ReferencedHeader] // All Header $ref pointers
 
 	InlineExamples    []*IndexNode[*ReferencedExample] // Examples defined inline
 	ComponentExamples []*IndexNode[*ReferencedExample] // Examples in /components/examples/
+	ExternalExamples  []*IndexNode[*ReferencedExample] // Top-level Examples in external documents
 	ExampleReferences []*IndexNode[*ReferencedExample] // All Example $ref pointers
 
 	InlineLinks    []*IndexNode[*ReferencedLink] // Links defined inline in responses
 	ComponentLinks []*IndexNode[*ReferencedLink] // Links in /components/links/
+	ExternalLinks  []*IndexNode[*ReferencedLink] // Top-level Links in external documents
 	LinkReferences []*IndexNode[*ReferencedLink] // All Link $ref pointers
 
 	InlineCallbacks    []*IndexNode[*ReferencedCallback] // Callbacks defined inline in operations
 	ComponentCallbacks []*IndexNode[*ReferencedCallback] // Callbacks in /components/callbacks/
+	ExternalCallbacks  []*IndexNode[*ReferencedCallback] // Top-level Callbacks in external documents
 	CallbackReferences []*IndexNode[*ReferencedCallback] // All Callback $ref pointers
 
 	ComponentSecuritySchemes []*IndexNode[*ReferencedSecurityScheme] // SecuritySchemes in /components/securitySchemes/
@@ -166,6 +173,14 @@ type Index struct {
 
 	// Circular reference tracking (internal)
 	indexedSchemas       map[*oas3.JSONSchemaReferenceable]bool // Tracks which schemas have been fully indexed
+	indexedParameters    map[*Parameter]bool                    // Tracks which parameters have been fully indexed
+	indexedResponses     map[*Response]bool                     // Tracks which responses have been fully indexed
+	indexedRequestBodies map[*RequestBody]bool                  // Tracks which request bodies have been fully indexed
+	indexedHeaders       map[*Header]bool                       // Tracks which headers have been fully indexed
+	indexedExamples      map[*Example]bool                      // Tracks which examples have been fully indexed
+	indexedLinks         map[*Link]bool                         // Tracks which links have been fully indexed
+	indexedCallbacks     map[*Callback]bool                     // Tracks which callbacks have been fully indexed
+	indexedPathItems     map[*PathItem]bool                     // Tracks which path items have been fully indexed
 	referenceStack       []referenceStackEntry                  // Active reference resolution chain (by ref target)
 	polymorphicRefs      []*PolymorphicCircularRef              // Pending polymorphic circulars
 	visitedRefs          map[string]bool                        // Tracks visited ref targets to avoid duplicates
@@ -197,6 +212,14 @@ func BuildIndex(ctx context.Context, doc *OpenAPI, resolveOpts references.Resolv
 		Doc:                  doc,
 		resolveOpts:          resolveOpts,
 		indexedSchemas:       make(map[*oas3.JSONSchemaReferenceable]bool),
+		indexedParameters:    make(map[*Parameter]bool),
+		indexedResponses:     make(map[*Response]bool),
+		indexedRequestBodies: make(map[*RequestBody]bool),
+		indexedHeaders:       make(map[*Header]bool),
+		indexedExamples:      make(map[*Example]bool),
+		indexedLinks:         make(map[*Link]bool),
+		indexedCallbacks:     make(map[*Callback]bool),
+		indexedPathItems:     make(map[*PathItem]bool),
 		referenceStack:       make([]referenceStackEntry, 0),
 		polymorphicRefs:      make([]*PolymorphicCircularRef, 0),
 		visitedRefs:          make(map[string]bool),
@@ -221,18 +244,16 @@ func (i *Index) GetAllSchemas() []*IndexNode[*oas3.JSONSchemaReferenceable] {
 	allSchemas := make([]*IndexNode[*oas3.JSONSchemaReferenceable], 0, len(i.BooleanSchemas)+
 		len(i.InlineSchemas)+
 		len(i.ComponentSchemas)+
-		len(i.ExternalSchemas)+
-		len(i.SchemaReferences),
+		len(i.ExternalSchemas),
 	)
 	allSchemas = append(allSchemas, i.BooleanSchemas...)
 	allSchemas = append(allSchemas, i.InlineSchemas...)
 	allSchemas = append(allSchemas, i.ComponentSchemas...)
 	allSchemas = append(allSchemas, i.ExternalSchemas...)
-	allSchemas = append(allSchemas, i.SchemaReferences...)
 	return allSchemas
 }
 
-// GetAllPathItems returns all path items in the index (inline, component, and references).
+// GetAllPathItems returns all path items in the index (inline, component, and external).
 func (i *Index) GetAllPathItems() []*IndexNode[*ReferencedPathItem] {
 	if i == nil {
 		return nil
@@ -240,14 +261,124 @@ func (i *Index) GetAllPathItems() []*IndexNode[*ReferencedPathItem] {
 
 	allPathItems := make([]*IndexNode[*ReferencedPathItem], 0, len(i.InlinePathItems)+
 		len(i.ComponentPathItems)+
-		len(i.ExternalPathItems)+
-		len(i.PathItemReferences),
+		len(i.ExternalPathItems),
 	)
 	allPathItems = append(allPathItems, i.InlinePathItems...)
 	allPathItems = append(allPathItems, i.ComponentPathItems...)
 	allPathItems = append(allPathItems, i.ExternalPathItems...)
-	allPathItems = append(allPathItems, i.PathItemReferences...)
 	return allPathItems
+}
+
+// GetAllParameters returns all parameters in the index (inline, component, and external).
+func (i *Index) GetAllParameters() []*IndexNode[*ReferencedParameter] {
+	if i == nil {
+		return nil
+	}
+
+	allParameters := make([]*IndexNode[*ReferencedParameter], 0, len(i.InlineParameters)+
+		len(i.ComponentParameters)+
+		len(i.ExternalParameters),
+	)
+	allParameters = append(allParameters, i.InlineParameters...)
+	allParameters = append(allParameters, i.ComponentParameters...)
+	allParameters = append(allParameters, i.ExternalParameters...)
+	return allParameters
+}
+
+// GetAllResponses returns all responses in the index (inline, component, and external).
+func (i *Index) GetAllResponses() []*IndexNode[*ReferencedResponse] {
+	if i == nil {
+		return nil
+	}
+
+	allResponses := make([]*IndexNode[*ReferencedResponse], 0, len(i.InlineResponses)+
+		len(i.ComponentResponses)+
+		len(i.ExternalResponses),
+	)
+	allResponses = append(allResponses, i.InlineResponses...)
+	allResponses = append(allResponses, i.ComponentResponses...)
+	allResponses = append(allResponses, i.ExternalResponses...)
+	return allResponses
+}
+
+// GetAllRequestBodies returns all request bodies in the index (inline, component, and external).
+func (i *Index) GetAllRequestBodies() []*IndexNode[*ReferencedRequestBody] {
+	if i == nil {
+		return nil
+	}
+
+	allRequestBodies := make([]*IndexNode[*ReferencedRequestBody], 0, len(i.InlineRequestBodies)+
+		len(i.ComponentRequestBodies)+
+		len(i.ExternalRequestBodies),
+	)
+	allRequestBodies = append(allRequestBodies, i.InlineRequestBodies...)
+	allRequestBodies = append(allRequestBodies, i.ComponentRequestBodies...)
+	allRequestBodies = append(allRequestBodies, i.ExternalRequestBodies...)
+	return allRequestBodies
+}
+
+// GetAllHeaders returns all headers in the index (inline, component, and external).
+func (i *Index) GetAllHeaders() []*IndexNode[*ReferencedHeader] {
+	if i == nil {
+		return nil
+	}
+
+	allHeaders := make([]*IndexNode[*ReferencedHeader], 0, len(i.InlineHeaders)+
+		len(i.ComponentHeaders)+
+		len(i.ExternalHeaders),
+	)
+	allHeaders = append(allHeaders, i.InlineHeaders...)
+	allHeaders = append(allHeaders, i.ComponentHeaders...)
+	allHeaders = append(allHeaders, i.ExternalHeaders...)
+	return allHeaders
+}
+
+// GetAllExamples returns all examples in the index (inline, component, and external).
+func (i *Index) GetAllExamples() []*IndexNode[*ReferencedExample] {
+	if i == nil {
+		return nil
+	}
+
+	allExamples := make([]*IndexNode[*ReferencedExample], 0, len(i.InlineExamples)+
+		len(i.ComponentExamples)+
+		len(i.ExternalExamples),
+	)
+	allExamples = append(allExamples, i.InlineExamples...)
+	allExamples = append(allExamples, i.ComponentExamples...)
+	allExamples = append(allExamples, i.ExternalExamples...)
+	return allExamples
+}
+
+// GetAllLinks returns all links in the index (inline, component, and external).
+func (i *Index) GetAllLinks() []*IndexNode[*ReferencedLink] {
+	if i == nil {
+		return nil
+	}
+
+	allLinks := make([]*IndexNode[*ReferencedLink], 0, len(i.InlineLinks)+
+		len(i.ComponentLinks)+
+		len(i.ExternalLinks),
+	)
+	allLinks = append(allLinks, i.InlineLinks...)
+	allLinks = append(allLinks, i.ComponentLinks...)
+	allLinks = append(allLinks, i.ExternalLinks...)
+	return allLinks
+}
+
+// GetAllCallbacks returns all callbacks in the index (inline, component, and external).
+func (i *Index) GetAllCallbacks() []*IndexNode[*ReferencedCallback] {
+	if i == nil {
+		return nil
+	}
+
+	allCallbacks := make([]*IndexNode[*ReferencedCallback], 0, len(i.InlineCallbacks)+
+		len(i.ComponentCallbacks)+
+		len(i.ExternalCallbacks),
+	)
+	allCallbacks = append(allCallbacks, i.InlineCallbacks...)
+	allCallbacks = append(allCallbacks, i.ComponentCallbacks...)
+	allCallbacks = append(allCallbacks, i.ExternalCallbacks...)
+	return allCallbacks
 }
 
 // GetValidationErrors returns validation errors from resolution operations.
@@ -380,6 +511,15 @@ func buildIndex[T any](ctx context.Context, index *Index, obj *T) error {
 				return nil
 			},
 			Any: func(a any) error {
+				// Check for unknown properties on any model with a core
+				if coreAccessor, ok := a.(interface{ GetCoreAny() any }); ok {
+					if core := coreAccessor.GetCoreAny(); core != nil {
+						if coreModeler, ok := core.(marshaller.CoreModeler); ok {
+							index.checkUnknownProperties(ctx, coreModeler)
+						}
+					}
+				}
+
 				if d, ok := a.(Descriptioner); ok {
 					index.indexDescriptionNode(ctx, item.Location, d)
 				}
@@ -549,7 +689,7 @@ func (i *Index) indexSchema(ctx context.Context, loc Locations, schema *oas3.JSO
 	// Check if this is a top-level schema in an external document
 	// Important: Only mark as external if it's NOT from the main document
 	if isTopLevelExternalSchema(loc) {
-		if !i.isFromMainDocument(schema) && !i.indexedSchemas[schema] {
+		if !i.isFromMainDocument() && !i.indexedSchemas[schema] {
 			i.ExternalSchemas = append(i.ExternalSchemas, &IndexNode[*oas3.JSONSchemaReferenceable]{
 				Node:     schema,
 				Location: loc,
@@ -592,7 +732,7 @@ func isTopLevelExternalSchema(loc Locations) bool {
 
 // isFromMainDocument checks if we're currently walking the main document
 // by checking the current document stack.
-func (i *Index) isFromMainDocument(_ *oas3.JSONSchemaReferenceable) bool {
+func (i *Index) isFromMainDocument() bool {
 	if len(i.currentDocumentStack) == 0 {
 		return true // Safety fallback - assume main document
 	}
@@ -631,6 +771,37 @@ func (i *Index) buildCircularReferenceChain(startStackIdx int, refTarget string)
 	}
 	chain = append(chain, refTarget)
 	return chain
+}
+
+// checkUnknownProperties checks for unknown properties in a core model and adds warnings.
+func (i *Index) checkUnknownProperties(_ context.Context, core marshaller.CoreModeler) {
+	if core == nil {
+		return
+	}
+
+	unknownProps := core.GetUnknownProperties()
+	if len(unknownProps) == 0 {
+		return
+	}
+
+	docPath := ""
+	if len(i.currentDocumentStack) > 0 {
+		currentDoc := i.currentDocumentStack[len(i.currentDocumentStack)-1]
+		if currentDoc != i.resolveOpts.TargetLocation {
+			docPath = currentDoc
+		}
+	}
+
+	for _, prop := range unknownProps {
+		err := fmt.Errorf("unknown property '%s' found", prop)
+		i.validationErrs = append(i.validationErrs, validation.NewValidationErrorWithDocumentLocation(
+			validation.SeverityWarning,
+			"validation-unknown-properties",
+			err,
+			core.GetRootNode(),
+			docPath,
+		))
+	}
 }
 
 func (i *Index) indexExternalDocs(_ context.Context, loc Locations, ed *oas3.ExternalDocumentation) {
@@ -694,33 +865,76 @@ func (i *Index) indexReferencedPathItem(ctx context.Context, loc Locations, path
 			Node:     pathItem,
 			Location: loc,
 		})
+
+		// Get the document path for the resolved path item
+		info := pathItem.GetReferenceResolutionInfo()
+		var docPath string
+		if info != nil {
+			docPath = info.AbsoluteDocumentPath
+		}
+
+		// Push document path onto document stack BEFORE walking
+		currentDoc := ""
+		if len(i.currentDocumentStack) > 0 {
+			currentDoc = i.currentDocumentStack[len(i.currentDocumentStack)-1]
+		}
+		if docPath != "" && docPath != currentDoc {
+			i.currentDocumentStack = append(i.currentDocumentStack, docPath)
+			defer func() {
+				// Pop from document stack
+				if len(i.currentDocumentStack) > 1 {
+					i.currentDocumentStack = i.currentDocumentStack[:len(i.currentDocumentStack)-1]
+				}
+			}()
+		}
+
+		// If resolved, explicitly walk the resolved content (similar to how schemas are handled)
+		resolved := pathItem.GetObject()
+		if resolved != nil {
+			// Wrap the resolved PathItem back into a ReferencedPathItem for walking
+			wrapped := &ReferencedPathItem{Object: resolved}
+			_ = buildIndex(ctx, i, wrapped)
+		}
+		return
+	}
+
+	if obj == nil {
 		return
 	}
 
 	// Check if this is a component path item
 	if isTopLevelComponent(loc, "pathItems") {
-		i.ComponentPathItems = append(i.ComponentPathItems, &IndexNode[*ReferencedPathItem]{
-			Node:     pathItem,
-			Location: loc,
-		})
+		if obj != nil && !i.indexedPathItems[obj] {
+			i.ComponentPathItems = append(i.ComponentPathItems, &IndexNode[*ReferencedPathItem]{
+				Node:     pathItem,
+				Location: loc,
+			})
+			i.indexedPathItems[obj] = true
+		}
 		return
 	}
 
 	// Check if this is a top-level path item in an external document
 	// External path items appear at location "/" (root of external doc)
 	if isTopLevelExternalSchema(loc) {
-		i.ExternalPathItems = append(i.ExternalPathItems, &IndexNode[*ReferencedPathItem]{
-			Node:     pathItem,
-			Location: loc,
-		})
+		if !i.indexedPathItems[obj] {
+			i.ExternalPathItems = append(i.ExternalPathItems, &IndexNode[*ReferencedPathItem]{
+				Node:     pathItem,
+				Location: loc,
+			})
+			i.indexedPathItems[obj] = true
+		}
 		return
 	}
 
 	// Everything else is an inline path item
-	i.InlinePathItems = append(i.InlinePathItems, &IndexNode[*ReferencedPathItem]{
-		Node:     pathItem,
-		Location: loc,
-	})
+	if !i.indexedPathItems[obj] {
+		i.InlinePathItems = append(i.InlinePathItems, &IndexNode[*ReferencedPathItem]{
+			Node:     pathItem,
+			Location: loc,
+		})
+		i.indexedPathItems[obj] = true
+	}
 }
 
 func (i *Index) indexOperation(_ context.Context, loc Locations, operation *Operation) {
@@ -747,21 +961,75 @@ func (i *Index) indexReferencedParameter(ctx context.Context, loc Locations, par
 			Node:     param,
 			Location: loc,
 		})
+
+		// Get the document path for the resolved parameter
+		info := param.GetReferenceResolutionInfo()
+		var docPath string
+		if info != nil {
+			docPath = info.AbsoluteDocumentPath
+		}
+
+		// Push document path onto document stack BEFORE walking
+		currentDoc := ""
+		if len(i.currentDocumentStack) > 0 {
+			currentDoc = i.currentDocumentStack[len(i.currentDocumentStack)-1]
+		}
+		if docPath != "" && docPath != currentDoc {
+			i.currentDocumentStack = append(i.currentDocumentStack, docPath)
+			defer func() {
+				// Pop from document stack
+				if len(i.currentDocumentStack) > 1 {
+					i.currentDocumentStack = i.currentDocumentStack[:len(i.currentDocumentStack)-1]
+				}
+			}()
+		}
+
+		// If resolved, explicitly walk the resolved content
+		resolved := param.GetObject()
+		if resolved != nil {
+			wrapped := &ReferencedParameter{Object: resolved}
+			_ = buildIndex(ctx, i, wrapped)
+		}
+		return
+	}
+
+	obj := param.GetObject()
+	if obj == nil {
 		return
 	}
 
 	if isTopLevelComponent(loc, "parameters") {
-		i.ComponentParameters = append(i.ComponentParameters, &IndexNode[*ReferencedParameter]{
-			Node:     param,
-			Location: loc,
-		})
+		if !i.indexedParameters[obj] {
+			i.ComponentParameters = append(i.ComponentParameters, &IndexNode[*ReferencedParameter]{
+				Node:     param,
+				Location: loc,
+			})
+			i.indexedParameters[obj] = true
+		}
 		return
 	}
 
-	i.InlineParameters = append(i.InlineParameters, &IndexNode[*ReferencedParameter]{
-		Node:     param,
-		Location: loc,
-	})
+	// Check if this is a top-level parameter in an external document
+	// Important: Only mark as external if it's NOT from the main document
+	if isTopLevelExternalSchema(loc) {
+		if !i.isFromMainDocument() && !i.indexedParameters[obj] {
+			i.ExternalParameters = append(i.ExternalParameters, &IndexNode[*ReferencedParameter]{
+				Node:     param,
+				Location: loc,
+			})
+			i.indexedParameters[obj] = true
+		}
+		return
+	}
+
+	// Everything else is an inline parameter
+	if !i.indexedParameters[obj] {
+		i.InlineParameters = append(i.InlineParameters, &IndexNode[*ReferencedParameter]{
+			Node:     param,
+			Location: loc,
+		})
+		i.indexedParameters[obj] = true
+	}
 }
 
 func (i *Index) indexResponses(_ context.Context, loc Locations, responses *Responses) {
@@ -788,21 +1056,75 @@ func (i *Index) indexReferencedResponse(ctx context.Context, loc Locations, resp
 			Node:     resp,
 			Location: loc,
 		})
+
+		// Get the document path for the resolved response
+		info := resp.GetReferenceResolutionInfo()
+		var docPath string
+		if info != nil {
+			docPath = info.AbsoluteDocumentPath
+		}
+
+		// Push document path onto document stack BEFORE walking
+		currentDoc := ""
+		if len(i.currentDocumentStack) > 0 {
+			currentDoc = i.currentDocumentStack[len(i.currentDocumentStack)-1]
+		}
+		if docPath != "" && docPath != currentDoc {
+			i.currentDocumentStack = append(i.currentDocumentStack, docPath)
+			defer func() {
+				// Pop from document stack
+				if len(i.currentDocumentStack) > 1 {
+					i.currentDocumentStack = i.currentDocumentStack[:len(i.currentDocumentStack)-1]
+				}
+			}()
+		}
+
+		// If resolved, explicitly walk the resolved content
+		resolved := resp.GetObject()
+		if resolved != nil {
+			wrapped := &ReferencedResponse{Object: resolved}
+			_ = buildIndex(ctx, i, wrapped)
+		}
+		return
+	}
+
+	obj := resp.GetObject()
+	if obj == nil {
 		return
 	}
 
 	if isTopLevelComponent(loc, "responses") {
-		i.ComponentResponses = append(i.ComponentResponses, &IndexNode[*ReferencedResponse]{
-			Node:     resp,
-			Location: loc,
-		})
+		if !i.indexedResponses[obj] {
+			i.ComponentResponses = append(i.ComponentResponses, &IndexNode[*ReferencedResponse]{
+				Node:     resp,
+				Location: loc,
+			})
+			i.indexedResponses[obj] = true
+		}
 		return
 	}
 
-	i.InlineResponses = append(i.InlineResponses, &IndexNode[*ReferencedResponse]{
-		Node:     resp,
-		Location: loc,
-	})
+	// Check if this is a top-level response in an external document
+	// Important: Only mark as external if it's NOT from the main document
+	if isTopLevelExternalSchema(loc) {
+		if !i.isFromMainDocument() && !i.indexedResponses[obj] {
+			i.ExternalResponses = append(i.ExternalResponses, &IndexNode[*ReferencedResponse]{
+				Node:     resp,
+				Location: loc,
+			})
+			i.indexedResponses[obj] = true
+		}
+		return
+	}
+
+	// Everything else is an inline response
+	if !i.indexedResponses[obj] {
+		i.InlineResponses = append(i.InlineResponses, &IndexNode[*ReferencedResponse]{
+			Node:     resp,
+			Location: loc,
+		})
+		i.indexedResponses[obj] = true
+	}
 }
 
 func (i *Index) indexReferencedRequestBody(ctx context.Context, loc Locations, rb *ReferencedRequestBody) {
@@ -819,21 +1141,75 @@ func (i *Index) indexReferencedRequestBody(ctx context.Context, loc Locations, r
 			Node:     rb,
 			Location: loc,
 		})
+
+		// Get the document path for the resolved request body
+		info := rb.GetReferenceResolutionInfo()
+		var docPath string
+		if info != nil {
+			docPath = info.AbsoluteDocumentPath
+		}
+
+		// Push document path onto document stack BEFORE walking
+		currentDoc := ""
+		if len(i.currentDocumentStack) > 0 {
+			currentDoc = i.currentDocumentStack[len(i.currentDocumentStack)-1]
+		}
+		if docPath != "" && docPath != currentDoc {
+			i.currentDocumentStack = append(i.currentDocumentStack, docPath)
+			defer func() {
+				// Pop from document stack
+				if len(i.currentDocumentStack) > 1 {
+					i.currentDocumentStack = i.currentDocumentStack[:len(i.currentDocumentStack)-1]
+				}
+			}()
+		}
+
+		// If resolved, explicitly walk the resolved content
+		resolved := rb.GetObject()
+		if resolved != nil {
+			wrapped := &ReferencedRequestBody{Object: resolved}
+			_ = buildIndex(ctx, i, wrapped)
+		}
+		return
+	}
+
+	obj := rb.GetObject()
+	if obj == nil {
 		return
 	}
 
 	if isTopLevelComponent(loc, "requestBodies") {
-		i.ComponentRequestBodies = append(i.ComponentRequestBodies, &IndexNode[*ReferencedRequestBody]{
-			Node:     rb,
-			Location: loc,
-		})
+		if !i.indexedRequestBodies[obj] {
+			i.ComponentRequestBodies = append(i.ComponentRequestBodies, &IndexNode[*ReferencedRequestBody]{
+				Node:     rb,
+				Location: loc,
+			})
+			i.indexedRequestBodies[obj] = true
+		}
 		return
 	}
 
-	i.InlineRequestBodies = append(i.InlineRequestBodies, &IndexNode[*ReferencedRequestBody]{
-		Node:     rb,
-		Location: loc,
-	})
+	// Check if this is a top-level request body in an external document
+	// Important: Only mark as external if it's NOT from the main document
+	if isTopLevelExternalSchema(loc) {
+		if !i.isFromMainDocument() && !i.indexedRequestBodies[obj] {
+			i.ExternalRequestBodies = append(i.ExternalRequestBodies, &IndexNode[*ReferencedRequestBody]{
+				Node:     rb,
+				Location: loc,
+			})
+			i.indexedRequestBodies[obj] = true
+		}
+		return
+	}
+
+	// Everything else is an inline request body
+	if !i.indexedRequestBodies[obj] {
+		i.InlineRequestBodies = append(i.InlineRequestBodies, &IndexNode[*ReferencedRequestBody]{
+			Node:     rb,
+			Location: loc,
+		})
+		i.indexedRequestBodies[obj] = true
+	}
 }
 
 func (i *Index) indexReferencedHeader(ctx context.Context, loc Locations, header *ReferencedHeader) {
@@ -850,21 +1226,75 @@ func (i *Index) indexReferencedHeader(ctx context.Context, loc Locations, header
 			Node:     header,
 			Location: loc,
 		})
+
+		// Get the document path for the resolved header
+		info := header.GetReferenceResolutionInfo()
+		var docPath string
+		if info != nil {
+			docPath = info.AbsoluteDocumentPath
+		}
+
+		// Push document path onto document stack BEFORE walking
+		currentDoc := ""
+		if len(i.currentDocumentStack) > 0 {
+			currentDoc = i.currentDocumentStack[len(i.currentDocumentStack)-1]
+		}
+		if docPath != "" && docPath != currentDoc {
+			i.currentDocumentStack = append(i.currentDocumentStack, docPath)
+			defer func() {
+				// Pop from document stack
+				if len(i.currentDocumentStack) > 1 {
+					i.currentDocumentStack = i.currentDocumentStack[:len(i.currentDocumentStack)-1]
+				}
+			}()
+		}
+
+		// If resolved, explicitly walk the resolved content
+		resolved := header.GetObject()
+		if resolved != nil {
+			wrapped := &ReferencedHeader{Object: resolved}
+			_ = buildIndex(ctx, i, wrapped)
+		}
+		return
+	}
+
+	obj := header.GetObject()
+	if obj == nil {
 		return
 	}
 
 	if isTopLevelComponent(loc, "headers") {
-		i.ComponentHeaders = append(i.ComponentHeaders, &IndexNode[*ReferencedHeader]{
-			Node:     header,
-			Location: loc,
-		})
+		if !i.indexedHeaders[obj] {
+			i.ComponentHeaders = append(i.ComponentHeaders, &IndexNode[*ReferencedHeader]{
+				Node:     header,
+				Location: loc,
+			})
+			i.indexedHeaders[obj] = true
+		}
 		return
 	}
 
-	i.InlineHeaders = append(i.InlineHeaders, &IndexNode[*ReferencedHeader]{
-		Node:     header,
-		Location: loc,
-	})
+	// Check if this is a top-level header in an external document
+	// Important: Only mark as external if it's NOT from the main document
+	if isTopLevelExternalSchema(loc) {
+		if !i.isFromMainDocument() && !i.indexedHeaders[obj] {
+			i.ExternalHeaders = append(i.ExternalHeaders, &IndexNode[*ReferencedHeader]{
+				Node:     header,
+				Location: loc,
+			})
+			i.indexedHeaders[obj] = true
+		}
+		return
+	}
+
+	// Everything else is an inline header
+	if !i.indexedHeaders[obj] {
+		i.InlineHeaders = append(i.InlineHeaders, &IndexNode[*ReferencedHeader]{
+			Node:     header,
+			Location: loc,
+		})
+		i.indexedHeaders[obj] = true
+	}
 }
 
 func (i *Index) indexReferencedExample(ctx context.Context, loc Locations, example *ReferencedExample) {
@@ -881,21 +1311,75 @@ func (i *Index) indexReferencedExample(ctx context.Context, loc Locations, examp
 			Node:     example,
 			Location: loc,
 		})
+
+		// Get the document path for the resolved example
+		info := example.GetReferenceResolutionInfo()
+		var docPath string
+		if info != nil {
+			docPath = info.AbsoluteDocumentPath
+		}
+
+		// Push document path onto document stack BEFORE walking
+		currentDoc := ""
+		if len(i.currentDocumentStack) > 0 {
+			currentDoc = i.currentDocumentStack[len(i.currentDocumentStack)-1]
+		}
+		if docPath != "" && docPath != currentDoc {
+			i.currentDocumentStack = append(i.currentDocumentStack, docPath)
+			defer func() {
+				// Pop from document stack
+				if len(i.currentDocumentStack) > 1 {
+					i.currentDocumentStack = i.currentDocumentStack[:len(i.currentDocumentStack)-1]
+				}
+			}()
+		}
+
+		// If resolved, explicitly walk the resolved content
+		resolved := example.GetObject()
+		if resolved != nil {
+			wrapped := &ReferencedExample{Object: resolved}
+			_ = buildIndex(ctx, i, wrapped)
+		}
+		return
+	}
+
+	obj := example.GetObject()
+	if obj == nil {
 		return
 	}
 
 	if isTopLevelComponent(loc, "examples") {
-		i.ComponentExamples = append(i.ComponentExamples, &IndexNode[*ReferencedExample]{
-			Node:     example,
-			Location: loc,
-		})
+		if !i.indexedExamples[obj] {
+			i.ComponentExamples = append(i.ComponentExamples, &IndexNode[*ReferencedExample]{
+				Node:     example,
+				Location: loc,
+			})
+			i.indexedExamples[obj] = true
+		}
 		return
 	}
 
-	i.InlineExamples = append(i.InlineExamples, &IndexNode[*ReferencedExample]{
-		Node:     example,
-		Location: loc,
-	})
+	// Check if this is a top-level example in an external document
+	// Important: Only mark as external if it's NOT from the main document
+	if isTopLevelExternalSchema(loc) {
+		if !i.isFromMainDocument() && !i.indexedExamples[obj] {
+			i.ExternalExamples = append(i.ExternalExamples, &IndexNode[*ReferencedExample]{
+				Node:     example,
+				Location: loc,
+			})
+			i.indexedExamples[obj] = true
+		}
+		return
+	}
+
+	// Everything else is an inline example
+	if !i.indexedExamples[obj] {
+		i.InlineExamples = append(i.InlineExamples, &IndexNode[*ReferencedExample]{
+			Node:     example,
+			Location: loc,
+		})
+		i.indexedExamples[obj] = true
+	}
 }
 
 func (i *Index) indexReferencedLink(ctx context.Context, loc Locations, link *ReferencedLink) {
@@ -912,21 +1396,75 @@ func (i *Index) indexReferencedLink(ctx context.Context, loc Locations, link *Re
 			Node:     link,
 			Location: loc,
 		})
+
+		// Get the document path for the resolved link
+		info := link.GetReferenceResolutionInfo()
+		var docPath string
+		if info != nil {
+			docPath = info.AbsoluteDocumentPath
+		}
+
+		// Push document path onto document stack BEFORE walking
+		currentDoc := ""
+		if len(i.currentDocumentStack) > 0 {
+			currentDoc = i.currentDocumentStack[len(i.currentDocumentStack)-1]
+		}
+		if docPath != "" && docPath != currentDoc {
+			i.currentDocumentStack = append(i.currentDocumentStack, docPath)
+			defer func() {
+				// Pop from document stack
+				if len(i.currentDocumentStack) > 1 {
+					i.currentDocumentStack = i.currentDocumentStack[:len(i.currentDocumentStack)-1]
+				}
+			}()
+		}
+
+		// If resolved, explicitly walk the resolved content
+		resolved := link.GetObject()
+		if resolved != nil {
+			wrapped := &ReferencedLink{Object: resolved}
+			_ = buildIndex(ctx, i, wrapped)
+		}
+		return
+	}
+
+	obj := link.GetObject()
+	if obj == nil {
 		return
 	}
 
 	if isTopLevelComponent(loc, "links") {
-		i.ComponentLinks = append(i.ComponentLinks, &IndexNode[*ReferencedLink]{
-			Node:     link,
-			Location: loc,
-		})
+		if !i.indexedLinks[obj] {
+			i.ComponentLinks = append(i.ComponentLinks, &IndexNode[*ReferencedLink]{
+				Node:     link,
+				Location: loc,
+			})
+			i.indexedLinks[obj] = true
+		}
 		return
 	}
 
-	i.InlineLinks = append(i.InlineLinks, &IndexNode[*ReferencedLink]{
-		Node:     link,
-		Location: loc,
-	})
+	// Check if this is a top-level link in an external document
+	// Important: Only mark as external if it's NOT from the main document
+	if isTopLevelExternalSchema(loc) {
+		if !i.isFromMainDocument() && !i.indexedLinks[obj] {
+			i.ExternalLinks = append(i.ExternalLinks, &IndexNode[*ReferencedLink]{
+				Node:     link,
+				Location: loc,
+			})
+			i.indexedLinks[obj] = true
+		}
+		return
+	}
+
+	// Everything else is an inline link
+	if !i.indexedLinks[obj] {
+		i.InlineLinks = append(i.InlineLinks, &IndexNode[*ReferencedLink]{
+			Node:     link,
+			Location: loc,
+		})
+		i.indexedLinks[obj] = true
+	}
 }
 
 func (i *Index) indexReferencedCallback(ctx context.Context, loc Locations, callback *ReferencedCallback) {
@@ -943,21 +1481,75 @@ func (i *Index) indexReferencedCallback(ctx context.Context, loc Locations, call
 			Node:     callback,
 			Location: loc,
 		})
+
+		// Get the document path for the resolved callback
+		info := callback.GetReferenceResolutionInfo()
+		var docPath string
+		if info != nil {
+			docPath = info.AbsoluteDocumentPath
+		}
+
+		// Push document path onto document stack BEFORE walking
+		currentDoc := ""
+		if len(i.currentDocumentStack) > 0 {
+			currentDoc = i.currentDocumentStack[len(i.currentDocumentStack)-1]
+		}
+		if docPath != "" && docPath != currentDoc {
+			i.currentDocumentStack = append(i.currentDocumentStack, docPath)
+			defer func() {
+				// Pop from document stack
+				if len(i.currentDocumentStack) > 1 {
+					i.currentDocumentStack = i.currentDocumentStack[:len(i.currentDocumentStack)-1]
+				}
+			}()
+		}
+
+		// If resolved, explicitly walk the resolved content
+		resolved := callback.GetObject()
+		if resolved != nil {
+			wrapped := &ReferencedCallback{Object: resolved}
+			_ = buildIndex(ctx, i, wrapped)
+		}
+		return
+	}
+
+	obj := callback.GetObject()
+	if obj == nil {
 		return
 	}
 
 	if isTopLevelComponent(loc, "callbacks") {
-		i.ComponentCallbacks = append(i.ComponentCallbacks, &IndexNode[*ReferencedCallback]{
-			Node:     callback,
-			Location: loc,
-		})
+		if !i.indexedCallbacks[obj] {
+			i.ComponentCallbacks = append(i.ComponentCallbacks, &IndexNode[*ReferencedCallback]{
+				Node:     callback,
+				Location: loc,
+			})
+			i.indexedCallbacks[obj] = true
+		}
 		return
 	}
 
-	i.InlineCallbacks = append(i.InlineCallbacks, &IndexNode[*ReferencedCallback]{
-		Node:     callback,
-		Location: loc,
-	})
+	// Check if this is a top-level callback in an external document
+	// Important: Only mark as external if it's NOT from the main document
+	if isTopLevelExternalSchema(loc) {
+		if !i.isFromMainDocument() && !i.indexedCallbacks[obj] {
+			i.ExternalCallbacks = append(i.ExternalCallbacks, &IndexNode[*ReferencedCallback]{
+				Node:     callback,
+				Location: loc,
+			})
+			i.indexedCallbacks[obj] = true
+		}
+		return
+	}
+
+	// Everything else is an inline callback
+	if !i.indexedCallbacks[obj] {
+		i.InlineCallbacks = append(i.InlineCallbacks, &IndexNode[*ReferencedCallback]{
+			Node:     callback,
+			Location: loc,
+		})
+		i.indexedCallbacks[obj] = true
+	}
 }
 
 func (i *Index) indexReferencedSecurityScheme(ctx context.Context, loc Locations, ss *ReferencedSecurityScheme) {

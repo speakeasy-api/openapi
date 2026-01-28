@@ -49,57 +49,8 @@ func (r *OwaspNoNumericIDsRule) Run(ctx context.Context, docInfo *linter.Documen
 
 	var errs []error
 
-	// Check inline parameters
-	for _, paramNode := range docInfo.Index.InlineParameters {
-		param := paramNode.Node
-		if param == nil {
-			continue
-		}
-
-		paramObj := param.GetObject()
-		if paramObj == nil {
-			continue
-		}
-
-		name := paramObj.GetName()
-		if !isIDParameter(name) {
-			continue
-		}
-
-		// Check if schema type is integer
-		jsonSchema := paramObj.GetSchema()
-		if jsonSchema == nil {
-			continue
-		}
-
-		schema := jsonSchema.GetSchema()
-		if schema == nil {
-			continue
-		}
-
-		types := schema.GetType()
-		if len(types) == 0 {
-			continue
-		}
-
-		// Check if type contains "integer"
-		for _, typ := range types {
-			if typ == "integer" {
-				if rootNode := jsonSchema.GetRootNode(); rootNode != nil {
-					errs = append(errs, validation.NewValidationError(
-						config.GetSeverity(r.DefaultSeverity()),
-						RuleOwaspNoNumericIDs,
-						fmt.Errorf("parameter '%s' uses integer type for ID - use random IDs like UUIDs instead of numeric IDs", name),
-						rootNode,
-					))
-				}
-				break
-			}
-		}
-	}
-
-	// Check component parameters
-	for _, paramNode := range docInfo.Index.ComponentParameters {
+	// Check all parameters (inline, component, external, and references)
+	for _, paramNode := range docInfo.Index.GetAllParameters() {
 		param := paramNode.Node
 		if param == nil {
 			continue

@@ -330,6 +330,33 @@ paths:
 `,
 			wantErrs: []string{"error validation-operation-parameters the `GET` operation parameter at path `/users/{id}`, index 1 has a duplicate name `id` and `in` type"},
 		},
+		{
+			name: "duplicate_pathitem_parameter",
+			yml: `
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+    get:
+      responses:
+        '200':
+          description: ok
+`,
+			wantErrs: []string{"error validation-operation-parameters the pathItem parameter at path `/users/{id}`, index 1 has a duplicate name `id` and `in` type"},
+		},
 	}
 
 	for _, tt := range tests {

@@ -36,16 +36,12 @@ func (r *NoRefSiblingsRule) Run(ctx context.Context, docInfo *linter.DocumentInf
 
 	var errs []error
 
-	// Use the pre-computed schema indexes to find all schemas
-	for _, schemaNode := range docInfo.Index.GetAllSchemas() {
+	// Check schema references for $ref with siblings
+	// SchemaReferences contains all schemas with $ref (whether or not they have siblings)
+	for _, schemaNode := range docInfo.Index.SchemaReferences {
 		refSchema := schemaNode.Node
 		schema := refSchema.GetSchema()
 		if schema == nil {
-			continue
-		}
-
-		// Check if this schema has a $ref
-		if !schema.IsReference() {
 			continue
 		}
 

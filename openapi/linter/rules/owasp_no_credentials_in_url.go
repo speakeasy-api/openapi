@@ -80,11 +80,8 @@ func (r *OwaspNoCredentialsInURLRule) Run(ctx context.Context, docInfo *linter.D
 		}
 	}
 
-	// Check both inline and component parameters
-	for _, paramNode := range docInfo.Index.InlineParameters {
-		checkParameter(paramNode)
-	}
-	for _, paramNode := range docInfo.Index.ComponentParameters {
+	// Check all parameters (inline, component, external, and references)
+	for _, paramNode := range docInfo.Index.GetAllParameters() {
 		checkParameter(paramNode)
 	}
 

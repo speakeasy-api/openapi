@@ -45,9 +45,7 @@ func (r *OAS3ExampleMissingRule) Run(ctx context.Context, docInfo *linter.Docume
 	schemasWithExamplesElsewhere := make(map[*oas3.JSONSchemaReferenceable]bool)
 
 	// Collect schemas from parameters with examples
-	allParameters := make([]*openapi.IndexNode[*openapi.ReferencedParameter], 0, len(docInfo.Index.InlineParameters)+len(docInfo.Index.ComponentParameters))
-	allParameters = append(allParameters, docInfo.Index.InlineParameters...)
-	allParameters = append(allParameters, docInfo.Index.ComponentParameters...)
+	allParameters := docInfo.Index.GetAllParameters()
 	for _, paramNode := range allParameters {
 		param := paramNode.Node
 		if param == nil {
@@ -67,9 +65,7 @@ func (r *OAS3ExampleMissingRule) Run(ctx context.Context, docInfo *linter.Docume
 	}
 
 	// Collect schemas from headers with examples
-	allHeaders := make([]*openapi.IndexNode[*openapi.ReferencedHeader], 0, len(docInfo.Index.InlineHeaders)+len(docInfo.Index.ComponentHeaders))
-	allHeaders = append(allHeaders, docInfo.Index.InlineHeaders...)
-	allHeaders = append(allHeaders, docInfo.Index.ComponentHeaders...)
+	allHeaders := docInfo.Index.GetAllHeaders()
 	for _, headerNode := range allHeaders {
 		header := headerNode.Node
 		if header == nil {

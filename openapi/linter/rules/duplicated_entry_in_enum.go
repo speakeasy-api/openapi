@@ -52,13 +52,14 @@ func (r *DuplicatedEnumRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 
 		// Check for duplicates
 		duplicateIndices := findDuplicateIndices(enumValues)
-		for value, indices := range duplicateIndices {
+		for _, indices := range duplicateIndices {
 			// Report on first duplicate occurrence (second index in the list)
 			if len(indices) > 1 {
+				displayValue := nodeToDisplayString(enumValues[indices[1]])
 				errs = append(errs, validation.NewSliceError(
 					config.GetSeverity(r.DefaultSeverity()),
 					RuleSemanticDuplicatedEnum,
-					fmt.Errorf("enum contains a duplicate: `%s`", value),
+					fmt.Errorf("enum contains a duplicate: `%s`", displayValue),
 					schema.GetCore(),
 					schema.GetCore().Enum,
 					indices[1], // Report at second occurrence
@@ -91,6 +92,7 @@ func findDuplicateIndices(enumValues []*yaml.Node) map[string][]int {
 }
 
 // nodeToString converts a yaml.Node to a string representation for comparison
+// This includes type prefixes to distinguish between different types of the same value
 func nodeToString(node *yaml.Node) string {
 	if node == nil {
 		return "null"
@@ -101,6 +103,29 @@ func nodeToString(node *yaml.Node) string {
 		return "null"
 	case "!!str":
 		return "string:" + node.Value
+	case "!!int":
+		return "int:" + node.Value
+	case "!!float":
+		return "float:" + node.Value
+	case "!!bool":
+		return "bool:" + node.Value
+	default:
+		return node.Value
+	}
+}
+
+// nodeToDisplayString converts a yaml.Node to a string representation for display in error messages
+// For strings, the type prefix is omitted since it's implicit
+func nodeToDisplayString(node *yaml.Node) string {
+	if node == nil {
+		return "null"
+	}
+
+	switch node.Tag {
+	case "!!null":
+		return "null"
+	case "!!str":
+		return node.Value // String type is implicit, no prefix needed
 	case "!!int":
 		return "int:" + node.Value
 	case "!!float":

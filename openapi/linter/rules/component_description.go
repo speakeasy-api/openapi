@@ -26,7 +26,7 @@ func (r *ComponentDescriptionRule) Category() string {
 }
 
 func (r *ComponentDescriptionRule) DefaultSeverity() validation.Severity {
-	return validation.SeverityWarning
+	return validation.SeverityHint
 }
 
 func (r *ComponentDescriptionRule) Link() string {

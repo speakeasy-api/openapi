@@ -343,6 +343,57 @@ func getOperationIDValueNode(op *Operation) *yaml.Node {
 	return core.OperationID.ValueNode
 }
 
+// validateParameterUniqueness checks for duplicate parameters in a list
+// methodOrLevel should be the HTTP method (GET, POST, etc.) or "TOP" for path-level
+func validateParameterUniqueness(parameters []*ReferencedParameter, methodOrLevel, path string, fallbackNode *yaml.Node) []error {
+	if len(parameters) == 0 {
+		return nil
+	}
+
+	var errs []error
+	seen := make(map[string]bool)
+
+	for index, paramRef := range parameters {
+		param := paramRef.GetObject()
+		if param == nil {
+			continue
+		}
+
+		paramName := param.GetName()
+		paramIn := param.GetIn().String()
+		if paramName == "" || paramIn == "" {
+			continue
+		}
+
+		key := paramName + "::" + paramIn
+		if seen[key] {
+			core := param.GetCore()
+			errNode := core.GetRootNode()
+			if errNode == nil {
+				errNode = fallbackNode
+			}
+
+			var errMsg string
+			if methodOrLevel == "TOP" {
+				errMsg = fmt.Sprintf("the pathItem parameter at path `%s`, index %d has a duplicate name `%s` and `in` type", path, index, paramName)
+			} else {
+				errMsg = fmt.Sprintf("the `%s` operation parameter at path `%s`, index %d has a duplicate name `%s` and `in` type", methodOrLevel, path, index, paramName)
+			}
+
+			err := validation.NewValidationError(
+				validation.SeverityError,
+				validation.RuleValidationOperationParameters,
+				fmt.Errorf("%s", errMsg),
+				errNode,
+			)
+			errs = append(errs, err)
+		}
+		seen[key] = true
+	}
+
+	return errs
+}
+
 func validateOperationParameterUniqueness(ctx context.Context, doc *OpenAPI) []error {
 	if doc == nil {
 		return nil
@@ -352,48 +403,43 @@ func validateOperationParameterUniqueness(ctx context.Context, doc *OpenAPI) []e
 
 	for item := range Walk(ctx, doc) {
 		if err := item.Match(Matcher{
+			// Check duplicate parameters at Operation level
 			Operation: func(op *Operation) error {
 				method, path := ExtractMethodAndPath(item.Location)
 				if method == "" || path == "" {
 					return nil
 				}
 
-				seen := make(map[string]bool)
-				parameters := op.GetParameters()
-				if len(parameters) == 0 {
+				paramErrs := validateParameterUniqueness(
+					op.GetParameters(),
+					strings.ToUpper(method),
+					path,
+					op.GetCore().GetRootNode(),
+				)
+				errs = append(errs, paramErrs...)
+
+				return nil
+			},
+			// Check duplicate parameters at PathItem level
+			ReferencedPathItem: func(refPathItem *ReferencedPathItem) error {
+				pathItem := refPathItem.GetObject()
+				if pathItem == nil {
 					return nil
 				}
 
-				for index, paramRef := range parameters {
-					param := paramRef.GetObject()
-					if param == nil {
-						continue
-					}
-
-					paramName := param.GetName()
-					paramIn := param.GetIn().String()
-					if paramName == "" || paramIn == "" {
-						continue
-					}
-
-					key := paramName + "::" + paramIn
-					if seen[key] {
-						core := param.GetCore()
-						errNode := core.GetRootNode()
-						if errNode == nil {
-							errNode = op.GetCore().GetRootNode()
-						}
-
-						err := validation.NewValidationError(
-							validation.SeverityError,
-							validation.RuleValidationOperationParameters,
-							fmt.Errorf("the `%s` operation parameter at path `%s`, index %d has a duplicate name `%s` and `in` type", strings.ToUpper(method), path, index, paramName),
-							errNode,
-						)
-						errs = append(errs, err)
-					}
-					seen[key] = true
+				// Get the path from the location (parent key)
+				path := item.Location.ParentKey()
+				if path == "" {
+					return nil
 				}
+
+				paramErrs := validateParameterUniqueness(
+					pathItem.Parameters,
+					"TOP",
+					path,
+					pathItem.GetCore().GetRootNode(),
+				)
+				errs = append(errs, paramErrs...)
 
 				return nil
 			},

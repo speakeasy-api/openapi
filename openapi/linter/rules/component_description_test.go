@@ -203,7 +203,7 @@ components:
     User:
       type: object
 `,
-			expectedError: "[9:5] warning style-component-description `schemas` component `User` is missing a description",
+			expectedError: "[9:5] hint style-component-description `schemas` component `User` is missing a description",
 		},
 		{
 			name: "parameter missing description",
@@ -222,7 +222,7 @@ components:
       schema:
         type: string
 `,
-			expectedError: "[9:5] warning style-component-description `parameters` component `userId` is missing a description",
+			expectedError: "[9:5] hint style-component-description `parameters` component `userId` is missing a description",
 		},
 		{
 			name: "requestBody missing description",
@@ -240,7 +240,7 @@ components:
           schema:
             type: object
 `,
-			expectedError: "[9:5] warning style-component-description `requestBodies` component `UserCreate` is missing a description",
+			expectedError: "[9:5] hint style-component-description `requestBodies` component `UserCreate` is missing a description",
 		},
 		{
 			name: "response missing description",
@@ -258,7 +258,7 @@ components:
           schema:
             type: object
 `,
-			expectedError: "[8:3] warning style-component-description `responses` component `NotFound` is missing a description",
+			expectedError: "[8:3] hint style-component-description `responses` component `NotFound` is missing a description",
 		},
 		{
 			name: "example missing description",
@@ -274,7 +274,7 @@ components:
       value:
         name: John Doe
 `,
-			expectedError: "[9:5] warning style-component-description `examples` component `UserExample` is missing a description",
+			expectedError: "[9:5] hint style-component-description `examples` component `UserExample` is missing a description",
 		},
 		{
 			name: "header missing description",
@@ -290,7 +290,7 @@ components:
       schema:
         type: integer
 `,
-			expectedError: "[9:5] warning style-component-description `headers` component `X-Rate-Limit` is missing a description",
+			expectedError: "[9:5] hint style-component-description `headers` component `X-Rate-Limit` is missing a description",
 		},
 		{
 			name: "link missing description",
@@ -305,7 +305,7 @@ components:
     UserByUserId:
       operationId: getUser
 `,
-			expectedError: "[9:5] warning style-component-description `links` component `UserByUserId` is missing a description",
+			expectedError: "[9:5] hint style-component-description `links` component `UserByUserId` is missing a description",
 		},
 		{
 			name: "securityScheme missing description",
@@ -321,7 +321,7 @@ components:
       type: http
       scheme: bearer
 `,
-			expectedError: "[9:5] warning style-component-description `securitySchemes` component `BearerAuth` is missing a description",
+			expectedError: "[9:5] hint style-component-description `securitySchemes` component `BearerAuth` is missing a description",
 		},
 	}
 
@@ -354,6 +354,6 @@ func TestComponentDescriptionRule_RuleMetadata(t *testing.T) {
 	assert.Equal(t, rules.CategoryStyle, rule.Category())
 	assert.NotEmpty(t, rule.Description())
 	assert.NotEmpty(t, rule.Link())
-	assert.Equal(t, validation.SeverityWarning, rule.DefaultSeverity())
+	assert.Equal(t, validation.SeverityHint, rule.DefaultSeverity())
 	assert.Nil(t, rule.Versions())
 }

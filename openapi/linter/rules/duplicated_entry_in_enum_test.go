@@ -152,7 +152,7 @@ components:
         - inactive
         - active
 `,
-			expectedError: "[13:11] warning semantic-duplicated-enum enum contains a duplicate: `string:active`",
+			expectedError: "[13:11] warning semantic-duplicated-enum enum contains a duplicate: `active`",
 		},
 		{
 			name: "duplicate integer values",

@@ -476,3 +476,428 @@ func TestBuildIndex_ExternalReferences_Comprehensive(t *testing.T) {
 		})
 	}
 }
+
+// TestExternalPathItemReferencesWithOperations verifies that:
+// 1. External path item references are resolved correctly
+// 2. Operations within external path items are indexed
+// 3. Walk descends into resolved external path items
+func TestExternalPathItemReferencesWithOperations(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	// Create external file with path items containing operations
+	externalSpec := `
+a:
+  get:
+    operationId: op-a
+    responses:
+      '200':
+        description: OK
+  post:
+    operationId: op-a-post
+    responses:
+      '201':
+        description: Created
+b:
+  get:
+    operationId: op-b
+    responses:
+      '200':
+        description: OK
+`
+
+	// Create main spec that references the external path items
+	mainSpec := `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /a:
+    $ref: "./external.yaml#/a"
+  /b:
+    $ref: "./external.yaml#/b"
+`
+
+	// Parse main document
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(mainSpec))
+	require.NoError(t, err)
+	require.NotNil(t, doc)
+
+	// Setup virtual filesystem with external file
+	// Use absolute path and matching reference in spec
+	vfs := NewMockVirtualFS()
+	vfs.AddFile("/test/external.yaml", externalSpec)
+
+	// Build index with external reference resolution
+	resolveOpts := references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "/test/main.yaml", // Absolute path so relative refs resolve correctly
+		VirtualFS:      vfs,
+	}
+
+	idx := openapi.BuildIndex(ctx, doc, resolveOpts)
+	require.NotNil(t, idx)
+
+	// Verify external path item references were resolved
+	assert.Len(t, idx.PathItemReferences, 2, "should have 2 external path item references")
+
+	// Verify operations from external path items are indexed
+	assert.Len(t, idx.Operations, 3, "should have 3 operations (2 from /a, 1 from /b)")
+
+	// Verify operation IDs are correct
+	operationIDs := make([]string, len(idx.Operations))
+	for i, op := range idx.Operations {
+		operationIDs[i] = op.Node.GetOperationID()
+	}
+	assert.Contains(t, operationIDs, "op-a", "should contain op-a")
+	assert.Contains(t, operationIDs, "op-a-post", "should contain op-a-post")
+	assert.Contains(t, operationIDs, "op-b", "should contain op-b")
+
+	// Verify no resolution errors
+	assert.Empty(t, idx.GetResolutionErrors(), "should have no resolution errors")
+}
+
+// TestExternalReferencedComponentsWithinOperations verifies that:
+// 1. External parameter, requestBody, response, header, and example references are resolved
+// 2. Walk descends into resolved external references within operations
+// 3. Referenced components are properly indexed
+func TestExternalReferencedComponentsWithinOperations(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	// Create external file with reusable components
+	componentsSpec := `
+UserParam:
+  name: userId
+  in: path
+  required: true
+  schema:
+    type: string
+
+CreateRequest:
+  required: true
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          name:
+            type: string
+
+SuccessResponse:
+  description: Success
+  headers:
+    X-Request-ID:
+      description: Request ID header
+      schema:
+        type: string
+  content:
+    application/json:
+      schema:
+        type: object
+      examples:
+        example1:
+          value:
+            status: success
+`
+
+	// Create main spec with operations that reference external components
+	mainSpec := `
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users/{userId}:
+    parameters:
+      - $ref: "./components.yaml#/UserParam"
+    post:
+      operationId: createUser
+      requestBody:
+        $ref: "./components.yaml#/CreateRequest"
+      responses:
+        '200':
+          $ref: "./components.yaml#/SuccessResponse"
+`
+
+	// Parse main document
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(mainSpec))
+	require.NoError(t, err)
+	require.NotNil(t, doc)
+
+	// Setup virtual filesystem
+	vfs := NewMockVirtualFS()
+	vfs.AddFile("/test/components.yaml", componentsSpec)
+
+	// Build index
+	resolveOpts := references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "/test/main.yaml",
+		VirtualFS:      vfs,
+	}
+
+	idx := openapi.BuildIndex(ctx, doc, resolveOpts)
+	require.NotNil(t, idx)
+
+	// Verify operations were indexed
+	assert.Len(t, idx.Operations, 1, "should have 1 operation")
+
+	// Verify external parameter reference was resolved and indexed
+	assert.NotEmpty(t, idx.ParameterReferences, "should have parameter references")
+
+	// Verify external request body reference was resolved
+	assert.NotEmpty(t, idx.RequestBodyReferences, "should have request body references")
+
+	// Verify external response reference was resolved
+	assert.NotEmpty(t, idx.ResponseReferences, "should have response references")
+
+	// Verify headers within resolved response are indexed (inline headers, not references)
+	assert.NotEmpty(t, idx.InlineHeaders, "should have inline headers from resolved response")
+
+	// Verify examples within resolved response are indexed (inline examples, not references)
+	assert.NotEmpty(t, idx.InlineExamples, "should have inline examples from resolved response")
+
+	// Verify no resolution errors
+	assert.Empty(t, idx.GetResolutionErrors(), "should have no resolution errors")
+}
+func TestBuildIndex_ExternalReferencesForAllTypes_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	vfs := NewMockVirtualFS()
+
+	// Main API document with references to external components
+	vfs.AddFile("/api/openapi.yaml", `
+openapi: "3.1.0"
+info:
+  title: External Components Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      parameters:
+        - $ref: 'components.yaml#/PageSize'
+      responses:
+        "200":
+          $ref: 'components.yaml#/UsersResponse'
+      callbacks:
+        onUpdate:
+          $ref: 'components.yaml#/UpdateCallback'
+    post:
+      operationId: createUser
+      requestBody:
+        $ref: 'components.yaml#/UserRequestBody'
+      responses:
+        "201":
+          description: Created
+`)
+
+	// External components file with all types at top level
+	vfs.AddFile("/api/components.yaml", `
+PageSize:
+  name: pageSize
+  in: query
+  schema:
+    type: integer
+
+UsersResponse:
+  description: Users response
+  headers:
+    X-Total-Count:
+      $ref: '#/TotalCountHeader'
+  content:
+    application/json:
+      schema:
+        type: array
+        items:
+          type: object
+      examples:
+        singleUser:
+          $ref: '#/SingleUserExample'
+  links:
+    GetUserById:
+      $ref: '#/UserLink'
+
+UserRequestBody:
+  description: User request body
+  content:
+    application/json:
+      schema:
+        type: object
+
+TotalCountHeader:
+  description: Total count header
+  schema:
+    type: integer
+
+SingleUserExample:
+  value:
+    id: 1
+    name: John Doe
+
+UserLink:
+  operationId: getUsers
+  description: Link to get users
+
+UpdateCallback:
+  '{$request.body#/callbackUrl}':
+    post:
+      requestBody:
+        description: Update notification
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+`)
+
+	// Unmarshal and build index
+	doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(vfs.files["/api/openapi.yaml"]))
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	resolveOpts := references.ResolveOptions{
+		TargetLocation: "/api/openapi.yaml",
+		RootDocument:   doc,
+		TargetDocument: doc,
+		VirtualFS:      vfs,
+	}
+	idx := openapi.BuildIndex(ctx, doc, resolveOpts)
+	require.NotNil(t, idx)
+
+	// Test External Parameters
+	assert.Len(t, idx.ExternalParameters, 1, "should have 1 external parameter (PageSize)")
+	assert.Len(t, idx.ParameterReferences, 1, "should have 1 parameter reference")
+	assert.Empty(t, idx.ComponentParameters, "should have 0 component parameters (PageSize is external)")
+	assert.Empty(t, idx.InlineParameters, "should have 0 inline parameters")
+
+	// Test External Responses
+	assert.Len(t, idx.ExternalResponses, 1, "should have 1 external response (UsersResponse)")
+	assert.Len(t, idx.ResponseReferences, 1, "should have 1 response reference")
+	assert.Empty(t, idx.ComponentResponses, "should have 0 component responses (UsersResponse is external)")
+	assert.Len(t, idx.InlineResponses, 2, "should have 2 inline responses (201 Created + default from callback)")
+
+	// Test External RequestBodies
+	assert.Len(t, idx.ExternalRequestBodies, 1, "should have 1 external request body (UserRequestBody)")
+	assert.Len(t, idx.RequestBodyReferences, 1, "should have 1 request body reference")
+	assert.Empty(t, idx.ComponentRequestBodies, "should have 0 component request bodies")
+	assert.Len(t, idx.InlineRequestBodies, 1, "should have 1 inline request body (from callback)")
+
+	// Test External Headers
+	// Note: Header reference inside external response can't be resolved (not an OpenAPI doc structure)
+	assert.Empty(t, idx.ExternalHeaders, "should have 0 external headers (resolution failed)")
+	assert.Len(t, idx.HeaderReferences, 1, "should have 1 header reference (unresolved)")
+	assert.Empty(t, idx.ComponentHeaders, "should have 0 component headers")
+	assert.Empty(t, idx.InlineHeaders, "should have 0 inline headers (resolution failed)")
+
+	// Test External Examples
+	// Note: Example reference inside external response can't be resolved (not an OpenAPI doc structure)
+	assert.Empty(t, idx.ExternalExamples, "should have 0 external examples (resolution failed)")
+	assert.Len(t, idx.ExampleReferences, 1, "should have 1 example reference (unresolved)")
+	assert.Empty(t, idx.ComponentExamples, "should have 0 component examples")
+	assert.Empty(t, idx.InlineExamples, "should have 0 inline examples (resolution failed)")
+
+	// Test External Links
+	// Note: Link reference inside external response can't be resolved (not an OpenAPI doc structure)
+	assert.Empty(t, idx.ExternalLinks, "should have 0 external links (resolution failed)")
+	assert.Len(t, idx.LinkReferences, 1, "should have 1 link reference (unresolved)")
+	assert.Empty(t, idx.ComponentLinks, "should have 0 component links")
+	assert.Empty(t, idx.InlineLinks, "should have 0 inline links (resolution failed)")
+
+	// Test External Callbacks
+	assert.Len(t, idx.ExternalCallbacks, 1, "should have 1 external callback (UpdateCallback)")
+	assert.Len(t, idx.CallbackReferences, 1, "should have 1 callback reference")
+	assert.Empty(t, idx.ComponentCallbacks, "should have 0 component callbacks")
+	assert.Empty(t, idx.InlineCallbacks, "should have 0 inline callbacks")
+
+	// Test GetAll* methods include external items (but not references)
+	allParameters := idx.GetAllParameters()
+	assert.Len(t, allParameters, 1, "GetAllParameters should return external (not reference)")
+
+	allResponses := idx.GetAllResponses()
+	assert.Len(t, allResponses, 3, "GetAllResponses should return external + 2 inline (not reference)")
+
+	allRequestBodies := idx.GetAllRequestBodies()
+	assert.Len(t, allRequestBodies, 2, "GetAllRequestBodies should return external + inline (not reference)")
+
+	allHeaders := idx.GetAllHeaders()
+	assert.Empty(t, allHeaders, "GetAllHeaders should have 0 (reference not included)")
+
+	allExamples := idx.GetAllExamples()
+	assert.Empty(t, allExamples, "GetAllExamples should have 0 (reference not included)")
+
+	allLinks := idx.GetAllLinks()
+	assert.Empty(t, allLinks, "GetAllLinks should have 0 (reference not included)")
+
+	allCallbacks := idx.GetAllCallbacks()
+	assert.Len(t, allCallbacks, 1, "GetAllCallbacks should return external (not reference)")
+
+	// Verify errors (3 resolution errors for unresolved references in external doc)
+	assert.True(t, idx.HasErrors(), "should have resolution errors")
+	assert.Len(t, idx.GetResolutionErrors(), 3, "should have 3 resolution errors for unresolved refs")
+}
+func TestDebugExternalParameter(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	vfs := NewMockVirtualFS()
+
+	// Main document
+	vfs.AddFile("/api/main.yaml", `
+openapi: "3.1.0"
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      operationId: test
+      parameters:
+        - $ref: 'external.yaml#/PageSize'
+      responses:
+        "200":
+          description: OK
+`)
+
+	// External parameter
+	vfs.AddFile("/api/external.yaml", `
+PageSize:
+  name: pageSize
+  in: query
+  schema:
+    type: integer
+`)
+
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(vfs.files["/api/main.yaml"]))
+	require.NoError(t, err)
+
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		TargetLocation: "/api/main.yaml",
+		RootDocument:   doc,
+		TargetDocument: doc,
+		VirtualFS:      vfs,
+	})
+
+	t.Logf("ComponentParameters: %d", len(idx.ComponentParameters))
+	t.Logf("ExternalParameters: %d", len(idx.ExternalParameters))
+	t.Logf("InlineParameters: %d", len(idx.InlineParameters))
+	t.Logf("ParameterReferences: %d", len(idx.ParameterReferences))
+
+	if len(idx.ExternalParameters) > 0 {
+		t.Logf("External parameter location: %s", idx.ExternalParameters[0].Location.ToJSONPointer())
+	}
+	if len(idx.InlineParameters) > 0 {
+		t.Logf("Inline parameter location: %s", idx.InlineParameters[0].Location.ToJSONPointer())
+	}
+
+	t.Logf("Errors: %v", idx.HasErrors())
+	for _, err := range idx.GetAllErrors() {
+		t.Logf("Error: %v", err)
+	}
+}

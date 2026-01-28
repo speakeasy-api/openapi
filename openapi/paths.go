@@ -3,6 +3,7 @@ package openapi
 import (
 	"context"
 	"fmt"
+	"iter"
 	"slices"
 	"strings"
 
@@ -40,6 +41,14 @@ func (p *Paths) Len() int {
 		return 0
 	}
 	return p.Map.Len()
+}
+
+// All returns an iterator over all path items in the paths map. nil safe.
+func (p *Paths) All() iter.Seq2[string, *ReferencedPathItem] {
+	if p == nil {
+		return func(yield func(string, *ReferencedPathItem) bool) {}
+	}
+	return p.Map.All()
 }
 
 // GetExtensions returns the value of the Extensions field. Returns an empty extensions map if not set.

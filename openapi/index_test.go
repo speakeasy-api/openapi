@@ -2,11 +2,13 @@ package openapi_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/references"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -344,10 +346,365 @@ components:
 	allSchemas := idx.GetAllSchemas()
 	assert.NotEmpty(t, allSchemas, "should have schemas")
 
-	// Should include boolean, inline, component, external, and reference schemas
+	// Should include boolean, inline, component, and external schemas (not references)
 	totalExpected := len(idx.BooleanSchemas) + len(idx.InlineSchemas) +
-		len(idx.ComponentSchemas) + len(idx.ExternalSchemas) + len(idx.SchemaReferences)
+		len(idx.ComponentSchemas) + len(idx.ExternalSchemas)
 	assert.Len(t, allSchemas, totalExpected, "GetAllSchemas should return all schema types")
+}
+
+func TestBuildIndex_GetAllParameters_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: getUser
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        "200":
+          description: Success
+components:
+  parameters:
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+
+	allParameters := idx.GetAllParameters()
+	assert.NotEmpty(t, allParameters, "should have parameters")
+
+	// Should include inline, component, and external parameters (not references)
+	totalExpected := len(idx.InlineParameters) + len(idx.ComponentParameters) +
+		len(idx.ExternalParameters)
+	assert.Len(t, allParameters, totalExpected, "GetAllParameters should return all parameter types")
+}
+
+func TestBuildIndex_GetAllResponses_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        "200":
+          description: Success
+        "404":
+          $ref: '#/components/responses/NotFound'
+components:
+  responses:
+    NotFound:
+      description: Not found
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+
+	allResponses := idx.GetAllResponses()
+	assert.NotEmpty(t, allResponses, "should have responses")
+
+	// Should include inline, component, and external responses (not references)
+	totalExpected := len(idx.InlineResponses) + len(idx.ComponentResponses) +
+		len(idx.ExternalResponses)
+	assert.Len(t, allResponses, totalExpected, "GetAllResponses should return all response types")
+}
+
+func TestBuildIndex_GetAllRequestBodies_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    post:
+      operationId: createUser
+      requestBody:
+        description: User to create
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "201":
+          description: Created
+    put:
+      operationId: updateUser
+      requestBody:
+        $ref: '#/components/requestBodies/UserBody'
+      responses:
+        "200":
+          description: Updated
+components:
+  requestBodies:
+    UserBody:
+      description: User body
+      content:
+        application/json:
+          schema:
+            type: object
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+
+	allRequestBodies := idx.GetAllRequestBodies()
+	assert.NotEmpty(t, allRequestBodies, "should have request bodies")
+
+	// Should include inline, component, and external request bodies (not references)
+	totalExpected := len(idx.InlineRequestBodies) + len(idx.ComponentRequestBodies) +
+		len(idx.ExternalRequestBodies)
+	assert.Len(t, allRequestBodies, totalExpected, "GetAllRequestBodies should return all request body types")
+}
+
+func TestBuildIndex_GetAllHeaders_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        "200":
+          description: Success
+          headers:
+            X-Rate-Limit:
+              description: Rate limit
+              schema:
+                type: integer
+            X-Custom:
+              $ref: '#/components/headers/CustomHeader'
+components:
+  headers:
+    CustomHeader:
+      description: Custom header
+      schema:
+        type: string
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+
+	allHeaders := idx.GetAllHeaders()
+	assert.NotEmpty(t, allHeaders, "should have headers")
+
+	// Should include inline, component, and external headers (not references)
+	totalExpected := len(idx.InlineHeaders) + len(idx.ComponentHeaders) +
+		len(idx.ExternalHeaders)
+	assert.Len(t, allHeaders, totalExpected, "GetAllHeaders should return all header types")
+}
+
+func TestBuildIndex_GetAllExamples_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              examples:
+                inline:
+                  value: { id: 1 }
+                referenced:
+                  $ref: '#/components/examples/UserExample'
+components:
+  examples:
+    UserExample:
+      value: { id: 2 }
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+
+	allExamples := idx.GetAllExamples()
+	assert.NotEmpty(t, allExamples, "should have examples")
+
+	// Should include inline, component, and external examples (not references)
+	totalExpected := len(idx.InlineExamples) + len(idx.ComponentExamples) +
+		len(idx.ExternalExamples)
+	assert.Len(t, allExamples, totalExpected, "GetAllExamples should return all example types")
+}
+
+func TestBuildIndex_GetAllLinks_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        "200":
+          description: Success
+          links:
+            GetUserById:
+              operationId: getUsers
+            ReferencedLink:
+              $ref: '#/components/links/CustomLink'
+  /products:
+    get:
+      operationId: getProducts
+      responses:
+        "200":
+          description: Success
+components:
+  links:
+    CustomLink:
+      operationId: getProducts
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+
+	allLinks := idx.GetAllLinks()
+	assert.NotEmpty(t, allLinks, "should have links")
+
+	// Should include inline, component, and external links (not references)
+	totalExpected := len(idx.InlineLinks) + len(idx.ComponentLinks) +
+		len(idx.ExternalLinks)
+	assert.Len(t, allLinks, totalExpected, "GetAllLinks should return all link types")
+}
+
+func TestBuildIndex_GetAllCallbacks_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /subscribe:
+    post:
+      operationId: subscribe
+      callbacks:
+        onData:
+          '{$request.body#/callbackUrl}':
+            post:
+              requestBody:
+                description: Callback
+                content:
+                  application/json:
+                    schema:
+                      type: object
+              responses:
+                "200":
+                  description: OK
+        onComplete:
+          $ref: '#/components/callbacks/CompleteCallback'
+      responses:
+        "201":
+          description: Created
+components:
+  callbacks:
+    CompleteCallback:
+      '{$request.body#/callbackUrl}':
+        post:
+          requestBody:
+            description: Complete callback
+            content:
+              application/json:
+                schema:
+                  type: object
+          responses:
+            "200":
+              description: OK
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+
+	allCallbacks := idx.GetAllCallbacks()
+	assert.NotEmpty(t, allCallbacks, "should have callbacks")
+
+	// Should include inline, component, and external callbacks (not references)
+	totalExpected := len(idx.InlineCallbacks) + len(idx.ComponentCallbacks) +
+		len(idx.ExternalCallbacks)
+	assert.Len(t, allCallbacks, totalExpected, "GetAllCallbacks should return all callback types")
 }
 
 func TestBuildIndex_NilIndex_Methods_Success(t *testing.T) {
@@ -1139,4 +1496,124 @@ components:
 	assert.Len(t, idx.OAuthFlows, 1, "should have 1 OAuth flows")
 	// Should have 1 OAuth flow item (implicit)
 	assert.Len(t, idx.OAuthFlowItems, 1, "should have 1 OAuth flow item")
+}
+
+func TestBuildIndex_UnknownProperties_DetectedAsWarnings(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	tests := []struct {
+		name                  string
+		yaml                  string
+		expectedWarningCount  int
+		expectedWarningSubstr string
+	}{
+		{
+			name: "MediaType with $ref property in OpenAPI 3.1",
+			yaml: `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /vehicles:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              $ref: '#/components/schemas/VehiclesResponse'
+components:
+  schemas:
+    VehiclesResponse:
+      type: object
+      properties:
+        vehicles:
+          type: array
+`,
+			expectedWarningCount:  1,
+			expectedWarningSubstr: "unknown property '$ref'",
+		},
+		{
+			name: "MediaType with schema property (valid)",
+			yaml: `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /vehicles:
+    get:
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehiclesResponse'
+components:
+  schemas:
+    VehiclesResponse:
+      type: object
+`,
+			expectedWarningCount:  0,
+			expectedWarningSubstr: "",
+		},
+		{
+			name: "Operation with unknown property",
+			yaml: `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      unknownField: value
+      responses:
+        "200":
+          description: Success
+`,
+			expectedWarningCount:  1,
+			expectedWarningSubstr: "unknown property 'unknownField'",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := unmarshalOpenAPI(t, ctx, tt.yaml)
+			idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+				RootDocument:   doc,
+				TargetDocument: doc,
+				TargetLocation: "test.yaml",
+			})
+
+			require.NotNil(t, idx, "index should not be nil")
+
+			allErrors := idx.GetAllErrors()
+			warnings := []error{}
+			for _, err := range allErrors {
+				var vErr *validation.Error
+				if errors.As(err, &vErr) && vErr.Severity == validation.SeverityWarning {
+					warnings = append(warnings, err)
+				}
+			}
+
+			assert.Len(t, warnings, tt.expectedWarningCount, "should have expected number of warnings")
+
+			if tt.expectedWarningCount > 0 {
+				found := false
+				for _, w := range warnings {
+					if strings.Contains(w.Error(), tt.expectedWarningSubstr) {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "should have warning containing '%s'", tt.expectedWarningSubstr)
+			}
+		})
+	}
 }
