@@ -49,9 +49,9 @@ func (r *OperationIdRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[
 			continue
 		}
 
-		errNode := op.GetCore().GetRootNode()
+		errNode := op.GetRootNode()
 		if errNode == nil {
-			errNode = docInfo.Document.GetCore().GetRootNode()
+			errNode = docInfo.Document.GetRootNode()
 		}
 
 		err := validation.NewValidationError(

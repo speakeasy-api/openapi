@@ -51,7 +51,7 @@ func (r *OAS3HostNotExampleRule) Run(ctx context.Context, docInfo *linter.Docume
 
 		errNode := GetFieldValueNode(server, "url", doc)
 		if errNode == nil {
-			errNode = doc.GetCore().GetRootNode()
+			errNode = doc.GetRootNode()
 		}
 
 		errs = append(errs, validation.NewValidationError(

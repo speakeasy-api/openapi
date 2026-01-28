@@ -70,7 +70,7 @@ func (r *NoAmbiguousPathsRule) Run(ctx context.Context, docInfo *linter.Document
 		if entries, exists := seenPaths[normalizedPath]; exists {
 			// Found an ambiguous path - report it
 			for _, entry := range entries {
-				pathItemNode := pathItem.GetCore().GetRootNode()
+				pathItemNode := pathItem.GetRootNode()
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					RuleSemanticNoAmbiguousPaths,

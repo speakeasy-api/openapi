@@ -66,7 +66,7 @@ func (r *OperationTagsRule) Run(ctx context.Context, docInfo *linter.DocumentInf
 				config.GetSeverity(r.DefaultSeverity()),
 				RuleStyleOperationTags,
 				fmt.Errorf("the %s is missing tags", opIdentifier),
-				operation.GetCore().GetRootNode(),
+				operation.GetRootNode(),
 			))
 		}
 	}

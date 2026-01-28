@@ -48,7 +48,7 @@ func (r *InfoContactRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleInfoContact,
 			errors.New("info section is missing contact details"),
-			info.GetCore().GetRootNode(),
+			info.GetRootNode(),
 		))
 	}
 

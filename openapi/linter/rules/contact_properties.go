@@ -64,7 +64,7 @@ func (r *ContactPropertiesRule) Run(ctx context.Context, docInfo *linter.Documen
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleContactProperties,
 			errors.New("`contact` section must contain a `name`"),
-			contact.GetCore().GetRootNode(),
+			contact.GetRootNode(),
 		))
 	}
 
@@ -73,7 +73,7 @@ func (r *ContactPropertiesRule) Run(ctx context.Context, docInfo *linter.Documen
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleContactProperties,
 			errors.New("`contact` section must contain a `url`"),
-			contact.GetCore().GetRootNode(),
+			contact.GetRootNode(),
 		))
 	}
 
@@ -82,7 +82,7 @@ func (r *ContactPropertiesRule) Run(ctx context.Context, docInfo *linter.Documen
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleContactProperties,
 			errors.New("`contact` section must contain an `email`"),
-			contact.GetCore().GetRootNode(),
+			contact.GetRootNode(),
 		))
 	}
 

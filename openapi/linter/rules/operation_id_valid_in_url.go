@@ -64,7 +64,7 @@ func (r *OperationIDValidInURLRule) Run(ctx context.Context, docInfo *linter.Doc
 		if !urlFriendlyPattern.MatchString(operationID) {
 			node := GetFieldValueNode(operation, "operationId", doc)
 			if node == nil {
-				node = operation.GetCore().GetRootNode()
+				node = operation.GetRootNode()
 			}
 
 			errs = append(errs, validation.NewValidationError(

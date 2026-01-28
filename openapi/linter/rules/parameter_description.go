@@ -78,7 +78,7 @@ func (r *OAS3ParameterDescriptionRule) Run(ctx context.Context, docInfo *linter.
 
 			errNode := GetFieldValueNode(param, "description", doc)
 			if errNode == nil {
-				errNode = param.GetCore().GetRootNode()
+				errNode = param.GetRootNode()
 			}
 
 			var msg string

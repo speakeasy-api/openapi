@@ -307,7 +307,7 @@ func validateOperationIDUniqueness(ctx context.Context, doc *OpenAPI) []error {
 				if _, ok := seen[operationID]; ok {
 					errNode := getOperationIDValueNode(op)
 					if errNode == nil {
-						errNode = op.GetCore().GetRootNode()
+						errNode = op.GetRootNode()
 					}
 					err := validation.NewValidationError(
 						validation.SeverityError,
@@ -414,7 +414,7 @@ func validateOperationParameterUniqueness(ctx context.Context, doc *OpenAPI) []e
 					op.GetParameters(),
 					strings.ToUpper(method),
 					path,
-					op.GetCore().GetRootNode(),
+					op.GetRootNode(),
 				)
 				errs = append(errs, paramErrs...)
 
@@ -437,7 +437,7 @@ func validateOperationParameterUniqueness(ctx context.Context, doc *OpenAPI) []e
 					pathItem.Parameters,
 					"TOP",
 					path,
-					pathItem.GetCore().GetRootNode(),
+					pathItem.GetRootNode(),
 				)
 				errs = append(errs, paramErrs...)
 

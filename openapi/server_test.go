@@ -1,6 +1,7 @@
 package openapi
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/sequencedmap"
@@ -103,8 +104,8 @@ func Test_resolveServerVariables_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, err := resolveServerVariables(tt.args.serverURL, tt.args.variables)
-			require.NoError(t, err)
+			result, errs := resolveServerVariables(tt.args.serverURL, tt.args.variables)
+			require.Empty(t, errs, "expected no errors")
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -118,9 +119,9 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 		variables *sequencedmap.Map[string, *ServerVariable]
 	}
 	tests := []struct {
-		name        string
-		args        args
-		expectedErr string
+		name         string
+		args         args
+		expectedErrs []string
 	}{
 		{
 			name: "no variables defined",
@@ -128,7 +129,7 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 				serverURL: "https://{host}/api",
 				variables: sequencedmap.New[string, *ServerVariable](),
 			},
-			expectedErr: "serverURL contains variables but no variables are defined",
+			expectedErrs: []string{"serverURL contains variables but no variables are defined"},
 		},
 		{
 			name: "undefined variable",
@@ -140,7 +141,7 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 					return vars
 				}(),
 			},
-			expectedErr: "server variable 'host' is not defined",
+			expectedErrs: []string{"server variable 'host' is not defined"},
 		},
 		{
 			name: "variable with empty default",
@@ -152,7 +153,7 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 					return vars
 				}(),
 			},
-			expectedErr: "server variable 'host' has no default value",
+			expectedErrs: []string{"server variable 'host' has no default value"},
 		},
 		{
 			name: "multiple variables with one undefined",
@@ -164,7 +165,7 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 					return vars
 				}(),
 			},
-			expectedErr: "server variable 'port' is not defined",
+			expectedErrs: []string{"server variable 'port' is not defined"},
 		},
 		{
 			name: "multiple variables with one having empty default",
@@ -177,7 +178,7 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 					return vars
 				}(),
 			},
-			expectedErr: "server variable 'port' has no default value",
+			expectedErrs: []string{"server variable 'port' has no default value"},
 		},
 		{
 			name: "malformed nested brackets creates invalid variable name",
@@ -189,7 +190,23 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 					return vars
 				}(),
 			},
-			expectedErr: "server variable 'incomplete/path/{host' is not defined",
+			expectedErrs: []string{"server variable 'incomplete/path/{host' is not defined"},
+		},
+		{
+			name: "double curly braces produces multiple errors",
+			args: args{
+				serverURL: "https://{{host}}{{port}}/api",
+				variables: func() *sequencedmap.Map[string, *ServerVariable] {
+					vars := sequencedmap.New[string, *ServerVariable]()
+					vars.Set("host", &ServerVariable{Default: "api.example.com"})
+					vars.Set("port", &ServerVariable{Default: "8080"})
+					return vars
+				}(),
+			},
+			expectedErrs: []string{
+				"server variable '{host}' is not defined. Use single curly braces for variable substitution",
+				"server variable '{port}' is not defined. Use single curly braces for variable substitution",
+			},
 		},
 	}
 
@@ -197,10 +214,27 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, err := resolveServerVariables(tt.args.serverURL, tt.args.variables)
-			require.Error(t, err)
+			result, errs := resolveServerVariables(tt.args.serverURL, tt.args.variables)
+			require.NotEmpty(t, errs, "expected errors")
 			assert.Empty(t, result)
-			assert.Contains(t, err.Error(), tt.expectedErr)
+			for _, expectedErr := range tt.expectedErrs {
+				assertErrorContains(t, errs, expectedErr)
+			}
 		})
 	}
+}
+
+func assertErrorContains(t *testing.T, errs []error, expected string) {
+	t.Helper()
+
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+		if strings.Contains(err.Error(), expected) {
+			return
+		}
+	}
+
+	assert.Fail(t, "expected error not found", "expected %q in errors: %v", expected, errs)
 }

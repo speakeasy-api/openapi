@@ -68,7 +68,7 @@ func (r *TagsAlphabeticalRule) Run(ctx context.Context, docInfo *linter.Document
 			// Get the node for the tags array
 			tagsNode := doc.GetCore().Tags.ValueNode
 			if tagsNode == nil {
-				tagsNode = doc.GetCore().GetRootNode()
+				tagsNode = doc.GetRootNode()
 			}
 
 			errs = append(errs, validation.NewValidationError(

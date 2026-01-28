@@ -51,7 +51,7 @@ func (r *NoRefSiblingsRule) Run(ctx context.Context, docInfo *linter.DocumentInf
 				config.GetSeverity(r.DefaultSeverity()),
 				RuleStyleNoRefSiblings,
 				errors.New("schema contains $ref with sibling properties, which is not allowed in OAS 3.0.x"),
-				schema.GetCore().GetRootNode(),
+				schema.GetRootNode(),
 			))
 		}
 	}

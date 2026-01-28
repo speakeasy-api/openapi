@@ -53,7 +53,7 @@ func (r *LicenseURLRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleLicenseURL,
 			errors.New("license should contain a URL"),
-			license.GetCore().GetRootNode(),
+			license.GetRootNode(),
 		))
 	}
 

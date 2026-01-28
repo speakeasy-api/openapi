@@ -152,7 +152,7 @@ variables:
       - development
     description: Environment name
 `,
-			wantErrs: []string{"[7:7] error validation-allowed-values serverVariable.default must be one of [staging, development]"},
+			wantErrs: []string{"[5:14] error validation-allowed-values serverVariable.default must be one of [staging, development]"},
 		},
 		{
 			name: "multiple validation errors",
@@ -166,6 +166,45 @@ variables:
 			wantErrs: []string{
 				"[2:6] error validation-required-field server.url is required",
 				"[5:14] error validation-required-field serverVariable.default is required",
+			},
+		},
+		{
+			name: "double curly braces variable",
+			yml: `
+url: http://{{hostname}}:8080
+variables:
+  hostname:
+    default: api
+`,
+			wantErrs: []string{
+				"error validation-invalid-syntax server variable '{hostname}' is not defined. Use single curly braces for variable substitution",
+			},
+		},
+		{
+			name: "double curly braces multiple variables",
+			yml: `
+url: http://{{hostname}}{{port}}
+variables:
+  hostname:
+    default: api
+  port:
+    default: "8080"
+`,
+			wantErrs: []string{
+				"error validation-invalid-syntax server variable '{hostname}' is not defined. Use single curly braces for variable substitution",
+				"error validation-invalid-syntax server variable '{port}' is not defined. Use single curly braces for variable substitution",
+			},
+		},
+		{
+			name: "missing variable with single braces",
+			yml: `
+url: http://{hostname}:8080
+variables:
+  port:
+    default: "8080"
+`,
+			wantErrs: []string{
+				"error validation-invalid-syntax server variable 'hostname' is not defined",
 			},
 		},
 	}
@@ -299,7 +338,7 @@ enum:
   - valid2
 description: Variable with invalid default
 `,
-			wantErrs: []string{"[4:3] error validation-allowed-values serverVariable.default must be one of [valid1, valid2]"},
+			wantErrs: []string{"[2:10] error validation-allowed-values serverVariable.default must be one of [valid1, valid2]"},
 		},
 	}
 

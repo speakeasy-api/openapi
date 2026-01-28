@@ -48,7 +48,7 @@ func (r *InfoDescriptionRule) Run(ctx context.Context, docInfo *linter.DocumentI
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleInfoDescription,
 			errors.New("info section is missing a description"),
-			info.GetCore().GetRootNode(),
+			info.GetRootNode(),
 		))
 	}
 

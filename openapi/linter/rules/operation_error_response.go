@@ -63,7 +63,7 @@ func (r *OperationErrorResponseRule) Run(ctx context.Context, docInfo *linter.Do
 
 		if !has4xxResponse {
 			// Get the responses node for error reporting
-			responsesNode := responses.GetCore().GetRootNode()
+			responsesNode := responses.GetRootNode()
 			errs = append(errs, validation.NewValidationError(
 				config.GetSeverity(r.DefaultSeverity()),
 				RuleStyleOperationErrorResponse,

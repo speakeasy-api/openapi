@@ -56,7 +56,7 @@ func (r *OAS3HostTrailingSlashRule) Run(ctx context.Context, docInfo *linter.Doc
 		if strings.HasSuffix(url, "/") {
 			errNode := GetFieldValueNode(server, "url", doc)
 			if errNode == nil {
-				errNode = server.GetCore().GetRootNode()
+				errNode = server.GetRootNode()
 			}
 
 			errs = append(errs, validation.NewValidationError(

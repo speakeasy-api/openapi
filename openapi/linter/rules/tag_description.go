@@ -63,7 +63,7 @@ func (r *TagDescriptionRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 				config.GetSeverity(r.DefaultSeverity()),
 				RuleStyleTagDescription,
 				fmt.Errorf("tag `%s` must have a description", name),
-				tag.GetCore().GetRootNode(),
+				tag.GetRootNode(),
 			))
 		}
 	}

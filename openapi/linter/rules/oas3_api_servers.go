@@ -54,7 +54,7 @@ func (r *OAS3APIServersRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 	// We need to check the actual Servers field on the document
 	if len(doc.Servers) == 0 {
 		// Get the root node for error reporting
-		rootNode := doc.GetCore().GetRootNode()
+		rootNode := doc.GetRootNode()
 		errs = append(errs, validation.NewValidationError(
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleOAS3APIServers,
@@ -75,7 +75,7 @@ func (r *OAS3APIServersRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 		if serverURL == "" {
 			errNode := GetFieldValueNode(server, "url", doc)
 			if errNode == nil {
-				errNode = server.GetCore().GetRootNode()
+				errNode = server.GetRootNode()
 			}
 
 			errs = append(errs, validation.NewValidationError(
@@ -99,7 +99,7 @@ func (r *OAS3APIServersRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 		if err != nil {
 			errNode := GetFieldValueNode(server, "url", doc)
 			if errNode == nil {
-				errNode = server.GetCore().GetRootNode()
+				errNode = server.GetRootNode()
 			}
 
 			errs = append(errs, validation.NewValidationError(
@@ -116,7 +116,7 @@ func (r *OAS3APIServersRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 		if parsed.Host == "" && parsed.Path == "" {
 			errNode := GetFieldValueNode(server, "url", doc)
 			if errNode == nil {
-				errNode = server.GetCore().GetRootNode()
+				errNode = server.GetRootNode()
 			}
 
 			errs = append(errs, validation.NewValidationError(

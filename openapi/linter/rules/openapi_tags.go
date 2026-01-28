@@ -50,7 +50,7 @@ func (r *OpenAPITagsRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleOpenAPITags,
 			errors.New("OpenAPI object must have a non-empty tags array"),
-			doc.GetCore().GetRootNode(),
+			doc.GetRootNode(),
 		)}
 	}
 

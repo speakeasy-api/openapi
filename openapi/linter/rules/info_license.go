@@ -48,7 +48,7 @@ func (r *InfoLicenseRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[
 			config.GetSeverity(r.DefaultSeverity()),
 			RuleStyleInfoLicense,
 			errors.New("info section should contain a license"),
-			info.GetCore().GetRootNode(),
+			info.GetRootNode(),
 		))
 	}
 

@@ -105,7 +105,7 @@ func (r *OperationSuccessResponseRule) Run(ctx context.Context, docInfo *linter.
 func getOperationResponsesKeyNode(op *openapi.Operation, doc *openapi.OpenAPI) *yaml.Node {
 	if op == nil {
 		if doc != nil {
-			return doc.GetCore().GetRootNode()
+			return doc.GetRootNode()
 		}
 		return nil
 	}
@@ -120,7 +120,7 @@ func getOperationResponsesKeyNode(op *openapi.Operation, doc *openapi.OpenAPI) *
 	}
 
 	if doc != nil {
-		return doc.GetCore().GetRootNode()
+		return doc.GetRootNode()
 	}
 
 	return nil

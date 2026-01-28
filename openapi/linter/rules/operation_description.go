@@ -68,7 +68,7 @@ func (r *OperationDescriptionRule) Run(ctx context.Context, docInfo *linter.Docu
 				config.GetSeverity(r.DefaultSeverity()),
 				RuleStyleOperationDescription,
 				fmt.Errorf("the %s is missing a description or summary", opIdentifier),
-				operation.GetCore().GetRootNode(),
+				operation.GetRootNode(),
 			))
 		}
 	}
