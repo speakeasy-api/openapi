@@ -11,6 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
 	openapiLinter "github.com/speakeasy-api/openapi/openapi/linter"
+	"github.com/speakeasy-api/openapi/openapi/linter/rules"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/references"
 	"github.com/stretchr/testify/assert"
@@ -434,4 +435,96 @@ paths:
 		"[1:7] error validation-invalid-schema schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string' (document: /spec/schema.yaml)",
 		"[1:7] error validation-type-mismatch schema.type expected array, got string (document: /spec/schema.yaml)",
 	}, documentErrors)
+}
+
+func TestNewLinter_WithoutDefaultRules(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	// Create linter with no rules
+	config := linter.NewConfig()
+	lntr := openapiLinter.NewLinter(config, openapiLinter.WithoutDefaultRules())
+
+	require.NotNil(t, lntr)
+	require.NotNil(t, lntr.Registry())
+
+	// Verify no rules registered
+	assert.Empty(t, lntr.Registry().AllRules(), "should have no rules registered")
+
+	// Parse test document with known linting issues
+	yamlInput := `
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users/{userId}:
+    get:
+      responses:
+        '200':
+          description: ok
+`
+
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(yamlInput))
+	require.NoError(t, err)
+
+	docInfo := linter.NewDocumentInfo(doc, "/spec/openapi.yaml")
+	output, err := lntr.Lint(ctx, docInfo, nil, nil)
+	require.NoError(t, err)
+
+	// Should have no lint errors since no rules are registered
+	assert.Empty(t, output.Results, "should have no lint errors with no rules")
+	assert.False(t, output.HasErrors())
+}
+
+func TestNewLinter_WithoutDefaultRules_ManualRegistration(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	// Create linter with no rules
+	config := &linter.Config{
+		Extends: []string{"all"}, // Enable all registered rules
+	}
+	lntr := openapiLinter.NewLinter(config, openapiLinter.WithoutDefaultRules())
+
+	// Manually register specific rules
+	lntr.Registry().Register(&rules.PathParamsRule{})
+
+	// Verify only one rule registered
+	assert.Len(t, lntr.Registry().AllRules(), 1, "should have exactly one rule registered")
+
+	yamlInput := `
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users/{userId}:
+    get:
+      responses:
+        '200':
+          description: ok
+`
+
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(yamlInput))
+	require.NoError(t, err)
+
+	docInfo := linter.NewDocumentInfo(doc, "/spec/openapi.yaml")
+	output, err := lntr.Lint(ctx, docInfo, nil, nil)
+	require.NoError(t, err)
+
+	// Should have error from PathParamsRule only
+	assert.NotEmpty(t, output.Results, "should have lint errors from registered rule")
+	assert.Contains(t, output.Results[0].Error(), "userId", "error should be about missing userId parameter")
+}
+
+func TestNewLinter_BackwardCompatibility(t *testing.T) {
+	t.Parallel()
+
+	// Verify NewLinter() without options still registers all default rules
+	config := linter.NewConfig()
+	lntr := openapiLinter.NewLinter(config)
+
+	// Should have many rules registered (125+)
+	assert.Greater(t, len(lntr.Registry().AllRules()), 60, "should have all default rules registered")
 }

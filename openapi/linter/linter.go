@@ -16,13 +16,55 @@ type Linter struct {
 	base *baseLinter.Linter[*openapi.OpenAPI]
 }
 
-// NewLinter creates a new OpenAPI linter with all default rules registered.
+// NewLinterOption is a functional option for configuring linter creation.
+type NewLinterOption func(*newLinterOpts)
+
+type newLinterOpts struct {
+	skipDefaultRules bool
+}
+
+// WithoutDefaultRules creates a linter with no rules registered.
+// This is useful for advanced use cases where you want to register custom
+// rules or selectively register only specific rules via the Registry() method.
+//
+// Example:
+//
+//	linter := NewLinter(config, WithoutDefaultRules())
+//	linter.Registry().Register(&rules.PathParamsRule{})
+func WithoutDefaultRules() NewLinterOption {
+	return func(o *newLinterOpts) {
+		o.skipDefaultRules = true
+	}
+}
+
+// NewLinter creates a new OpenAPI linter.
+// By default, all built-in rules are registered. Use WithoutDefaultRules()
+// to create a linter with no rules registered.
+//
+// Example - Default behavior (all rules):
+//
+//	linter := NewLinter(config)
+//
+// Example - No rules registered:
+//
+//	linter := NewLinter(config, WithoutDefaultRules())
+//	linter.Registry().Register(&rules.PathParamsRule{})
+//
 // The linter automatically builds an index before running rules.
-func NewLinter(config *baseLinter.Config) *Linter {
+func NewLinter(config *baseLinter.Config, opts ...NewLinterOption) *Linter {
+	options := &newLinterOpts{
+		skipDefaultRules: false,
+	}
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	registry := baseLinter.NewRegistry[*openapi.OpenAPI]()
 
-	// Register all OpenAPI rules
-	registerDefaultRules(registry)
+	// Register all OpenAPI rules unless explicitly skipped
+	if !options.skipDefaultRules {
+		registerDefaultRules(registry)
+	}
 
 	return &Linter{
 		base: baseLinter.NewLinter(config, registry),
