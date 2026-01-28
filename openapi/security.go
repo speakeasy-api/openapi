@@ -208,6 +208,10 @@ func (s *SecurityScheme) Validate(ctx context.Context, opts ...validation.Option
 			case SecuritySchemeTypeOpenIDConnect:
 				if !core.OpenIdConnectUrl.Present || *s.OpenIdConnectUrl == "" {
 					errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("securityScheme.openIdConnectUrl is required for type=openIdConnect"), core, core.OpenIdConnectUrl))
+				} else {
+					if _, err := url.Parse(*s.OpenIdConnectUrl); err != nil {
+						errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("securityScheme.openIdConnectUrl is not a valid uri: %w", err), core, core.OpenIdConnectUrl))
+					}
 				}
 			default:
 				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("securityScheme.type must be one of [%s]", strings.Join([]string{string(SecuritySchemeTypeAPIKey), string(SecuritySchemeTypeHTTP), string(SecuritySchemeTypeMutualTLS), string(SecuritySchemeTypeOAuth2), string(SecuritySchemeTypeOpenIDConnect)}, ", ")), core, core.Type))

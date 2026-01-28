@@ -229,6 +229,26 @@ oauth2MetadataUrl: ://invalid-url
 `,
 			wantErrs: []string{"oauth2MetadataUrl is not a valid uri"},
 		},
+		{
+			name: "oauth2_flow_invalid_authorization_url",
+			yml: `
+type: oauth2
+flows:
+  implicit:
+    authorizationUrl: http:// blah.
+    scopes:
+      read: Read access
+`,
+			wantErrs: []string{"authorizationUrl is not a valid uri"},
+		},
+		{
+			name: "openid_invalid_url",
+			yml: `
+type: openIdConnect
+openIdConnectUrl: http:// blah.
+`,
+			wantErrs: []string{"openIdConnectUrl is not a valid uri"},
+		},
 	}
 
 	for _, tt := range tests {
