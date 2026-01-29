@@ -148,7 +148,7 @@ content:
     schema:
       type: object
 `,
-			wantErrs: []string{"[2:1] response.description is missing"},
+			wantErrs: []string{"[2:1] error validation-required-field response.description is required"},
 		},
 		{
 			name: "empty description",
@@ -159,7 +159,7 @@ content:
     schema:
       type: object
 `,
-			wantErrs: []string{"[2:14] response.description is required"},
+			wantErrs: []string{"[2:14] error validation-required-field response.description is required"},
 		},
 		{
 			name: "invalid schema in content",
@@ -171,8 +171,8 @@ content:
       type: invalid-type
 `,
 			wantErrs: []string{
-				"[6:13] schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
-				"[6:13] schema.type expected array, got string",
+				"[6:13] error validation-invalid-schema schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"[6:13] error validation-type-mismatch schema.type expected array, got string",
 			},
 		},
 	}
@@ -298,19 +298,19 @@ func TestResponses_Validate_Error(t *testing.T) {
 "404":
   description: Not found
 `,
-			wantErrs: []string{"description is required"},
+			wantErrs: []string{"error validation-required-field response.description is required"},
 		},
 		{
 			name: "no response codes",
 			yml: `
 x-test: some-value
 `,
-			wantErrs: []string{"responses must have at least one response code"},
+			wantErrs: []string{"error validation-allowed-values responses must have at least one response code"},
 		},
 		{
 			name:     "empty responses object",
 			yml:      `{}`,
-			wantErrs: []string{"responses must have at least one response code"},
+			wantErrs: []string{"error validation-allowed-values responses must have at least one response code"},
 		},
 	}
 

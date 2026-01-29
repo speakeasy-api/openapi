@@ -309,7 +309,7 @@ get:
     '200':
       description: Successful response
 `,
-			wantErrs: []string{"[3:5] server.url is missing"},
+			wantErrs: []string{"[3:5] error validation-required-field server.url is required"},
 		},
 		{
 			name: "invalid_parameter",
@@ -324,7 +324,7 @@ get:
     '200':
       description: Successful response
 `,
-			wantErrs: []string{"[3:5] parameter.name is missing"},
+			wantErrs: []string{"[3:5] error validation-required-field parameter.name is required"},
 		},
 		{
 			name:           "unexpected_additional_operations",
@@ -360,7 +360,7 @@ additionalOperations:
         description: Successful response
     x-test: some-value
         `,
-			wantErrs: []string{"method [GET] is a standard HTTP method and must be defined in its own field"},
+			wantErrs: []string{"method [GET] is a standardized HTTP method and must be defined in its own field"},
 		},
 		{
 			name:           "invalid_openapi_version",
@@ -384,7 +384,7 @@ copy:
       '201':
         description: Resource copied
       `,
-			wantErrs: []string{"method [copy] is not a standard HTTP method and must be defined in the additionalOperations field"},
+			wantErrs: []string{"method [copy] is not a standardized HTTP method and must be listed under additionalOperations"},
 		},
 	}
 

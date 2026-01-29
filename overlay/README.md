@@ -3,7 +3,7 @@
     <img  width="200px" alt="OpenAPI" src="https://github.com/user-attachments/assets/b9fa9c14-1c6f-4d8b-910f-15e5f962bab6">
   </p>
   <h1 align="center"><b>OpenAPI Overlay</b></h1>
-  <p align="center">An implementation of the <a href="https://github.com/OAI/Overlay-Specification/blob/main/versions/1.1.0.md">OpenAPI Overlay Specification 1.1.0</a> for applying modifications to OpenAPI documents
+  <p align="center">An implementation of the <a href="https://github.com/OAI/Overlay-Specification/blob/3f398c6/versions/1.0.0.md">OpenAPI Overlay Specification</a> for applying modifications to OpenAPI documents
 </p>
   <p align="center">
     <!-- Overlay Reference badge -->
@@ -25,19 +25,16 @@
 
 ## Features
 
-- **OpenAPI Overlay Specification Compliance**: Full implementation of the [OpenAPI Overlay Specification 1.0.0](https://github.com/OAI/Overlay-Specification/blob/main/versions/1.0.0.md) and [1.1.0](https://github.com/OAI/Overlay-Specification/blob/main/versions/1.1.0.md)
+- **OpenAPI Overlay Specification Compliance**: Full implementation of the [OpenAPI Overlay Specification](https://github.com/OAI/Overlay-Specification/blob/3f398c6/versions/1.0.0.md) (2023-10-12) and [version 1.1.0](https://github.com/OAI/Overlay-Specification/blob/e2c3cec/versions/1.1.0-dev.md)
 - **JSONPath Target Selection**: Uses JSONPath expressions to select nodes for modification
-- **RFC 9535 JSONPath**: Version 1.1.0 uses RFC 9535-compliant JSONPath by default for improved interoperability
 - **Remove, Update, and Copy Actions**: Support for remove actions (pruning nodes), update actions (merging values), and copy actions (duplicating or moving nodes)
-- **Upgrade Support**: Built-in `Upgrade()` function to upgrade overlay documents from 1.0.0 to 1.1.0
-- **Info Description Field**: Version 1.1.0 supports a `description` field in the overlay info section
 - **Flexible Input/Output**: Works with both YAML and JSON formats
 - **Batch Operations**: Apply multiple modifications to large numbers of nodes in a single operation
 - **YAML v1.2 Support**: Uses [gopkg.in/yaml.v3](https://pkg.go.dev/gopkg.in/yaml.v3) for YAML v1.2 parsing (superset of JSON)
 
 ## About OpenAPI Overlays
 
-This specification defines a means of editing an OpenAPI Specification file by applying a list of actions. Each action is either a remove action that prunes nodes or an update that merges a value into nodes. The nodes impacted are selected by a target expression which uses JSONPath. This implementation supports [version 1.1.0](https://github.com/OAI/Overlay-Specification/blob/main/versions/1.1.0.md) which adds a `copy` action for duplicating or moving nodes within the document, RFC 9535 JSONPath as the default, and a description field in the info section.
+This specification defines a means of editing an OpenAPI Specification file by applying a list of actions. Each action is either a remove action that prunes nodes or an update that merges a value into nodes. The nodes impacted are selected by a target expression which uses JSONPath. This implementation also supports [version 1.1.0](https://github.com/OAI/Overlay-Specification/blob/e2c3cec/versions/1.1.0-dev.md) which adds a `copy` action for duplicating or moving nodes within the document.
 
 The specification itself says very little about the input file to be modified or the output file. The presumed intention is that the input and output be an OpenAPI Specification, but that is not required.
 

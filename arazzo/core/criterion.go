@@ -63,7 +63,7 @@ func (c *CriterionTypeUnion) Unmarshal(ctx context.Context, parentName string, n
 		c.DetermineValidity(validationErrs)
 	default:
 		return []error{
-			validation.NewValidationError(validation.NewTypeMismatchError(parentName, "criterionTypeUnion expected string or object, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+			validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, "criterionTypeUnion expected string or object, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
 		}, nil
 	}
 

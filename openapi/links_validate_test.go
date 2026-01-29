@@ -177,7 +177,7 @@ server:
   description: Invalid server without URL
 description: Link with invalid server
 `,
-			wantErrs: []string{"[4:3] server.url is missing"},
+			wantErrs: []string{"[4:3] error validation-required-field server.url is required"},
 		},
 		{
 			name: "invalid_operation_ref_uri",

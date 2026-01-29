@@ -485,9 +485,9 @@ func TestJSONSchema_Resolve_Caching(t *testing.T) {
 
 		// Set up cached resolved schema using the actual cache field
 		schema.referenceResolutionCache = &references.ResolveResult[JSONSchema[Referenceable]]{
-			Object:            resolved,
-			AbsoluteReference: "testdata/simple_schema.yaml#/components/schemas/User",
-			ResolvedDocument:  resolved,
+			Object:               resolved,
+			AbsoluteDocumentPath: "testdata/simple_schema.yaml#/components/schemas/User",
+			ResolvedDocument:     resolved,
 		}
 
 		root, err := LoadTestSchemaFromFile(t.Context(), "testdata/simple_schema.yaml")
@@ -1928,7 +1928,7 @@ func TestGetEffectiveBaseURI_Success(t *testing.T) {
 
 		schema := createSchemaWithRef("#foo")
 		schema.referenceResolutionCache = &references.ResolveResult[JSONSchema[Referenceable]]{
-			AbsoluteReference: "https://example.com/cached.json",
+			AbsoluteDocumentPath: "https://example.com/cached.json",
 		}
 
 		opts := ResolveOptions{

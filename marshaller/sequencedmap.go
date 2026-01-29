@@ -30,7 +30,7 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 	// Check if the node is actually a mapping node
 	if resolvedNode.Kind != yaml.MappingNode {
 		validationErr := validation.NewTypeMismatchError(parentName, "expected mapping node for sequenced map, got %v", resolvedNode.Kind)
-		return []error{validation.NewValidationError(validationErr, resolvedNode)}, nil
+		return []error{validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validationErr, resolvedNode)}, nil
 	}
 
 	target.Init()
@@ -57,7 +57,9 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 			indicesToSkip[existing.lastIndex] = true
 			// Create validation error for the earlier occurrence
 			duplicateKeyErrs = append(duplicateKeyErrs, validation.NewValidationError(
-				validation.NewValueValidationError("mapping key %q at line %d is a duplicate; previous definition at line %d", key, keyNode.Line, existing.firstLine),
+				validation.SeverityWarning,
+				validation.RuleValidationDuplicateKey,
+				fmt.Errorf("mapping key %q at line %d is a duplicate; previous definition at line %d", key, keyNode.Line, existing.firstLine),
 				keyNode,
 			))
 			// Update to point to current (last) occurrence

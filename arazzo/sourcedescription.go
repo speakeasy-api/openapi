@@ -2,6 +2,8 @@ package arazzo
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -57,14 +59,14 @@ func (s *SourceDescription) Validate(ctx context.Context, opts ...validation.Opt
 	errs := []error{}
 
 	if core.Name.Present && s.Name == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("sourceDescription.name is required"), core, core.Name))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("sourceDescription.name is required"), core, core.Name))
 	}
 
 	if core.URL.Present && s.URL == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("sourceDescription.url is required"), core, core.URL))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("sourceDescription.url is required"), core, core.URL))
 	} else if core.URL.Present {
 		if _, err := url.Parse(s.URL); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("sourceDescription.url is not a valid url/uri according to RFC 3986: %s", err), core, core.URL))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("sourceDescription.url is not a valid url/uri according to RFC 3986: %w", err), core, core.URL))
 		}
 	}
 
@@ -72,7 +74,7 @@ func (s *SourceDescription) Validate(ctx context.Context, opts ...validation.Opt
 	case SourceDescriptionTypeOpenAPI:
 	case SourceDescriptionTypeArazzo:
 	default:
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("sourceDescription.type must be one of [%s]", strings.Join([]string{SourceDescriptionTypeOpenAPI, SourceDescriptionTypeArazzo}, ", ")), core, core.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("sourceDescription.type must be one of [%s]", strings.Join([]string{SourceDescriptionTypeOpenAPI, SourceDescriptionTypeArazzo}, ", ")), core, core.Type))
 	}
 
 	s.Valid = len(errs) == 0 && core.GetValid()

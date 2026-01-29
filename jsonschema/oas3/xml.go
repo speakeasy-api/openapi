@@ -2,6 +2,7 @@ package oas3
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"reflect"
 
@@ -124,9 +125,9 @@ func (x *XML) Validate(ctx context.Context, opts ...validation.Option) []error {
 	if x.Namespace != nil {
 		u, err := url.Parse(*x.Namespace)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("xml.namespace is not a valid uri: %s", err), core, core.Namespace))
+			errs = append(errs, validation.NewValueError(validation.SeverityWarning, validation.RuleValidationInvalidFormat, fmt.Errorf("xml.namespace is not a valid uri: %w", err), core, core.Namespace))
 		} else if !u.IsAbs() {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("xml.namespace must be an absolute uri: %s", *x.Namespace), core, core.Namespace))
+			errs = append(errs, validation.NewValueError(validation.SeverityWarning, validation.RuleValidationInvalidFormat, fmt.Errorf("xml.namespace must be an absolute uri: %s", *x.Namespace), core, core.Namespace))
 		}
 	}
 

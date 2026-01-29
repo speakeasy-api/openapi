@@ -3,6 +3,7 @@ package arazzo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
@@ -69,22 +70,22 @@ func (f *FailureAction) Validate(ctx context.Context, opts ...validation.Option)
 	errs := []error{}
 
 	if core.Name.Present && f.Name == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("failureAction.name is required"), core, core.Name))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("failureAction.name is required"), core, core.Name))
 	}
 
 	switch f.Type {
 	case FailureActionTypeEnd:
 		if f.WorkflowID != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("failureAction.workflowId is not allowed when type: end is specified"), core, core.WorkflowID))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("failureAction.workflowId is not allowed when type: end is specified"), core, core.WorkflowID))
 		}
 		if f.StepID != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("failureAction.stepId is not allowed when type: end is specified"), core, core.StepID))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("failureAction.stepId is not allowed when type: end is specified"), core, core.StepID))
 		}
 		if f.RetryAfter != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("failureAction.retryAfter is not allowed when type: end is specified"), core, core.RetryAfter))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("failureAction.retryAfter is not allowed when type: end is specified"), core, core.RetryAfter))
 		}
 		if f.RetryLimit != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("failureAction.retryLimit is not allowed when type: end is specified"), core, core.RetryLimit))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("failureAction.retryLimit is not allowed when type: end is specified"), core, core.RetryLimit))
 		}
 	case FailureActionTypeGoto:
 		workflowIDNode := core.WorkflowID.GetKeyNodeOrRoot(core.RootNode)
@@ -100,10 +101,10 @@ func (f *FailureAction) Validate(ctx context.Context, opts ...validation.Option)
 			required:       true,
 		}, opts...)...)
 		if f.RetryAfter != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("failureAction.retryAfter is not allowed when type: goto is specified"), core, core.RetryAfter))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("failureAction.retryAfter is not allowed when type: goto is specified"), core, core.RetryAfter))
 		}
 		if f.RetryLimit != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("failureAction.retryLimit is not allowed when type: goto is specified"), core, core.RetryLimit))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("failureAction.retryLimit is not allowed when type: goto is specified"), core, core.RetryLimit))
 		}
 	case FailureActionTypeRetry:
 		workflowIDNode := core.WorkflowID.GetKeyNodeOrRoot(core.RootNode)
@@ -120,16 +121,16 @@ func (f *FailureAction) Validate(ctx context.Context, opts ...validation.Option)
 		}, opts...)...)
 		if f.RetryAfter != nil {
 			if *f.RetryAfter < 0 {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("failureAction.retryAfter must be greater than or equal to 0"), core, core.RetryAfter))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("failureAction.retryAfter must be greater than or equal to 0"), core, core.RetryAfter))
 			}
 		}
 		if f.RetryLimit != nil {
 			if *f.RetryLimit < 0 {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("failureAction.retryLimit must be greater than or equal to 0"), core, core.RetryLimit))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("failureAction.retryLimit must be greater than or equal to 0"), core, core.RetryLimit))
 			}
 		}
 	default:
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("failureAction.type must be one of [%s]", strings.Join([]string{string(FailureActionTypeEnd), string(FailureActionTypeGoto), string(FailureActionTypeRetry)}, ", ")), core, core.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("failureAction.type must be one of [%s]", strings.Join([]string{string(FailureActionTypeEnd), string(FailureActionTypeGoto), string(FailureActionTypeRetry)}, ", ")), core, core.Type))
 	}
 
 	for i := range f.Criteria {

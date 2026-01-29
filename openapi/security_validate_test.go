@@ -160,7 +160,7 @@ func TestSecurityScheme_Validate_Error(t *testing.T) {
 			yml: `
 description: Some security scheme
 `,
-			wantErrs: []string{"[2:1] securityScheme.type is missing"},
+			wantErrs: []string{"[2:1] error validation-required-field securityScheme.type is required"},
 		},
 		{
 			name: "invalid_type",
@@ -228,6 +228,26 @@ flows:
 oauth2MetadataUrl: ://invalid-url
 `,
 			wantErrs: []string{"oauth2MetadataUrl is not a valid uri"},
+		},
+		{
+			name: "oauth2_flow_invalid_authorization_url",
+			yml: `
+type: oauth2
+flows:
+  implicit:
+    authorizationUrl: http:// blah.
+    scopes:
+      read: Read access
+`,
+			wantErrs: []string{"authorizationUrl is not a valid uri"},
+		},
+		{
+			name: "openid_invalid_url",
+			yml: `
+type: openIdConnect
+openIdConnectUrl: http:// blah.
+`,
+			wantErrs: []string{"openIdConnectUrl is not a valid uri"},
 		},
 	}
 

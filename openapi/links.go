@@ -2,6 +2,8 @@ package openapi
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/url"
 
 	"github.com/speakeasy-api/openapi/expression"
@@ -105,7 +107,7 @@ func (l *Link) Validate(ctx context.Context, opts ...validation.Option) []error 
 	o := validation.GetContextObject[OpenAPI](op)
 
 	if core.OperationID.Present && core.OperationRef.Present {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("operationID and operationRef are mutually exclusive"), core, core.OperationID))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("operationID and operationRef are mutually exclusive"), core, core.OperationID))
 	}
 
 	if l.OperationID != nil {
@@ -135,36 +137,36 @@ func (l *Link) Validate(ctx context.Context, opts ...validation.Option) []error 
 		}
 
 		if !foundOp {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("link.operationId value %s does not exist in document", *l.OperationID), core, core.OperationID))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationOperationNotFound, fmt.Errorf("link.operationId value %s does not exist in document", *l.OperationID), core, core.OperationID))
 		}
 	}
 
 	// TODO should we validate the reference resolves here? Or as part of the resolution operation? Or make it optional?
 	if l.OperationRef != nil {
 		if _, err := url.Parse(*l.OperationRef); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("link.operationRef is not a valid uri: %s", err), core, core.OperationRef))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("link.operationRef is not a valid uri: %w", err), core, core.OperationRef))
 		}
 	}
 
 	for key, exp := range l.GetParameters().All() {
 		_, expression, err := expression.GetValueOrExpressionValue(exp)
 		if err != nil {
-			errs = append(errs, validation.NewMapValueError(validation.NewValueValidationError("link.parameters expression is invalid: %s", err.Error()), core, core.Parameters, key))
+			errs = append(errs, validation.NewMapValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("link.parameters expression is invalid: %w", err), core, core.Parameters, key))
 		}
 		if expression != nil {
 			if err := expression.Validate(); err != nil {
-				errs = append(errs, validation.NewMapValueError(validation.NewValueValidationError("link.parameters expression is invalid: %s", err.Error()), core, core.Parameters, key))
+				errs = append(errs, validation.NewMapValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("link.parameters expression is invalid: %w", err), core, core.Parameters, key))
 			}
 		}
 	}
 
 	_, rbe, err := expression.GetValueOrExpressionValue(l.RequestBody)
 	if err != nil {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("link.requestBody expression is invalid: %s", err.Error()), core, core.RequestBody))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("link.requestBody expression is invalid: %w", err), core, core.RequestBody))
 	}
 	if rbe != nil {
 		if err := rbe.Validate(); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("link.requestBody expression is invalid: %s", err.Error()), core, core.RequestBody))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("link.requestBody expression is invalid: %w", err), core, core.RequestBody))
 		}
 	}
 

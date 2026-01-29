@@ -218,7 +218,7 @@ value:
   id: 123
 externalValue: https://example.com/user.json
 `,
-			wantErrs: []string{"value and externalValue are mutually exclusive"},
+			wantErrs: []string{"error validation-mutually-exclusive-fields example.value and example.externalValue are mutually exclusive"},
 		},
 	}
 

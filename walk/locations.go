@@ -50,3 +50,34 @@ func (l Locations[T]) ToJSONPointer() jsonpointer.JSONPointer {
 
 	return jsonpointer.JSONPointer(sb.String())
 }
+
+// IsParent checks if the immediate parent field matches the given field name.
+// It handles both direct struct fields and map/slice items.
+func (l Locations[T]) IsParent(field string) bool {
+	if len(l) == 0 {
+		return false
+	}
+
+	last := l[len(l)-1]
+	if last.ParentKey != nil || last.ParentIndex != nil {
+		if len(l) < 2 {
+			return false
+		}
+		return l[len(l)-2].ParentField == field
+	}
+
+	return last.ParentField == field
+}
+
+// ParentKey returns the key of the current item if it is in a map.
+// Returns empty string if not in a map or key is nil.
+func (l Locations[T]) ParentKey() string {
+	if len(l) == 0 {
+		return ""
+	}
+	last := l[len(l)-1]
+	if last.ParentKey != nil {
+		return *last.ParentKey
+	}
+	return ""
+}

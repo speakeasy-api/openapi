@@ -181,7 +181,7 @@ in: query
 schema:
   type: string
 `,
-			wantErrs: []string{"[2:1] parameter.name is missing"},
+			wantErrs: []string{"[2:1] error validation-required-field parameter.name is required"},
 		},
 		{
 			name: "empty name",
@@ -191,7 +191,7 @@ in: query
 schema:
   type: string
 `,
-			wantErrs: []string{"[2:7] parameter.name is required"},
+			wantErrs: []string{"[2:7] error validation-required-field parameter.name is required"},
 		},
 		{
 			name: "missing in",
@@ -200,7 +200,7 @@ name: test
 schema:
   type: string
 `,
-			wantErrs: []string{"[2:1] parameter.in is missing"},
+			wantErrs: []string{"[2:1] error validation-required-field parameter.in is required"},
 		},
 		{
 			name: "path parameter not required",
@@ -211,7 +211,7 @@ required: false
 schema:
   type: string
 `,
-			wantErrs: []string{"[4:11] parameter.in=path requires required=true"},
+			wantErrs: []string{"[4:11] error validation-required-field parameter.in=path requires required=true"},
 		},
 		{
 			name: "invalid parameter location",
@@ -221,7 +221,7 @@ in: invalid
 schema:
   type: string
 `,
-			wantErrs: []string{"[3:5] parameter.in must be one of [query, querystring, header, path, cookie]"},
+			wantErrs: []string{"[3:5] error validation-allowed-values parameter.in must be one of [query, querystring, header, path, cookie]"},
 		},
 		{
 			name: "multiple validation errors",
@@ -231,8 +231,8 @@ in: path
 required: false
 `,
 			wantErrs: []string{
-				"[2:7] parameter.name is required",
-				"[4:11] parameter.in=path requires required=true",
+				"[2:7] error validation-required-field parameter.name is required",
+				"[4:11] error validation-required-field parameter.in=path requires required=true",
 			},
 		},
 		{
@@ -244,8 +244,8 @@ schema:
   type: object
 `,
 			wantErrs: []string{
-				"parameter field schema is not allowed for in=querystring",
-				"parameter field content is required for in=querystring",
+				"error validation-allowed-values parameter.schema is not allowed for in=querystring",
+				"error validation-required-field parameter.content is required for in=querystring",
 			},
 		},
 		{
@@ -259,7 +259,7 @@ content:
     schema:
       type: object
 `,
-			wantErrs: []string{"parameter field style is not allowed for in=querystring"},
+			wantErrs: []string{"error validation-allowed-values parameter field style is not allowed for in=querystring"},
 		},
 		{
 			name: "querystring parameter missing content",
@@ -268,7 +268,7 @@ name: filter
 in: querystring
 description: Missing content field
 `,
-			wantErrs: []string{"parameter field content is required for in=querystring"},
+			wantErrs: []string{"error validation-required-field parameter.content is required for in=querystring"},
 		},
 		{
 			name: "parameter with multiple content entries",
@@ -283,7 +283,7 @@ content:
     schema:
       type: object
 `,
-			wantErrs: []string{"parameter field content must have exactly one entry"},
+			wantErrs: []string{"error validation-allowed-values parameter.content must have exactly one entry"},
 		},
 	}
 
