@@ -1617,3 +1617,422 @@ paths:
 		})
 	}
 }
+
+func TestBuildIndex_CircularReferenceCounts_ValidCircular_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Node:
+      type: object
+      properties:
+        value:
+          type: string
+        next:
+          $ref: '#/components/schemas/Node'
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+	assert.Equal(t, 1, idx.GetValidCircularRefCount(), "should have 1 valid circular reference")
+	assert.Equal(t, 0, idx.GetInvalidCircularRefCount(), "should have 0 invalid circular references")
+	assert.Empty(t, idx.GetCircularReferenceErrors(), "should have no circular reference errors")
+}
+
+func TestBuildIndex_CircularReferenceCounts_InvalidCircular_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    BadNode:
+      type: object
+      required:
+        - next
+      properties:
+        next:
+          $ref: '#/components/schemas/BadNode'
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+	assert.Equal(t, 0, idx.GetValidCircularRefCount(), "should have 0 valid circular references")
+	assert.Equal(t, 1, idx.GetInvalidCircularRefCount(), "should have 1 invalid circular reference")
+	assert.Len(t, idx.GetCircularReferenceErrors(), 1, "should have 1 circular reference error")
+}
+
+func TestBuildIndex_CircularReferenceCounts_MixedCirculars_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    GoodNode:
+      type: object
+      properties:
+        value:
+          type: string
+        next:
+          $ref: '#/components/schemas/GoodNode'
+    BadNode:
+      type: object
+      required:
+        - next
+      properties:
+        next:
+          $ref: '#/components/schemas/BadNode'
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+	assert.Equal(t, 1, idx.GetValidCircularRefCount(), "should have 1 valid circular reference")
+	assert.Equal(t, 1, idx.GetInvalidCircularRefCount(), "should have 1 invalid circular reference")
+	assert.Len(t, idx.GetCircularReferenceErrors(), 1, "should have 1 circular reference error")
+}
+
+func TestBuildIndex_CircularReferenceCounts_ArrayWithMinItems_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    TreeNode:
+      type: object
+      properties:
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/TreeNode'
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+	assert.Equal(t, 1, idx.GetValidCircularRefCount(), "should have 1 valid circular reference (empty array terminates)")
+	assert.Equal(t, 0, idx.GetInvalidCircularRefCount(), "should have 0 invalid circular references")
+	assert.Empty(t, idx.GetCircularReferenceErrors(), "should have no circular reference errors")
+}
+
+func TestBuildIndex_CircularReferenceCounts_NullableSchema_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    NullableNode:
+      type: object
+      nullable: true
+      required:
+        - next
+      properties:
+        next:
+          $ref: '#/components/schemas/NullableNode'
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+	assert.Equal(t, 1, idx.GetValidCircularRefCount(), "should have 1 valid circular reference (nullable terminates)")
+	assert.Equal(t, 0, idx.GetInvalidCircularRefCount(), "should have 0 invalid circular references")
+	assert.Empty(t, idx.GetCircularReferenceErrors(), "should have no circular reference errors")
+}
+
+func TestBuildIndex_CircularReferenceCounts_OneOfValid_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	tests := []struct {
+		name                  string
+		yaml                  string
+		expectedValidCircular int
+	}{
+		{
+			name: "oneOf with referenced schema",
+			yaml: `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    PolyNode:
+      oneOf:
+        - type: string
+        - $ref: '#/components/schemas/PolyNodeObject'
+    PolyNodeObject:
+      type: object
+      properties:
+        next:
+          $ref: '#/components/schemas/PolyNode'
+`,
+			// 2 circular refs detected: one starting from PolyNode, one from PolyNodeObject
+			// Both are part of the same cycle but detected at different entry points
+			expectedValidCircular: 2,
+		},
+		{
+			name: "oneOf with inline schema",
+			yaml: `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    PolyNode:
+      oneOf:
+        - type: string
+        - type: object
+          properties:
+            next:
+              $ref: '#/components/schemas/PolyNode'
+`,
+			// 1 circular ref: PolyNode referencing itself
+			expectedValidCircular: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := unmarshalOpenAPI(t, ctx, tt.yaml)
+			idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+				RootDocument:   doc,
+				TargetDocument: doc,
+				TargetLocation: "test.yaml",
+			})
+
+			require.NotNil(t, idx, "index should not be nil")
+			assert.Equal(t, tt.expectedValidCircular, idx.GetValidCircularRefCount(), "should have expected valid circular references")
+			assert.Equal(t, 0, idx.GetInvalidCircularRefCount(), "should have 0 invalid circular references")
+			assert.Empty(t, idx.GetCircularReferenceErrors(), "should have no circular reference errors")
+		})
+	}
+}
+
+func TestBuildIndex_CircularReferenceCounts_GettersWithNilIndex_Success(t *testing.T) {
+	t.Parallel()
+
+	var idx *openapi.Index = nil
+
+	assert.Equal(t, 0, idx.GetValidCircularRefCount(), "should return 0 for nil index")
+	assert.Equal(t, 0, idx.GetInvalidCircularRefCount(), "should return 0 for nil index")
+}
+
+func TestIndex_GetAllReferences_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          $ref: '#/components/responses/UserResponse'
+      callbacks:
+        statusUpdate:
+          $ref: '#/components/callbacks/StatusCallback'
+components:
+  parameters:
+    UserIdParam:
+      name: userId
+      in: query
+      schema:
+        type: string
+  responses:
+    UserResponse:
+      description: User response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/User'
+          examples:
+            user1:
+              $ref: '#/components/examples/UserExample'
+      headers:
+        X-Custom:
+          $ref: '#/components/headers/CustomHeader'
+      links:
+        self:
+          $ref: '#/components/links/SelfLink'
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        profile:
+          $ref: '#/components/schemas/Profile'
+    Profile:
+      type: object
+      properties:
+        name:
+          type: string
+  examples:
+    UserExample:
+      value:
+        id: "123"
+  headers:
+    CustomHeader:
+      schema:
+        type: string
+  links:
+    SelfLink:
+      operationId: getUsers
+  requestBodies:
+    UserBody:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/User'
+  callbacks:
+    StatusCallback:
+      '{$request.body#/callbackUrl}':
+        post:
+          requestBody:
+            $ref: '#/components/requestBodies/UserBody'
+          responses:
+            '200':
+              description: Callback response
+  securitySchemes:
+    ApiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+	assert.False(t, idx.HasErrors(), "should have no errors")
+
+	// Get all references
+	allRefs := idx.GetAllReferences()
+	require.NotNil(t, allRefs, "GetAllReferences should not return nil")
+
+	expectedRefCount := 10
+	assert.Len(t, allRefs, expectedRefCount, "should have expected number of references")
+
+	// Verify all returned nodes implement ReferenceNode interface
+	for i, ref := range allRefs {
+		assert.NotNil(t, ref, "reference at index %d should not be nil", i)
+		assert.NotNil(t, ref.Node, "reference node at index %d should not be nil", i)
+
+		// Verify it's actually a reference
+		assert.True(t, ref.Node.IsReference(), "node at index %d should be a reference", i)
+
+		// Verify it has a reference value
+		refVal := ref.Node.GetReference()
+		assert.NotEmpty(t, refVal, "node at index %d should have a reference value", i)
+	}
+
+	// Verify specific reference counts
+	assert.Len(t, idx.SchemaReferences, 3, "should have 3 schema references")
+	assert.Len(t, idx.ParameterReferences, 1, "should have 1 parameter reference")
+	assert.Len(t, idx.ResponseReferences, 1, "should have 1 response reference")
+	assert.Len(t, idx.ExampleReferences, 1, "should have 1 example reference")
+	assert.Len(t, idx.HeaderReferences, 1, "should have 1 header reference")
+	assert.Len(t, idx.LinkReferences, 1, "should have 1 link reference")
+	assert.Len(t, idx.RequestBodyReferences, 1, "should have 1 request body reference")
+	assert.Len(t, idx.CallbackReferences, 1, "should have 1 callback reference")
+}
+
+func TestIndex_GetAllReferences_EmptyDoc_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Empty API
+  version: 1.0.0
+paths: {}
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+
+	allRefs := idx.GetAllReferences()
+	assert.Empty(t, allRefs, "should have no references in empty doc")
+}
+
+func TestIndex_GetAllReferences_NilIndex_Success(t *testing.T) {
+	t.Parallel()
+
+	var idx *openapi.Index = nil
+	allRefs := idx.GetAllReferences()
+	assert.Nil(t, allRefs, "should return nil for nil index")
+}

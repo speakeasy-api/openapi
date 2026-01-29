@@ -32,13 +32,14 @@ const (
 // CircularPathSegment represents a segment of the path through the schema tree.
 // It captures constraint information needed to determine if a circular reference can terminate.
 type CircularPathSegment struct {
-	Field         string // e.g., "properties", "items", "allOf", "oneOf", "anyOf", "additionalProperties"
-	PropertyName  string // Set if Field == "properties"
-	IsRequired    bool   // Set if this property is in parent's Required array
-	ArrayMinItems int64  // Parent's MinItems value (0 means empty array terminates)
-	MinProperties int64  // Parent's MinProperties value (0 means empty object terminates)
-	BranchIndex   int    // Index in oneOf/anyOf/allOf array
-	IsNullable    bool   // True if this schema allows null (termination point)
+	Field         string                        // e.g., "properties", "items", "allOf", "oneOf", "anyOf", "additionalProperties"
+	PropertyName  string                        // Set if Field == "properties"
+	IsRequired    bool                          // Set if this property is in parent's Required array
+	ArrayMinItems int64                         // Parent's MinItems value (0 means empty array terminates)
+	MinProperties int64                         // Parent's MinProperties value (0 means empty object terminates)
+	BranchIndex   int                           // Index in oneOf/anyOf/allOf array
+	IsNullable    bool                          // True if this schema allows null (termination point)
+	ParentSchema  *oas3.JSONSchemaReferenceable // The parent schema (for polymorphic cases)
 }
 
 // SchemaVisitInfo tracks the visitation state of a schema during indexing.
@@ -169,6 +170,9 @@ type Index struct {
 	resolutionErrs []error
 	circularErrs   []error
 
+	validCircularRefs   int // Count of valid (terminating) circular references
+	invalidCircularRefs int // Count of invalid (non-terminating) circular references
+
 	resolveOpts references.ResolveOptions
 
 	// Circular reference tracking (internal)
@@ -184,6 +188,7 @@ type Index struct {
 	referenceStack       []referenceStackEntry                  // Active reference resolution chain (by ref target)
 	polymorphicRefs      []*PolymorphicCircularRef              // Pending polymorphic circulars
 	visitedRefs          map[string]bool                        // Tracks visited ref targets to avoid duplicates
+	indexedReferences    map[any]bool                           // Tracks indexed reference objects to ensure each $ref appears once
 	currentDocumentStack []string                               // Stack of document paths being walked (for determining external vs main)
 }
 
@@ -223,6 +228,7 @@ func BuildIndex(ctx context.Context, doc *OpenAPI, resolveOpts references.Resolv
 		referenceStack:       make([]referenceStackEntry, 0),
 		polymorphicRefs:      make([]*PolymorphicCircularRef, 0),
 		visitedRefs:          make(map[string]bool),
+		indexedReferences:    make(map[any]bool),
 		currentDocumentStack: []string{resolveOpts.TargetLocation}, // Start with main document
 	}
 
@@ -381,6 +387,120 @@ func (i *Index) GetAllCallbacks() []*IndexNode[*ReferencedCallback] {
 	return allCallbacks
 }
 
+// ReferenceNode represents any node that can be a reference in an OpenAPI document.
+// This interface is satisfied by both Reference[T, V, C] types (PathItem, Parameter, Response, etc.)
+// and JSONSchemaReferenceable.
+type ReferenceNode interface {
+	GetReference() references.Reference
+	IsReference() bool
+	GetRootNode() *yaml.Node
+}
+
+// GetAllReferences returns all reference nodes in the index across all reference types.
+// This includes SchemaReferences, PathItemReferences, ParameterReferences, ResponseReferences,
+// RequestBodyReferences, HeaderReferences, ExampleReferences, LinkReferences, CallbackReferences,
+// and SecuritySchemeReferences.
+func (i *Index) GetAllReferences() []*IndexNode[ReferenceNode] {
+	if i == nil {
+		return nil
+	}
+
+	totalCount := len(i.SchemaReferences) +
+		len(i.PathItemReferences) +
+		len(i.ParameterReferences) +
+		len(i.ResponseReferences) +
+		len(i.RequestBodyReferences) +
+		len(i.HeaderReferences) +
+		len(i.ExampleReferences) +
+		len(i.LinkReferences) +
+		len(i.CallbackReferences) +
+		len(i.SecuritySchemeReferences)
+
+	allReferences := make([]*IndexNode[ReferenceNode], 0, totalCount)
+
+	// Add schema references
+	for _, ref := range i.SchemaReferences {
+		allReferences = append(allReferences, &IndexNode[ReferenceNode]{
+			Node:     ref.Node,
+			Location: ref.Location,
+		})
+	}
+
+	// Add path item references
+	for _, ref := range i.PathItemReferences {
+		allReferences = append(allReferences, &IndexNode[ReferenceNode]{
+			Node:     ref.Node,
+			Location: ref.Location,
+		})
+	}
+
+	// Add parameter references
+	for _, ref := range i.ParameterReferences {
+		allReferences = append(allReferences, &IndexNode[ReferenceNode]{
+			Node:     ref.Node,
+			Location: ref.Location,
+		})
+	}
+
+	// Add response references
+	for _, ref := range i.ResponseReferences {
+		allReferences = append(allReferences, &IndexNode[ReferenceNode]{
+			Node:     ref.Node,
+			Location: ref.Location,
+		})
+	}
+
+	// Add request body references
+	for _, ref := range i.RequestBodyReferences {
+		allReferences = append(allReferences, &IndexNode[ReferenceNode]{
+			Node:     ref.Node,
+			Location: ref.Location,
+		})
+	}
+
+	// Add header references
+	for _, ref := range i.HeaderReferences {
+		allReferences = append(allReferences, &IndexNode[ReferenceNode]{
+			Node:     ref.Node,
+			Location: ref.Location,
+		})
+	}
+
+	// Add example references
+	for _, ref := range i.ExampleReferences {
+		allReferences = append(allReferences, &IndexNode[ReferenceNode]{
+			Node:     ref.Node,
+			Location: ref.Location,
+		})
+	}
+
+	// Add link references
+	for _, ref := range i.LinkReferences {
+		allReferences = append(allReferences, &IndexNode[ReferenceNode]{
+			Node:     ref.Node,
+			Location: ref.Location,
+		})
+	}
+
+	// Add callback references
+	for _, ref := range i.CallbackReferences {
+		allReferences = append(allReferences, &IndexNode[ReferenceNode]{
+			Node:     ref.Node,
+			Location: ref.Location,
+		})
+	}
+
+	// Add security scheme references
+	for _, ref := range i.SecuritySchemeReferences {
+		allReferences = append(allReferences, &IndexNode[ReferenceNode]{
+			Node:     ref.Node,
+			Location: ref.Location,
+		})
+	}
+
+	return allReferences
+}
+
 // GetValidationErrors returns validation errors from resolution operations.
 func (i *Index) GetValidationErrors() []error {
 	if i == nil {
@@ -423,6 +543,22 @@ func (i *Index) HasErrors() bool {
 		return false
 	}
 	return len(i.validationErrs) > 0 || len(i.resolutionErrs) > 0 || len(i.circularErrs) > 0
+}
+
+// GetValidCircularRefCount returns the count of valid (terminating) circular references found during indexing.
+func (i *Index) GetValidCircularRefCount() int {
+	if i == nil {
+		return 0
+	}
+	return i.validCircularRefs
+}
+
+// GetInvalidCircularRefCount returns the count of invalid (non-terminating) circular references found during indexing.
+func (i *Index) GetInvalidCircularRefCount() int {
+	if i == nil {
+		return 0
+	}
+	return i.invalidCircularRefs
 }
 
 func buildIndex[T any](ctx context.Context, index *Index, obj *T) error {
@@ -574,11 +710,15 @@ func (i *Index) indexSchema(ctx context.Context, loc Locations, schema *oas3.JSO
 	}
 
 	if schema.IsReference() {
-		// Add to references list (allow duplicates at different locations)
-		i.SchemaReferences = append(i.SchemaReferences, &IndexNode[*oas3.JSONSchemaReferenceable]{
-			Node:     schema,
-			Location: loc,
-		})
+		// Add to references list only if this exact schema object hasn't been indexed yet
+		// This ensures each $ref in the source document is indexed exactly once
+		if !i.indexedSchemas[schema] {
+			i.SchemaReferences = append(i.SchemaReferences, &IndexNode[*oas3.JSONSchemaReferenceable]{
+				Node:     schema,
+				Location: loc,
+			})
+			i.indexedSchemas[schema] = true
+		}
 
 		// Get the $ref target for tracking
 		refTarget := getRefTarget(schema)
@@ -603,7 +743,9 @@ func (i *Index) indexSchema(ctx context.Context, loc Locations, schema *oas3.JSO
 				// Classify the circular reference
 				classification, polymorphicInfo := i.classifyCircularPath(schema, pathSegments, loc)
 
-				if classification == CircularInvalid {
+				switch classification {
+				case CircularInvalid:
+					i.invalidCircularRefs++
 					err := fmt.Errorf("non-terminating circular reference detected: %s", joinReferenceChainWithArrows(circularChain))
 					i.circularErrs = append(i.circularErrs, validation.NewValidationErrorWithDocumentLocation(
 						validation.SeverityError,
@@ -612,10 +754,15 @@ func (i *Index) indexSchema(ctx context.Context, loc Locations, schema *oas3.JSO
 						getSchemaErrorNode(schema),
 						externalDocumentPath,
 					))
-				} else if classification == CircularPending && polymorphicInfo != nil {
-					i.recordPolymorphicBranch(polymorphicInfo)
+				case CircularPending:
+					if polymorphicInfo != nil {
+						i.recordPolymorphicBranch(polymorphicInfo)
+					}
+				case CircularValid:
+					i.validCircularRefs++
+				case CircularUnclassified:
+					// No action needed for unclassified circulars
 				}
-				// CircularValid - no action needed
 
 				// Stop processing this branch - don't walk the same schema again
 				return nil
@@ -861,10 +1008,14 @@ func (i *Index) indexReferencedPathItem(ctx context.Context, loc Locations, path
 
 	// Categorize path items similarly to schemas
 	if pathItem.IsReference() {
-		i.PathItemReferences = append(i.PathItemReferences, &IndexNode[*ReferencedPathItem]{
-			Node:     pathItem,
-			Location: loc,
-		})
+		// Add to references list only if this exact reference object hasn't been indexed
+		if !i.indexedReferences[pathItem] {
+			i.PathItemReferences = append(i.PathItemReferences, &IndexNode[*ReferencedPathItem]{
+				Node:     pathItem,
+				Location: loc,
+			})
+			i.indexedReferences[pathItem] = true
+		}
 
 		// Get the document path for the resolved path item
 		info := pathItem.GetReferenceResolutionInfo()
@@ -904,7 +1055,7 @@ func (i *Index) indexReferencedPathItem(ctx context.Context, loc Locations, path
 
 	// Check if this is a component path item
 	if isTopLevelComponent(loc, "pathItems") {
-		if obj != nil && !i.indexedPathItems[obj] {
+		if !i.indexedPathItems[obj] {
 			i.ComponentPathItems = append(i.ComponentPathItems, &IndexNode[*ReferencedPathItem]{
 				Node:     pathItem,
 				Location: loc,
@@ -957,10 +1108,14 @@ func (i *Index) indexReferencedParameter(ctx context.Context, loc Locations, par
 	}
 
 	if param.IsReference() {
-		i.ParameterReferences = append(i.ParameterReferences, &IndexNode[*ReferencedParameter]{
-			Node:     param,
-			Location: loc,
-		})
+		// Add to references list only if this exact reference object hasn't been indexed
+		if !i.indexedReferences[param] {
+			i.ParameterReferences = append(i.ParameterReferences, &IndexNode[*ReferencedParameter]{
+				Node:     param,
+				Location: loc,
+			})
+			i.indexedReferences[param] = true
+		}
 
 		// Get the document path for the resolved parameter
 		info := param.GetReferenceResolutionInfo()
@@ -1052,10 +1207,14 @@ func (i *Index) indexReferencedResponse(ctx context.Context, loc Locations, resp
 	}
 
 	if resp.IsReference() {
-		i.ResponseReferences = append(i.ResponseReferences, &IndexNode[*ReferencedResponse]{
-			Node:     resp,
-			Location: loc,
-		})
+		// Add to references list only if this exact reference object hasn't been indexed
+		if !i.indexedReferences[resp] {
+			i.ResponseReferences = append(i.ResponseReferences, &IndexNode[*ReferencedResponse]{
+				Node:     resp,
+				Location: loc,
+			})
+			i.indexedReferences[resp] = true
+		}
 
 		// Get the document path for the resolved response
 		info := resp.GetReferenceResolutionInfo()
@@ -1137,10 +1296,14 @@ func (i *Index) indexReferencedRequestBody(ctx context.Context, loc Locations, r
 	}
 
 	if rb.IsReference() {
-		i.RequestBodyReferences = append(i.RequestBodyReferences, &IndexNode[*ReferencedRequestBody]{
-			Node:     rb,
-			Location: loc,
-		})
+		// Add to references list only if this exact reference object hasn't been indexed
+		if !i.indexedReferences[rb] {
+			i.RequestBodyReferences = append(i.RequestBodyReferences, &IndexNode[*ReferencedRequestBody]{
+				Node:     rb,
+				Location: loc,
+			})
+			i.indexedReferences[rb] = true
+		}
 
 		// Get the document path for the resolved request body
 		info := rb.GetReferenceResolutionInfo()
@@ -1222,10 +1385,14 @@ func (i *Index) indexReferencedHeader(ctx context.Context, loc Locations, header
 	}
 
 	if header.IsReference() {
-		i.HeaderReferences = append(i.HeaderReferences, &IndexNode[*ReferencedHeader]{
-			Node:     header,
-			Location: loc,
-		})
+		// Add to references list only if this exact reference object hasn't been indexed
+		if !i.indexedReferences[header] {
+			i.HeaderReferences = append(i.HeaderReferences, &IndexNode[*ReferencedHeader]{
+				Node:     header,
+				Location: loc,
+			})
+			i.indexedReferences[header] = true
+		}
 
 		// Get the document path for the resolved header
 		info := header.GetReferenceResolutionInfo()
@@ -1307,10 +1474,14 @@ func (i *Index) indexReferencedExample(ctx context.Context, loc Locations, examp
 	}
 
 	if example.IsReference() {
-		i.ExampleReferences = append(i.ExampleReferences, &IndexNode[*ReferencedExample]{
-			Node:     example,
-			Location: loc,
-		})
+		// Add to references list only if this exact reference object hasn't been indexed
+		if !i.indexedReferences[example] {
+			i.ExampleReferences = append(i.ExampleReferences, &IndexNode[*ReferencedExample]{
+				Node:     example,
+				Location: loc,
+			})
+			i.indexedReferences[example] = true
+		}
 
 		// Get the document path for the resolved example
 		info := example.GetReferenceResolutionInfo()
@@ -1392,10 +1563,14 @@ func (i *Index) indexReferencedLink(ctx context.Context, loc Locations, link *Re
 	}
 
 	if link.IsReference() {
-		i.LinkReferences = append(i.LinkReferences, &IndexNode[*ReferencedLink]{
-			Node:     link,
-			Location: loc,
-		})
+		// Add to references list only if this exact reference object hasn't been indexed
+		if !i.indexedReferences[link] {
+			i.LinkReferences = append(i.LinkReferences, &IndexNode[*ReferencedLink]{
+				Node:     link,
+				Location: loc,
+			})
+			i.indexedReferences[link] = true
+		}
 
 		// Get the document path for the resolved link
 		info := link.GetReferenceResolutionInfo()
@@ -1477,10 +1652,14 @@ func (i *Index) indexReferencedCallback(ctx context.Context, loc Locations, call
 	}
 
 	if callback.IsReference() {
-		i.CallbackReferences = append(i.CallbackReferences, &IndexNode[*ReferencedCallback]{
-			Node:     callback,
-			Location: loc,
-		})
+		// Add to references list only if this exact reference object hasn't been indexed
+		if !i.indexedReferences[callback] {
+			i.CallbackReferences = append(i.CallbackReferences, &IndexNode[*ReferencedCallback]{
+				Node:     callback,
+				Location: loc,
+			})
+			i.indexedReferences[callback] = true
+		}
 
 		// Get the document path for the resolved callback
 		info := callback.GetReferenceResolutionInfo()
@@ -1562,10 +1741,14 @@ func (i *Index) indexReferencedSecurityScheme(ctx context.Context, loc Locations
 	}
 
 	if ss.IsReference() {
-		i.SecuritySchemeReferences = append(i.SecuritySchemeReferences, &IndexNode[*ReferencedSecurityScheme]{
-			Node:     ss,
-			Location: loc,
-		})
+		// Add to references list only if this exact reference object hasn't been indexed
+		if !i.indexedReferences[ss] {
+			i.SecuritySchemeReferences = append(i.SecuritySchemeReferences, &IndexNode[*ReferencedSecurityScheme]{
+				Node:     ss,
+				Location: loc,
+			})
+			i.indexedReferences[ss] = true
+		}
 		return
 	}
 
@@ -1845,6 +2028,16 @@ func buildPathSegment(loc LocationContext) CircularPathSegment {
 		segment.BranchIndex = *loc.ParentIndex
 	}
 
+	// Get the parent schema for this segment
+	var parentSchemaRef *oas3.JSONSchemaReferenceable
+	_ = loc.ParentMatchFunc(Matcher{
+		Schema: func(s *oas3.JSONSchemaReferenceable) error {
+			parentSchemaRef = s
+			return nil
+		},
+	})
+	segment.ParentSchema = parentSchemaRef
+
 	parent := getParentSchema(loc)
 	if parent == nil {
 		return segment
@@ -1937,12 +2130,20 @@ func (i *Index) classifyCircularPath(schema *oas3.JSONSchemaReferenceable, segme
 			}
 			parentLoc := copyLocations(loc[:parentLocLen])
 
+			// Use the ParentSchema from the segment (which has the oneOf/anyOf)
+			// instead of the schema parameter (which is the $ref)
+			parentSchema := segment.ParentSchema
+			if parentSchema == nil {
+				parentSchema = schema // Fallback to old behavior if ParentSchema not set
+			}
+
+			totalBranches := countPolymorphicBranches(parentSchema, segment.Field)
 			polymorphicInfo := &PolymorphicCircularRef{
-				ParentSchema:   schema,
+				ParentSchema:   parentSchema,
 				ParentLocation: parentLoc,
 				Field:          segment.Field,
 				BranchResults:  make(map[int]CircularClassification),
-				TotalBranches:  countPolymorphicBranches(schema, segment.Field),
+				TotalBranches:  totalBranches,
 			}
 			// Record this branch as potentially invalid (recurses)
 			polymorphicInfo.BranchResults[segment.BranchIndex] = CircularInvalid
@@ -2079,6 +2280,7 @@ func (i *Index) finalizePolymorphicCirculars() {
 			}
 
 			if allInvalid && ref.TotalBranches > 0 {
+				i.invalidCircularRefs++
 				i.circularErrs = append(i.circularErrs, validation.NewValidationErrorWithDocumentLocation(
 					validation.SeverityError,
 					"circular-reference-invalid",
@@ -2086,6 +2288,9 @@ func (i *Index) finalizePolymorphicCirculars() {
 					getSchemaErrorNode(ref.ParentSchema),
 					i.documentPathForSchema(ref.ParentSchema),
 				))
+			} else if !allInvalid && ref.TotalBranches > 0 {
+				// At least one branch allows termination - this is a valid circular ref
+				i.validCircularRefs++
 			}
 
 		case "allOf":
