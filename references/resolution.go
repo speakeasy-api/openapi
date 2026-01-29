@@ -28,6 +28,7 @@ type ResolutionTarget interface {
 type Resolvable[T any] interface {
 	GetReference() Reference
 	Resolve(ctx context.Context, opts ResolveOptions) ([]error, error)
+	IsResolved() bool
 	GetResolvedObject() *T
 }
 
