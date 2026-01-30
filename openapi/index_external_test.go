@@ -790,25 +790,25 @@ UpdateCallback:
 	assert.Len(t, idx.InlineRequestBodies, 1, "should have 1 inline request body (from callback)")
 
 	// Test External Headers
-	// Note: Header reference inside external response can't be resolved (not an OpenAPI doc structure)
-	assert.Empty(t, idx.ExternalHeaders, "should have 0 external headers (resolution failed)")
-	assert.Len(t, idx.HeaderReferences, 1, "should have 1 header reference (unresolved)")
+	// FIXED: Header references inside external files CAN now be resolved!
+	assert.Len(t, idx.ExternalHeaders, 1, "should have 1 external header (TotalCountHeader)")
+	assert.Len(t, idx.HeaderReferences, 1, "should have 1 header reference")
 	assert.Empty(t, idx.ComponentHeaders, "should have 0 component headers")
-	assert.Empty(t, idx.InlineHeaders, "should have 0 inline headers (resolution failed)")
+	assert.Empty(t, idx.InlineHeaders, "should have 0 inline headers")
 
 	// Test External Examples
-	// Note: Example reference inside external response can't be resolved (not an OpenAPI doc structure)
-	assert.Empty(t, idx.ExternalExamples, "should have 0 external examples (resolution failed)")
-	assert.Len(t, idx.ExampleReferences, 1, "should have 1 example reference (unresolved)")
+	// FIXED: Example references inside external files CAN now be resolved!
+	assert.Len(t, idx.ExternalExamples, 1, "should have 1 external example (SingleUserExample)")
+	assert.Len(t, idx.ExampleReferences, 1, "should have 1 example reference")
 	assert.Empty(t, idx.ComponentExamples, "should have 0 component examples")
-	assert.Empty(t, idx.InlineExamples, "should have 0 inline examples (resolution failed)")
+	assert.Empty(t, idx.InlineExamples, "should have 0 inline examples")
 
 	// Test External Links
-	// Note: Link reference inside external response can't be resolved (not an OpenAPI doc structure)
-	assert.Empty(t, idx.ExternalLinks, "should have 0 external links (resolution failed)")
-	assert.Len(t, idx.LinkReferences, 1, "should have 1 link reference (unresolved)")
+	// FIXED: Link references inside external files CAN now be resolved!
+	assert.Len(t, idx.ExternalLinks, 1, "should have 1 external link (UserLink)")
+	assert.Len(t, idx.LinkReferences, 1, "should have 1 link reference")
 	assert.Empty(t, idx.ComponentLinks, "should have 0 component links")
-	assert.Empty(t, idx.InlineLinks, "should have 0 inline links (resolution failed)")
+	assert.Empty(t, idx.InlineLinks, "should have 0 inline links")
 
 	// Test External Callbacks
 	assert.Len(t, idx.ExternalCallbacks, 1, "should have 1 external callback (UpdateCallback)")
@@ -827,20 +827,20 @@ UpdateCallback:
 	assert.Len(t, allRequestBodies, 2, "GetAllRequestBodies should return external + inline (not reference)")
 
 	allHeaders := idx.GetAllHeaders()
-	assert.Empty(t, allHeaders, "GetAllHeaders should have 0 (reference not included)")
+	assert.Len(t, allHeaders, 1, "GetAllHeaders should have 1 (TotalCountHeader - internal refs now work!)")
 
 	allExamples := idx.GetAllExamples()
-	assert.Empty(t, allExamples, "GetAllExamples should have 0 (reference not included)")
+	assert.Len(t, allExamples, 1, "GetAllExamples should have 1 (SingleUserExample - internal refs now work!)")
 
 	allLinks := idx.GetAllLinks()
-	assert.Empty(t, allLinks, "GetAllLinks should have 0 (reference not included)")
+	assert.Len(t, allLinks, 1, "GetAllLinks should have 1 (UserLink - internal refs now work!)")
 
 	allCallbacks := idx.GetAllCallbacks()
 	assert.Len(t, allCallbacks, 1, "GetAllCallbacks should return external (not reference)")
 
-	// Verify errors (3 resolution errors for unresolved references in external doc)
-	assert.True(t, idx.HasErrors(), "should have resolution errors")
-	assert.Len(t, idx.GetResolutionErrors(), 3, "should have 3 resolution errors for unresolved refs")
+	// FIXED: No more resolution errors! Internal references in external files now work correctly
+	assert.False(t, idx.HasErrors(), "should have no errors after multi-file reference fix")
+	assert.Empty(t, idx.GetResolutionErrors(), "should have 0 resolution errors (bug is fixed!)")
 }
 func TestDebugExternalParameter(t *testing.T) {
 	t.Parallel()

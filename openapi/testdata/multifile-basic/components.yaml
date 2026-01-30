@@ -1,0 +1,78 @@
+components:
+  schemas:
+    TestObject:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+    ErrorObject:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+  responses:
+    TestResponse:
+      description: Successful response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TestObject"
+      headers:
+        X-Custom-Header:
+          $ref: "#/components/headers/CustomHeader"
+      links:
+        TestLink:
+          $ref: "#/components/links/TestLink"
+
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorObject"
+
+  headers:
+    CustomHeader:
+      description: Custom header
+      schema:
+        type: string
+
+  links:
+    TestLink:
+      operationId: getTest
+      description: Link back to test operation
+
+  callbacks:
+    TestCallback:
+      "{$request.body#/callbackUrl}":
+        post:
+          operationId: callbackOperation
+          requestBody:
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/TestObject"
+          responses:
+            "200":
+              description: Callback acknowledged
+
+  pathItems:
+    TestWebhook:
+      post:
+        operationId: webhookOperation
+        summary: Webhook operation
+        requestBody:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestObject"
+        responses:
+          "200":
+            $ref: "#/components/responses/TestResponse"

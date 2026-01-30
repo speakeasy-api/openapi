@@ -49,8 +49,9 @@ type Model[T any] struct {
 	Valid bool
 	core  T
 
-	objectCache   *sync.Map
-	documentCache *sync.Map
+	objectCache           *sync.Map
+	documentCache         *sync.Map
+	externalDocumentCache *sync.Map
 }
 
 // GetCore will return the low level representation of the model.
@@ -203,11 +204,25 @@ func (m *Model[T]) StoreReferenceDocumentInCache(key string, doc []byte) {
 	m.documentCache.Store(key, doc)
 }
 
+func (m *Model[T]) GetCachedExternalDocument(key string) (any, bool) {
+	if m == nil || m.externalDocumentCache == nil {
+		return nil, false
+	}
+	return m.externalDocumentCache.Load(key)
+}
+
+func (m *Model[T]) StoreExternalDocumentInCache(key string, doc any) {
+	m.externalDocumentCache.Store(key, doc)
+}
+
 func (m *Model[T]) InitCache() {
 	if m.objectCache == nil {
 		m.objectCache = &sync.Map{}
 	}
 	if m.documentCache == nil {
 		m.documentCache = &sync.Map{}
+	}
+	if m.externalDocumentCache == nil {
+		m.externalDocumentCache = &sync.Map{}
 	}
 }

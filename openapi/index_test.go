@@ -1578,6 +1578,35 @@ paths:
 			expectedWarningCount:  1,
 			expectedWarningSubstr: "unknown property 'unknownField'",
 		},
+		{
+			name: "Schema property with unknown keyword",
+			yaml: `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /test:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              example: foobar
+              properties:
+                test:
+                  type: string
+                  description: Test
+                  name: foo
+      responses:
+        "204":
+          description: No content
+`,
+			expectedWarningCount:  1,
+			expectedWarningSubstr: "unknown property 'name'",
+		},
 	}
 
 	for _, tt := range tests {

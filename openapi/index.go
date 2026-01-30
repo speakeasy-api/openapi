@@ -166,6 +166,12 @@ type Index struct {
 	SummaryNodes               []*IndexNode[Summarizer]            // All nodes that have a Summary field
 	DescriptionAndSummaryNodes []*IndexNode[DescriptionAndSummary] // All nodes that have both Description and Summary fields
 
+	// NodeToOperations maps yaml.Node pointers to the operations that reference them.
+	// A node may be referenced by multiple operations (e.g., shared schemas via $ref).
+	// This is only populated when BuildIndex is called with WithNodeOperationMap().
+	// nil when the feature is disabled.
+	NodeToOperations map[*yaml.Node][]*IndexNode[*Operation]
+
 	validationErrs []error
 	resolutionErrs []error
 	circularErrs   []error
@@ -176,20 +182,23 @@ type Index struct {
 	resolveOpts references.ResolveOptions
 
 	// Circular reference tracking (internal)
-	indexedSchemas       map[*oas3.JSONSchemaReferenceable]bool // Tracks which schemas have been fully indexed
-	indexedParameters    map[*Parameter]bool                    // Tracks which parameters have been fully indexed
-	indexedResponses     map[*Response]bool                     // Tracks which responses have been fully indexed
-	indexedRequestBodies map[*RequestBody]bool                  // Tracks which request bodies have been fully indexed
-	indexedHeaders       map[*Header]bool                       // Tracks which headers have been fully indexed
-	indexedExamples      map[*Example]bool                      // Tracks which examples have been fully indexed
-	indexedLinks         map[*Link]bool                         // Tracks which links have been fully indexed
-	indexedCallbacks     map[*Callback]bool                     // Tracks which callbacks have been fully indexed
-	indexedPathItems     map[*PathItem]bool                     // Tracks which path items have been fully indexed
-	referenceStack       []referenceStackEntry                  // Active reference resolution chain (by ref target)
-	polymorphicRefs      []*PolymorphicCircularRef              // Pending polymorphic circulars
-	visitedRefs          map[string]bool                        // Tracks visited ref targets to avoid duplicates
-	indexedReferences    map[any]bool                           // Tracks indexed reference objects to ensure each $ref appears once
-	currentDocumentStack []string                               // Stack of document paths being walked (for determining external vs main)
+	indexedSchemas         map[*oas3.JSONSchemaReferenceable]bool // Tracks which schemas have been fully indexed
+	indexedParameters      map[*Parameter]bool                    // Tracks which parameters have been fully indexed
+	indexedResponses       map[*Response]bool                     // Tracks which responses have been fully indexed
+	indexedRequestBodies   map[*RequestBody]bool                  // Tracks which request bodies have been fully indexed
+	indexedHeaders         map[*Header]bool                       // Tracks which headers have been fully indexed
+	indexedExamples        map[*Example]bool                      // Tracks which examples have been fully indexed
+	indexedLinks           map[*Link]bool                         // Tracks which links have been fully indexed
+	indexedCallbacks       map[*Callback]bool                     // Tracks which callbacks have been fully indexed
+	indexedPathItems       map[*PathItem]bool                     // Tracks which path items have been fully indexed
+	referenceStack         []referenceStackEntry                  // Active reference resolution chain (by ref target)
+	polymorphicRefs        []*PolymorphicCircularRef              // Pending polymorphic circulars
+	visitedRefs            map[string]bool                        // Tracks visited ref targets to avoid duplicates
+	indexedReferences      map[any]bool                           // Tracks indexed reference objects to ensure each $ref appears once
+	currentDocumentStack   []string                               // Stack of document paths being walked (for determining external vs main)
+	buildNodeOperationMap  bool                                   // Whether to build the node-to-operation map
+	currentOperation       *IndexNode[*Operation]                 // Current operation being walked (for node-to-operation mapping)
+	operationLocationDepth int                                    // Location depth when we entered the current operation
 }
 
 // IndexNode wraps a node with its location in the document.
@@ -199,10 +208,69 @@ type IndexNode[T any] struct {
 	Location Locations
 }
 
+// IndexOptions configures optional features when building the index.
+type IndexOptions struct {
+	// BuildNodeOperationMap enables building the NodeToOperations map
+	// which tracks which operations reference each yaml.Node.
+	// This is disabled by default as it adds overhead.
+	// Enable this when you need to determine which operations are affected
+	// by issues found on specific nodes (e.g., for validity tracking).
+	BuildNodeOperationMap bool
+}
+
+// IndexOption is a function that configures IndexOptions.
+type IndexOption func(*IndexOptions)
+
+// WithNodeOperationMap enables building the node-to-operation mapping.
+func WithNodeOperationMap() IndexOption {
+	return func(opts *IndexOptions) {
+		opts.BuildNodeOperationMap = true
+	}
+}
+
+// IsWebhookLocation returns true if this location is within the webhooks section.
+func IsWebhookLocation(loc Locations) bool {
+	for _, l := range loc {
+		if l.ParentField == "webhooks" {
+			return true
+		}
+	}
+	return false
+}
+
+// ExtractOperationInfo extracts path/webhook name, method, and whether it's a webhook
+// from a location. Works for any location within an operation's subtree.
+func ExtractOperationInfo(loc Locations) (path, method string, isWebhook bool) {
+	for i := len(loc) - 1; i >= 0; i-- {
+		l := loc[i]
+		parentType := GetParentType(l)
+
+		switch parentType {
+		case "Paths":
+			if l.ParentKey != nil {
+				path = *l.ParentKey
+			}
+		case "PathItem", "ReferencedPathItem":
+			if l.ParentKey != nil {
+				method = *l.ParentKey
+			}
+		}
+
+		if l.ParentField == "webhooks" {
+			isWebhook = true
+			if l.ParentKey != nil {
+				path = *l.ParentKey
+			}
+		}
+	}
+	return
+}
+
 // BuildIndex creates a new Index by walking the entire OpenAPI document.
 // It resolves references and detects circular reference patterns.
 // Requires resolveOpts to have RootDocument, TargetDocument, and TargetLocation set.
-func BuildIndex(ctx context.Context, doc *OpenAPI, resolveOpts references.ResolveOptions) *Index {
+// Optional features can be enabled via IndexOption functions.
+func BuildIndex(ctx context.Context, doc *OpenAPI, resolveOpts references.ResolveOptions, opts ...IndexOption) *Index {
 	if resolveOpts.RootDocument == nil {
 		panic("BuildIndex: resolveOpts.RootDocument is required")
 	}
@@ -213,23 +281,35 @@ func BuildIndex(ctx context.Context, doc *OpenAPI, resolveOpts references.Resolv
 		panic("BuildIndex: resolveOpts.TargetLocation is required")
 	}
 
+	// Apply options
+	var options IndexOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	idx := &Index{
-		Doc:                  doc,
-		resolveOpts:          resolveOpts,
-		indexedSchemas:       make(map[*oas3.JSONSchemaReferenceable]bool),
-		indexedParameters:    make(map[*Parameter]bool),
-		indexedResponses:     make(map[*Response]bool),
-		indexedRequestBodies: make(map[*RequestBody]bool),
-		indexedHeaders:       make(map[*Header]bool),
-		indexedExamples:      make(map[*Example]bool),
-		indexedLinks:         make(map[*Link]bool),
-		indexedCallbacks:     make(map[*Callback]bool),
-		indexedPathItems:     make(map[*PathItem]bool),
-		referenceStack:       make([]referenceStackEntry, 0),
-		polymorphicRefs:      make([]*PolymorphicCircularRef, 0),
-		visitedRefs:          make(map[string]bool),
-		indexedReferences:    make(map[any]bool),
-		currentDocumentStack: []string{resolveOpts.TargetLocation}, // Start with main document
+		Doc:                   doc,
+		resolveOpts:           resolveOpts,
+		indexedSchemas:        make(map[*oas3.JSONSchemaReferenceable]bool),
+		indexedParameters:     make(map[*Parameter]bool),
+		indexedResponses:      make(map[*Response]bool),
+		indexedRequestBodies:  make(map[*RequestBody]bool),
+		indexedHeaders:        make(map[*Header]bool),
+		indexedExamples:       make(map[*Example]bool),
+		indexedLinks:          make(map[*Link]bool),
+		indexedCallbacks:      make(map[*Callback]bool),
+		indexedPathItems:      make(map[*PathItem]bool),
+		referenceStack:        make([]referenceStackEntry, 0),
+		polymorphicRefs:       make([]*PolymorphicCircularRef, 0),
+		visitedRefs:           make(map[string]bool),
+		indexedReferences:     make(map[any]bool),
+		currentDocumentStack:  []string{resolveOpts.TargetLocation}, // Start with main document
+		buildNodeOperationMap: options.BuildNodeOperationMap,
+	}
+
+	// Initialize the node-to-operation map if enabled
+	if options.BuildNodeOperationMap {
+		idx.NodeToOperations = make(map[*yaml.Node][]*IndexNode[*Operation])
 	}
 
 	// Phase 1: Walk and index everything
@@ -561,6 +641,31 @@ func (i *Index) GetInvalidCircularRefCount() int {
 	return i.invalidCircularRefs
 }
 
+// GetNodeOperations returns the operations that reference a given yaml.Node.
+// Returns nil if the node was not found or if the node-to-operation mapping was not enabled.
+// Enable this feature by passing WithNodeOperationMap() to BuildIndex.
+func (i *Index) GetNodeOperations(node *yaml.Node) []*IndexNode[*Operation] {
+	if i == nil || i.NodeToOperations == nil || node == nil {
+		return nil
+	}
+	return i.NodeToOperations[node]
+}
+
+// registerNodeWithOperation adds a node-operation mapping, avoiding duplicates.
+func (i *Index) registerNodeWithOperation(node *yaml.Node, op *IndexNode[*Operation]) {
+	if node == nil || op == nil || i.NodeToOperations == nil {
+		return
+	}
+	// Check for duplicates
+	existing := i.NodeToOperations[node]
+	for _, existingOp := range existing {
+		if existingOp == op {
+			return
+		}
+	}
+	i.NodeToOperations[node] = append(existing, op)
+}
+
 func buildIndex[T any](ctx context.Context, index *Index, obj *T) error {
 	for item := range Walk(ctx, obj) {
 		if err := item.Match(Matcher{
@@ -647,12 +752,36 @@ func buildIndex[T any](ctx context.Context, index *Index, obj *T) error {
 				return nil
 			},
 			Any: func(a any) error {
-				// Check for unknown properties on any model with a core
-				if coreAccessor, ok := a.(interface{ GetCoreAny() any }); ok {
-					if core := coreAccessor.GetCoreAny(); core != nil {
-						if coreModeler, ok := core.(marshaller.CoreModeler); ok {
-							index.checkUnknownProperties(ctx, coreModeler)
+				// Node-to-operation mapping: check if we've exited the current operation's subtree
+				// Only check location depth when NOT in a reference walk
+				// During reference walks (len(referenceStack) > 0), location depth resets for the resolved target
+				// but we should continue associating nodes with the current operation
+				if index.buildNodeOperationMap && index.currentOperation != nil && len(index.referenceStack) == 0 {
+					if len(item.Location) < index.operationLocationDepth {
+						// We've moved to a shallower level - no longer under the operation
+						index.currentOperation = nil
+					}
+				}
+
+				// Register nodes with current operation if applicable
+				if index.buildNodeOperationMap && index.currentOperation != nil {
+					// Register the root node
+					if rootNode := getRootNodeFromAny(a); rootNode != nil {
+						index.registerNodeWithOperation(rootNode, index.currentOperation)
+					}
+					// Also register all leaf nodes from the core model
+					// This ensures scalar values (like items: true) are also mapped
+					if core := getCoreModelFromAny(a); core != nil {
+						for _, node := range marshaller.CollectLeafNodes(core) {
+							index.registerNodeWithOperation(node, index.currentOperation)
 						}
+					}
+				}
+
+				// Check for unknown properties on any model with a core
+				if core := getCoreModelFromAny(a); core != nil {
+					if coreModeler, ok := core.(marshaller.CoreModeler); ok {
+						index.checkUnknownProperties(ctx, coreModeler)
 					}
 				}
 
@@ -678,7 +807,7 @@ func buildIndex[T any](ctx context.Context, index *Index, obj *T) error {
 func (i *Index) indexSchema(ctx context.Context, loc Locations, schema *oas3.JSONSchemaReferenceable) error {
 	// Resolve if needed (do this first to get the resolved schema for tracking)
 	if !schema.IsResolved() {
-		vErrs, err := schema.Resolve(ctx, i.resolveOpts)
+		vErrs, err := schema.Resolve(ctx, i.getCurrentResolveOptions())
 		if err != nil {
 			i.resolutionErrs = append(i.resolutionErrs, validation.NewValidationErrorWithDocumentLocation(
 				validation.SeverityError,
@@ -1092,10 +1221,18 @@ func (i *Index) indexOperation(_ context.Context, loc Locations, operation *Oper
 	if operation == nil {
 		return
 	}
-	i.Operations = append(i.Operations, &IndexNode[*Operation]{
+
+	indexNode := &IndexNode[*Operation]{
 		Node:     operation,
 		Location: loc,
-	})
+	}
+	i.Operations = append(i.Operations, indexNode)
+
+	// Track current operation for node-to-operation mapping
+	if i.buildNodeOperationMap {
+		i.currentOperation = indexNode
+		i.operationLocationDepth = len(loc)
+	}
 }
 
 func (i *Index) indexReferencedParameter(ctx context.Context, loc Locations, param *ReferencedParameter) {
@@ -1924,6 +2061,31 @@ func (i *Index) referenceValidationOptions() []validation.Option {
 	}
 }
 
+// getCurrentResolveOptions returns ResolveOptions appropriate for the current document context.
+// CRITICAL FIX for multi-file specs: When processing schemas/references in external files,
+// this ensures they resolve internal references against the external file's YAML structure,
+// not the main document. Without this, references like #/components/schemas/... in external
+// files would fail with "source is nil" errors.
+func (i *Index) getCurrentResolveOptions() references.ResolveOptions {
+	resolveOpts := i.resolveOpts
+
+	if len(i.currentDocumentStack) > 0 {
+		currentDoc := i.currentDocumentStack[len(i.currentDocumentStack)-1]
+		// If we're in a different document than the original target, use that document's context
+		if currentDoc != i.resolveOpts.TargetLocation {
+			// Check if we have a cached parsed YAML node for this external document
+			if cachedDoc, ok := i.resolveOpts.RootDocument.GetCachedExternalDocument(currentDoc); ok {
+				// Use the cached YAML node as the TargetDocument for this resolution
+				// This allows internal references to navigate through the external file's structure
+				resolveOpts.TargetDocument = cachedDoc
+				resolveOpts.TargetLocation = currentDoc
+			}
+		}
+	}
+
+	return resolveOpts
+}
+
 func documentPathForReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](i *Index, ref *Reference[T, V, C]) string {
 	if i == nil || ref == nil {
 		return ""
@@ -1944,7 +2106,7 @@ func resolveAndValidateReference[T any, V interfaces.Validator[T], C marshaller.
 		return
 	}
 
-	if _, err := ref.Resolve(ctx, i.resolveOpts); err != nil {
+	if _, err := ref.Resolve(ctx, i.getCurrentResolveOptions()); err != nil {
 		i.resolutionErrs = append(i.resolutionErrs, validation.NewValidationErrorWithDocumentLocation(
 			validation.SeverityError,
 			"resolution-openapi-reference",

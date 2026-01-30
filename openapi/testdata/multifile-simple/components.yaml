@@ -1,0 +1,14 @@
+components:
+  schemas:
+    TestSchema:
+      type: object
+      properties:
+        id:
+          type: string
+  responses:
+    TestResponse:
+      description: Test response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TestSchema"

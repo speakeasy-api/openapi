@@ -217,11 +217,128 @@ func (s *SecurityScheme) Validate(ctx context.Context, opts ...validation.Option
 				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("securityScheme.type must be one of [%s]", strings.Join([]string{string(SecuritySchemeTypeAPIKey), string(SecuritySchemeTypeHTTP), string(SecuritySchemeTypeMutualTLS), string(SecuritySchemeTypeOAuth2), string(SecuritySchemeTypeOpenIDConnect)}, ", ")), core, core.Type))
 			}
 		}
+
+		// Check for unused properties based on security scheme type
+		if s.Type != "" {
+			unusedFields := getUnusedFields(s.Type.String(), core)
+			for _, field := range unusedFields {
+				errs = append(errs, field.error)
+			}
+		}
 	}
 
 	s.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs
+}
+
+type unusedFieldError struct {
+	fieldName string
+	error     error
+}
+
+func getUnusedFields(schemeType string, coreScheme *core.SecurityScheme) []unusedFieldError {
+	var unused []unusedFieldError
+
+	// Define which fields are invalid for each type
+	invalidFields := map[string]struct {
+		name              bool
+		in                bool
+		scheme            bool
+		bearerFormat      bool
+		flows             bool
+		openIdConnectUrl  bool
+		oauth2MetadataUrl bool
+	}{
+		string(SecuritySchemeTypeAPIKey): {
+			scheme:            true,
+			bearerFormat:      true,
+			flows:             true,
+			openIdConnectUrl:  true,
+			oauth2MetadataUrl: true,
+		},
+		string(SecuritySchemeTypeHTTP): {
+			name:              true,
+			in:                true,
+			flows:             true,
+			openIdConnectUrl:  true,
+			oauth2MetadataUrl: true,
+		},
+		string(SecuritySchemeTypeMutualTLS): {
+			name:              true,
+			in:                true,
+			scheme:            true,
+			bearerFormat:      true,
+			flows:             true,
+			openIdConnectUrl:  true,
+			oauth2MetadataUrl: true,
+		},
+		string(SecuritySchemeTypeOAuth2): {
+			name:             true,
+			in:               true,
+			scheme:           true,
+			bearerFormat:     true,
+			openIdConnectUrl: true,
+		},
+		string(SecuritySchemeTypeOpenIDConnect): {
+			name:              true,
+			in:                true,
+			scheme:            true,
+			bearerFormat:      true,
+			flows:             true,
+			oauth2MetadataUrl: true,
+		},
+	}
+
+	invalid, exists := invalidFields[schemeType]
+	if !exists {
+		return unused
+	}
+
+	if invalid.name && coreScheme.Name.Present {
+		unused = append(unused, unusedFieldError{
+			fieldName: "name",
+			error:     validation.NewValueError(validation.SeverityWarning, validation.RuleValidationAllowedValues, errors.New("securityScheme.name is not used for type="+schemeType+" (only valid for type=apiKey)"), coreScheme, coreScheme.Name),
+		})
+	}
+	if invalid.in && coreScheme.In.Present {
+		unused = append(unused, unusedFieldError{
+			fieldName: "in",
+			error:     validation.NewValueError(validation.SeverityWarning, validation.RuleValidationAllowedValues, errors.New("securityScheme.in is not used for type="+schemeType+" (only valid for type=apiKey)"), coreScheme, coreScheme.In),
+		})
+	}
+	if invalid.scheme && coreScheme.Scheme.Present {
+		unused = append(unused, unusedFieldError{
+			fieldName: "scheme",
+			error:     validation.NewValueError(validation.SeverityWarning, validation.RuleValidationAllowedValues, errors.New("securityScheme.scheme is not used for type="+schemeType+" (only valid for type=http)"), coreScheme, coreScheme.Scheme),
+		})
+	}
+	if invalid.bearerFormat && coreScheme.BearerFormat.Present {
+		unused = append(unused, unusedFieldError{
+			fieldName: "bearerFormat",
+			error:     validation.NewValueError(validation.SeverityWarning, validation.RuleValidationAllowedValues, errors.New("securityScheme.bearerFormat is not used for type="+schemeType+" (only valid for type=http)"), coreScheme, coreScheme.BearerFormat),
+		})
+	}
+	if invalid.flows && coreScheme.Flows.Present {
+		unused = append(unused, unusedFieldError{
+			fieldName: "flows",
+			error:     validation.NewValueError(validation.SeverityWarning, validation.RuleValidationAllowedValues, errors.New("securityScheme.flows is not used for type="+schemeType+" (only valid for type=oauth2)"), coreScheme, coreScheme.Flows),
+		})
+	}
+	if invalid.openIdConnectUrl && coreScheme.OpenIdConnectUrl.Present {
+		unused = append(unused, unusedFieldError{
+			fieldName: "openIdConnectUrl",
+			error:     validation.NewValueError(validation.SeverityWarning, validation.RuleValidationAllowedValues, errors.New("securityScheme.openIdConnectUrl is not used for type="+schemeType+" (only valid for type=openIdConnect)"), coreScheme, coreScheme.OpenIdConnectUrl),
+		})
+	}
+	if invalid.oauth2MetadataUrl && coreScheme.OAuth2MetadataUrl.Present {
+		unused = append(unused, unusedFieldError{
+			fieldName: "oauth2MetadataUrl",
+			error:     validation.NewValueError(validation.SeverityWarning, validation.RuleValidationAllowedValues, errors.New("securityScheme.oauth2MetadataUrl is not used for type="+schemeType+" (only valid for type=oauth2)"), coreScheme, coreScheme.OAuth2MetadataUrl),
+		})
+	}
+
+	return unused
 }
 
 // SecurityRequirement represents a security requirement for an API or operation.

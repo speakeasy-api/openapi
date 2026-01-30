@@ -606,10 +606,17 @@ func getCoreModelFromAny(model any) any {
 		GetCoreAny() any
 	}
 
+	var directCore any
 	if coreModel, ok := model.(coreGetter); ok {
-		core := coreModel.GetCoreAny()
-		if core != nil {
-			return core
+		directCore = coreModel.GetCoreAny()
+		if directCore != nil {
+			if coreModeler, ok := directCore.(marshaller.CoreModeler); ok {
+				if len(coreModeler.GetUnknownProperties()) > 0 {
+					return directCore
+				}
+			} else {
+				return directCore
+			}
 		}
 	}
 
@@ -622,7 +629,48 @@ func getCoreModelFromAny(model any) any {
 		inner, err := navigable.GetNavigableNode()
 		if err == nil && inner != nil {
 			// Recursively try to get core from the inner value
-			return getCoreModelFromAny(inner)
+			if innerCore := getCoreModelFromAny(inner); innerCore != nil {
+				return innerCore
+			}
+		}
+	}
+
+	return directCore
+}
+
+// getRootNodeFromAny attempts to extract the root yaml.Node from various OpenAPI types.
+// This is used for node-to-operation mapping during indexing.
+func getRootNodeFromAny(model any) *yaml.Node {
+	if model == nil {
+		return nil
+	}
+
+	// Try direct GetRootNode()
+	type rootNodeGetter interface {
+		GetRootNode() *yaml.Node
+	}
+
+	if getter, ok := model.(rootNodeGetter); ok {
+		return getter.GetRootNode()
+	}
+
+	// Try navigable node (for EitherValue wrappers)
+	type navigableNoder interface {
+		GetNavigableNode() (any, error)
+	}
+
+	if navigable, ok := model.(navigableNoder); ok {
+		inner, err := navigable.GetNavigableNode()
+		if err == nil && inner != nil {
+			// Recursively try to get root node from the inner value
+			return getRootNodeFromAny(inner)
+		}
+	}
+
+	// Try to get core model and extract root node from there
+	if core := getCoreModelFromAny(model); core != nil {
+		if getter, ok := core.(rootNodeGetter); ok {
+			return getter.GetRootNode()
 		}
 	}
 

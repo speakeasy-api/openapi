@@ -23,6 +23,9 @@ type ResolutionTarget interface {
 
 	GetCachedReferenceDocument(key string) ([]byte, bool)
 	StoreReferenceDocumentInCache(key string, doc []byte)
+
+	GetCachedExternalDocument(key string) (any, bool)
+	StoreExternalDocumentInCache(key string, doc any)
 }
 
 type Resolvable[T any] interface {
@@ -266,19 +269,35 @@ func resolveAgainstData[T any](ctx context.Context, absRef string, reader io.Rea
 		return nil, nil, nil, err
 	}
 
-	var node yaml.Node
-	if err := yaml.Unmarshal(data, &node); err != nil {
-		return nil, nil, nil, err
+	opts.RootDocument.InitCache()
+
+	// Check if we have a cached parsed YAML node for this external document
+	var node *yaml.Node
+	if cachedDoc, ok := opts.RootDocument.GetCachedExternalDocument(absRef); ok {
+		if cachedNode, ok := cachedDoc.(*yaml.Node); ok {
+			node = cachedNode
+		}
+	}
+
+	// If not cached, parse and cache the YAML node
+	if node == nil {
+		var parsedNode yaml.Node
+		if err := yaml.Unmarshal(data, &parsedNode); err != nil {
+			return nil, nil, nil, err
+		}
+		node = &parsedNode
+		// Cache the parsed YAML node so internal references can navigate it
+		opts.RootDocument.StoreExternalDocumentInCache(absRef, node)
 	}
 
 	var target any
 
 	// Handle empty JSON pointer case - if jp is empty, target the root node directly
 	if jp == "" {
-		target = &node
+		target = node
 	} else {
 		var jpErr error
-		target, jpErr = jsonpointer.GetTarget(node, jp)
+		target, jpErr = jsonpointer.GetTarget(*node, jp)
 		if jpErr != nil {
 			return nil, nil, nil, jpErr
 		}
@@ -293,6 +312,12 @@ func resolveAgainstData[T any](ctx context.Context, absRef string, reader io.Rea
 		return nil, nil, nil, fmt.Errorf("expected *yaml.Node, got %T", target)
 	}
 
+	// CRITICAL FIX: Update the TargetDocument to be the parsed YAML node
+	// This allows internal references (like #/components/schemas/...) within
+	// the resolved component to navigate through the external file's structure
+	resolveOptsWithDocument := opts
+	resolveOptsWithDocument.TargetDocument = node
+
 	resolved, validationErrs, err := unmarshaler(ctx, targetNode, opts.SkipValidation)
 	if err != nil {
 		return nil, nil, validationErrs, err
@@ -302,10 +327,9 @@ func resolveAgainstData[T any](ctx context.Context, absRef string, reader io.Rea
 		return nil, nil, validationErrs, fmt.Errorf("nil %T returned from unmarshaler", target)
 	}
 
-	opts.RootDocument.InitCache()
 	opts.RootDocument.StoreReferenceDocumentInCache(absRef, data)
 
-	return resolved, &node, validationErrs, nil
+	return resolved, node, validationErrs, nil
 }
 
 func cast[T any](target any) (*T, error) {

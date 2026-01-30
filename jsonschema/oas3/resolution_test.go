@@ -23,14 +23,16 @@ import (
 
 // MockResolutionTarget implements references.ResolutionTarget for testing
 type MockResolutionTarget struct {
-	objCache map[string]any
-	docCache map[string][]byte
+	objCache    map[string]any
+	docCache    map[string][]byte
+	extDocCache map[string]any
 }
 
 func NewMockResolutionTarget() *MockResolutionTarget {
 	return &MockResolutionTarget{
-		objCache: make(map[string]any),
-		docCache: make(map[string][]byte),
+		objCache:    make(map[string]any),
+		docCache:    make(map[string][]byte),
+		extDocCache: make(map[string]any),
 	}
 }
 
@@ -59,6 +61,18 @@ func (m *MockResolutionTarget) InitCache() {
 	if m.docCache == nil {
 		m.docCache = make(map[string][]byte)
 	}
+	if m.extDocCache == nil {
+		m.extDocCache = make(map[string]any)
+	}
+}
+
+func (m *MockResolutionTarget) GetCachedExternalDocument(key string) (any, bool) {
+	data, exists := m.extDocCache[key]
+	return data, exists
+}
+
+func (m *MockResolutionTarget) StoreExternalDocumentInCache(key string, doc any) {
+	m.extDocCache[key] = doc
 }
 
 // MockVirtualFS implements system.VirtualFS for testing
