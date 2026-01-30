@@ -13,7 +13,6 @@ import (
 	"github.com/speakeasy-api/openapi/openapi/core"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
-	walkpkg "github.com/speakeasy-api/openapi/walk"
 )
 
 type Link struct {
@@ -103,43 +102,13 @@ func (l *Link) Validate(ctx context.Context, opts ...validation.Option) []error 
 	core := l.GetCore()
 	errs := []error{}
 
-	op := validation.NewOptions(opts...)
-	o := validation.GetContextObject[OpenAPI](op)
-
 	if core.OperationID.Present && core.OperationRef.Present {
 		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("operationID and operationRef are mutually exclusive"), core, core.OperationID))
 	}
 
-	if l.OperationID != nil {
-		if o == nil {
-			panic("OpenAPI object is required to validate operationId")
-		}
-
-		foundOp := false
-
-		for item := range Walk(ctx, o) {
-			err := item.Match(Matcher{
-				Operation: func(o *Operation) error {
-					if o.GetOperationID() == "" {
-						return nil
-					}
-
-					if o.GetOperationID() == l.GetOperationID() {
-						foundOp = true
-						return walkpkg.ErrTerminate
-					}
-					return nil
-				},
-			})
-			if err != nil {
-				break
-			}
-		}
-
-		if !foundOp {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationOperationNotFound, fmt.Errorf("link.operationId value %s does not exist in document", *l.OperationID), core, core.OperationID))
-		}
-	}
+	// Note: operationId validation has been moved to the linter rule "semantic-link-operation"
+	// This allows validation to occur after the index is built, enabling checks against
+	// operations in external documents that may be referenced later.
 
 	// TODO should we validate the reference resolves here? Or as part of the resolution operation? Or make it optional?
 	if l.OperationRef != nil {

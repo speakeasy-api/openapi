@@ -157,6 +157,7 @@ func registerDefaultRules(registry *baseLinter.Registry[*openapi.OpenAPI]) {
 	registry.Register(&rules.ComponentDescriptionRule{})
 	registry.Register(&rules.UnusedComponentRule{})
 	registry.Register(&rules.OperationIDValidInURLRule{})
+	registry.Register(&rules.LinkOperationRule{})
 	registry.Register(&rules.OAS3HostTrailingSlashRule{})
 	registry.Register(&rules.OAS3ParameterDescriptionRule{})
 	registry.Register(&rules.NoAmbiguousPathsRule{})

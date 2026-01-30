@@ -240,30 +240,10 @@ description: Invalid request body expression syntax - empty query name
 	}
 }
 
-func TestLink_Validate_OperationID_NotFound(t *testing.T) {
-	t.Parallel()
-
-	// Create a minimal OpenAPI document with operations
-	openAPIDoc := &openapi.OpenAPI{
-		Paths: openapi.NewPaths(),
-	}
-
-	// Add a path with an operation
-	pathItem := openapi.NewPathItem()
-	operation := &openapi.Operation{
-		OperationID: pointer.From("existingOperation"),
-	}
-	pathItem.Set("get", operation)
-	openAPIDoc.Paths.Set("/users/{id}", &openapi.ReferencedPathItem{Object: pathItem})
-
-	link := &openapi.Link{
-		OperationID: pointer.From("nonExistentOperation"),
-	}
-
-	errs := link.Validate(t.Context(), validation.WithContextObject(openAPIDoc))
-	require.NotEmpty(t, errs, "Expected validation error for non-existent operationId")
-	require.Contains(t, errs[0].Error(), "link.operationId value nonExistentOperation does not exist in document")
-}
+// Note: TestLink_Validate_OperationID_NotFound has been removed because operationId validation
+// has been moved to the linter rule "semantic-link-operation" (see link_operation.go in linter/rules).
+// This allows validation to occur after the index is built, enabling checks against operations
+// in external documents that may be referenced later.
 
 func TestLink_Validate_OperationID_Found(t *testing.T) {
 	t.Parallel()
@@ -289,17 +269,9 @@ func TestLink_Validate_OperationID_Found(t *testing.T) {
 	require.Empty(t, errs, "Expected no validation errors for existing operationId")
 }
 
-func TestLink_Validate_OperationID_WithoutOpenAPIContext_Panics(t *testing.T) {
-	t.Parallel()
-
-	link := &openapi.Link{
-		OperationID: pointer.From("getUserById"),
-	}
-
-	require.Panics(t, func() {
-		link.Validate(t.Context())
-	}, "Expected panic when validating operationId without OpenAPI context")
-}
+// Note: TestLink_Validate_OperationID_WithoutOpenAPIContext_Panics has been removed because
+// operationId validation has been moved to the linter rule "semantic-link-operation".
+// Link.Validate() no longer requires OpenAPI context for operationId validation.
 
 func TestLink_Validate_ComplexExpressions(t *testing.T) {
 	t.Parallel()
