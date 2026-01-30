@@ -1647,6 +1647,86 @@ paths:
 	}
 }
 
+func TestBuildIndex_UnknownProperties_Deduplicated_WhenComponentReferencedMultipleTimes(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	// Create a schema with an unknown property that is referenced from multiple operations
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      responses:
+        "200":
+          description: Get users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        "201":
+          description: Created
+  /admin/users:
+    get:
+      responses:
+        "200":
+          description: Get admin users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      unknownField: this-should-trigger-warning
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+`
+
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+
+	// Get all warnings
+	allErrors := idx.GetAllErrors()
+	unknownPropWarnings := []error{}
+	for _, err := range allErrors {
+		var vErr *validation.Error
+		if errors.As(err, &vErr) && vErr.Severity == validation.SeverityWarning {
+			if strings.Contains(err.Error(), "unknown property 'unknownField'") {
+				unknownPropWarnings = append(unknownPropWarnings, err)
+			}
+		}
+	}
+
+	// Despite the User schema being referenced 3 times (in 3 different operations),
+	// we should only get 1 warning for the unknown property
+	assert.Len(t, unknownPropWarnings, 1, "should only have 1 warning for unknownField despite multiple references")
+	assert.Contains(t, unknownPropWarnings[0].Error(), "unknown property 'unknownField'", "warning should mention the unknown field")
+}
+
 func TestBuildIndex_CircularReferenceCounts_ValidCircular_Success(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

@@ -182,23 +182,24 @@ type Index struct {
 	resolveOpts references.ResolveOptions
 
 	// Circular reference tracking (internal)
-	indexedSchemas         map[*oas3.JSONSchemaReferenceable]bool // Tracks which schemas have been fully indexed
-	indexedParameters      map[*Parameter]bool                    // Tracks which parameters have been fully indexed
-	indexedResponses       map[*Response]bool                     // Tracks which responses have been fully indexed
-	indexedRequestBodies   map[*RequestBody]bool                  // Tracks which request bodies have been fully indexed
-	indexedHeaders         map[*Header]bool                       // Tracks which headers have been fully indexed
-	indexedExamples        map[*Example]bool                      // Tracks which examples have been fully indexed
-	indexedLinks           map[*Link]bool                         // Tracks which links have been fully indexed
-	indexedCallbacks       map[*Callback]bool                     // Tracks which callbacks have been fully indexed
-	indexedPathItems       map[*PathItem]bool                     // Tracks which path items have been fully indexed
-	referenceStack         []referenceStackEntry                  // Active reference resolution chain (by ref target)
-	polymorphicRefs        []*PolymorphicCircularRef              // Pending polymorphic circulars
-	visitedRefs            map[string]bool                        // Tracks visited ref targets to avoid duplicates
-	indexedReferences      map[any]bool                           // Tracks indexed reference objects to ensure each $ref appears once
-	currentDocumentStack   []string                               // Stack of document paths being walked (for determining external vs main)
-	buildNodeOperationMap  bool                                   // Whether to build the node-to-operation map
-	currentOperation       *IndexNode[*Operation]                 // Current operation being walked (for node-to-operation mapping)
-	operationLocationDepth int                                    // Location depth when we entered the current operation
+	indexedSchemas         map[*oas3.JSONSchemaReferenceable]bool     // Tracks which schemas have been fully indexed
+	indexedParameters      map[*Parameter]bool                        // Tracks which parameters have been fully indexed
+	indexedResponses       map[*Response]bool                         // Tracks which responses have been fully indexed
+	indexedRequestBodies   map[*RequestBody]bool                      // Tracks which request bodies have been fully indexed
+	indexedHeaders         map[*Header]bool                           // Tracks which headers have been fully indexed
+	indexedExamples        map[*Example]bool                          // Tracks which examples have been fully indexed
+	indexedLinks           map[*Link]bool                             // Tracks which links have been fully indexed
+	indexedCallbacks       map[*Callback]bool                         // Tracks which callbacks have been fully indexed
+	indexedPathItems       map[*PathItem]bool                         // Tracks which path items have been fully indexed
+	referenceStack         []referenceStackEntry                      // Active reference resolution chain (by ref target)
+	polymorphicRefs        []*PolymorphicCircularRef                  // Pending polymorphic circulars
+	visitedRefs            map[string]bool                            // Tracks visited ref targets to avoid duplicates
+	indexedReferences      map[any]bool                               // Tracks indexed reference objects to ensure each $ref appears once
+	reportedUnknownProps   map[marshaller.CoreModeler]map[string]bool // Tracks which unknown properties have been reported per core model
+	currentDocumentStack   []string                                   // Stack of document paths being walked (for determining external vs main)
+	buildNodeOperationMap  bool                                       // Whether to build the node-to-operation map
+	currentOperation       *IndexNode[*Operation]                     // Current operation being walked (for node-to-operation mapping)
+	operationLocationDepth int                                        // Location depth when we entered the current operation
 }
 
 // IndexNode wraps a node with its location in the document.
@@ -303,6 +304,7 @@ func BuildIndex(ctx context.Context, doc *OpenAPI, resolveOpts references.Resolv
 		polymorphicRefs:       make([]*PolymorphicCircularRef, 0),
 		visitedRefs:           make(map[string]bool),
 		indexedReferences:     make(map[any]bool),
+		reportedUnknownProps:  make(map[marshaller.CoreModeler]map[string]bool),
 		currentDocumentStack:  []string{resolveOpts.TargetLocation}, // Start with main document
 		buildNodeOperationMap: options.BuildNodeOperationMap,
 	}
@@ -1060,6 +1062,11 @@ func (i *Index) checkUnknownProperties(_ context.Context, core marshaller.CoreMo
 		return
 	}
 
+	// Initialize the map for this core model if not already present
+	if i.reportedUnknownProps[core] == nil {
+		i.reportedUnknownProps[core] = make(map[string]bool)
+	}
+
 	docPath := ""
 	if len(i.currentDocumentStack) > 0 {
 		currentDoc := i.currentDocumentStack[len(i.currentDocumentStack)-1]
@@ -1069,6 +1076,14 @@ func (i *Index) checkUnknownProperties(_ context.Context, core marshaller.CoreMo
 	}
 
 	for _, prop := range unknownProps {
+		// Skip if this property has already been reported for this core model
+		if i.reportedUnknownProps[core][prop] {
+			continue
+		}
+
+		// Mark as reported
+		i.reportedUnknownProps[core][prop] = true
+
 		err := fmt.Errorf("unknown property '%s' found", prop)
 		i.validationErrs = append(i.validationErrs, validation.NewValidationErrorWithDocumentLocation(
 			validation.SeverityWarning,

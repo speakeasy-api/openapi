@@ -149,6 +149,44 @@ components:
           type: string
 `,
 		},
+		{
+			name: "nullable integer enum with null value",
+			yaml: `
+openapi: 3.0.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    NullableIntEnum:
+      type: integer
+      nullable: true
+      enum:
+        - 1
+        - 2
+        - 3
+        - null
+`,
+		},
+		{
+			name: "nullable string enum with null value",
+			yaml: `
+openapi: 3.0.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    NullableStringEnum:
+      type: string
+      nullable: true
+      enum:
+        - First
+        - Second
+        - Third
+        - null
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -234,6 +272,42 @@ components:
         - yes
 `,
 			expectedError: "[12:11] warning semantic-typed-enum enum value at index 1 does not match schema type [boolean]",
+		},
+		{
+			name: "openapi 3.0 null in enum without nullable true",
+			yaml: `
+openapi: 3.0.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Status:
+      type: string
+      enum:
+        - active
+        - inactive
+        - null
+`,
+			expectedError: "[13:11] warning semantic-typed-enum enum contains null at index 2 but schema does not have 'nullable: true'. Add 'nullable: true' to allow null values",
+		},
+		{
+			name: "openapi 3.1 null in enum without null in type",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Priority:
+      type: integer
+      enum:
+        - 1
+        - 2
+        - null
+`,
+			expectedError: `[13:11] warning semantic-typed-enum enum contains null at index 2 but schema type does not include null. Change 'type: [integer]' to 'type: ["integer", "null"]' to allow null values`,
 		},
 	}
 
