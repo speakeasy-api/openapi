@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/references"
 	"gopkg.in/yaml.v3"
@@ -144,9 +145,11 @@ func (s *JSONSchema[Referenceable]) tryResolveLocalDefs(_ context.Context, ref r
 		absRef = schemaID
 	}
 
+	absRefWithFragment := utils.BuildAbsoluteReference(absRef, string(ref.GetJSONPointer()))
 	return &references.ResolveResult[JSONSchemaReferenceable]{
-		Object:            defSchema,
-		AbsoluteReference: absRef,
+		Object:               defSchema,
+		AbsoluteDocumentPath: absRef,
+		AbsoluteReference:    references.Reference(absRefWithFragment),
 	}
 }
 

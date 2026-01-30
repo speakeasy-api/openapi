@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/speakeasy-api/openapi/extensions"
@@ -114,7 +115,7 @@ func (r *Responses) Validate(ctx context.Context, opts ...validation.Option) []e
 	}
 
 	if r.Len() == 0 && r.Default == nil {
-		errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("responses must have at least one response code"), core.RootNode))
+		errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("responses must have at least one response code"), core.RootNode))
 	}
 
 	for _, response := range r.All() {
@@ -191,7 +192,7 @@ func (r *Response) Validate(ctx context.Context, opts ...validation.Option) []er
 	errs := []error{}
 
 	if core.Description.Present && r.Description == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("response.description is required"), core, core.Description))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("response.description is required"), core, core.Description))
 	}
 
 	for _, header := range r.GetHeaders().All() {

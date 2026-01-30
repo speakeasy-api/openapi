@@ -254,22 +254,22 @@ func Example_validating() {
 
 	fmt.Printf("\nReduced validation errors from %d to %d\n", len(validationErrs), len(newValidationErrs))
 	// Output: Initial validation errors: 16
-	//   [3:3] info.version is missing
-	//   [22:17] schema.type.0 expected string, got null
-	//   [28:30] response.content.application/json expected object, got ``
-	//   [31:18] responses must have at least one response code
-	//   [34:7] operation.responses is missing
-	//   [43:17] schema.properties.required failed to validate either Schema [schema.properties.required expected object, got sequence] or bool [schema.properties.required expected bool, got sequence]
-	//   [51:25] schema.properties.name.type expected array, got string
-	//   [51:25] schema.properties.name.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
-	//   [56:7] schema.examples expected array, got object
-	//   [59:15] schema.properties.name expected one of [boolean, object], got string
-	//   [59:15] schema.properties.name expected one of [boolean, object], got string
-	//   [59:15] schema.properties.name failed to validate either Schema [schema.properties.name expected object, got `str...`] or bool [schema.properties.name line 59: cannot unmarshal !!str `string` into bool]
-	//   [60:18] schema.properties.example expected one of [boolean, object], got string
-	//   [60:18] schema.properties.example expected one of [boolean, object], got string
-	//   [60:18] schema.properties.example failed to validate either Schema [schema.properties.example expected object, got `John Do...`] or bool [schema.properties.example line 60: cannot unmarshal !!str `John Doe` into bool]
-	//   [63:9] schema.examples expected sequence, got object
+	//   [3:3] error validation-required-field info.version is required
+	//   [22:17] error validation-type-mismatch schema.type.0 expected string, got null
+	//   [28:30] error validation-type-mismatch response.content.application/json expected object, got ``
+	//   [31:18] error validation-allowed-values responses must have at least one response code
+	//   [34:7] error validation-required-field operation.responses is required
+	//   [43:17] error validation-type-mismatch schema.properties.required failed to validate either Schema [schema.properties.required expected object, got sequence] or bool [schema.properties.required expected bool, got sequence]
+	//   [51:25] error validation-invalid-schema schema.properties.name.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
+	//   [51:25] error validation-type-mismatch schema.properties.name.type expected array, got string
+	//   [56:7] error validation-type-mismatch schema.examples expected array, got object
+	//   [59:15] error validation-type-mismatch schema.properties.name expected one of [boolean, object], got string
+	//   [59:15] error validation-type-mismatch schema.properties.name expected one of [boolean, object], got string
+	//   [59:15] error validation-type-mismatch schema.properties.name failed to validate either Schema [schema.properties.name expected object, got `str...`] or bool [schema.properties.name line 59: cannot unmarshal !!str `string` into bool]
+	//   [60:18] error validation-type-mismatch schema.properties.example expected one of [boolean, object], got string
+	//   [60:18] error validation-type-mismatch schema.properties.example expected one of [boolean, object], got string
+	//   [60:18] error validation-type-mismatch schema.properties.example failed to validate either Schema [schema.properties.example expected object, got `John Do...`] or bool [schema.properties.example line 60: cannot unmarshal !!str `John Doe` into bool]
+	//   [63:9] error validation-type-mismatch schema.examples expected sequence, got object
 	//
 	// Fixing validation errors...
 	//   ✓ Added missing info.version
@@ -277,13 +277,13 @@ func Example_validating() {
 	//   ✓ Added missing responses to POST /invalid
 	//
 	// Validation errors after fixes: 7
-	//   [51:25] schema.properties.name.type expected array, got string
-	//   [51:25] schema.properties.name.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
-	//   [56:7] schema.examples expected array, got object
-	//   [59:15] schema.properties.name expected one of [boolean, object], got string
-	//   [59:15] schema.properties.name expected one of [boolean, object], got string
-	//   [60:18] schema.properties.example expected one of [boolean, object], got string
-	//   [60:18] schema.properties.example expected one of [boolean, object], got string
+	//   [51:25] error validation-invalid-schema schema.properties.name.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'
+	//   [51:25] error validation-type-mismatch schema.properties.name.type expected array, got string
+	//   [56:7] error validation-type-mismatch schema.examples expected array, got object
+	//   [59:15] error validation-type-mismatch schema.properties.name expected one of [boolean, object], got string
+	//   [59:15] error validation-type-mismatch schema.properties.name expected one of [boolean, object], got string
+	//   [60:18] error validation-type-mismatch schema.properties.example expected one of [boolean, object], got string
+	//   [60:18] error validation-type-mismatch schema.properties.example expected one of [boolean, object], got string
 	//
 	// Reduced validation errors from 16 to 7
 }

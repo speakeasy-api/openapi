@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/extensions"
@@ -136,11 +137,7 @@ func (m *MediaType) Validate(ctx context.Context, opts ...validation.Option) []e
 
 	// Validate mutual exclusivity: encoding MUST NOT be present with prefixEncoding or itemEncoding
 	if core.Encoding.Present && (core.PrefixEncoding.Present || core.ItemEncoding.Present) {
-		errs = append(errs, validation.NewValueError(
-			validation.NewValueValidationError("encoding field MUST NOT be present when prefixEncoding or itemEncoding is present"),
-			core,
-			core.Encoding,
-		))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("mediaType.encoding is mutually exclusive with mediaType.prefixEncoding and mediaType.itemEncoding"), core, core.Encoding))
 	}
 
 	// Validate multipart-only constraint for encoding, prefixEncoding, and itemEncoding
@@ -151,27 +148,15 @@ func (m *MediaType) Validate(ctx context.Context, opts ...validation.Option) []e
 		isFormURLEncoded := strings.ToLower(mtCtx.MediaType) == "application/x-www-form-urlencoded"
 
 		if core.PrefixEncoding.Present && !isMultipart {
-			errs = append(errs, validation.NewValueError(
-				validation.NewValueValidationError("prefixEncoding field SHALL only apply when the media type is multipart"),
-				core,
-				core.PrefixEncoding,
-			))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("mediaType.prefixEncoding is only valid when the media type is multipart"), core, core.PrefixEncoding))
 		}
 
 		if core.ItemEncoding.Present && !isMultipart {
-			errs = append(errs, validation.NewValueError(
-				validation.NewValueValidationError("itemEncoding field SHALL only apply when the media type is multipart"),
-				core,
-				core.ItemEncoding,
-			))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("mediaType.itemEncoding is only valid when the media type is multipart"), core, core.ItemEncoding))
 		}
 
 		if core.Encoding.Present && !isMultipart && !isFormURLEncoded {
-			errs = append(errs, validation.NewValueError(
-				validation.NewValueValidationError("encoding field SHALL only apply when the media type is multipart or application/x-www-form-urlencoded"),
-				core,
-				core.Encoding,
-			))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("mediaType.encoding is only valid when the media type is multipart or application/x-www-form-urlencoded"), core, core.Encoding))
 		}
 	}
 

@@ -241,7 +241,7 @@ func discoverSchemaReference(ctx context.Context, schema *oas3.JSONSchema[oas3.R
 		if resolutionInfo != nil {
 			storage.externalRefs.Set(normalizedFilePath, "") // Will be filled in filename generation phase
 
-			if data, found := opts.RootDocument.GetCachedReferenceDocument(resolutionInfo.AbsoluteReference); found {
+			if data, found := opts.RootDocument.GetCachedReferenceDocument(resolutionInfo.AbsoluteDocumentPath); found {
 				storage.resolvedContent[normalizedFilePath] = data
 			} else {
 				return fmt.Errorf("failed to get cached content for reference %s", normalizedFilePath)
@@ -266,7 +266,7 @@ func discoverSchemaReference(ctx context.Context, schema *oas3.JSONSchema[oas3.R
 					return discoverSchemaReference(ctx, s, ResolveOptions{
 						RootDocument:   opts.RootDocument,
 						TargetDocument: targetDocInfo.ResolvedDocument,
-						TargetLocation: targetDocInfo.AbsoluteReference,
+						TargetLocation: targetDocInfo.AbsoluteDocumentPath,
 						VirtualFS:      opts.VirtualFS,
 						HTTPClient:     opts.HTTPClient,
 					}, storage)
@@ -320,7 +320,7 @@ func discoverGenericReference[T any, V interfaces.Validator[T], C marshaller.Cor
 	if resolutionInfo != nil {
 		storage.externalRefs.Set(normalizedFilePath, "") // Will be filled in filename generation phase
 
-		if data, found := opts.RootDocument.GetCachedReferenceDocument(resolutionInfo.AbsoluteReference); found {
+		if data, found := opts.RootDocument.GetCachedReferenceDocument(resolutionInfo.AbsoluteDocumentPath); found {
 			storage.resolvedContent[normalizedFilePath] = data
 		} else {
 			return fmt.Errorf("failed to get cached content for reference %s", normalizedFilePath)
@@ -337,7 +337,7 @@ func discoverGenericReference[T any, V interfaces.Validator[T], C marshaller.Cor
 		resolveOpts := ResolveOptions{
 			RootDocument:   opts.RootDocument,
 			TargetDocument: targetDocInfo.ResolvedDocument,
-			TargetLocation: targetDocInfo.AbsoluteReference,
+			TargetLocation: targetDocInfo.AbsoluteDocumentPath,
 			VirtualFS:      opts.VirtualFS,
 			HTTPClient:     opts.HTTPClient,
 		}

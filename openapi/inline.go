@@ -349,7 +349,7 @@ func inlineReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler]
 		recursiveOpts := ResolveOptions{
 			RootDocument:   opts.RootDocument,
 			TargetDocument: targetDocInfo.ResolvedDocument,
-			TargetLocation: targetDocInfo.AbsoluteReference,
+			TargetLocation: targetDocInfo.AbsoluteDocumentPath,
 		}
 		if err := inlineObject(ctx, ref, doc, recursiveOpts, collectedDefs, defHashes); err != nil {
 			return fmt.Errorf("failed to inline nested references in %s: %w", ref.GetReference(), err)

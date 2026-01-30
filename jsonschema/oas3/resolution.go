@@ -64,7 +64,7 @@ func (j *JSONSchema[Referenceable]) GetAbsRef() references.Reference {
 	if j.referenceResolutionCache == nil {
 		return ref
 	}
-	return references.Reference(j.referenceResolutionCache.AbsoluteReference + "#" + ref.GetJSONPointer().String())
+	return references.Reference(j.referenceResolutionCache.AbsoluteDocumentPath + "#" + ref.GetJSONPointer().String())
 }
 
 // Resolve will fully resolve the reference and return the JSONSchema referenced. This will recursively resolve any intermediate references as well.
@@ -180,7 +180,7 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 		// The ResolveResult.ResolvedDocument should be used as the new TargetDocument
 		if s.referenceResolutionCache.ResolvedDocument != nil {
 			opts.TargetDocument = s.referenceResolutionCache.ResolvedDocument
-			opts.TargetLocation = s.referenceResolutionCache.AbsoluteReference
+			opts.TargetLocation = s.referenceResolutionCache.AbsoluteDocumentPath
 		}
 	}
 
@@ -195,7 +195,7 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 	if result := s.tryResolveViaRegistry(ctx, ref, opts); result != nil {
 		// Compute absolute reference for circular detection
 		// Use the result's AbsoluteReference combined with any anchor/fragment
-		absRef := result.AbsoluteReference
+		absRef := result.AbsoluteDocumentPath
 		if anchor := ExtractAnchor(string(ref)); anchor != "" {
 			absRef = absRef + "#" + anchor
 		} else if jp := ref.GetJSONPointer(); jp != "" {
@@ -279,7 +279,7 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 	// Use $id as base URI if present in the resolved schema (JSON Schema spec)
 	// The $id keyword identifies a schema resource with its canonical URI
 	// and serves as the base URI for relative references within that schema
-	baseURI := result.AbsoluteReference
+	baseURI := result.AbsoluteDocumentPath
 	if !schema.IsBool() && schema.GetSchema() != nil {
 		if schemaID := schema.GetSchema().GetID(); schemaID != "" {
 			baseURI = schemaID
@@ -301,9 +301,13 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 							localBaseURI = jsID
 						}
 					}
+					// Get the ref to build absolute reference with fragment
+					jsRef := js.GetRef()
+					absRef := utils.BuildAbsoluteReference(localBaseURI, string(jsRef.GetJSONPointer()))
 					js.referenceResolutionCache = &references.ResolveResult[JSONSchemaReferenceable]{
-						AbsoluteReference: localBaseURI,
-						ResolvedDocument:  result.ResolvedDocument,
+						AbsoluteDocumentPath: localBaseURI,
+						AbsoluteReference:    references.Reference(absRef),
+						ResolvedDocument:     result.ResolvedDocument,
 					}
 				}
 				return nil

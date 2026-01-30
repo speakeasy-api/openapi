@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -111,7 +112,7 @@ func PromptForFilePath(prompt, defaultValue string) (string, error) {
 
 	inputModel, ok := finalModel.(InputModel)
 	if !ok {
-		return "", fmt.Errorf("unexpected model type")
+		return "", errors.New("unexpected model type")
 	}
 
 	if inputModel.IsCancelled() {

@@ -220,8 +220,8 @@ encoding:
           type: invalid-type
 `,
 			wantErrs: []string{
-				"[13:17] schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
-				"[13:17] schema.type expected array, got string",
+				"[13:17] error validation-invalid-schema schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"[13:17] error validation-type-mismatch schema.type expected array, got string",
 			},
 		},
 		{
@@ -239,7 +239,7 @@ prefixEncoding:
   - contentType: application/json
 `,
 			wantErrs: []string{
-				"[8:3] encoding field MUST NOT be present when prefixEncoding or itemEncoding is present",
+				"[8:3] error validation-mutually-exclusive-fields mediaType.encoding is mutually exclusive with mediaType.prefixEncoding and mediaType.itemEncoding",
 			},
 		},
 		{
@@ -257,7 +257,7 @@ itemEncoding:
   contentType: application/json
 `,
 			wantErrs: []string{
-				"[8:3] encoding field MUST NOT be present when prefixEncoding or itemEncoding is present",
+				"[8:3] error validation-mutually-exclusive-fields mediaType.encoding is mutually exclusive with mediaType.prefixEncoding and mediaType.itemEncoding",
 			},
 		},
 	}

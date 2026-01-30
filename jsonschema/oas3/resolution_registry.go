@@ -3,6 +3,7 @@ package oas3
 import (
 	"context"
 
+	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/references"
 )
 
@@ -34,10 +35,12 @@ func (s *JSONSchema[Referenceable]) tryResolveViaRegistry(ctx context.Context, r
 		}
 
 		if resolved := registry.LookupByAnchor(anchorBase, anchor); resolved != nil {
+			absRef := utils.BuildAbsoluteReference(anchorBase, "#"+anchor)
 			return &references.ResolveResult[JSONSchemaReferenceable]{
-				Object:            resolved,
-				AbsoluteReference: anchorBase,
-				ResolvedDocument:  opts.TargetDocument,
+				Object:               resolved,
+				AbsoluteDocumentPath: anchorBase,
+				AbsoluteReference:    references.Reference(absRef),
+				ResolvedDocument:     opts.TargetDocument,
 			}
 		}
 
@@ -45,10 +48,12 @@ func (s *JSONSchema[Referenceable]) tryResolveViaRegistry(ctx context.Context, r
 		// This handles the case where anchors were registered without a document base URI
 		if ref.GetURI() == "" && anchorBase != "" {
 			if resolved := registry.LookupByAnchor("", anchor); resolved != nil {
+				absRef := "#" + anchor
 				return &references.ResolveResult[JSONSchemaReferenceable]{
-					Object:            resolved,
-					AbsoluteReference: "",
-					ResolvedDocument:  opts.TargetDocument,
+					Object:               resolved,
+					AbsoluteDocumentPath: "",
+					AbsoluteReference:    references.Reference(absRef),
+					ResolvedDocument:     opts.TargetDocument,
 				}
 			}
 		}
@@ -57,10 +62,12 @@ func (s *JSONSchema[Referenceable]) tryResolveViaRegistry(ctx context.Context, r
 		docBase := registry.GetDocumentBaseURI()
 		if docBase != "" && docBase != anchorBase {
 			if resolved := registry.LookupByAnchor(docBase, anchor); resolved != nil {
+				absRef := utils.BuildAbsoluteReference(docBase, "#"+anchor)
 				return &references.ResolveResult[JSONSchemaReferenceable]{
-					Object:            resolved,
-					AbsoluteReference: docBase,
-					ResolvedDocument:  opts.TargetDocument,
+					Object:               resolved,
+					AbsoluteDocumentPath: docBase,
+					AbsoluteReference:    references.Reference(absRef),
+					ResolvedDocument:     opts.TargetDocument,
 				}
 			}
 		}
@@ -108,19 +115,22 @@ func (s *JSONSchema[Referenceable]) tryResolveViaRegistry(ctx context.Context, r
 			// If there's no JSON pointer, return the schema directly
 			if jp == "" {
 				return &references.ResolveResult[JSONSchemaReferenceable]{
-					Object:            resolvedSchema,
-					AbsoluteReference: absoluteReference,
-					ResolvedDocument:  opts.TargetDocument,
+					Object:               resolvedSchema,
+					AbsoluteDocumentPath: absoluteReference,
+					AbsoluteReference:    references.Reference(absoluteReference),
+					ResolvedDocument:     opts.TargetDocument,
 				}
 			}
 
 			// There's a JSON pointer - navigate within the found schema
 			target, err := navigateJSONPointer(ctx, resolvedSchema, jp)
 			if err == nil && target != nil {
+				absRef := utils.BuildAbsoluteReference(absoluteReference, string(jp))
 				return &references.ResolveResult[JSONSchemaReferenceable]{
-					Object:            target,
-					AbsoluteReference: absoluteReference,
-					ResolvedDocument:  opts.TargetDocument,
+					Object:               target,
+					AbsoluteDocumentPath: absoluteReference,
+					AbsoluteReference:    references.Reference(absRef),
+					ResolvedDocument:     opts.TargetDocument,
 				}
 			}
 			// If navigation failed, fall through to external resolution
@@ -171,8 +181,8 @@ func (s *JSONSchema[Referenceable]) getEffectiveBaseURI(opts references.ResolveO
 	}
 
 	// Check if we have a cached absolute reference
-	if s.referenceResolutionCache != nil && s.referenceResolutionCache.AbsoluteReference != "" {
-		return s.referenceResolutionCache.AbsoluteReference
+	if s.referenceResolutionCache != nil && s.referenceResolutionCache.AbsoluteDocumentPath != "" {
+		return s.referenceResolutionCache.AbsoluteDocumentPath
 	}
 
 	// Fall back to target location

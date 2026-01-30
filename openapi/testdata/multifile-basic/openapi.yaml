@@ -1,0 +1,26 @@
+openapi: 3.1.0
+info:
+  title: Multi-file Reference Test
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      operationId: getTest
+      summary: Test operation
+      responses:
+        "200":
+          $ref: "./components.yaml#/components/responses/TestResponse"
+        "400":
+          $ref: "./components.yaml#/components/responses/ErrorResponse"
+      callbacks:
+        testCallback:
+          $ref: "./components.yaml#/components/callbacks/TestCallback"
+webhooks:
+  testWebhook:
+    $ref: "./components.yaml#/components/pathItems/TestWebhook"
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key

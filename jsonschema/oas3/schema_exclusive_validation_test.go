@@ -227,7 +227,7 @@ exclusiveMinimum: true
 exclusiveMaximum: false
 `,
 			openAPIVersion: pointer.From("3.1.0"),
-			wantErrs:       []string{"[5:19] schema.exclusiveMinimum expected number, got boolean", "[6:19] schema.exclusiveMaximum expected number, got boolean"},
+			wantErrs:       []string{"[5:19] error validation-type-mismatch schema.exclusiveMinimum expected number, got boolean", "[6:19] error validation-type-mismatch schema.exclusiveMaximum expected number, got boolean"},
 		},
 		{
 			name: "boolean exclusiveMinimum with 3.1 $schema should fail",
@@ -239,7 +239,7 @@ maximum: 100
 exclusiveMinimum: true
 exclusiveMaximum: false
 `,
-			wantErrs: []string{"[6:19] schema.exclusiveMinimum expected number, got boolean", "[7:19] schema.exclusiveMaximum expected number, got boolean"},
+			wantErrs: []string{"[6:19] error validation-type-mismatch schema.exclusiveMinimum expected number, got boolean", "[7:19] error validation-type-mismatch schema.exclusiveMaximum expected number, got boolean"},
 		},
 		// Invalid types should always fail
 		{
@@ -248,7 +248,7 @@ exclusiveMaximum: false
 type: number
 exclusiveMinimum: "invalid"
 `,
-			wantErrs: []string{"[2:1] schema.exclusiveMinimum expected number, got string", "[3:19] schema.exclusiveMinimum failed to validate either bool [schema.exclusiveMinimum line 3: cannot unmarshal !!str `invalid` into bool] or float64 [schema.exclusiveMinimum line 3: cannot unmarshal !!str `invalid` into float64]"},
+			wantErrs: []string{"[2:1] error validation-type-mismatch schema.exclusiveMinimum expected number, got string", "[3:19] error validation-type-mismatch schema.exclusiveMinimum failed to validate either bool [schema.exclusiveMinimum line 3: cannot unmarshal !!str `invalid` into bool] or float64 [schema.exclusiveMinimum line 3: cannot unmarshal !!str `invalid` into float64]"},
 		},
 		{
 			name: "invalid string type for exclusiveMaximum",
@@ -256,7 +256,7 @@ exclusiveMinimum: "invalid"
 type: number
 exclusiveMaximum: "invalid"
 `,
-			wantErrs: []string{"[2:1] schema.exclusiveMaximum expected number, got string", "[3:19] schema.exclusiveMaximum failed to validate either bool [schema.exclusiveMaximum line 3: cannot unmarshal !!str `invalid` into bool] or float64 [schema.exclusiveMaximum line 3: cannot unmarshal !!str `invalid` into float64]"},
+			wantErrs: []string{"[2:1] error validation-type-mismatch schema.exclusiveMaximum expected number, got string", "[3:19] error validation-type-mismatch schema.exclusiveMaximum failed to validate either bool [schema.exclusiveMaximum line 3: cannot unmarshal !!str `invalid` into bool] or float64 [schema.exclusiveMaximum line 3: cannot unmarshal !!str `invalid` into float64]"},
 		},
 		{
 			name: "invalid array type for exclusiveMinimum",
@@ -264,7 +264,7 @@ exclusiveMaximum: "invalid"
 type: number
 exclusiveMinimum: [1, 2, 3]
 `,
-			wantErrs: []string{"[2:1] schema.exclusiveMinimum expected number, got array", "[3:19] schema.exclusiveMinimum failed to validate either bool [schema.exclusiveMinimum expected bool, got sequence] or float64 [schema.exclusiveMinimum expected float64, got sequence]"},
+			wantErrs: []string{"[2:1] error validation-type-mismatch schema.exclusiveMinimum expected number, got array", "[3:19] error validation-type-mismatch schema.exclusiveMinimum failed to validate either bool [schema.exclusiveMinimum expected bool, got sequence] or float64 [schema.exclusiveMinimum expected float64, got sequence]"},
 		},
 		// Mixed boolean and numeric should fail with OpenAPI 3.0 (only supports boolean)
 		{
@@ -276,7 +276,7 @@ exclusiveMinimum: true
 exclusiveMaximum: 50.5
 `,
 			openAPIVersion: pointer.From("3.0.3"),
-			wantErrs:       []string{"[5:19] schema.exclusiveMaximum expected boolean, got number"},
+			wantErrs:       []string{"[5:19] error validation-type-mismatch schema.exclusiveMaximum expected boolean, got number"},
 		},
 		{
 			name: "mixed numeric exclusiveMinimum and boolean exclusiveMaximum with OpenAPI 3.0 should fail",
@@ -287,7 +287,7 @@ exclusiveMinimum: 0.5
 exclusiveMaximum: true
 `,
 			openAPIVersion: pointer.From("3.0.3"),
-			wantErrs:       []string{"[4:19] schema.exclusiveMinimum expected boolean, got number"},
+			wantErrs:       []string{"[4:19] error validation-type-mismatch schema.exclusiveMinimum expected boolean, got number"},
 		},
 	}
 

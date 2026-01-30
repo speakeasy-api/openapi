@@ -2,6 +2,8 @@ package openapi
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/mail"
 	"net/url"
 
@@ -106,16 +108,16 @@ func (i *Info) Validate(ctx context.Context, opts ...validation.Option) []error 
 	errs := []error{}
 
 	if core.Title.Present && i.Title == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("info.title is required"), core, core.Title))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("info.title is required"), core, core.Title))
 	}
 
 	if core.Version.Present && i.Version == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("info.version is required"), core, core.Version))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("info.version is required"), core, core.Version))
 	}
 
 	if core.TermsOfService.Present {
 		if _, err := url.Parse(*i.TermsOfService); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("info.termsOfService is not a valid uri: %s", err), core, core.TermsOfService))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("info.termsOfService is not a valid uri: %w", err), core, core.TermsOfService))
 		}
 	}
 
@@ -186,13 +188,13 @@ func (c *Contact) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	if core.URL.Present {
 		if _, err := url.Parse(*c.URL); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("contact.url is not a valid uri: %s", err), core, core.URL))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("contact.url is not a valid uri: %w", err), core, core.URL))
 		}
 	}
 
 	if core.Email.Present {
 		if _, err := mail.ParseAddress(*c.Email); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("contact.email is not a valid email address: %s", err), core, core.Email))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("contact.email is not a valid email address: %w", err), core, core.Email))
 		}
 	}
 
@@ -255,12 +257,12 @@ func (l *License) Validate(ctx context.Context, opts ...validation.Option) []err
 	errs := []error{}
 
 	if core.Name.Present && l.Name == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("license.name is required"), core, core.Name))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("license.name is required"), core, core.Name))
 	}
 
 	if core.URL.Present {
 		if _, err := url.Parse(*l.URL); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("license.url is not a valid uri: %s", err), core, core.URL))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("license.url is not a valid uri: %w", err), core, core.URL))
 		}
 	}
 

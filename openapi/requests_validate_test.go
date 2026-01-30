@@ -130,7 +130,7 @@ func TestRequestBody_Validate_Error(t *testing.T) {
 description: Request body without content
 required: true
 `,
-			wantErrs: []string{"[2:1] requestBody.content is missing"},
+			wantErrs: []string{"[2:1] error validation-required-field requestBody.content is required"},
 		},
 		{
 			name: "empty content",
@@ -138,7 +138,7 @@ required: true
 content: {}
 description: Request body with empty content
 `,
-			wantErrs: []string{"[2:10] requestBody.content is required"},
+			wantErrs: []string{"[2:10] error validation-required-field requestBody.content is required"},
 		},
 		{
 			name: "invalid schema in content",
@@ -150,8 +150,8 @@ content:
 description: Request body with invalid schema
 `,
 			wantErrs: []string{
-				"[5:13] schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
-				"[5:13] schema.type expected array, got string",
+				"[5:13] error validation-invalid-schema schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"[5:13] error validation-type-mismatch schema.type expected array, got string",
 			},
 		},
 	}

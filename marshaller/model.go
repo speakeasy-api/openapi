@@ -49,8 +49,9 @@ type Model[T any] struct {
 	Valid bool
 	core  T
 
-	objectCache   *sync.Map
-	documentCache *sync.Map
+	objectCache           *sync.Map
+	documentCache         *sync.Map
+	externalDocumentCache *sync.Map
 }
 
 // GetCore will return the low level representation of the model.
@@ -119,37 +120,45 @@ func (m *Model[T]) GetRootNodeColumn() int {
 	return -1
 }
 
-func (m *Model[T]) GetPropertyLine(prop string) int {
+func (m *Model[T]) GetPropertyNode(prop string) *yaml.Node {
 	// Use reflection to find the property in the core and then see if it is a marshaller.Node and if it is get the line of the key node if set
 	if m == nil {
-		return -1
+		return nil
 	}
 
 	// Get reflection value of the core
 	coreValue := reflect.ValueOf(&m.core).Elem()
 	if !coreValue.IsValid() {
-		return -1
+		return nil
 	}
 
 	// Find the field by name
 	fieldValue := coreValue.FieldByName(prop)
 	if !fieldValue.IsValid() {
-		return -1
+		return nil
 	}
 
 	// Check if the field implements the interface we need to get the key node
 	// We need to check if it has a GetKeyNode method or if it's a Node type
 	fieldInterface := fieldValue.Interface()
 
+	var keyNode *yaml.Node
+
 	// Try to cast to a Node-like interface that has GetKeyNode method
 	if nodeWithKeyNode, ok := fieldInterface.(interface{ GetKeyNode() *yaml.Node }); ok {
-		keyNode := nodeWithKeyNode.GetKeyNode()
-		if keyNode != nil {
-			return keyNode.Line
-		}
+		keyNode = nodeWithKeyNode.GetKeyNode()
+
 	}
 
-	return -1
+	return keyNode
+}
+
+func (m *Model[T]) GetPropertyLine(prop string) int {
+	node := m.GetPropertyNode(prop)
+	if node == nil {
+		return -1
+	}
+	return node.Line
 }
 
 // SetCore implements CoreAccessor interface
@@ -195,11 +204,25 @@ func (m *Model[T]) StoreReferenceDocumentInCache(key string, doc []byte) {
 	m.documentCache.Store(key, doc)
 }
 
+func (m *Model[T]) GetCachedExternalDocument(key string) (any, bool) {
+	if m == nil || m.externalDocumentCache == nil {
+		return nil, false
+	}
+	return m.externalDocumentCache.Load(key)
+}
+
+func (m *Model[T]) StoreExternalDocumentInCache(key string, doc any) {
+	m.externalDocumentCache.Store(key, doc)
+}
+
 func (m *Model[T]) InitCache() {
 	if m.objectCache == nil {
 		m.objectCache = &sync.Map{}
 	}
 	if m.documentCache == nil {
 		m.documentCache = &sync.Map{}
+	}
+	if m.externalDocumentCache == nil {
+		m.externalDocumentCache = &sync.Map{}
 	}
 }
