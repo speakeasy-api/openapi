@@ -3,6 +3,7 @@ package linter
 import (
 	"context"
 	"errors"
+	"regexp"
 	"sort"
 	"sync"
 
@@ -14,6 +15,19 @@ import (
 type Linter[T any] struct {
 	config   *Config
 	registry *Registry[T]
+}
+
+type ruleOverride struct {
+	present  bool
+	severity *validation.Severity
+	disabled *bool
+}
+
+type matchFilter struct {
+	ruleID   string
+	pattern  *regexp.Regexp
+	severity *validation.Severity
+	disabled *bool
 }
 
 // NewLinter creates a new linter with the given configuration
@@ -43,6 +57,12 @@ func (l *Linter[T]) Lint(ctx context.Context, docInfo *DocumentInfo[T], preExist
 
 	// Apply severity overrides from config
 	allErrs = l.applySeverityOverrides(allErrs)
+
+	filteredErrs, err := l.FilterErrors(allErrs)
+	if err != nil {
+		return nil, err
+	}
+	allErrs = filteredErrs
 
 	// Sort errors by location
 	validation.SortValidationErrors(allErrs)
@@ -149,10 +169,14 @@ func (l *Linter[T]) getEnabledRules() []RuleRunner[T] {
 		}
 	}
 
-	// Apply rule config
-	for id, ruleConfig := range l.config.Rules {
-		if ruleConfig.Enabled != nil {
-			ruleStatus[id] = *ruleConfig.Enabled
+	// Apply rule config from list entries without match
+	for id, override := range l.ruleOverrides() {
+		if override.disabled != nil {
+			ruleStatus[id] = !*override.disabled
+			continue
+		}
+		if override.present {
+			ruleStatus[id] = true
 		}
 	}
 
@@ -186,13 +210,14 @@ func (l *Linter[T]) getRuleConfig(ruleID string) RuleConfig {
 		}
 	}
 
-	// Apply rule config
-	if ruleConfig, ok := l.config.Rules[ruleID]; ok {
-		if ruleConfig.Severity != nil {
-			config.Severity = ruleConfig.Severity
+	// Apply rule config from list entries without match
+	if override, ok := l.ruleOverrides()[ruleID]; ok {
+		if override.severity != nil {
+			config.Severity = override.severity
 		}
-		if ruleConfig.Options != nil {
-			config.Options = ruleConfig.Options
+		if override.disabled != nil {
+			enabled := !*override.disabled
+			config.Enabled = &enabled
 		}
 	}
 
@@ -212,11 +237,137 @@ func (l *Linter[T]) applySeverityOverrides(errs []error) []error {
 	return errs
 }
 
+// FilterErrors applies rule-level overrides and match filters to any errors.
+func (l *Linter[T]) FilterErrors(errs []error) ([]error, error) {
+	filters, err := l.buildMatchFilters()
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []error
+	for _, err := range errs {
+		var vErr *validation.Error
+		if !errors.As(err, &vErr) {
+			filtered = append(filtered, err)
+			continue
+		}
+
+		updatedErr, include := applyMatchFilters(vErr, filters)
+		if include {
+			filtered = append(filtered, updatedErr)
+		}
+	}
+
+	return filtered, nil
+}
+
 func (l *Linter[T]) formatOutput(errs []error) *Output {
 	return &Output{
 		Results: errs,
 		Format:  l.config.OutputFormat,
 	}
+}
+
+func (l *Linter[T]) ruleOverrides() map[string]ruleOverride {
+	overrides := make(map[string]ruleOverride)
+	for _, entry := range l.config.Rules {
+		if entry.Match != nil {
+			continue
+		}
+		if entry.ID == "" {
+			continue
+		}
+		override := overrides[entry.ID]
+		override.present = true
+		if entry.Severity != nil {
+			override.severity = entry.Severity
+		}
+		if entry.Disabled != nil {
+			override.disabled = entry.Disabled
+		}
+		overrides[entry.ID] = override
+	}
+	return overrides
+}
+
+func (l *Linter[T]) buildMatchFilters() ([]matchFilter, error) {
+	var filters []matchFilter
+	for _, entry := range l.config.Rules {
+		if entry.ID == "" {
+			return nil, errors.New("rule entry missing id")
+		}
+
+		if entry.Match == nil {
+			if entry.Severity == nil && entry.Disabled == nil {
+				continue
+			}
+			filters = append(filters, matchFilter{
+				ruleID:   entry.ID,
+				pattern:  nil,
+				severity: entry.Severity,
+				disabled: entry.Disabled,
+			})
+			continue
+		}
+
+		pattern, err := regexp.Compile(*entry.Match)
+		if err != nil {
+			return nil, err
+		}
+		filters = append(filters, matchFilter{
+			ruleID:   entry.ID,
+			pattern:  pattern,
+			severity: entry.Severity,
+			disabled: entry.Disabled,
+		})
+	}
+	return filters, nil
+}
+
+func applyMatchFilters(vErr *validation.Error, filters []matchFilter) (*validation.Error, bool) {
+	var (
+		matched  bool
+		severity *validation.Severity
+		disabled *bool
+	)
+
+	message := ""
+	if vErr.UnderlyingError != nil {
+		message = vErr.UnderlyingError.Error()
+	}
+
+	for _, filter := range filters {
+		if filter.ruleID != "" && filter.ruleID != vErr.Rule {
+			continue
+		}
+		if filter.pattern != nil && !filter.pattern.MatchString(message) {
+			continue
+		}
+
+		matched = true
+		if filter.severity != nil {
+			severity = filter.severity
+		}
+		if filter.disabled != nil {
+			disabled = filter.disabled
+		}
+	}
+
+	if !matched {
+		return vErr, true
+	}
+
+	if disabled != nil && *disabled {
+		return nil, false
+	}
+
+	if severity != nil {
+		modifiedErr := *vErr
+		modifiedErr.Severity = *severity
+		return &modifiedErr, true
+	}
+
+	return vErr, true
 }
 
 // Output represents the result of linting

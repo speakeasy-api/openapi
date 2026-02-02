@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/linter"
+	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -97,12 +98,12 @@ func TestLinter_RuleSelection(t *testing.T) {
 			},
 		})
 
-		falseVal := false
 		config := &linter.Config{
 			Extends: []string{"all"},
-			Rules: map[string]linter.RuleConfig{
-				"test-rule-1": {
-					Enabled: &falseVal,
+			Rules: []linter.RuleEntry{
+				{
+					ID:       "test-rule-1",
+					Disabled: pointer.From(true),
 				},
 			},
 		}
@@ -193,8 +194,9 @@ func TestLinter_SeverityOverrides(t *testing.T) {
 		warningSeverity := validation.SeverityWarning
 		config := &linter.Config{
 			Extends: []string{"all"},
-			Rules: map[string]linter.RuleConfig{
-				"test-rule": {
+			Rules: []linter.RuleEntry{
+				{
+					ID:       "test-rule",
 					Severity: &warningSeverity,
 				},
 			},
@@ -275,8 +277,9 @@ func TestLinter_SeverityOverrides(t *testing.T) {
 					Severity: &warningSeverity,
 				},
 			},
-			Rules: map[string]linter.RuleConfig{
-				"style-rule": {
+			Rules: []linter.RuleEntry{
+				{
+					ID:       "style-rule",
 					Severity: &hintSeverity,
 				},
 			},
@@ -330,6 +333,120 @@ func TestLinter_PreExistingErrors(t *testing.T) {
 
 	// Should include both pre-existing and lint errors
 	assert.Len(t, output.Results, 2)
+}
+
+func TestLinter_FilterErrors_RuleLevelOverride(t *testing.T) {
+	t.Parallel()
+
+	warningSeverity := validation.SeverityWarning
+	config := &linter.Config{
+		Extends: []string{"all"},
+		Rules: []linter.RuleEntry{
+			{
+				ID:       "validation-required",
+				Severity: &warningSeverity,
+			},
+		},
+	}
+
+	lntr := linter.NewLinter(config, linter.NewRegistry[*MockDoc]())
+	input := []error{
+		validation.NewValidationError(validation.SeverityError, "validation-required", errors.New("validation error"), nil),
+	}
+
+	filtered, err := lntr.FilterErrors(input)
+	require.NoError(t, err)
+	require.Len(t, filtered, 1)
+
+	var vErr *validation.Error
+	require.ErrorAs(t, filtered[0], &vErr)
+	assert.Equal(t, validation.SeverityWarning, vErr.Severity)
+}
+
+func TestLinter_FilterErrors_UnknownRuleNoMatch_Passthrough(t *testing.T) {
+	t.Parallel()
+
+	config := &linter.Config{
+		Extends: []string{"all"},
+		Rules: []linter.RuleEntry{
+			{
+				ID: "validation-required",
+			},
+		},
+	}
+
+	lntr := linter.NewLinter(config, linter.NewRegistry[*MockDoc]())
+	input := []error{
+		validation.NewValidationError(validation.SeverityError, "validation-required", errors.New("validation error"), nil),
+	}
+
+	filtered, err := lntr.FilterErrors(input)
+	require.NoError(t, err)
+	require.Len(t, filtered, 1)
+
+	var vErr *validation.Error
+	require.ErrorAs(t, filtered[0], &vErr)
+	assert.Equal(t, validation.SeverityError, vErr.Severity)
+}
+
+func TestLinter_FilterErrors_MatchOrder_LastWins(t *testing.T) {
+	t.Parallel()
+
+	warningSeverity := validation.SeverityWarning
+	hintSeverity := validation.SeverityHint
+	config := &linter.Config{
+		Extends: []string{"all"},
+		Rules: []linter.RuleEntry{
+			{
+				ID:       "validation-required",
+				Match:    pointer.From(".*title.*"),
+				Severity: &warningSeverity,
+			},
+			{
+				ID:       "validation-required",
+				Match:    pointer.From(".*title.*"),
+				Severity: &hintSeverity,
+			},
+		},
+	}
+
+	lntr := linter.NewLinter(config, linter.NewRegistry[*MockDoc]())
+	input := []error{
+		validation.NewValidationError(validation.SeverityError, "validation-required", errors.New("info.title is required"), nil),
+	}
+
+	filtered, err := lntr.FilterErrors(input)
+	require.NoError(t, err)
+	require.Len(t, filtered, 1)
+
+	var vErr *validation.Error
+	require.ErrorAs(t, filtered[0], &vErr)
+	assert.Equal(t, validation.SeverityHint, vErr.Severity)
+}
+
+func TestLinter_FilterErrors_MatchDisable(t *testing.T) {
+	t.Parallel()
+
+	disabled := true
+	config := &linter.Config{
+		Extends: []string{"all"},
+		Rules: []linter.RuleEntry{
+			{
+				ID:       "validation-required",
+				Match:    pointer.From(".*title.*"),
+				Disabled: &disabled,
+			},
+		},
+	}
+
+	lntr := linter.NewLinter(config, linter.NewRegistry[*MockDoc]())
+	input := []error{
+		validation.NewValidationError(validation.SeverityError, "validation-required", errors.New("info.title is required"), nil),
+	}
+
+	filtered, err := lntr.FilterErrors(input)
+	require.NoError(t, err)
+	assert.Empty(t, filtered)
 }
 
 func TestLinter_ParallelExecution(t *testing.T) {

@@ -93,8 +93,11 @@ paths:
 	// Use empty Extends to disable all rules - we only want to test the path params validation
 	config := &linter.Config{
 		Extends: []string{},
-		Rules: map[string]linter.RuleConfig{
-			"semantic-path-params": {Enabled: pointer.From(true)},
+		Rules: []linter.RuleEntry{
+			{
+				ID:       "semantic-path-params",
+				Disabled: pointer.From(false),
+			},
 		},
 	}
 	lntr := openapiLinter.NewLinter(config)
@@ -185,8 +188,11 @@ paths:
 	// Use empty Extends to disable all rules - we only want to test the path params validation
 	config := &linter.Config{
 		Extends: []string{},
-		Rules: map[string]linter.RuleConfig{
-			"semantic-path-params": {Enabled: pointer.From(true)},
+		Rules: []linter.RuleEntry{
+			{
+				ID:       "semantic-path-params",
+				Disabled: pointer.From(false),
+			},
 		},
 	}
 	lntr := openapiLinter.NewLinter(config)
@@ -286,8 +292,11 @@ paths:
 	// Use empty Extends to disable all rules - we only want to test the path params validation
 	config := &linter.Config{
 		Extends: []string{},
-		Rules: map[string]linter.RuleConfig{
-			"semantic-path-params": {Enabled: pointer.From(true)},
+		Rules: []linter.RuleEntry{
+			{
+				ID:       "semantic-path-params",
+				Disabled: pointer.From(false),
+			},
 		},
 	}
 

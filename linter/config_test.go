@@ -1,11 +1,13 @@
 package linter_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRuleConfig_GetSeverity(t *testing.T) {
@@ -51,4 +53,24 @@ func TestNewConfig(t *testing.T) {
 	assert.NotNil(t, config.Rules)
 	assert.NotNil(t, config.Categories)
 	assert.NotNil(t, config.Extends)
+}
+
+func TestLoadConfig_ExtendsString(t *testing.T) {
+	t.Parallel()
+
+	configYAML := `extends: recommended`
+	config, err := linter.LoadConfig(strings.NewReader(configYAML))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"recommended"}, config.Extends)
+}
+
+func TestLoadConfig_ExtendsList(t *testing.T) {
+	t.Parallel()
+
+	configYAML := `extends:
+  - recommended
+  - strict`
+	config, err := linter.LoadConfig(strings.NewReader(configYAML))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"recommended", "strict"}, config.Extends)
 }

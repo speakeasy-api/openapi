@@ -111,20 +111,32 @@ func buildLintConfig() *linter.Config {
 
 	// Load from config file if specified
 	if lintConfigFile != "" {
-		// TODO: Load config from file
-	}
-
-	// Apply ruleset
-	if lintRuleset != "" {
-		config.Extends = []string{lintRuleset}
+		loaded, err := linter.LoadConfigFromFile(lintConfigFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		config = loaded
+	} else {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		defaultPath := filepath.Join(homeDir, ".openapi", "lint.yaml")
+		loaded, err := linter.LoadConfigFromFile(defaultPath)
+		if err == nil {
+			config = loaded
+		}
 	}
 
 	// Disable specified rules
 	for _, rule := range lintDisableRules {
-		if config.Rules == nil {
-			config.Rules = make(map[string]linter.RuleConfig)
-		}
-		config.Rules[rule] = linter.RuleConfig{Enabled: ptr(false)}
+		disabled := true
+		config.Rules = append(config.Rules, linter.RuleEntry{
+			ID:       rule,
+			Disabled: &disabled,
+		})
 	}
 
 	// Set output format

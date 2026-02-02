@@ -26,9 +26,9 @@ The linter engine is a generic, spec-agnostic framework for implementing configu
    - Individual linting rules (e.g., [`style-path-params`](openapi/linter/rules/path_params.go))
    - Each rule implements the [`RuleRunner[*openapi.OpenAPI]`](linter/rule.go) interface
 
-4. **CLI Integration** ([`cmd/openapi/commands/openapi.spec/lint.go`](cmd/openapi/commands/openapi.spec/lint.go))
+4. **CLI Integration** ([`cmd/openapi/commands/openapi/lint.go`](cmd/openapi/commands/openapi/lint.go))
    - `openapi spec lint` command
-   - Configuration file support (`.lint.yaml`)
+   - Configuration file support (`lint.yaml`)
    - Rule documentation generation (`--list-rules`)
 
 ## Key Features
@@ -47,11 +47,12 @@ categories:
     severity: warning
 
 rules:
-  style-path-params:
-    enabled: true
+  - id: style-path-params
     severity: error
-    options:
-      # Rule-specific options
+
+  - id: validation-required-field
+    match: ".*info\\.title is required.*"
+    disabled: true
 ```
 
 ### 2. Severity Overrides
@@ -140,7 +141,7 @@ paths:
 openapi spec lint openapi.yaml
 
 # Lint with custom config
-openapi spec lint --config .lint.yaml openapi.yaml
+openapi spec lint --config /path/to/lint.yaml openapi.yaml
 
 # List all available rules
 openapi spec lint --list-rules
@@ -177,6 +178,17 @@ if err != nil {
 // Check results
 if output.HasErrors() {
     fmt.Println(output.FormatText())
+}
+```
+
+## Filtering Errors After Linting
+
+To apply the config filters to additional errors after the initial lint (for example, errors discovered during lazy reference resolution), use [`FilterErrors`](linter/linter.go:237):
+
+```go
+filtered, err := lntr.FilterErrors(extraErrors)
+if err != nil {
+    // handle config or regex errors
 }
 ```
 
