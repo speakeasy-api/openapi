@@ -58,11 +58,7 @@ func (l *Linter[T]) Lint(ctx context.Context, docInfo *DocumentInfo[T], preExist
 	// Apply severity overrides from config
 	allErrs = l.applySeverityOverrides(allErrs)
 
-	filteredErrs, err := l.FilterErrors(allErrs)
-	if err != nil {
-		return nil, err
-	}
-	allErrs = filteredErrs
+	allErrs = l.FilterErrors(allErrs)
 
 	// Sort errors by location
 	validation.SortValidationErrors(allErrs)
@@ -238,11 +234,8 @@ func (l *Linter[T]) applySeverityOverrides(errs []error) []error {
 }
 
 // FilterErrors applies rule-level overrides and match filters to any errors.
-func (l *Linter[T]) FilterErrors(errs []error) ([]error, error) {
-	filters, err := l.buildMatchFilters()
-	if err != nil {
-		return nil, err
-	}
+func (l *Linter[T]) FilterErrors(errs []error) []error {
+	filters := l.buildMatchFilters()
 
 	var filtered []error
 	for _, err := range errs {
@@ -258,7 +251,7 @@ func (l *Linter[T]) FilterErrors(errs []error) ([]error, error) {
 		}
 	}
 
-	return filtered, nil
+	return filtered
 }
 
 func (l *Linter[T]) formatOutput(errs []error) *Output {
@@ -290,11 +283,11 @@ func (l *Linter[T]) ruleOverrides() map[string]ruleOverride {
 	return overrides
 }
 
-func (l *Linter[T]) buildMatchFilters() ([]matchFilter, error) {
+func (l *Linter[T]) buildMatchFilters() []matchFilter {
 	var filters []matchFilter
 	for _, entry := range l.config.Rules {
 		if entry.ID == "" {
-			return nil, errors.New("rule entry missing id")
+			continue
 		}
 
 		if entry.Match == nil {
@@ -309,19 +302,14 @@ func (l *Linter[T]) buildMatchFilters() ([]matchFilter, error) {
 			})
 			continue
 		}
-
-		pattern, err := regexp.Compile(*entry.Match)
-		if err != nil {
-			return nil, err
-		}
 		filters = append(filters, matchFilter{
 			ruleID:   entry.ID,
-			pattern:  pattern,
+			pattern:  entry.Match,
 			severity: entry.Severity,
 			disabled: entry.Disabled,
 		})
 	}
-	return filters, nil
+	return filters
 }
 
 func applyMatchFilters(vErr *validation.Error, filters []matchFilter) (*validation.Error, bool) {

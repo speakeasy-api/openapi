@@ -32,6 +32,9 @@ func LoadConfig(r io.Reader) (*Config, error) {
 	if cfg.OutputFormat == "" {
 		cfg.OutputFormat = OutputFormatText
 	}
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
 
 	return &cfg, nil
 }

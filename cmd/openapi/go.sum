@@ -77,6 +77,8 @@ github.com/speakeasy-api/jsonpath v0.6.2 h1:Mys71yd6u8kuowNCR0gCVPlVAHCmKtoGXYoA
 github.com/speakeasy-api/jsonpath v0.6.2/go.mod h1:ymb2iSkyOycmzKwbEAYPJV/yi2rSmvBCLZJcyD+VVWw=
 github.com/speakeasy-api/openapi v1.15.1-0.20260123232020-443f8a84b64c h1:nmJ3K4QQO1fNkIKM0GKfEGs/Cav7udtn9LijHF8ZaFw=
 github.com/speakeasy-api/openapi v1.15.1-0.20260123232020-443f8a84b64c/go.mod h1:aiVj+JnirrwZDtKegt0hQrj/ixl3v17EkN2YGnTuSro=
+github.com/speakeasy-api/openapi v1.15.2-0.20260202014254-4c1a374b7a36 h1:ax2AmUvMdH6+lmA44ON1Gr1oTumEnSOFC8G2iRWLVLQ=
+github.com/speakeasy-api/openapi v1.15.2-0.20260202014254-4c1a374b7a36/go.mod h1:aiVj+JnirrwZDtKegt0hQrj/ixl3v17EkN2YGnTuSro=
 github.com/spf13/cobra v1.10.1 h1:lJeBwCfmrnXthfAupyUTzJ/J4Nc1RsHC/mSRU2dll/s=
 github.com/spf13/cobra v1.10.1/go.mod h1:7SmJGaTHFVBY0jW4NXGluQoLvhqFQM+6XSKD+P4XaB0=
 github.com/spf13/pflag v1.0.9 h1:9exaQaMOCwffKiiiYk6/BndUBv+iRViNW+4lEMi0PvY=

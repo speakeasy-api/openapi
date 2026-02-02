@@ -3,6 +3,7 @@ package linter
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/references"
@@ -70,16 +71,16 @@ type RuleEntry struct {
 	ID       string               `yaml:"id" json:"id"`
 	Severity *validation.Severity `yaml:"severity,omitempty" json:"severity,omitempty"`
 	Disabled *bool                `yaml:"disabled,omitempty" json:"disabled,omitempty"`
-	Match    *string              `yaml:"match,omitempty" json:"match,omitempty"`
+	Match    *regexp.Regexp       `yaml:"match,omitempty" json:"match,omitempty"`
 }
 
 // UnmarshalYAML allows severity aliases (warn, info) in rule entries.
 func (r *RuleEntry) UnmarshalYAML(value *yaml.Node) error {
 	var raw struct {
-		ID       string  `yaml:"id"`
-		Severity *string `yaml:"severity,omitempty"`
-		Disabled *bool   `yaml:"disabled,omitempty"`
-		Match    *string `yaml:"match,omitempty"`
+		ID       string         `yaml:"id"`
+		Severity *string        `yaml:"severity,omitempty"`
+		Disabled *bool          `yaml:"disabled,omitempty"`
+		Match    *regexp.Regexp `yaml:"match,omitempty"`
 	}
 	if err := value.Decode(&raw); err != nil {
 		return err
@@ -94,6 +95,16 @@ func (r *RuleEntry) UnmarshalYAML(value *yaml.Node) error {
 			return err
 		}
 		r.Severity = &sev
+	}
+	return nil
+}
+
+// Validate checks for missing rule IDs in the configuration.
+func (c *Config) Validate() error {
+	for _, entry := range c.Rules {
+		if strings.TrimSpace(entry.ID) == "" {
+			return errors.New("rule entry missing id")
+		}
 	}
 	return nil
 }

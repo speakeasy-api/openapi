@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/linter"
@@ -354,8 +355,7 @@ func TestLinter_FilterErrors_RuleLevelOverride(t *testing.T) {
 		validation.NewValidationError(validation.SeverityError, "validation-required", errors.New("validation error"), nil),
 	}
 
-	filtered, err := lntr.FilterErrors(input)
-	require.NoError(t, err)
+	filtered := lntr.FilterErrors(input)
 	require.Len(t, filtered, 1)
 
 	var vErr *validation.Error
@@ -380,8 +380,7 @@ func TestLinter_FilterErrors_UnknownRuleNoMatch_Passthrough(t *testing.T) {
 		validation.NewValidationError(validation.SeverityError, "validation-required", errors.New("validation error"), nil),
 	}
 
-	filtered, err := lntr.FilterErrors(input)
-	require.NoError(t, err)
+	filtered := lntr.FilterErrors(input)
 	require.Len(t, filtered, 1)
 
 	var vErr *validation.Error
@@ -399,12 +398,12 @@ func TestLinter_FilterErrors_MatchOrder_LastWins(t *testing.T) {
 		Rules: []linter.RuleEntry{
 			{
 				ID:       "validation-required",
-				Match:    pointer.From(".*title.*"),
+				Match:    regexp.MustCompile(".*title.*"),
 				Severity: &warningSeverity,
 			},
 			{
 				ID:       "validation-required",
-				Match:    pointer.From(".*title.*"),
+				Match:    regexp.MustCompile(".*title.*"),
 				Severity: &hintSeverity,
 			},
 		},
@@ -415,8 +414,7 @@ func TestLinter_FilterErrors_MatchOrder_LastWins(t *testing.T) {
 		validation.NewValidationError(validation.SeverityError, "validation-required", errors.New("info.title is required"), nil),
 	}
 
-	filtered, err := lntr.FilterErrors(input)
-	require.NoError(t, err)
+	filtered := lntr.FilterErrors(input)
 	require.Len(t, filtered, 1)
 
 	var vErr *validation.Error
@@ -433,7 +431,7 @@ func TestLinter_FilterErrors_MatchDisable(t *testing.T) {
 		Rules: []linter.RuleEntry{
 			{
 				ID:       "validation-required",
-				Match:    pointer.From(".*title.*"),
+				Match:    regexp.MustCompile(".*title.*"),
 				Disabled: &disabled,
 			},
 		},
@@ -444,8 +442,7 @@ func TestLinter_FilterErrors_MatchDisable(t *testing.T) {
 		validation.NewValidationError(validation.SeverityError, "validation-required", errors.New("info.title is required"), nil),
 	}
 
-	filtered, err := lntr.FilterErrors(input)
-	require.NoError(t, err)
+	filtered := lntr.FilterErrors(input)
 	assert.Empty(t, filtered)
 }
 

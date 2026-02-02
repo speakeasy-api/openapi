@@ -1,6 +1,7 @@
 package linter_test
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -73,4 +74,29 @@ func TestLoadConfig_ExtendsList(t *testing.T) {
 	config, err := linter.LoadConfig(strings.NewReader(configYAML))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"recommended", "strict"}, config.Extends)
+}
+
+func TestLoadConfig_MatchRegex(t *testing.T) {
+	t.Parallel()
+
+	configYAML := `rules:
+  - id: validation-required
+    match: ".*title.*"`
+	config, err := linter.LoadConfig(strings.NewReader(configYAML))
+	require.NoError(t, err)
+	require.Len(t, config.Rules, 1)
+	require.NotNil(t, config.Rules[0].Match)
+	assert.Equal(t, regexp.MustCompile(".*title.*").String(), config.Rules[0].Match.String())
+}
+
+func TestConfig_ValidateMissingRuleID(t *testing.T) {
+	t.Parallel()
+
+	config := &linter.Config{
+		Rules: []linter.RuleEntry{{}},
+	}
+
+	err := config.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "rule entry missing id")
 }

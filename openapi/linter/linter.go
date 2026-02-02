@@ -76,6 +76,12 @@ func (l *Linter) Registry() *baseLinter.Registry[*openapi.OpenAPI] {
 	return l.base.Registry()
 }
 
+// FilterErrors applies rule-level overrides and match filters to arbitrary errors.
+// This is useful when you collect additional validation errors after the main lint run.
+func (l *Linter) FilterErrors(errs []error) []error {
+	return l.base.FilterErrors(errs)
+}
+
 // Lint runs all configured rules against the document.
 // The index is automatically built and made available to rules via DocumentInfo.Index.
 func (l *Linter) Lint(ctx context.Context, docInfo *baseLinter.DocumentInfo[*openapi.OpenAPI], preExistingErrors []error, opts *baseLinter.LintOptions) (*baseLinter.Output, error) {

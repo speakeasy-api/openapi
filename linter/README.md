@@ -186,10 +186,7 @@ if output.HasErrors() {
 To apply the config filters to additional errors after the initial lint (for example, errors discovered during lazy reference resolution), use [`FilterErrors`](linter/linter.go:237):
 
 ```go
-filtered, err := lntr.FilterErrors(extraErrors)
-if err != nil {
-    // handle config or regex errors
-}
+filtered := lntr.FilterErrors(extraErrors)
 ```
 
 ## Adding New Rules
