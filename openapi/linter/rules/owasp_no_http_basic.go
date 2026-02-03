@@ -20,6 +20,12 @@ func (r *OwaspNoHttpBasicRule) Category() string { return CategorySecurity }
 func (r *OwaspNoHttpBasicRule) Description() string {
 	return "Security schemes must not use HTTP Basic authentication without additional security layers. HTTP Basic sends credentials in easily-decoded base64 encoding, making it vulnerable to interception without HTTPS."
 }
+func (r *OwaspNoHttpBasicRule) Summary() string {
+	return "Security schemes must not use HTTP Basic authentication."
+}
+func (r *OwaspNoHttpBasicRule) HowToFix() string {
+	return "Replace HTTP Basic schemes with more secure authentication (e.g., OAuth2 or bearer tokens)."
+}
 func (r *OwaspNoHttpBasicRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-no-http-basic"
 }

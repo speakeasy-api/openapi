@@ -19,6 +19,12 @@ func (r *PathParamsRule) Category() string { return CategorySemantic }
 func (r *PathParamsRule) Description() string {
 	return "Path template variables like {userId} must have corresponding parameter definitions with in='path', and declared path parameters must be used in the URL template. This ensures request routing works correctly and all path variables are properly documented. Parameters can be defined at PathItem level (inherited by all operations) or Operation level (can override PathItem parameters)."
 }
+func (r *PathParamsRule) Summary() string {
+	return "Path template variables must have matching path parameters and vice versa."
+}
+func (r *PathParamsRule) HowToFix() string {
+	return "Ensure every {param} in the path has an in: path parameter and remove any unused path parameters."
+}
 func (r *PathParamsRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#semantic-path-params"
 }

@@ -32,6 +32,12 @@ func (r *OwaspRateLimitRule) Category() string {
 func (r *OwaspRateLimitRule) Description() string {
 	return "2XX and 4XX responses must define rate limiting headers (X-RateLimit-Limit, X-RateLimit-Remaining) to prevent API overload. Rate limit headers help clients manage their usage and avoid hitting limits."
 }
+func (r *OwaspRateLimitRule) Summary() string {
+	return "2XX and 4XX responses should include rate limit headers."
+}
+func (r *OwaspRateLimitRule) HowToFix() string {
+	return "Add rate limit headers (e.g., X-RateLimit-Limit, X-RateLimit-Remaining) to 2XX and 4XX responses."
+}
 func (r *OwaspRateLimitRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-rate-limit"
 }

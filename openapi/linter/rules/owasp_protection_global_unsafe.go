@@ -30,6 +30,12 @@ func (r *OwaspProtectionGlobalUnsafeRule) Category() string {
 func (r *OwaspProtectionGlobalUnsafeRule) Description() string {
 	return "Unsafe operations (POST, PUT, PATCH, DELETE) must be protected by security schemes to prevent unauthorized modifications. Write operations without authentication create serious security vulnerabilities allowing data tampering."
 }
+func (r *OwaspProtectionGlobalUnsafeRule) Summary() string {
+	return "Unsafe operations must be protected by security schemes."
+}
+func (r *OwaspProtectionGlobalUnsafeRule) HowToFix() string {
+	return "Define security requirements globally or per operation for POST/PUT/PATCH/DELETE endpoints."
+}
 func (r *OwaspProtectionGlobalUnsafeRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-protection-global-unsafe"
 }

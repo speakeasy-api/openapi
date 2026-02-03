@@ -21,6 +21,7 @@ func NewDocGenerator[T any](registry *Registry[T]) *DocGenerator[T] {
 type RuleDoc struct {
 	ID              string         `json:"id" yaml:"id"`
 	Category        string         `json:"category" yaml:"category"`
+	Summary         string         `json:"summary" yaml:"summary"`
 	Description     string         `json:"description" yaml:"description"`
 	Rationale       string         `json:"rationale,omitempty" yaml:"rationale,omitempty"`
 	Link            string         `json:"link,omitempty" yaml:"link,omitempty"`
@@ -39,6 +40,7 @@ func (g *DocGenerator[T]) GenerateRuleDoc(rule RuleRunner[T]) *RuleDoc {
 	doc := &RuleDoc{
 		ID:              rule.ID(),
 		Category:        rule.Category(),
+		Summary:         rule.Summary(),
 		Description:     rule.Description(),
 		Link:            rule.Link(),
 		DefaultSeverity: rule.DefaultSeverity().String(),
@@ -146,6 +148,11 @@ func (g *DocGenerator[T]) writeRuleMarkdown(w io.Writer, rule *RuleDoc) error {
 	}
 	if err := writeF(w, "**Category:** %s  \n", rule.Category); err != nil {
 		return err
+	}
+	if rule.Summary != "" {
+		if err := writeF(w, "**Summary:** %s  \n", rule.Summary); err != nil {
+			return err
+		}
 	}
 
 	if len(rule.Versions) > 0 {

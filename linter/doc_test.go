@@ -21,6 +21,7 @@ func TestDocGenerator_GenerateRuleDoc(t *testing.T) {
 		registry.Register(&mockRule{
 			id:              "test-rule",
 			category:        "style",
+			summary:         "Test rule summary",
 			description:     "Test rule description",
 			link:            "https://example.com/rules/test-rule",
 			defaultSeverity: validation.SeverityError,
@@ -33,6 +34,7 @@ func TestDocGenerator_GenerateRuleDoc(t *testing.T) {
 
 		assert.Equal(t, "test-rule", doc.ID)
 		assert.Equal(t, "style", doc.Category)
+		assert.Equal(t, "Test rule summary", doc.Summary)
 		assert.Equal(t, "Test rule description", doc.Description)
 		assert.Equal(t, "https://example.com/rules/test-rule", doc.Link)
 		assert.Equal(t, "error", doc.DefaultSeverity)
@@ -48,6 +50,7 @@ func TestDocGenerator_GenerateRuleDoc(t *testing.T) {
 			mockRule: mockRule{
 				id:              "documented-rule",
 				category:        "style",
+				summary:         "Documented rule summary",
 				description:     "Rule with examples",
 				defaultSeverity: validation.SeverityWarning,
 			},
@@ -75,6 +78,7 @@ func TestDocGenerator_GenerateRuleDoc(t *testing.T) {
 			mockRule: mockRule{
 				id:              "configurable-rule",
 				category:        "style",
+				summary:         "Configurable rule summary",
 				description:     "Configurable rule",
 				defaultSeverity: validation.SeverityError,
 			},
@@ -146,6 +150,7 @@ func TestDocGenerator_WriteJSON(t *testing.T) {
 	registry.Register(&mockRule{
 		id:              "test-rule",
 		category:        "style",
+		summary:         "Test rule summary",
 		description:     "Test description",
 		link:            "https://example.com",
 		defaultSeverity: validation.SeverityError,
@@ -188,6 +193,7 @@ func TestDocGenerator_WriteMarkdown(t *testing.T) {
 		mockRule: mockRule{
 			id:              "test-rule",
 			category:        "style",
+			summary:         "Test rule summary",
 			description:     "Test rule description",
 			link:            "https://docs.example.com/rules/test-rule",
 			defaultSeverity: validation.SeverityError,
@@ -213,6 +219,7 @@ func TestDocGenerator_WriteMarkdown(t *testing.T) {
 	assert.Contains(t, output, "### test-rule") // Rule header
 	assert.Contains(t, output, "**Severity:** error")
 	assert.Contains(t, output, "**Category:** style")
+	assert.Contains(t, output, "**Summary:** Test rule summary")
 	assert.Contains(t, output, "Test rule description")
 	assert.Contains(t, output, "#### Rationale")
 	assert.Contains(t, output, "This rule ensures consistency")
@@ -232,6 +239,7 @@ func TestDocGenerator_WriteMarkdown_WithVersions(t *testing.T) {
 	registry.Register(&mockRule{
 		id:              "versioned-rule",
 		category:        "validation",
+		summary:         "Versioned rule summary",
 		description:     "Version-specific rule",
 		defaultSeverity: validation.SeverityError,
 		versions:        []string{"3.1.0", "3.2.0"},

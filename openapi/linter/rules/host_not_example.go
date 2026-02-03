@@ -19,6 +19,12 @@ func (r *OAS3HostNotExampleRule) Category() string { return CategoryStyle }
 func (r *OAS3HostNotExampleRule) Description() string {
 	return "Server URLs should not point to example.com domains, which are reserved for documentation purposes. Production API specifications should reference actual server endpoints where the API is hosted."
 }
+func (r *OAS3HostNotExampleRule) Summary() string {
+	return "Server URLs should not point to example.com domains."
+}
+func (r *OAS3HostNotExampleRule) HowToFix() string {
+	return "Replace example.com server URLs with real API endpoints."
+}
 func (r *OAS3HostNotExampleRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#style-oas3-host-not-example"
 }

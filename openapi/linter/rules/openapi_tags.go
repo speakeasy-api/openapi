@@ -21,6 +21,14 @@ func (r *OpenAPITagsRule) Description() string {
 	return "The OpenAPI specification should define a non-empty tags array at the root level to organize and categorize API operations. Tags help structure API documentation and enable logical grouping of related endpoints."
 }
 
+func (r *OpenAPITagsRule) Summary() string {
+	return "The OpenAPI object should define a non-empty tags array."
+}
+
+func (r *OpenAPITagsRule) HowToFix() string {
+	return "Define at least one tag in the top-level tags array."
+}
+
 func (r *OpenAPITagsRule) Category() string {
 	return CategoryStyle
 }

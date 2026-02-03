@@ -27,11 +27,13 @@ type mockRule struct {
 	link            string
 	defaultSeverity validation.Severity
 	versions        []string
+	summary         string
 	runFunc         func(ctx context.Context, docInfo *linter.DocumentInfo[*MockDoc], config *linter.RuleConfig) []error
 }
 
 func (r *mockRule) ID() string                           { return r.id }
 func (r *mockRule) Category() string                     { return r.category }
+func (r *mockRule) Summary() string                      { return r.summary }
 func (r *mockRule) Description() string                  { return r.description }
 func (r *mockRule) Link() string                         { return r.link }
 func (r *mockRule) DefaultSeverity() validation.Severity { return r.defaultSeverity }

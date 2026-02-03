@@ -21,6 +21,14 @@ func (r *OAS3ParameterDescriptionRule) Description() string {
 	return "Parameters should include descriptions that explain their purpose and expected values. Clear parameter documentation helps developers understand how to construct valid requests and what each parameter controls."
 }
 
+func (r *OAS3ParameterDescriptionRule) Summary() string {
+	return "Parameters should include descriptions."
+}
+
+func (r *OAS3ParameterDescriptionRule) HowToFix() string {
+	return "Add descriptions to parameters that explain their purpose and expected values."
+}
+
 func (r *OAS3ParameterDescriptionRule) Category() string {
 	return CategoryStyle
 }

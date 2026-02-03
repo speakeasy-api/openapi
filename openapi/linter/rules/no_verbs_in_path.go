@@ -22,6 +22,14 @@ func (r *NoVerbsInPathRule) Description() string {
 	return "Path segments should not contain HTTP verbs like GET, POST, PUT, DELETE, or QUERY since the HTTP method already conveys the action. RESTful API design favors resource-oriented paths (e.g., `/users`) over action-oriented paths (e.g., `/getUsers`)."
 }
 
+func (r *NoVerbsInPathRule) Summary() string {
+	return "Paths should not include HTTP verbs in segments."
+}
+
+func (r *NoVerbsInPathRule) HowToFix() string {
+	return "Rename paths to use resource nouns instead of HTTP verbs."
+}
+
 func (r *NoVerbsInPathRule) Category() string {
 	return CategoryStyle
 }

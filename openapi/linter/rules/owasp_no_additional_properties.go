@@ -22,6 +22,12 @@ func (r *OwaspNoAdditionalPropertiesRule) Category() string {
 func (r *OwaspNoAdditionalPropertiesRule) Description() string {
 	return "Object schemas must not allow arbitrary additional properties (set additionalProperties to false or omit it). Allowing unexpected properties can lead to mass assignment vulnerabilities where attackers inject unintended fields."
 }
+func (r *OwaspNoAdditionalPropertiesRule) Summary() string {
+	return "Object schemas should not allow additional properties."
+}
+func (r *OwaspNoAdditionalPropertiesRule) HowToFix() string {
+	return "Set additionalProperties to false or remove it from object schemas."
+}
 func (r *OwaspNoAdditionalPropertiesRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-no-additional-properties"
 }

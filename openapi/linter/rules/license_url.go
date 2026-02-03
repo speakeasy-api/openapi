@@ -18,6 +18,12 @@ func (r *LicenseURLRule) Category() string { return CategoryStyle }
 func (r *LicenseURLRule) Description() string {
 	return "The license object should include a URL that points to the full license text. Providing a license URL allows API consumers to review the complete terms and conditions governing API usage."
 }
+func (r *LicenseURLRule) Summary() string {
+	return "The license object should include a URL to the full license text."
+}
+func (r *LicenseURLRule) HowToFix() string {
+	return "Add a license.url pointing to the full license text."
+}
 func (r *LicenseURLRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#style-license-url"
 }

@@ -18,6 +18,12 @@ func (r *InfoContactRule) Category() string { return CategoryStyle }
 func (r *InfoContactRule) Description() string {
 	return "The info section should include a contact object with details for reaching the API team. Providing contact information helps API consumers get support, report issues, and connect with maintainers when needed."
 }
+func (r *InfoContactRule) Summary() string {
+	return "The info section should include a contact object for API support."
+}
+func (r *InfoContactRule) HowToFix() string {
+	return "Add an info.contact object with support details."
+}
 func (r *InfoContactRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#style-info-contact"
 }

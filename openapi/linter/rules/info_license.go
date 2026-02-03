@@ -18,6 +18,12 @@ func (r *InfoLicenseRule) Category() string { return CategoryStyle }
 func (r *InfoLicenseRule) Description() string {
 	return "The info section should include a license object that specifies the terms under which the API can be used. Clearly stating the license helps API consumers understand their rights and obligations when integrating with your API."
 }
+func (r *InfoLicenseRule) Summary() string {
+	return "The info section should include a license object."
+}
+func (r *InfoLicenseRule) HowToFix() string {
+	return "Add an info.license object describing the API license."
+}
 func (r *InfoLicenseRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#style-info-license"
 }

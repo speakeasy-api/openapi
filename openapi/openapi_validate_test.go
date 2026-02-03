@@ -328,7 +328,7 @@ paths:
         '200':
           description: ok
 `,
-			wantErrs: []string{"error validation-operation-parameters the `GET` operation parameter at path `/users/{id}`, index 1 has a duplicate name `id` and `in` type"},
+			wantErrs: []string{"error validation-operation-parameters parameter \"id\" is duplicated in GET operation at path \"/users/{id}\""},
 		},
 		{
 			name: "duplicate_pathitem_parameter",
@@ -355,7 +355,7 @@ paths:
         '200':
           description: ok
 `,
-			wantErrs: []string{"error validation-operation-parameters the pathItem parameter at path `/users/{id}`, index 1 has a duplicate name `id` and `in` type"},
+			wantErrs: []string{"error validation-operation-parameters parameter \"id\" is duplicated in path \"/users/{id}\""},
 		},
 	}
 

@@ -21,6 +21,14 @@ func (r *TagDescriptionRule) Description() string {
 	return "Tags should include descriptions that explain the purpose and scope of the operations they group. Tag descriptions provide context in documentation and help developers understand the organization of API functionality."
 }
 
+func (r *TagDescriptionRule) Summary() string {
+	return "Tags should include descriptions."
+}
+
+func (r *TagDescriptionRule) HowToFix() string {
+	return "Add descriptions to each tag to explain the grouped operations."
+}
+
 func (r *TagDescriptionRule) Category() string {
 	return CategoryStyle
 }

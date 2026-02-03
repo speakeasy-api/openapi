@@ -23,6 +23,12 @@ func (r *OAS3ExampleMissingRule) Category() string {
 func (r *OAS3ExampleMissingRule) Description() string {
 	return "Schemas, parameters, headers, and media types should include example values to illustrate expected data formats. Examples improve documentation quality, help developers understand how to use the API correctly, and enable better testing and validation."
 }
+func (r *OAS3ExampleMissingRule) Summary() string {
+	return "Schemas, parameters, headers, and media types should include example values."
+}
+func (r *OAS3ExampleMissingRule) HowToFix() string {
+	return "Add example or examples values to schemas, parameters, headers, and media types."
+}
 func (r *OAS3ExampleMissingRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#oas3-example-missing"
 }

@@ -18,6 +18,12 @@ func (r *NoRefSiblingsRule) Category() string { return CategoryStyle }
 func (r *NoRefSiblingsRule) Description() string {
 	return "In OpenAPI 3.0.x, a $ref field should not have sibling properties alongside it in the same object. Either use $ref alone or move additional properties to the referenced schema definition. Note that OpenAPI 3.1+ allows $ref siblings per JSON Schema Draft 2020-12."
 }
+func (r *NoRefSiblingsRule) Summary() string {
+	return "$ref objects must not include sibling properties in OpenAPI 3.0.x."
+}
+func (r *NoRefSiblingsRule) HowToFix() string {
+	return "Move sibling fields into the referenced schema or inline the schema instead of using $ref."
+}
 func (r *NoRefSiblingsRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#style-no-ref-siblings"
 }

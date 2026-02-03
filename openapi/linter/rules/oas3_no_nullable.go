@@ -22,6 +22,12 @@ func (r *OAS3NoNullableRule) Category() string {
 func (r *OAS3NoNullableRule) Description() string {
 	return "The nullable keyword is not supported in OpenAPI 3.1+ and should be replaced with a type array that includes null (e.g., type: [string, null]). This change aligns OpenAPI 3.1 with JSON Schema Draft 2020-12, which uses type arrays to express nullable values."
 }
+func (r *OAS3NoNullableRule) Summary() string {
+	return "OpenAPI 3.1 must not use the nullable keyword."
+}
+func (r *OAS3NoNullableRule) HowToFix() string {
+	return "Replace nullable with a type array that includes 'null' (e.g., type: [string, null])."
+}
 func (r *OAS3NoNullableRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#oas3-no-nullable"
 }

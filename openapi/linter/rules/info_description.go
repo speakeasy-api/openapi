@@ -18,6 +18,12 @@ func (r *InfoDescriptionRule) Category() string { return CategoryStyle }
 func (r *InfoDescriptionRule) Description() string {
 	return "The info section should include a description field that explains the purpose and capabilities of the API. A well-written description helps developers quickly understand what the API does and whether it meets their needs."
 }
+func (r *InfoDescriptionRule) Summary() string {
+	return "The info section should include a description field for the API."
+}
+func (r *InfoDescriptionRule) HowToFix() string {
+	return "Add a concise info.description that explains the API's purpose."
+}
 func (r *InfoDescriptionRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#style-info-description"
 }

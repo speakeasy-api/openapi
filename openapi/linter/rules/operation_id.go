@@ -22,6 +22,14 @@ func (r *OperationIdRule) Description() string {
 	return "Operations should define an operationId for consistent referencing across the specification and in generated code. Operation IDs enable tooling to generate meaningful function names and provide stable identifiers for API operations."
 }
 
+func (r *OperationIdRule) Summary() string {
+	return "Operations should define an operationId."
+}
+
+func (r *OperationIdRule) HowToFix() string {
+	return "Add an operationId to each operation."
+}
+
 func (r *OperationIdRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#semantic-operation-operation-id"
 }

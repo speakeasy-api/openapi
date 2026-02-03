@@ -23,6 +23,12 @@ func (r *NoEvalInMarkdownRule) Category() string { return CategorySemantic }
 func (r *NoEvalInMarkdownRule) Description() string {
 	return "Markdown descriptions must not contain eval() statements, which pose serious security risks. Including eval() in documentation could enable code injection attacks if the documentation is rendered in contexts that execute JavaScript."
 }
+func (r *NoEvalInMarkdownRule) Summary() string {
+	return "Markdown descriptions must not include eval() statements."
+}
+func (r *NoEvalInMarkdownRule) HowToFix() string {
+	return "Remove eval() from markdown descriptions."
+}
 func (r *NoEvalInMarkdownRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#semantic-no-eval-in-markdown"
 }

@@ -22,6 +22,14 @@ func (r *OperationTagsRule) Description() string {
 	return "Operations should have at least one tag to enable logical grouping and organization in documentation. Tags help developers navigate the API by categorizing related operations together."
 }
 
+func (r *OperationTagsRule) Summary() string {
+	return "Operations should have at least one tag."
+}
+
+func (r *OperationTagsRule) HowToFix() string {
+	return "Add at least one tag to each operation."
+}
+
 func (r *OperationTagsRule) Category() string {
 	return CategoryStyle
 }

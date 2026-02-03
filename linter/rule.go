@@ -17,6 +17,9 @@ type Rule interface {
 	// Description returns a human-readable description of what the rule checks
 	Description() string
 
+	// Summary returns a short summary of what the rule checks
+	Summary() string
+
 	// Link returns an optional URL to documentation for this rule
 	Link() string
 

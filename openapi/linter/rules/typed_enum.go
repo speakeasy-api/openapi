@@ -21,6 +21,12 @@ func (r *TypedEnumRule) Category() string { return CategorySemantic }
 func (r *TypedEnumRule) Description() string {
 	return "Enum values must match the specified type - for example, if type is 'string', all enum values must be strings. Type mismatches in enums cause validation failures and break code generation tools."
 }
+func (r *TypedEnumRule) Summary() string {
+	return "Enum values must match the specified schema type."
+}
+func (r *TypedEnumRule) HowToFix() string {
+	return "Update enum values to match the schema type or adjust the schema type to include the enum value types."
+}
 func (r *TypedEnumRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#semantic-typed-enum"
 }

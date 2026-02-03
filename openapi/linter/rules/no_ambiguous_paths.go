@@ -19,6 +19,12 @@ func (r *NoAmbiguousPathsRule) Category() string { return CategorySemantic }
 func (r *NoAmbiguousPathsRule) Description() string {
 	return "Path definitions must be unambiguous and distinguishable from each other to ensure correct request routing. Ambiguous paths like `/users/{id}` and `/users/{name}` can cause runtime routing conflicts since both match the same URL pattern."
 }
+func (r *NoAmbiguousPathsRule) Summary() string {
+	return "Path definitions must not be ambiguous."
+}
+func (r *NoAmbiguousPathsRule) HowToFix() string {
+	return "Rename conflicting paths so their templates are distinct (avoid ambiguous parameter-only segments)."
+}
 func (r *NoAmbiguousPathsRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#semantic-no-ambiguous-paths"
 }

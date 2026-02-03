@@ -19,6 +19,12 @@ func (r *DuplicatedEnumRule) Category() string { return CategorySemantic }
 func (r *DuplicatedEnumRule) Description() string {
 	return "Enum arrays should not contain duplicate values. Duplicate enum values are redundant and can cause confusion or unexpected behavior in client code generation and validation."
 }
+func (r *DuplicatedEnumRule) Summary() string {
+	return "Enum arrays should not contain duplicate values."
+}
+func (r *DuplicatedEnumRule) HowToFix() string {
+	return "Remove or consolidate duplicate entries in enum arrays."
+}
 func (r *DuplicatedEnumRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#semantic-duplicated-enum"
 }

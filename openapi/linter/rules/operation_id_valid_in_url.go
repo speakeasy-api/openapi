@@ -25,6 +25,14 @@ func (r *OperationIDValidInURLRule) Description() string {
 	return "Operation IDs must use URL-friendly characters (alphanumeric, hyphens, and underscores only). URL-safe operation IDs ensure compatibility with code generators and tooling that may use them in URLs or file paths."
 }
 
+func (r *OperationIDValidInURLRule) Summary() string {
+	return "Operation IDs must contain only URL-friendly characters."
+}
+
+func (r *OperationIDValidInURLRule) HowToFix() string {
+	return "Update operationId values to use only URL-friendly characters."
+}
+
 func (r *OperationIDValidInURLRule) Category() string {
 	return CategorySemantic
 }

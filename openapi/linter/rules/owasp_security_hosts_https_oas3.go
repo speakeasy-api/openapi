@@ -24,6 +24,12 @@ func (r *OwaspSecurityHostsHttpsOAS3Rule) Category() string {
 func (r *OwaspSecurityHostsHttpsOAS3Rule) Description() string {
 	return "Server URLs must begin with https:// as the only permitted protocol. Using HTTPS is essential for protecting API traffic from interception, tampering, and eavesdropping attacks."
 }
+func (r *OwaspSecurityHostsHttpsOAS3Rule) Summary() string {
+	return "Server URLs must use HTTPS."
+}
+func (r *OwaspSecurityHostsHttpsOAS3Rule) HowToFix() string {
+	return "Update server URLs to use https:// instead of http://."
+}
 func (r *OwaspSecurityHostsHttpsOAS3Rule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-security-hosts-https-oas3"
 }

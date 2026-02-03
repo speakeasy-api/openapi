@@ -21,6 +21,14 @@ func (r *ComponentDescriptionRule) Description() string {
 	return "Reusable components (schemas, parameters, responses, etc.) should include descriptions to explain their purpose and usage. Clear component descriptions improve API documentation quality and help developers understand how to properly use shared definitions across the specification."
 }
 
+func (r *ComponentDescriptionRule) Summary() string {
+	return "Reusable components (schemas, parameters, responses, etc.) should include descriptions to explain their purpose and usage."
+}
+
+func (r *ComponentDescriptionRule) HowToFix() string {
+	return "Add a description to each reusable component (schemas, parameters, responses, requestBodies, headers, examples, links, callbacks, securitySchemes)."
+}
+
 func (r *ComponentDescriptionRule) Category() string {
 	return CategoryStyle
 }

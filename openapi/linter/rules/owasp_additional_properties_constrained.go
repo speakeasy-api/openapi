@@ -22,6 +22,12 @@ func (r *OwaspAdditionalPropertiesConstrainedRule) Category() string {
 func (r *OwaspAdditionalPropertiesConstrainedRule) Description() string {
 	return "Schemas with additionalProperties set to true or a schema should define maxProperties to limit object size. Without size limits, APIs are vulnerable to resource exhaustion attacks where clients send excessively large objects."
 }
+func (r *OwaspAdditionalPropertiesConstrainedRule) Summary() string {
+	return "Schemas with additionalProperties should define maxProperties."
+}
+func (r *OwaspAdditionalPropertiesConstrainedRule) HowToFix() string {
+	return "When additionalProperties is true or a schema, add a maxProperties limit to bound object size."
+}
 func (r *OwaspAdditionalPropertiesConstrainedRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-additional-properties-constrained"
 }

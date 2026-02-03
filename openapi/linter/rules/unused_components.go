@@ -21,6 +21,12 @@ func (r *UnusedComponentRule) Category() string { return CategorySemantic }
 func (r *UnusedComponentRule) Description() string {
 	return "Components that are declared but never referenced should be removed to keep the specification clean. Unused components create maintenance burden, increase specification size, and may confuse developers about which schemas are actually used."
 }
+func (r *UnusedComponentRule) Summary() string {
+	return "Components should not be declared if they are never referenced."
+}
+func (r *UnusedComponentRule) HowToFix() string {
+	return "Remove unused components or reference them where needed in the specification."
+}
 func (r *UnusedComponentRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#semantic-unused-component"
 }

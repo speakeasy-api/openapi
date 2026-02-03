@@ -23,6 +23,12 @@ func (r *OwaspNoNumericIDsRule) Category() string {
 func (r *OwaspNoNumericIDsRule) Description() string {
 	return "Resource identifiers must use random values like UUIDs instead of sequential numeric IDs. Sequential IDs enable enumeration attacks where attackers can guess valid IDs and access unauthorized resources."
 }
+func (r *OwaspNoNumericIDsRule) Summary() string {
+	return "Resource identifiers should not use sequential numeric IDs."
+}
+func (r *OwaspNoNumericIDsRule) HowToFix() string {
+	return "Use non-sequential identifiers (e.g., UUIDs) for ID parameters."
+}
 func (r *OwaspNoNumericIDsRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-no-numeric-ids"
 }

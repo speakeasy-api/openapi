@@ -24,6 +24,14 @@ func (r *OperationSuccessResponseRule) Description() string {
 	return "Operations should define at least one 2xx or 3xx response code to indicate successful execution. Success responses are essential for API consumers to understand what data they'll receive when requests complete successfully."
 }
 
+func (r *OperationSuccessResponseRule) Summary() string {
+	return "Operations must define at least one 2xx or 3xx response."
+}
+
+func (r *OperationSuccessResponseRule) HowToFix() string {
+	return "Add at least one 2xx or 3xx response code definition per operation."
+}
+
 func (r *OperationSuccessResponseRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#style-operation-success-response"
 }

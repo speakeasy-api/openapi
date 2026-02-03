@@ -24,6 +24,14 @@ func (r *OAS3APIServersRule) Description() string {
 	return "OpenAPI 3.x specifications should define at least one server with a valid URL where the API can be accessed. Server definitions help API consumers understand where to send requests and support multiple environments like production, staging, and development."
 }
 
+func (r *OAS3APIServersRule) Summary() string {
+	return "OpenAPI 3.x specs should define at least one valid server URL."
+}
+
+func (r *OAS3APIServersRule) HowToFix() string {
+	return "Define at least one valid server URL in the servers list."
+}
+
 func (r *OAS3APIServersRule) Category() string {
 	return CategoryStyle
 }

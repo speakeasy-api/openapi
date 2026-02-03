@@ -24,6 +24,12 @@ func (r *OwaspJWTBestPracticesRule) Category() string {
 func (r *OwaspJWTBestPracticesRule) Description() string {
 	return "Security schemes using OAuth2 or JWT must explicitly declare support for RFC8725 (JWT Best Current Practices) in the description. RFC8725 compliance ensures JWTs are validated properly and protected against common attacks like algorithm confusion."
 }
+func (r *OwaspJWTBestPracticesRule) Summary() string {
+	return "OAuth2/JWT schemes must mention RFC8725 in their description."
+}
+func (r *OwaspJWTBestPracticesRule) HowToFix() string {
+	return "Update OAuth2/JWT security scheme descriptions to mention RFC8725 compliance."
+}
 func (r *OwaspJWTBestPracticesRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-jwt-best-practices"
 }

@@ -19,6 +19,12 @@ func (r *PathTrailingSlashRule) Category() string { return CategoryStyle }
 func (r *PathTrailingSlashRule) Description() string {
 	return "Path definitions should not end with a trailing slash to maintain consistency and avoid routing ambiguity. Trailing slashes in paths can cause mismatches with server routing rules and create duplicate endpoint definitions."
 }
+func (r *PathTrailingSlashRule) Summary() string {
+	return "Paths should not end with a trailing slash."
+}
+func (r *PathTrailingSlashRule) HowToFix() string {
+	return "Remove trailing slashes from path keys (except the root '/')."
+}
 func (r *PathTrailingSlashRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#style-path-trailing-slash"
 }

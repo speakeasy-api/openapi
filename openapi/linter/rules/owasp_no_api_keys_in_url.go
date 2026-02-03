@@ -20,6 +20,12 @@ func (r *OwaspNoAPIKeysInURLRule) Category() string { return CategorySecurity }
 func (r *OwaspNoAPIKeysInURLRule) Description() string {
 	return "API keys must not be passed via URL parameters (query or path) as they are logged and cached. URL-based API keys appear in browser history, server logs, and proxy caches, creating security exposure."
 }
+func (r *OwaspNoAPIKeysInURLRule) Summary() string {
+	return "API keys must not be passed via URL parameters."
+}
+func (r *OwaspNoAPIKeysInURLRule) HowToFix() string {
+	return "Move API keys to header-based authentication instead of query or path parameters."
+}
 func (r *OwaspNoAPIKeysInURLRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-no-api-keys-in-url"
 }

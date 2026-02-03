@@ -22,6 +22,12 @@ func (r *OwaspStringRestrictedRule) Category() string {
 func (r *OwaspStringRestrictedRule) Description() string {
 	return "String schemas must specify format, const, enum, or pattern to restrict content. String restrictions prevent injection attacks and ensure data conforms to expected formats."
 }
+func (r *OwaspStringRestrictedRule) Summary() string {
+	return "String schemas must specify format, const, enum, or pattern."
+}
+func (r *OwaspStringRestrictedRule) HowToFix() string {
+	return "Add format, const, enum, or pattern constraints to string schemas."
+}
 func (r *OwaspStringRestrictedRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-string-restricted"
 }

@@ -31,6 +31,14 @@ func (r *OASSchemaCheckRule) Description() string {
 	return "Schemas must use type-appropriate constraints and have valid constraint values. For example, string types should use minLength/maxLength/pattern, numbers should use minimum/maximum/multipleOf, and constraint values must be logically valid (e.g., maxLength >= minLength)."
 }
 
+func (r *OASSchemaCheckRule) Summary() string {
+	return "Schemas must use type-appropriate constraints with valid values."
+}
+
+func (r *OASSchemaCheckRule) HowToFix() string {
+	return "Add or correct constraints appropriate to each schema type (e.g., minLength/maxLength for strings, minimum/maximum for numbers)."
+}
+
 func (r *OASSchemaCheckRule) Link() string {
 	return "https://quobix.com/vacuum/rules/schemas/oas-schema-check/"
 }

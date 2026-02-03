@@ -23,6 +23,12 @@ func (r *NoScriptTagsInMarkdownRule) Category() string { return CategorySemantic
 func (r *NoScriptTagsInMarkdownRule) Description() string {
 	return "Markdown descriptions must not contain <script> tags, which pose serious security risks. Including script tags in documentation could enable cross-site scripting (XSS) attacks if the documentation is rendered in web contexts."
 }
+func (r *NoScriptTagsInMarkdownRule) Summary() string {
+	return "Markdown descriptions must not include <script> tags."
+}
+func (r *NoScriptTagsInMarkdownRule) HowToFix() string {
+	return "Remove <script> tags from markdown descriptions."
+}
 func (r *NoScriptTagsInMarkdownRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#semantic-no-script-tags-in-markdown"
 }

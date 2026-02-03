@@ -22,6 +22,14 @@ func (r *TagsAlphabeticalRule) Description() string {
 	return "Tags should be listed in alphabetical order to improve documentation organization and navigation. Alphabetical ordering makes it easier for developers to find specific tag groups in API documentation."
 }
 
+func (r *TagsAlphabeticalRule) Summary() string {
+	return "Tags should be listed in alphabetical order."
+}
+
+func (r *TagsAlphabeticalRule) HowToFix() string {
+	return "Sort the tags array alphabetically by tag name."
+}
+
 func (r *TagsAlphabeticalRule) Category() string {
 	return CategoryStyle
 }

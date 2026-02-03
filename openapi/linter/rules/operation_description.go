@@ -22,6 +22,14 @@ func (r *OperationDescriptionRule) Description() string {
 	return "Operations should include either a description or summary field to explain their purpose and behavior. Clear operation documentation helps developers understand what each endpoint does and how to use it effectively."
 }
 
+func (r *OperationDescriptionRule) Summary() string {
+	return "Operations must include a description or summary."
+}
+
+func (r *OperationDescriptionRule) HowToFix() string {
+	return "Add a summary or description to each operation."
+}
+
 func (r *OperationDescriptionRule) Category() string {
 	return CategoryStyle
 }

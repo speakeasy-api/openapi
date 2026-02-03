@@ -19,6 +19,12 @@ func (r *OperationTagDefinedRule) Category() string { return CategoryStyle }
 func (r *OperationTagDefinedRule) Description() string {
 	return "Operation tags should be declared in the global tags array at the specification root. Pre-defining tags ensures consistency, enables tag-level documentation, and helps maintain a well-organized API structure."
 }
+func (r *OperationTagDefinedRule) Summary() string {
+	return "Operation tags should be defined in the global tags list."
+}
+func (r *OperationTagDefinedRule) HowToFix() string {
+	return "Add each operation tag to the top-level tags array."
+}
 func (r *OperationTagDefinedRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#style-operation-tag-defined"
 }

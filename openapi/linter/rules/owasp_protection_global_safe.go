@@ -30,6 +30,12 @@ func (r *OwaspProtectionGlobalSafeRule) Category() string {
 func (r *OwaspProtectionGlobalSafeRule) Description() string {
 	return "Safe operations (GET, HEAD) should be protected by security schemes or explicitly marked as public. Unprotected read operations may expose sensitive data to unauthorized users."
 }
+func (r *OwaspProtectionGlobalSafeRule) Summary() string {
+	return "Safe operations should be protected or explicitly marked public."
+}
+func (r *OwaspProtectionGlobalSafeRule) HowToFix() string {
+	return "Add global security requirements or set operation-level security (empty array for public endpoints)."
+}
 func (r *OwaspProtectionGlobalSafeRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-protection-global-safe"
 }

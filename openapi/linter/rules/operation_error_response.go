@@ -19,6 +19,12 @@ func (r *OperationErrorResponseRule) Category() string { return CategoryStyle }
 func (r *OperationErrorResponseRule) Description() string {
 	return "Operations should define at least one 4xx error response to document potential client errors. Documenting error responses helps API consumers handle failures gracefully and understand what went wrong when requests fail."
 }
+func (r *OperationErrorResponseRule) Summary() string {
+	return "Operations must define at least one 4xx error response."
+}
+func (r *OperationErrorResponseRule) HowToFix() string {
+	return "Add at least one 4xx response definition for each operation."
+}
 func (r *OperationErrorResponseRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#style-operation-error-response"
 }

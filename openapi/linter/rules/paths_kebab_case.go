@@ -23,6 +23,14 @@ func (r *PathsKebabCaseRule) Description() string {
 	return "Path segments should use kebab-case (lowercase with hyphens) for consistency and readability. Kebab-case paths are easier to read, follow REST conventions, and avoid case-sensitivity issues across different systems."
 }
 
+func (r *PathsKebabCaseRule) Summary() string {
+	return "Path segments should use kebab-case."
+}
+
+func (r *PathsKebabCaseRule) HowToFix() string {
+	return "Rename non-kebab-case path segments to lowercase with hyphens."
+}
+
 func (r *PathsKebabCaseRule) Category() string {
 	return CategoryStyle
 }

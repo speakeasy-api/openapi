@@ -26,6 +26,12 @@ func (r *OwaspNoCredentialsInURLRule) Category() string { return CategorySecurit
 func (r *OwaspNoCredentialsInURLRule) Description() string {
 	return "URL parameters must not contain credentials like API keys, passwords, or secrets. Credentials in URLs are logged by servers, proxies, and browsers, creating significant security risks."
 }
+func (r *OwaspNoCredentialsInURLRule) Summary() string {
+	return "URL parameters must not contain credentials."
+}
+func (r *OwaspNoCredentialsInURLRule) HowToFix() string {
+	return "Remove credentials from URL parameters; use headers or request bodies instead."
+}
 func (r *OwaspNoCredentialsInURLRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-no-credentials-in-url"
 }

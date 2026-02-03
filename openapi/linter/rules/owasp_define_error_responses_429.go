@@ -21,6 +21,12 @@ func (r *OwaspDefineErrorResponses429Rule) Category() string {
 func (r *OwaspDefineErrorResponses429Rule) Description() string {
 	return "Operations should define a 429 Too Many Requests response with a proper schema to indicate rate limiting. Rate limit responses help clients understand when they've exceeded usage thresholds and need to slow down requests."
 }
+func (r *OwaspDefineErrorResponses429Rule) Summary() string {
+	return "Operations should define a 429 Too Many Requests response with a schema."
+}
+func (r *OwaspDefineErrorResponses429Rule) HowToFix() string {
+	return "Add a 429 response with a response body schema to operations that may be rate limited."
+}
 func (r *OwaspDefineErrorResponses429Rule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-define-error-responses-429"
 }

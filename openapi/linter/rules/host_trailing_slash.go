@@ -22,6 +22,14 @@ func (r *OAS3HostTrailingSlashRule) Description() string {
 	return "Server URLs should not end with a trailing slash to avoid ambiguity when combining with path templates. Trailing slashes can lead to double slashes in final URLs when paths are appended, potentially causing routing issues."
 }
 
+func (r *OAS3HostTrailingSlashRule) Summary() string {
+	return "Server URLs should not end with a trailing slash."
+}
+
+func (r *OAS3HostTrailingSlashRule) HowToFix() string {
+	return "Remove trailing slashes from server URLs."
+}
+
 func (r *OAS3HostTrailingSlashRule) Category() string {
 	return CategoryStyle
 }

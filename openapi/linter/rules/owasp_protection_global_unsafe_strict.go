@@ -23,6 +23,12 @@ func (r *OwaspProtectionGlobalUnsafeStrictRule) Category() string {
 func (r *OwaspProtectionGlobalUnsafeStrictRule) Description() string {
 	return "Unsafe operations (POST, PUT, PATCH, DELETE) must be protected by non-empty security schemes without explicit opt-outs. Strict authentication requirements ensure write operations cannot bypass security even with empty security arrays."
 }
+func (r *OwaspProtectionGlobalUnsafeStrictRule) Summary() string {
+	return "Unsafe operations must have non-empty security schemes (no opt-outs)."
+}
+func (r *OwaspProtectionGlobalUnsafeStrictRule) HowToFix() string {
+	return "Define non-empty security requirements globally or per unsafe operation (no empty security arrays)."
+}
 func (r *OwaspProtectionGlobalUnsafeStrictRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-protection-global-unsafe-strict"
 }

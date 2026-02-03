@@ -22,6 +22,12 @@ func (r *OwaspRateLimitRetryAfterRule) Category() string {
 func (r *OwaspRateLimitRetryAfterRule) Description() string {
 	return "429 Too Many Requests responses must include a Retry-After header indicating when clients can retry. Retry-After headers prevent thundering herd problems by telling clients exactly when to resume requests."
 }
+func (r *OwaspRateLimitRetryAfterRule) Summary() string {
+	return "429 responses must include a Retry-After header."
+}
+func (r *OwaspRateLimitRetryAfterRule) HowToFix() string {
+	return "Add a Retry-After header to 429 responses to indicate when clients can retry."
+}
 func (r *OwaspRateLimitRetryAfterRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-rate-limit-retry-after"
 }

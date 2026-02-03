@@ -22,6 +22,12 @@ func (r *OwaspIntegerLimitRule) Category() string {
 func (r *OwaspIntegerLimitRule) Description() string {
 	return "Integer schemas must specify minimum and maximum values (or exclusive variants) to prevent unbounded inputs. Without numeric limits, APIs are vulnerable to overflow attacks and unexpected behavior from extreme values."
 }
+func (r *OwaspIntegerLimitRule) Summary() string {
+	return "Integer schemas must specify minimum and maximum values."
+}
+func (r *OwaspIntegerLimitRule) HowToFix() string {
+	return "Add minimum and maximum (or exclusiveMinimum/exclusiveMaximum) values to integer schemas."
+}
 func (r *OwaspIntegerLimitRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-integer-limit"
 }

@@ -18,7 +18,14 @@ type DescriptionDuplicationRule struct{}
 func (r *DescriptionDuplicationRule) ID() string       { return RuleStyleDescriptionDuplication }
 func (r *DescriptionDuplicationRule) Category() string { return CategoryStyle }
 func (r *DescriptionDuplicationRule) Description() string {
-	return "Description and summary fields should not contain identical text within the same node. These fields serve different purposes: summaries provide brief overviews while descriptions offer detailed explanations, so duplicating content provides no additional value to API consumers."
+	return "Description and summary fields should not contain identical text within the same object. These fields serve different purposes: summaries provide brief overviews while descriptions offer detailed explanations, so duplicating content provides no additional value to API consumers."
+}
+
+func (r *DescriptionDuplicationRule) Summary() string {
+	return "Description and summary fields should not contain identical text within the same object."
+}
+func (r *DescriptionDuplicationRule) HowToFix() string {
+	return "Use distinct summary and description text; keep the summary concise and expand details in the description."
 }
 func (r *DescriptionDuplicationRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#style-description-duplication"

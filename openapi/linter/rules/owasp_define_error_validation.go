@@ -20,6 +20,12 @@ func (r *OwaspDefineErrorValidationRule) Category() string {
 func (r *OwaspDefineErrorValidationRule) Description() string {
 	return "Operations should define validation error responses (400, 422, or 4XX) to indicate request data problems. Validation error responses help clients understand when and why their request data is invalid or malformed."
 }
+func (r *OwaspDefineErrorValidationRule) Summary() string {
+	return "Operations should define validation error responses (400, 422, or 4XX)."
+}
+func (r *OwaspDefineErrorValidationRule) HowToFix() string {
+	return "Add a 400, 422, or 4XX response with a schema to each operation to describe validation errors."
+}
 func (r *OwaspDefineErrorValidationRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-define-error-validation"
 }

@@ -22,6 +22,12 @@ func (r *OwaspArrayLimitRule) Category() string {
 func (r *OwaspArrayLimitRule) Description() string {
 	return "Array schemas must specify maxItems to prevent resource exhaustion attacks. Without array size limits, malicious clients could send extremely large arrays that consume excessive memory or processing time."
 }
+func (r *OwaspArrayLimitRule) Summary() string {
+	return "Array schemas must specify maxItems."
+}
+func (r *OwaspArrayLimitRule) HowToFix() string {
+	return "Add a maxItems constraint to array schemas to cap the allowed number of items."
+}
 func (r *OwaspArrayLimitRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-array-limit"
 }

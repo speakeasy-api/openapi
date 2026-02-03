@@ -353,7 +353,7 @@ func validateParameterUniqueness(parameters []*ReferencedParameter, methodOrLeve
 	var errs []error
 	seen := make(map[string]bool)
 
-	for index, paramRef := range parameters {
+	for _, paramRef := range parameters {
 		param := paramRef.GetObject()
 		if param == nil {
 			continue
@@ -375,9 +375,9 @@ func validateParameterUniqueness(parameters []*ReferencedParameter, methodOrLeve
 
 			var errMsg string
 			if methodOrLevel == "TOP" {
-				errMsg = fmt.Sprintf("the pathItem parameter at path `%s`, index %d has a duplicate name `%s` and `in` type", path, index, paramName)
+				errMsg = fmt.Sprintf("parameter %q is duplicated in path %q", paramName, path)
 			} else {
-				errMsg = fmt.Sprintf("the `%s` operation parameter at path `%s`, index %d has a duplicate name `%s` and `in` type", methodOrLevel, path, index, paramName)
+				errMsg = fmt.Sprintf("parameter %q is duplicated in %s operation at path %q", paramName, methodOrLevel, path)
 			}
 
 			err := validation.NewValidationError(

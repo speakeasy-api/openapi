@@ -21,6 +21,14 @@ func (r *ContactPropertiesRule) Description() string {
 	return "The contact object in the info section should include name, url, and email properties to provide complete contact information. Having comprehensive contact details makes it easier for API consumers to reach out for support, report issues, or ask questions about the API."
 }
 
+func (r *ContactPropertiesRule) Summary() string {
+	return "The contact object should contain contact details for API support."
+}
+
+func (r *ContactPropertiesRule) HowToFix() string {
+	return "Add name, url, and email fields to the info.contact object."
+}
+
 func (r *ContactPropertiesRule) Category() string {
 	return CategoryStyle
 }

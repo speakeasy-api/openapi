@@ -19,6 +19,12 @@ func (r *OperationSingularTagRule) Category() string { return CategoryStyle }
 func (r *OperationSingularTagRule) Description() string {
 	return "Operations should be associated with only a single tag to maintain clear organizational boundaries. Multiple tags can create ambiguity about where an operation belongs in the API structure and complicate documentation organization."
 }
+func (r *OperationSingularTagRule) Summary() string {
+	return "Operations should have no more than one tag."
+}
+func (r *OperationSingularTagRule) HowToFix() string {
+	return "Limit each operation to a single tag."
+}
 func (r *OperationSingularTagRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#style-operation-singular-tag"
 }

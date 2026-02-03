@@ -25,6 +25,14 @@ func (r *LinkOperationRule) Description() string {
 	return "Link operationId must reference an existing operation in the API specification. This ensures that links point to valid operations, including those defined in external documents that are referenced in the specification."
 }
 
+func (r *LinkOperationRule) Summary() string {
+	return "Link operationIds must reference existing operations."
+}
+
+func (r *LinkOperationRule) HowToFix() string {
+	return "Update link.operationId values to reference defined operations."
+}
+
 func (r *LinkOperationRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#semantic-link-operation"
 }

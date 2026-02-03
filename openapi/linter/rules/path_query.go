@@ -19,6 +19,12 @@ func (r *PathQueryRule) Category() string { return CategorySemantic }
 func (r *PathQueryRule) Description() string {
 	return "Paths must not include query strings - query parameters should be defined in the parameters array instead. Including query strings in paths creates ambiguity, breaks code generation, and violates OpenAPI specification structure."
 }
+func (r *PathQueryRule) Summary() string {
+	return "Paths must not include query strings."
+}
+func (r *PathQueryRule) HowToFix() string {
+	return "Remove query strings from path keys and define them as query parameters instead."
+}
 func (r *PathQueryRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#semantic-path-query"
 }

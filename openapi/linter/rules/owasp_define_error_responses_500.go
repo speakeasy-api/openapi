@@ -21,6 +21,12 @@ func (r *OwaspDefineErrorResponses500Rule) Category() string {
 func (r *OwaspDefineErrorResponses500Rule) Description() string {
 	return "Operations should define a 500 Internal Server Error response with a proper schema to handle unexpected failures. Documenting server error responses helps clients distinguish between client-side and server-side problems."
 }
+func (r *OwaspDefineErrorResponses500Rule) Summary() string {
+	return "Operations should define a 500 Internal Server Error response with a schema."
+}
+func (r *OwaspDefineErrorResponses500Rule) HowToFix() string {
+	return "Add a 500 response with a response body schema to each operation."
+}
 func (r *OwaspDefineErrorResponses500Rule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-define-error-responses-500"
 }

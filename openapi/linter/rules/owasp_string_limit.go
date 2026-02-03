@@ -22,6 +22,12 @@ func (r *OwaspStringLimitRule) Category() string {
 func (r *OwaspStringLimitRule) Description() string {
 	return "String schemas must specify maxLength, const, or enum to prevent unbounded data. Without string length limits, APIs are vulnerable to resource exhaustion from extremely long inputs."
 }
+func (r *OwaspStringLimitRule) Summary() string {
+	return "String schemas must specify maxLength, const, or enum."
+}
+func (r *OwaspStringLimitRule) HowToFix() string {
+	return "Add maxLength, const, or enum constraints to string schemas."
+}
 func (r *OwaspStringLimitRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-string-limit"
 }
