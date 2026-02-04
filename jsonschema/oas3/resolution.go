@@ -325,7 +325,7 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 	// This maintains reference chain tracking when accessing properties of resolved schemas
 	var topLevel *JSONSchemaReferenceable
 	if s.topLevelParent != nil {
-		topLevel = (*JSONSchemaReferenceable)(s.topLevelParent)
+		topLevel = s.topLevelParent
 	} else {
 		topLevel = (*JSONSchemaReferenceable)(s)
 	}
