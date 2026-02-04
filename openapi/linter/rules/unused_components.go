@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/references"
@@ -222,6 +223,10 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 		}
 		pointer := node.Location.ToJSONPointer().String()
 		if _, found := refs[pointer]; !found {
+			// Skip if component has a usage-marking extension
+			if hasUsageMarkingExtension(node.Node.GetExtensions()) {
+				continue
+			}
 			errNode := getComponentKeyNode(doc, node.Location)
 			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
 		}
@@ -234,6 +239,10 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 		}
 		pointer := node.Location.ToJSONPointer().String()
 		if _, found := refs[pointer]; !found {
+			// Skip if component has a usage-marking extension
+			if obj := node.Node.GetObject(); obj != nil && hasUsageMarkingExtension(obj.GetExtensions()) {
+				continue
+			}
 			errNode := getComponentKeyNode(doc, node.Location)
 			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
 		}
@@ -246,6 +255,10 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 		}
 		pointer := node.Location.ToJSONPointer().String()
 		if _, found := refs[pointer]; !found {
+			// Skip if component has a usage-marking extension
+			if obj := node.Node.GetObject(); obj != nil && hasUsageMarkingExtension(obj.GetExtensions()) {
+				continue
+			}
 			errNode := getComponentKeyNode(doc, node.Location)
 			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
 		}
@@ -258,6 +271,10 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 		}
 		pointer := node.Location.ToJSONPointer().String()
 		if _, found := refs[pointer]; !found {
+			// Skip if component has a usage-marking extension
+			if obj := node.Node.GetObject(); obj != nil && hasUsageMarkingExtension(obj.Extensions) {
+				continue
+			}
 			errNode := getComponentKeyNode(doc, node.Location)
 			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
 		}
@@ -270,6 +287,10 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 		}
 		pointer := node.Location.ToJSONPointer().String()
 		if _, found := refs[pointer]; !found {
+			// Skip if component has a usage-marking extension
+			if obj := node.Node.GetObject(); obj != nil && hasUsageMarkingExtension(obj.GetExtensions()) {
+				continue
+			}
 			errNode := getComponentKeyNode(doc, node.Location)
 			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
 		}
@@ -282,6 +303,10 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 		}
 		pointer := node.Location.ToJSONPointer().String()
 		if _, found := refs[pointer]; !found {
+			// Skip if component has a usage-marking extension
+			if obj := node.Node.GetObject(); obj != nil && hasUsageMarkingExtension(obj.GetExtensions()) {
+				continue
+			}
 			errNode := getComponentKeyNode(doc, node.Location)
 			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
 		}
@@ -294,6 +319,10 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 		}
 		pointer := node.Location.ToJSONPointer().String()
 		if _, found := refs[pointer]; !found {
+			// Skip if component has a usage-marking extension
+			if obj := node.Node.GetObject(); obj != nil && hasUsageMarkingExtension(obj.GetExtensions()) {
+				continue
+			}
 			errNode := getComponentKeyNode(doc, node.Location)
 			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
 		}
@@ -306,6 +335,10 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 		}
 		pointer := node.Location.ToJSONPointer().String()
 		if _, found := refs[pointer]; !found {
+			// Skip if component has a usage-marking extension
+			if obj := node.Node.GetObject(); obj != nil && hasUsageMarkingExtension(obj.GetExtensions()) {
+				continue
+			}
 			errNode := getComponentKeyNode(doc, node.Location)
 			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
 		}
@@ -318,6 +351,10 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 		}
 		pointer := node.Location.ToJSONPointer().String()
 		if _, found := refs[pointer]; !found {
+			// Skip if component has a usage-marking extension
+			if obj := node.Node.GetObject(); obj != nil && hasUsageMarkingExtension(obj.GetExtensions()) {
+				continue
+			}
 			errNode := getComponentKeyNode(doc, node.Location)
 			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
 		}
@@ -330,6 +367,10 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 		}
 		pointer := node.Location.ToJSONPointer().String()
 		if _, found := refs[pointer]; !found {
+			// Skip if component has a usage-marking extension
+			if obj := node.Node.GetObject(); obj != nil && hasUsageMarkingExtension(obj.GetExtensions()) {
+				continue
+			}
 			errNode := getComponentKeyNode(doc, node.Location)
 			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
 		}
@@ -387,6 +428,31 @@ func getComponentKeyNode(doc *openapi.OpenAPI, location openapi.Locations) *yaml
 	default:
 		return componentsRoot
 	}
+}
+
+// usageMarkingExtensions is the list of extensions that mark a component as being used
+// even when not directly referenced in the specification.
+var usageMarkingExtensions = []string{
+	"x-speakeasy-include",
+	"x-include",
+	"x-used",
+}
+
+// hasUsageMarkingExtension checks if the extensions contain any of the usage-marking
+// extensions (x-speakeasy-include, x-include, x-used) set to true.
+func hasUsageMarkingExtension(exts *extensions.Extensions) bool {
+	if exts == nil {
+		return false
+	}
+
+	for _, ext := range usageMarkingExtensions {
+		val, err := extensions.GetExtensionValue[bool](exts, ext)
+		if err == nil && val != nil && *val {
+			return true
+		}
+	}
+
+	return false
 }
 
 // createUnusedComponentError creates a validation error for an unused component.

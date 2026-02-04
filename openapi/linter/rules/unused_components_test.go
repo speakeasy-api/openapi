@@ -184,6 +184,247 @@ func TestUnusedComponentRule_RuleMetadata(t *testing.T) {
 	assert.Nil(t, rule.Versions(), "versions should be nil (all versions)")
 }
 
+func TestUnusedComponentRule_UsageMarkingExtensions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		yaml           string
+		expectedErrors []string
+	}{
+		{
+			name: "x-speakeasy-include marks schema as used",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      responses:
+        '200':
+          description: ok
+components:
+  schemas:
+    MarkedUsed:
+      type: string
+      x-speakeasy-include: true
+    ActuallyUnused:
+      type: string
+`,
+			expectedErrors: []string{
+				"[17:5] warning semantic-unused-component `#/components/schemas/ActuallyUnused` is potentially unused or has been orphaned",
+			},
+		},
+		{
+			name: "x-include marks schema as used",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      responses:
+        '200':
+          description: ok
+components:
+  schemas:
+    MarkedUsed:
+      type: string
+      x-include: true
+    ActuallyUnused:
+      type: string
+`,
+			expectedErrors: []string{
+				"[17:5] warning semantic-unused-component `#/components/schemas/ActuallyUnused` is potentially unused or has been orphaned",
+			},
+		},
+		{
+			name: "x-used marks schema as used",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      responses:
+        '200':
+          description: ok
+components:
+  schemas:
+    MarkedUsed:
+      type: string
+      x-used: true
+    ActuallyUnused:
+      type: string
+`,
+			expectedErrors: []string{
+				"[17:5] warning semantic-unused-component `#/components/schemas/ActuallyUnused` is potentially unused or has been orphaned",
+			},
+		},
+		{
+			name: "extension set to false does not mark as used",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      responses:
+        '200':
+          description: ok
+components:
+  schemas:
+    NotMarked:
+      type: string
+      x-speakeasy-include: false
+`,
+			expectedErrors: []string{
+				"[14:5] warning semantic-unused-component `#/components/schemas/NotMarked` is potentially unused or has been orphaned",
+			},
+		},
+		{
+			name: "x-speakeasy-include marks parameter as used",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      responses:
+        '200':
+          description: ok
+components:
+  parameters:
+    MarkedUsed:
+      name: test
+      in: query
+      x-speakeasy-include: true
+    ActuallyUnused:
+      name: unused
+      in: query
+`,
+			expectedErrors: []string{
+				"[18:5] warning semantic-unused-component `#/components/parameters/ActuallyUnused` is potentially unused or has been orphaned",
+			},
+		},
+		{
+			name: "x-include marks response as used",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      responses:
+        '200':
+          description: ok
+components:
+  responses:
+    MarkedUsed:
+      description: marked
+      x-include: true
+    ActuallyUnused:
+      description: unused
+`,
+			expectedErrors: []string{
+				"[17:5] warning semantic-unused-component `#/components/responses/ActuallyUnused` is potentially unused or has been orphaned",
+			},
+		},
+		{
+			name: "x-used marks security scheme as used",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      responses:
+        '200':
+          description: ok
+components:
+  securitySchemes:
+    MarkedUsed:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      x-used: true
+    ActuallyUnused:
+      type: apiKey
+      in: header
+      name: X-Unused
+`,
+			expectedErrors: []string{
+				"[19:5] warning semantic-unused-component `#/components/securitySchemes/ActuallyUnused` is potentially unused or has been orphaned",
+			},
+		},
+		{
+			name: "all components with extensions are not flagged",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      responses:
+        '200':
+          description: ok
+components:
+  schemas:
+    Schema1:
+      type: string
+      x-speakeasy-include: true
+    Schema2:
+      type: string
+      x-include: true
+    Schema3:
+      type: string
+      x-used: true
+`,
+			expectedErrors: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+
+			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
+			require.NoError(t, err, "unmarshal should succeed")
+
+			rule := &rules.UnusedComponentRule{}
+			config := &linter.RuleConfig{}
+
+			docInfo := createDocInfoWithIndexUnusedComponents(t, ctx, doc, "test.yaml")
+
+			errs := rule.Run(ctx, docInfo, config)
+
+			var errMsgs []string
+			for _, lintErr := range errs {
+				errMsgs = append(errMsgs, lintErr.Error())
+			}
+
+			assert.ElementsMatch(t, tt.expectedErrors, errMsgs, "should match expected errors")
+		})
+	}
+}
+
 func TestUnusedComponentRule_ExternalReferenceChainMarksUsed(t *testing.T) {
 	t.Parallel()
 
