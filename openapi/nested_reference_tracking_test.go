@@ -393,3 +393,105 @@ paths:
 	topLevelRef := resolvedSchema.GetTopLevelReference()
 	assert.Nil(t, topLevelRef, "inline schema should have no top-level reference")
 }
+
+// TestGetReferenceChain_NestedProperty tests that reference chains are properly maintained
+// when accessing a schema through a property of another schema.
+//
+// This is a regression test for a bug where nested property references would lose their
+// parent chain context, returning only the immediate reference instead of the full chain.
+//
+// Expected: ContainerSchema.nested → SharedSchema should have chain [ContainerSchema, SharedSchema]
+// Bug was: Chain only contained [SharedSchema], losing the parent context
+func TestGetReferenceChain_NestedProperty(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	yml := `openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /container:
+    get:
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerSchema"
+components:
+  schemas:
+    SharedSchema:
+      type: object
+      properties:
+        value:
+          type: string
+    ContainerSchema:
+      type: object
+      properties:
+        nested:
+          $ref: "#/components/schemas/SharedSchema"
+`
+
+	doc, validationErrs, err := Unmarshal(ctx, bytes.NewBufferString(yml))
+	require.NoError(t, err, "should parse OpenAPI document")
+	assert.Empty(t, validationErrs, "should have no validation errors")
+
+	// Get the ContainerSchema from the path response
+	pathItem, _ := doc.Paths.Get("/container")
+	require.NotNil(t, pathItem.GetObject(), "should have path item")
+
+	getOp := pathItem.GetObject().Get()
+	require.NotNil(t, getOp, "should have GET operation")
+
+	response, _ := getOp.Responses.Get("200")
+	require.NotNil(t, response.GetObject(), "should have response")
+
+	containerSchema, _ := response.GetObject().Content.Get("application/json")
+	require.NotNil(t, containerSchema.Schema, "should have schema")
+
+	// Resolve ContainerSchema
+	_, err = containerSchema.Schema.Resolve(ctx, oas3.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+	require.NoError(t, err, "should resolve container schema")
+
+	containerResolved := containerSchema.Schema.MustGetResolvedSchema()
+	props := containerResolved.GetSchema().GetProperties()
+	nestedProp, _ := props.Get("nested")
+	require.NotNil(t, nestedProp, "should have nested property")
+
+	// Resolve the nested property
+	_, err = nestedProp.Resolve(ctx, oas3.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+	require.NoError(t, err, "should resolve nested property")
+
+	// Get the reference chain for the nested property
+	// This should include BOTH ContainerSchema and SharedSchema
+	nestedResolved := nestedProp.MustGetResolvedSchema()
+	chain := nestedResolved.GetReferenceChain()
+
+	require.Len(t, chain, 2, "reference chain should include both parent and target schemas")
+	assert.Equal(t, "#/components/schemas/ContainerSchema", string(chain[0].Reference),
+		"first entry should be the parent schema (ContainerSchema)")
+	assert.Equal(t, "#/components/schemas/SharedSchema", string(chain[1].Reference),
+		"second entry should be the target schema (SharedSchema)")
+
+	// Verify convenience methods
+	immediateRef := nestedResolved.GetImmediateReference()
+	require.NotNil(t, immediateRef, "should have immediate reference")
+	assert.Equal(t, "#/components/schemas/SharedSchema", string(immediateRef.Reference),
+		"immediate reference should be SharedSchema")
+
+	topLevelRef := nestedResolved.GetTopLevelReference()
+	require.NotNil(t, topLevelRef, "should have top-level reference")
+	assert.Equal(t, "#/components/schemas/ContainerSchema", string(topLevelRef.Reference),
+		"top-level reference should be ContainerSchema")
+}

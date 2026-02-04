@@ -290,6 +290,9 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 	// This enables $id and $anchor resolution within the fetched document
 	setupRemoteSchemaRegistry(ctx, schema, baseURI)
 
+	// Collect nested reference schemas that need parent links set
+	var nestedRefs []*JSONSchemaReferenceable
+
 	for item := range Walk(ctx, schema) {
 		_ = item.Match(SchemaMatcher{
 			Schema: func(js *JSONSchemaReferenceable) error {
@@ -309,10 +312,26 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 						AbsoluteReference:    references.Reference(absRef),
 						ResolvedDocument:     result.ResolvedDocument,
 					}
+
+					// Collect this reference for setting parent links after the walk
+					nestedRefs = append(nestedRefs, js)
 				}
 				return nil
 			},
 		})
+	}
+
+	// Set parent links for all nested references found during the walk
+	// This maintains reference chain tracking when accessing properties of resolved schemas
+	var topLevel *JSONSchemaReferenceable
+	if s.topLevelParent != nil {
+		topLevel = (*JSONSchemaReferenceable)(s.topLevelParent)
+	} else {
+		topLevel = (*JSONSchemaReferenceable)(s)
+	}
+	for _, js := range nestedRefs {
+		js.SetParent((*JSONSchemaReferenceable)(s))
+		js.SetTopLevelParent(topLevel)
 	}
 
 	s.referenceResolutionCache = result
