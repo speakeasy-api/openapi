@@ -10,6 +10,9 @@ import (
 	"github.com/speakeasy-api/openapi/openapi"
 	openapiLinter "github.com/speakeasy-api/openapi/openapi/linter"
 	"github.com/spf13/cobra"
+
+	// Enable custom rules support
+	_ "github.com/speakeasy-api/openapi/openapi/linter/customrules"
 )
 
 var lintCmd = &cobra.Command{
