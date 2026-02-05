@@ -24,9 +24,40 @@ This command runs both spec validation and additional lint rules including:
 - Path parameter validation
 - Operation ID requirements
 - Consistent naming conventions
-- Security best practices
+- Security best practices (OWASP)
 
-Output can be formatted as text (default) or JSON.`,
+CONFIGURATION:
+
+By default, the linter looks for a configuration file at ~/.openapi/lint.yaml.
+Use --config to specify a custom configuration file.
+
+Available rulesets: all (default), recommended, security
+
+Example configuration (lint.yaml):
+
+  extends: recommended
+
+  rules:
+    - id: operation-operationId
+      severity: error
+    - id: some-rule
+      disabled: true
+
+  custom_rules:
+    paths:
+      - ./rules/*.ts
+
+CUSTOM RULES:
+
+Write custom linting rules in TypeScript or JavaScript. Install the types package
+in your rules directory:
+
+  npm install @speakeasy-api/openapi-linter-types
+
+Then configure the paths in your lint.yaml under custom_rules.paths.
+
+See the full documentation at:
+https://github.com/speakeasy-api/openapi/blob/main/cmd/openapi/commands/openapi/README.md#lint`,
 	Args: cobra.ExactArgs(1),
 	Run:  runLint,
 }
@@ -39,10 +70,10 @@ var (
 )
 
 func init() {
-	lintCmd.Flags().StringVarP(&lintOutputFormat, "format", "f", "text", "Output format (text, json)")
-	lintCmd.Flags().StringVarP(&lintRuleset, "ruleset", "r", "all", "Ruleset to use")
-	lintCmd.Flags().StringVarP(&lintConfigFile, "config", "c", "", "Path to lint configuration file")
-	lintCmd.Flags().StringSliceVarP(&lintDisableRules, "disable", "d", nil, "Rules to disable")
+	lintCmd.Flags().StringVarP(&lintOutputFormat, "format", "f", "text", "Output format: text or json")
+	lintCmd.Flags().StringVarP(&lintRuleset, "ruleset", "r", "all", "Ruleset to use (default loads from config)")
+	lintCmd.Flags().StringVarP(&lintConfigFile, "config", "c", "", "Path to lint config file (default: ~/.openapi/lint.yaml)")
+	lintCmd.Flags().StringSliceVarP(&lintDisableRules, "disable", "d", nil, "Rule IDs to disable (can be repeated)")
 }
 
 func runLint(cmd *cobra.Command, args []string) {

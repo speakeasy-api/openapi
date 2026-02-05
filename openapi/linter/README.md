@@ -121,12 +121,52 @@ func main() {
 
 <!-- END LINT RULES -->
 
+## Rulesets
+
+The linter provides built-in rulesets that group related rules together:
+
+| Ruleset | Description |
+|---------|-------------|
+| `all` | All available rules (default) |
+| `recommended` | Balanced ruleset for most APIs - includes semantic rules, essential style rules, and basic security rules |
+| `security` | Comprehensive OWASP security rules for APIs that need strict security validation |
+
+### Recommended Ruleset
+
+The `recommended` ruleset is a curated set of rules suitable for most APIs. It includes:
+
+- **Semantic rules** - catch real bugs like missing path parameters, invalid operation IDs, ambiguous paths
+- **Essential style rules** - info description, success responses, no trailing slashes, valid server URLs
+- **Basic security rules** - no HTTP basic auth, no API keys in URLs, no credentials in URLs, HTTPS servers
+
+```yaml
+extends: recommended
+```
+
+### Security Ruleset
+
+The `security` ruleset includes all OWASP security rules:
+
+```yaml
+extends: security
+```
+
+### Combining Rulesets
+
+You can extend multiple rulesets:
+
+```yaml
+extends:
+  - recommended
+  - security
+```
+
 ## Configuration
 
 Rules can be configured via YAML configuration file or command-line flags.
 
 ```yaml
-extends: speakeasy-recommended
+extends: recommended
 
 rules:
   - id: semantic-path-params

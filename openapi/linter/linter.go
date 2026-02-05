@@ -172,6 +172,7 @@ func (l *Linter) Lint(ctx context.Context, docInfo *baseLinter.DocumentInfo[*ope
 }
 
 func registerDefaultRules(registry *baseLinter.Registry[*openapi.OpenAPI]) {
+	// Register all rules
 	registry.Register(&rules.PathParamsRule{})
 	registry.Register(&rules.PathDeclarationsRule{})
 	registry.Register(&rules.PathQueryRule{})
@@ -234,5 +235,72 @@ func registerDefaultRules(registry *baseLinter.Registry[*openapi.OpenAPI]) {
 	registry.Register(&rules.OAS3NoNullableRule{})
 	registry.Register(&rules.OAS3ExampleMissingRule{})
 	registry.Register(&rules.OASSchemaCheckRule{})
-	// Future rules will be registered here
+
+	// Register rulesets
+	registerRulesets(registry)
+}
+
+// registerRulesets registers the built-in rulesets.
+func registerRulesets(registry *baseLinter.Registry[*openapi.OpenAPI]) {
+	// "recommended" - balanced ruleset for most APIs
+	// Includes semantic rules, essential style rules, and basic security rules
+	_ = registry.RegisterRuleset("recommended", []string{
+		// Semantic rules (catch real bugs)
+		rules.RuleSemanticPathParams,
+		rules.RuleSemanticPathDeclarations,
+		rules.RuleSemanticPathQuery,
+		rules.RuleSemanticTypedEnum,
+		rules.RuleSemanticDuplicatedEnum,
+		rules.RuleSemanticNoEvalInMarkdown,
+		rules.RuleSemanticNoScriptTagsInMarkdown,
+		rules.RuleSemanticOperationOperationId,
+		rules.RuleSemanticNoAmbiguousPaths,
+		rules.RuleSemanticOperationIDValidInURL,
+		rules.RuleSemanticLinkOperation,
+		rules.RuleSemanticUnusedComponent,
+
+		// Essential style rules
+		rules.RuleStyleInfoDescription,
+		rules.RuleStyleOperationSuccessResponse,
+		rules.RuleStylePathTrailingSlash,
+		rules.RuleStyleNoRefSiblings,
+		rules.RuleStyleOAS3HostNotExample,
+		rules.RuleStyleOAS3HostTrailingSlash,
+		rules.RuleStyleOAS3APIServers,
+		rules.RuleStyleDescriptionDuplication,
+
+		// Basic security rules
+		rules.RuleOwaspNoHttpBasic,
+		rules.RuleOwaspNoAPIKeysInURL,
+		rules.RuleOwaspNoCredentialsInURL,
+		rules.RuleOwaspAuthInsecureSchemes,
+		rules.RuleOwaspSecurityHostsHttpsOAS3,
+	})
+
+	// "security" - comprehensive OWASP security rules
+	_ = registry.RegisterRuleset("security", []string{
+		rules.RuleOwaspNoHttpBasic,
+		rules.RuleOwaspNoAPIKeysInURL,
+		rules.RuleOwaspNoCredentialsInURL,
+		rules.RuleOwaspAuthInsecureSchemes,
+		rules.RuleOwaspSecurityHostsHttpsOAS3,
+		rules.RuleOwaspDefineErrorResponses401,
+		rules.RuleOwaspDefineErrorResponses500,
+		rules.RuleOwaspDefineErrorResponses429,
+		rules.RuleOwaspDefineErrorValidation,
+		rules.RuleOwaspProtectionGlobalUnsafe,
+		rules.RuleOwaspProtectionGlobalUnsafeStrict,
+		rules.RuleOwaspProtectionGlobalSafe,
+		rules.RuleOwaspRateLimit,
+		rules.RuleOwaspRateLimitRetryAfter,
+		rules.RuleOwaspNoNumericIDs,
+		rules.RuleOwaspJWTBestPractices,
+		rules.RuleOwaspArrayLimit,
+		rules.RuleOwaspStringLimit,
+		rules.RuleOwaspStringRestricted,
+		rules.RuleOwaspIntegerFormat,
+		rules.RuleOwaspIntegerLimit,
+		rules.RuleOwaspNoAdditionalProperties,
+		rules.RuleOwaspAdditionalPropertiesConstrained,
+	})
 }

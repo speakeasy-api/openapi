@@ -545,6 +545,111 @@ func TestNewLinter_BackwardCompatibility(t *testing.T) {
 	lntr, err := openapiLinter.NewLinter(config)
 	require.NoError(t, err)
 
-	// Should have many rules registered (125+)
+	// Should have many rules registered (60+)
 	assert.Greater(t, len(lntr.Registry().AllRules()), 60, "should have all default rules registered")
+}
+
+func TestNewLinter_Rulesets(t *testing.T) {
+	t.Parallel()
+
+	config := linter.NewConfig()
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
+
+	t.Run("recommended ruleset exists", func(t *testing.T) {
+		t.Parallel()
+
+		ruleIDs, ok := lntr.Registry().GetRuleset("recommended")
+		assert.True(t, ok, "recommended ruleset should exist")
+		assert.NotEmpty(t, ruleIDs, "recommended ruleset should have rules")
+
+		// Verify it has a reasonable number of rules (not too many, not too few)
+		assert.GreaterOrEqual(t, len(ruleIDs), 20, "recommended should have at least 20 rules")
+		assert.LessOrEqual(t, len(ruleIDs), 40, "recommended should have at most 40 rules")
+
+		// Verify key rules are included
+		assert.Contains(t, ruleIDs, rules.RuleSemanticPathParams, "should include path-params rule")
+		assert.Contains(t, ruleIDs, rules.RuleSemanticOperationOperationId, "should include operation-id rule")
+		assert.Contains(t, ruleIDs, rules.RuleOwaspNoCredentialsInURL, "should include basic security rules")
+	})
+
+	t.Run("security ruleset exists", func(t *testing.T) {
+		t.Parallel()
+
+		ruleIDs, ok := lntr.Registry().GetRuleset("security")
+		assert.True(t, ok, "security ruleset should exist")
+		assert.NotEmpty(t, ruleIDs, "security ruleset should have rules")
+
+		// Verify all OWASP rules are included
+		assert.Contains(t, ruleIDs, rules.RuleOwaspNoHttpBasic)
+		assert.Contains(t, ruleIDs, rules.RuleOwaspNoAPIKeysInURL)
+		assert.Contains(t, ruleIDs, rules.RuleOwaspDefineErrorResponses401)
+		assert.Contains(t, ruleIDs, rules.RuleOwaspArrayLimit)
+	})
+
+	t.Run("all ruleset always exists", func(t *testing.T) {
+		t.Parallel()
+
+		ruleIDs, ok := lntr.Registry().GetRuleset("all")
+		assert.True(t, ok, "all ruleset should exist")
+		assert.NotEmpty(t, ruleIDs, "all ruleset should have rules")
+
+		// "all" should include every registered rule
+		allRules := lntr.Registry().AllRules()
+		assert.Equal(t, len(allRules), len(ruleIDs), "all ruleset should include every rule")
+	})
+
+	t.Run("AllRulesets returns available rulesets", func(t *testing.T) {
+		t.Parallel()
+
+		rulesets := lntr.Registry().AllRulesets()
+		assert.Contains(t, rulesets, "all")
+		assert.Contains(t, rulesets, "recommended")
+		assert.Contains(t, rulesets, "security")
+	})
+}
+
+func TestLinter_RecommendedRulesetUsage(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yamlInput := `
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users/{userId}:
+    get:
+      responses:
+        '200':
+          description: ok
+`
+
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(yamlInput))
+	require.NoError(t, err)
+
+	// Use recommended ruleset
+	config := &linter.Config{
+		Extends: []string{"recommended"},
+	}
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
+
+	docInfo := linter.NewDocumentInfo(doc, "/spec/openapi.yaml")
+	output, err := lntr.Lint(ctx, docInfo, nil, nil)
+	require.NoError(t, err)
+
+	// Should have lint errors from recommended rules
+	assert.NotEmpty(t, output.Results, "recommended ruleset should catch issues")
+
+	// Verify at least the path params error is caught
+	var hasPathParamsError bool
+	for _, result := range output.Results {
+		if strings.Contains(result.Error(), "semantic-path-params") {
+			hasPathParamsError = true
+			break
+		}
+	}
+	assert.True(t, hasPathParamsError, "recommended ruleset should catch path params error")
 }
