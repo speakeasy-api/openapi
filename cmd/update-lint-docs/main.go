@@ -46,7 +46,10 @@ func updateOpenAPILintDocs() error {
 
 	// Create linter to get the registry
 	config := linter.NewConfig()
-	lint := openapiLinter.NewLinter(config)
+	lint, err := openapiLinter.NewLinter(config)
+	if err != nil {
+		return fmt.Errorf("failed to create linter: %w", err)
+	}
 	docGen := linter.NewDocGenerator(lint.Registry())
 
 	// Generate rules table

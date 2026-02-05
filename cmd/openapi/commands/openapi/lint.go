@@ -78,7 +78,10 @@ func lintOpenAPI(ctx context.Context, file string) error {
 	config := buildLintConfig()
 
 	// Create the OpenAPI linter with default rules
-	lint := openapiLinter.NewLinter(config)
+	lint, err := openapiLinter.NewLinter(config)
+	if err != nil {
+		return fmt.Errorf("failed to create linter: %w", err)
+	}
 
 	// Create document info with location
 	docInfo := linter.NewDocumentInfo(doc, absPath)

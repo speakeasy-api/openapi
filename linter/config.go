@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/speakeasy-api/openapi/references"
 	"github.com/speakeasy-api/openapi/validation"
@@ -24,6 +25,20 @@ type Config struct {
 
 	// OutputFormat specifies the output format
 	OutputFormat OutputFormat `yaml:"output_format,omitempty" json:"output_format,omitempty"`
+
+	// CustomRules configures custom rule loading (requires customrules package import)
+	CustomRules *CustomRulesConfig `yaml:"custom_rules,omitempty" json:"custom_rules,omitempty"`
+}
+
+// CustomRulesConfig configures custom rule loading.
+// This is the YAML-serializable configuration. The customrules package
+// extends this with additional programmatic options like Logger.
+type CustomRulesConfig struct {
+	// Paths are glob patterns for rule files (e.g., "./rules/*.ts")
+	Paths []string `yaml:"paths,omitempty" json:"paths,omitempty"`
+
+	// Timeout is the maximum execution time per rule (default: 30s)
+	Timeout time.Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 // UnmarshalYAML supports "extends" as string or list and severity aliases.

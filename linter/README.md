@@ -231,20 +231,30 @@ func TestMyRule_Success(t *testing.T) {
 }
 ```
 
+## Custom Rule Loading
+
+The linter engine supports custom rule loaders that can be registered via the `RegisterCustomRuleLoader` function. This allows spec-specific linters to support custom rules written in different languages or formats.
+
+```go
+// CustomRuleLoaderFunc loads custom rules from configuration
+type CustomRuleLoaderFunc func(config *CustomRulesConfig) ([]RuleRunner[T], error)
+
+// Register a custom rule loader
+linter.RegisterCustomRuleLoader(myLoader)
+```
+
+Custom rules loaded through registered loaders:
+
+- Are automatically registered with the rule registry
+- Support the same configuration options as built-in rules (severity, disabled, match)
+- Integrate seamlessly with category-based configuration
+
 ## Design Principles
 
 1. **Generic Architecture** - The core linter is spec-agnostic (`Linter[T any]`)
 2. **Type Safety** - Spec-specific rules use typed interfaces (`RuleRunner[*openapi.OpenAPI]`)
 3. **Separation of Concerns** - Core engine, spec linters, and rules are separate packages
-4. **Extensibility** - Easy to add new rules, rulesets, and specs
+4. **Extensibility** - Easy to add new rules, rulesets, specs, and custom rule loaders
 5. **Configuration Over Code** - Rule behavior controlled via YAML config
 6. **Reference Resolution** - Automatic external reference resolution with proper error handling
 7. **Testing** - Comprehensive test coverage with parallel execution
-
-## Next Steps
-
-1. Add more OpenAPI rules (e.g., security, best practices, naming conventions)
-2. Create linters for other specs (Arazzo, Swagger 2.0)
-3. Add auto-fix capabilities for rules that support it
-4. Implement rule documentation generation in markdown/HTML formats
-5. Add performance profiles and caching for large documents

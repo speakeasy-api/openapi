@@ -1,0 +1,33 @@
+{
+  "name": "@speakeasy-api/openapi-linter-types",
+  "version": "0.1.0",
+  "description": "TypeScript types for writing custom OpenAPI linter rules",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/speakeasy-api/openapi.git",
+    "directory": "openapi/linter/customrules/types"
+  },
+  "keywords": [
+    "openapi",
+    "linter",
+    "types",
+    "typescript",
+    "custom-rules"
+  ],
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
+}

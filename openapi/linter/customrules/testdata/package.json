@@ -1,0 +1,12 @@
+{
+  "name": "customrules-testdata",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Test fixtures for custom linter rules",
+  "dependencies": {
+    "@speakeasy-api/openapi-linter-types": "file:../types"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

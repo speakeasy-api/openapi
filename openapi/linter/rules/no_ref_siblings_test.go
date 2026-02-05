@@ -240,7 +240,8 @@ components:
 	require.NoError(t, err)
 
 	// Create linter with the rule registered
-	lntr := openapiLinter.NewLinter(&linter.Config{})
+	lntr, err := openapiLinter.NewLinter(&linter.Config{})
+	require.NoError(t, err)
 
 	// Build index for the rule
 	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{

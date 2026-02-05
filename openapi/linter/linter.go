@@ -2,12 +2,32 @@ package linter
 
 import (
 	"context"
+	"fmt"
+	"sync"
 
 	baseLinter "github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/openapi/linter/rules"
 	"github.com/speakeasy-api/openapi/references"
 )
+
+// CustomRuleLoaderFunc loads custom rules from configuration.
+// It is called during NewLinter when custom rules are configured.
+type CustomRuleLoaderFunc func(config *baseLinter.CustomRulesConfig) ([]baseLinter.RuleRunner[*openapi.OpenAPI], error)
+
+var (
+	customRuleLoaders   []CustomRuleLoaderFunc
+	customRuleLoadersMu sync.Mutex
+)
+
+// RegisterCustomRuleLoader registers a custom rule loader.
+// This is called by the customrules package's init() function.
+// Loaders are invoked in registration order during NewLinter.
+func RegisterCustomRuleLoader(loader CustomRuleLoaderFunc) {
+	customRuleLoadersMu.Lock()
+	defer customRuleLoadersMu.Unlock()
+	customRuleLoaders = append(customRuleLoaders, loader)
+}
 
 // Linter is an OpenAPI-specific linter that automatically builds an index
 // before running rules. This provides rules with efficient access to
@@ -41,17 +61,19 @@ func WithoutDefaultRules() NewLinterOption {
 // By default, all built-in rules are registered. Use WithoutDefaultRules()
 // to create a linter with no rules registered.
 //
+// Returns an error if custom rules are configured and fail to load.
+//
 // Example - Default behavior (all rules):
 //
-//	linter := NewLinter(config)
+//	linter, err := NewLinter(config)
 //
 // Example - No rules registered:
 //
-//	linter := NewLinter(config, WithoutDefaultRules())
+//	linter, err := NewLinter(config, WithoutDefaultRules())
 //	linter.Registry().Register(&rules.PathParamsRule{})
 //
 // The linter automatically builds an index before running rules.
-func NewLinter(config *baseLinter.Config, opts ...NewLinterOption) *Linter {
+func NewLinter(config *baseLinter.Config, opts ...NewLinterOption) (*Linter, error) {
 	options := &newLinterOpts{
 		skipDefaultRules: false,
 	}
@@ -66,9 +88,27 @@ func NewLinter(config *baseLinter.Config, opts ...NewLinterOption) *Linter {
 		registerDefaultRules(registry)
 	}
 
+	// Load custom rules if configured and loaders are registered
+	if config != nil && config.CustomRules != nil && len(config.CustomRules.Paths) > 0 {
+		customRuleLoadersMu.Lock()
+		loaders := make([]CustomRuleLoaderFunc, len(customRuleLoaders))
+		copy(loaders, customRuleLoaders)
+		customRuleLoadersMu.Unlock()
+
+		for _, loader := range loaders {
+			customRules, err := loader(config.CustomRules)
+			if err != nil {
+				return nil, fmt.Errorf("loading custom rules: %w", err)
+			}
+			for _, rule := range customRules {
+				registry.Register(rule)
+			}
+		}
+	}
+
 	return &Linter{
 		base: baseLinter.NewLinter(config, registry),
-	}
+	}, nil
 }
 
 // Registry returns the rule registry for documentation generation

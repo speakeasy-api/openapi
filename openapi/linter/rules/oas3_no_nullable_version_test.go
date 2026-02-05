@@ -95,7 +95,8 @@ paths: {}
 			config := &linter.Config{
 				Extends: []string{"all"},
 			}
-			l := openapiLinter.NewLinter(config)
+			l, err := openapiLinter.NewLinter(config)
+			require.NoError(t, err, "should create linter")
 
 			// Lint the document
 			docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)

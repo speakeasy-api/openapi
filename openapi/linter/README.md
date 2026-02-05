@@ -135,6 +135,246 @@ rules:
   - id: validation-required-field
     match: ".*info\\.title is required.*"
     disabled: true
+
+# Enable custom rules (see Custom Rules section below)
+custom_rules:
+  paths:
+    - ./rules/*.ts
 ```
 
 By default, the CLI loads the config from `~/.openapi/lint.yaml` unless `--config` is provided.
+
+## Custom Rules
+
+Write custom linting rules in TypeScript or JavaScript that run alongside the built-in rules.
+
+### Getting Started
+
+1. **Install the types package** in your rules directory:
+
+```bash
+npm install @speakeasy-api/openapi-linter-types
+```
+
+1. **Create a rule file** (e.g., `rules/require-summary.ts`):
+
+```typescript
+import { Rule, registerRule, createValidationError } from '@speakeasy-api/openapi-linter-types';
+import type { Context, DocumentInfo, RuleConfig, ValidationError } from '@speakeasy-api/openapi-linter-types';
+
+class RequireOperationSummary extends Rule {
+  id(): string { return 'custom-require-operation-summary'; }
+  category(): string { return 'style'; }
+  description(): string { return 'All operations must have a summary.'; }
+  summary(): string { return 'Operations must have summary'; }
+
+  run(ctx: Context, docInfo: DocumentInfo, config: RuleConfig): ValidationError[] {
+    const errors: ValidationError[] = [];
+
+    for (const opNode of docInfo.index.operations) {
+      const op = opNode.node;
+      if (!op.getSummary()) {
+        errors.push(createValidationError(
+          config.getSeverity(this.defaultSeverity()),
+          this.id(),
+          `Operation "${op.getOperationID() || 'unnamed'}" is missing a summary`,
+          op.getRootNode()
+        ));
+      }
+    }
+
+    return errors;
+  }
+}
+
+registerRule(new RequireOperationSummary());
+```
+
+1. **Configure the linter** (`lint.yaml`):
+
+```yaml
+extends: recommended
+
+custom_rules:
+  paths:
+    - ./rules/*.ts
+
+rules:
+  - id: custom-require-operation-summary
+    severity: error
+```
+
+### Rule Implementation
+
+Extend the `Rule` base class and implement the required methods:
+
+| Method                      | Required | Description                                                     |
+| --------------------------- | -------- | --------------------------------------------------------------- |
+| `id()`                      | Yes      | Unique identifier (prefix with `custom-`)                       |
+| `category()`                | Yes      | Category for grouping (`style`, `security`, `semantic`, etc.)   |
+| `description()`             | Yes      | Full description of what the rule checks                        |
+| `summary()`                 | Yes      | Short summary for display                                       |
+| `run(ctx, docInfo, config)` | Yes      | Main logic returning validation errors                          |
+| `link()`                    | No       | URL to rule documentation                                       |
+| `defaultSeverity()`         | No       | Default: `'warning'`. Options: `'error'`, `'warning'`, `'hint'` |
+| `versions()`                | No       | OpenAPI versions this rule applies to (e.g., `['3.0', '3.1']`)  |
+
+### Accessing Document Data
+
+The `DocumentInfo` object provides access to the parsed OpenAPI document and pre-computed indices:
+
+```typescript
+run(ctx: Context, docInfo: DocumentInfo, config: RuleConfig): ValidationError[] {
+  // Access the document root
+  const doc = docInfo.document;
+  const info = doc.getInfo();
+
+  // Access file location
+  const location = docInfo.location;
+
+  // Use the pre-computed index for efficient iteration
+  const index = docInfo.index;
+
+  // All operations in the document
+  for (const opNode of index.operations) {
+    const operation = opNode.node;
+    const path = opNode.locations.path;
+    const method = opNode.locations.method;
+  }
+
+  // All component schemas
+  for (const schemaNode of index.componentSchemas) {
+    const schema = schemaNode.node;
+    const name = schemaNode.locations.name;
+  }
+
+  // All inline schemas
+  for (const schemaNode of index.inlineSchemas) { ... }
+
+  // All parameters (inline + component)
+  for (const paramNode of index.parameters) { ... }
+
+  // All request bodies
+  for (const reqBodyNode of index.requestBodies) { ... }
+
+  // All responses
+  for (const responseNode of index.responses) { ... }
+
+  // All headers
+  for (const headerNode of index.headers) { ... }
+
+  // All security schemes
+  for (const secSchemeNode of index.securitySchemes) { ... }
+
+  // ... and many more collections
+}
+```
+
+### Creating Validation Errors
+
+Use `createValidationError()` to create properly formatted errors:
+
+```typescript
+import { createValidationError } from '@speakeasy-api/openapi-linter-types';
+
+// Basic error
+errors.push(createValidationError(
+  'warning',                    // severity: 'error' | 'warning' | 'hint'
+  'custom-my-rule',            // rule ID
+  'Description of the issue',  // message
+  node.getRootNode()           // YAML node for location
+));
+
+// Using config severity (respects user overrides)
+errors.push(createValidationError(
+  config.getSeverity(this.defaultSeverity()),
+  this.id(),
+  'Description of the issue',
+  node.getRootNode()
+));
+```
+
+### Console Logging
+
+The `console` global is available for debugging:
+
+```typescript
+console.log('Processing:', op.getOperationID());
+console.warn('Missing recommended field');
+console.error('Invalid configuration');
+```
+
+### Configuring Custom Rules
+
+Custom rules support all standard configuration options:
+
+```yaml
+# Change severity
+rules:
+  - id: custom-require-operation-summary
+    severity: error
+
+# Disable a rule
+rules:
+  - id: custom-require-operation-summary
+    disabled: true
+
+# Filter by message pattern
+rules:
+  - id: custom-require-operation-summary
+    match: ".*unnamed.*"
+    severity: hint
+
+# Disable entire category
+categories:
+  style:
+    enabled: false
+```
+
+### Programmatic Usage
+
+Enable custom rules when using the linter as a Go library:
+
+```go
+import (
+    "context"
+
+    // Import customrules package for side effects (registers the loader)
+    _ "github.com/speakeasy-api/openapi/openapi/linter/customrules"
+
+    "github.com/speakeasy-api/openapi/linter"
+    "github.com/speakeasy-api/openapi/openapi"
+    openapiLinter "github.com/speakeasy-api/openapi/openapi/linter"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // Configure with custom rules
+    config := &linter.Config{
+        Extends: []string{"recommended"},
+        CustomRules: &linter.CustomRulesConfig{
+            Paths: []string{"./rules/*.ts"},
+        },
+    }
+
+    // Create linter (custom rules are automatically loaded)
+    lint, _ := openapiLinter.NewLinter(config)
+
+    // Load and lint document
+    f, _ := os.Open("api.yaml")
+    doc, validationErrs, _ := openapi.Unmarshal(ctx, f)
+
+    docInfo := linter.NewDocumentInfo(doc, "api.yaml")
+    output, _ := lint.Lint(ctx, docInfo, validationErrs, nil)
+
+    fmt.Println(output.FormatText())
+}
+```
+
+### API Notes
+
+- Field and method names use lowercase JavaScript conventions (e.g., `getSummary()`, not `GetSummary()`)
+- All Go struct fields and methods are automatically exposed to JavaScript
+- Arrays from the Index use JavaScript array methods (`.forEach()`, `.map()`, `.filter()`, etc.)
+- Rules are transpiled with esbuild; source maps provide accurate error locations

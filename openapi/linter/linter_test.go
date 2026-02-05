@@ -64,7 +64,8 @@ func TestNewLinter(t *testing.T) {
 	t.Parallel()
 
 	config := linter.NewConfig()
-	lntr := openapiLinter.NewLinter(config)
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
 
 	assert.NotNil(t, lntr)
 	assert.NotNil(t, lntr.Registry())
@@ -100,7 +101,8 @@ paths:
 			},
 		},
 	}
-	lntr := openapiLinter.NewLinter(config)
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
 
 	docInfo := linter.NewDocumentInfo(doc, "/spec/openapi.yaml")
 	output, err := lntr.Lint(ctx, docInfo, nil, nil)
@@ -135,7 +137,8 @@ paths:
 	config := &linter.Config{
 		Extends: []string{"all"},
 	}
-	lntr := openapiLinter.NewLinter(config)
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
 
 	docInfo := linter.NewDocumentInfo(doc, "/spec/openapi.yaml")
 	output, err := lntr.Lint(ctx, docInfo, nil, nil)
@@ -195,7 +198,8 @@ paths:
 			},
 		},
 	}
-	lntr := openapiLinter.NewLinter(config)
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
 
 	docInfo := linter.NewDocumentInfo(doc, "/spec/openapi.yaml")
 	output, err := lntr.Lint(ctx, docInfo, nil, nil)
@@ -241,7 +245,8 @@ paths:
 		Extends: []string{},
 	}
 
-	lntr := openapiLinter.NewLinter(config)
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
 
 	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(yamlInput))
 	require.NoError(t, err)
@@ -300,7 +305,8 @@ paths:
 		},
 	}
 
-	lntr := openapiLinter.NewLinter(config)
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
 
 	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(yamlInput))
 	require.NoError(t, err)
@@ -370,7 +376,8 @@ ExternalNode:
 		Extends: []string{},
 	}
 
-	lntr := openapiLinter.NewLinter(config)
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
 
 	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(yamlInput))
 	require.NoError(t, err)
@@ -425,7 +432,8 @@ paths:
 		Extends: []string{},
 	}
 
-	lntr := openapiLinter.NewLinter(config)
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
 
 	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(yamlInput))
 	require.NoError(t, err)
@@ -452,7 +460,8 @@ func TestNewLinter_WithoutDefaultRules(t *testing.T) {
 
 	// Create linter with no rules
 	config := linter.NewConfig()
-	lntr := openapiLinter.NewLinter(config, openapiLinter.WithoutDefaultRules())
+	lntr, err := openapiLinter.NewLinter(config, openapiLinter.WithoutDefaultRules())
+	require.NoError(t, err)
 
 	require.NotNil(t, lntr)
 	require.NotNil(t, lntr.Registry())
@@ -494,7 +503,8 @@ func TestNewLinter_WithoutDefaultRules_ManualRegistration(t *testing.T) {
 	config := &linter.Config{
 		Extends: []string{"all"}, // Enable all registered rules
 	}
-	lntr := openapiLinter.NewLinter(config, openapiLinter.WithoutDefaultRules())
+	lntr, err := openapiLinter.NewLinter(config, openapiLinter.WithoutDefaultRules())
+	require.NoError(t, err)
 
 	// Manually register specific rules
 	lntr.Registry().Register(&rules.PathParamsRule{})
@@ -532,7 +542,8 @@ func TestNewLinter_BackwardCompatibility(t *testing.T) {
 
 	// Verify NewLinter() without options still registers all default rules
 	config := linter.NewConfig()
-	lntr := openapiLinter.NewLinter(config)
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
 
 	// Should have many rules registered (125+)
 	assert.Greater(t, len(lntr.Registry().AllRules()), 60, "should have all default rules registered")
