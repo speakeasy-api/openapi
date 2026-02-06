@@ -3,6 +3,7 @@ package converter
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 
@@ -140,7 +141,7 @@ func Generate(ir *IntermediateConfig, opts ...GenerateOption) (*GenerateResult, 
 	// 4. Add custom_rules config if we generated any rules
 	if len(result.GeneratedRules) > 0 {
 		result.Config.CustomRules = &linter.CustomRulesConfig{
-			Paths: []string{filepath.Join(options.RulesDir, "*.ts")},
+			Paths: []string{path.Join(options.RulesDir, "*.ts")},
 		}
 	}
 

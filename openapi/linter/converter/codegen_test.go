@@ -398,5 +398,7 @@ func assertGoldenFile(t *testing.T, filename, actual string) {
 	expected, err := os.ReadFile(goldenPath)
 	require.NoError(t, err, "should read golden file %s", filename)
 
-	assert.Equal(t, string(expected), actual, "output should match golden file %s", filename)
+	// Normalize line endings for cross-platform compatibility (Windows checks out CRLF)
+	normalizedExpected := strings.ReplaceAll(string(expected), "\r\n", "\n")
+	assert.Equal(t, normalizedExpected, actual, "output should match golden file %s", filename)
 }
