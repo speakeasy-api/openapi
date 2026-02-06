@@ -240,6 +240,37 @@ func TestNavigateModel_EmbeddedMap(t *testing.T) {
 	})
 }
 
+func TestNavigateModel_NilModelPointer(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil model pointer returns error instead of panic", func(t *testing.T) {
+		t.Parallel()
+
+		// A nil pointer to a model type should return an error, not panic.
+		// This reproduces a crash when resolving a broken $ref like
+		// "#/components/schemas/DoesNotExist" where the Components pointer is nil.
+		var model *tests.TestPrimitiveHighModel
+		_, err := GetTarget(model, "/stringField")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+		assert.Contains(t, err.Error(), "nil")
+	})
+
+	t.Run("nil nested model pointer returns error instead of panic", func(t *testing.T) {
+		t.Parallel()
+
+		// A model with a nil nested model pointer should return an error
+		// when trying to navigate through the nil pointer.
+		model := &tests.TestComplexHighModel{
+			NestedModel: nil,
+		}
+		_, err := GetTarget(model, "/nestedModel/stringField")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+		assert.Contains(t, err.Error(), "nil")
+	})
+}
+
 func TestNavigateModel_EmbeddedMapEscapedKeys(t *testing.T) {
 	t.Parallel()
 

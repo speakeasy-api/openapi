@@ -221,6 +221,10 @@ type NavigableNoder interface {
 }
 
 func getStructTarget(sourceVal reflect.Value, currentPart navigationPart, stack []navigationPart, currentPath string, o *options) (any, []navigationPart, error) {
+	if sourceVal.Kind() == reflect.Ptr && sourceVal.IsNil() {
+		return nil, nil, ErrNotFound.Wrap(fmt.Errorf("struct is nil at %s", currentPath))
+	}
+
 	if interfaces.ImplementsInterface[NavigableNoder](sourceVal.Type()) {
 		val, stack, err := getNavigableNoderTarget(sourceVal, currentPart, stack, currentPath, o)
 		if err != nil {
