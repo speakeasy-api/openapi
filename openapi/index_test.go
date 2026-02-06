@@ -2145,3 +2145,63 @@ func TestIndex_GetAllReferences_NilIndex_Success(t *testing.T) {
 	allRefs := idx.GetAllReferences()
 	assert.Nil(t, allRefs, "should return nil for nil index")
 }
+
+func TestBuildIndex_CircularRef_OneOfSelfRefWithBaseCases_Valid(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	// A recursive JSON-value-like type: oneOf with self-referencing branches (object/array)
+	// AND non-recursive base-case branches (string/number/boolean).
+	// Referenced from within an inline oneOf in a path response.
+	// This should be VALID because the oneOf has non-recursive branches.
+	yaml := `
+openapi: "3.0.3"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      operationId: getTest
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/JsonValue'
+                  - type: object
+                    properties:
+                      items:
+                        $ref: '#/components/schemas/JsonValue'
+components:
+  schemas:
+    JsonValue:
+      nullable: true
+      oneOf:
+        - type: string
+        - type: number
+        - type: object
+          additionalProperties:
+            $ref: '#/components/schemas/JsonValue'
+        - type: array
+          items:
+            $ref: '#/components/schemas/JsonValue'
+        - type: boolean
+`
+	doc := unmarshalOpenAPI(t, ctx, yaml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+
+	require.NotNil(t, idx, "index should not be nil")
+
+	circularErrs := idx.GetCircularReferenceErrors()
+	assert.Empty(t, circularErrs, "oneOf with non-recursive base-case branches should be valid")
+}

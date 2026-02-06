@@ -1023,11 +1023,13 @@ func (i *Index) isFromMainDocument() bool {
 
 // buildPathSegmentsFromStack builds path segments from a point in the reference stack to current location.
 func (i *Index) buildPathSegmentsFromStack(startStackIdx int, currentLoc Locations) []CircularPathSegment {
-	// Collect all locations from the stack starting point plus current
+	// Collect only the segments WITHIN the circular loop.
+	// Skip referenceStack[startStackIdx].location because it contains the path
+	// leading TO the circular loop start (outside the loop), not the path within it.
+	// Only include entries after startStackIdx (intermediate refs in the loop) plus currentLoc.
 	var segments []CircularPathSegment
 
-	// Add segments from each stack entry after the circular start point
-	for stackIdx := startStackIdx; stackIdx < len(i.referenceStack); stackIdx++ {
+	for stackIdx := startStackIdx + 1; stackIdx < len(i.referenceStack); stackIdx++ {
 		entry := i.referenceStack[stackIdx]
 		for _, locCtx := range entry.location {
 			segments = append(segments, buildPathSegment(locCtx))
