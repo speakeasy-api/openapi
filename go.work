@@ -4,4 +4,6 @@ use (
 	.
 	./cmd/openapi
 	./jsonschema/oas3/tests
+	./openapi/linter/converter/tests
+	./openapi/linter/customrules
 )

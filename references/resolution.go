@@ -23,11 +23,15 @@ type ResolutionTarget interface {
 
 	GetCachedReferenceDocument(key string) ([]byte, bool)
 	StoreReferenceDocumentInCache(key string, doc []byte)
+
+	GetCachedExternalDocument(key string) (any, bool)
+	StoreExternalDocumentInCache(key string, doc any)
 }
 
 type Resolvable[T any] interface {
 	GetReference() Reference
 	Resolve(ctx context.Context, opts ResolveOptions) ([]error, error)
+	IsResolved() bool
 	GetResolvedObject() *T
 }
 
@@ -53,8 +57,10 @@ type Unmarshal[T any] func(ctx context.Context, node *yaml.Node, skipValidation 
 type ResolveResult[T any] struct {
 	// Object is the resolved object
 	Object *T
+	// AbsoluteDocumentPath is the absolute reference that was resolved
+	AbsoluteDocumentPath string
 	// AbsoluteReference is the absolute reference that was resolved
-	AbsoluteReference string
+	AbsoluteReference Reference
 	// ResolvedDocument is the document that was resolved against (for chaining resolutions)
 	ResolvedDocument any
 }
@@ -103,10 +109,10 @@ func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T]
 		return nil, nil, err
 	}
 
-	absRef := result.AbsoluteReference
+	absDocPath := result.AbsoluteReference
 	finalClassification := result.Classification
 
-	absRefWithJP := utils.BuildAbsoluteReference(absRef, string(jp))
+	absRefWithJP := utils.BuildAbsoluteReference(absDocPath, string(jp))
 
 	// Try and get the object from the cache as we should avoid recreating it if possible
 	var obj *T
@@ -119,9 +125,10 @@ func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T]
 	if uri == "" {
 		if coOK {
 			return &ResolveResult[T]{
-				Object:            obj,
-				AbsoluteReference: absRef,
-				ResolvedDocument:  opts.TargetDocument,
+				Object:               obj,
+				AbsoluteDocumentPath: absDocPath,
+				AbsoluteReference:    Reference(absRefWithJP),
+				ResolvedDocument:     opts.TargetDocument,
 			}, nil, nil
 		}
 
@@ -134,41 +141,44 @@ func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T]
 		opts.RootDocument.StoreReferencedObjectInCache(absRefWithJP, obj)
 
 		return &ResolveResult[T]{
-			Object:            obj,
-			AbsoluteReference: opts.TargetLocation,
-			ResolvedDocument:  opts.TargetDocument,
+			Object:               obj,
+			AbsoluteDocumentPath: opts.TargetLocation,
+			AbsoluteReference:    Reference(utils.BuildAbsoluteReference(opts.TargetLocation, string(jp))),
+			ResolvedDocument:     opts.TargetDocument,
 		}, validationErrs, nil
 	} else if opts.DisableExternalRefs {
 		return nil, nil, errors.New("external reference not allowed")
 	}
 
-	cd, cdOK := opts.RootDocument.GetCachedReferenceDocument(absRef)
+	cd, cdOK := opts.RootDocument.GetCachedReferenceDocument(absDocPath)
 
 	if coOK && cdOK {
 		return &ResolveResult[T]{
-			Object:            obj,
-			AbsoluteReference: absRef,
-			ResolvedDocument:  cd,
+			Object:               obj,
+			AbsoluteDocumentPath: absDocPath,
+			AbsoluteReference:    Reference(absRefWithJP),
+			ResolvedDocument:     cd,
 		}, nil, nil
 	}
 
 	// If we have a cached document, try and resolve against it
 	if cdOK {
-		obj, resolvedDoc, validationErrs, err := resolveAgainstData(ctx, absRef, bytes.NewReader(cd), jp, unmarshaler, opts)
+		obj, resolvedDoc, validationErrs, err := resolveAgainstData(ctx, absDocPath, bytes.NewReader(cd), jp, unmarshaler, opts)
 		if err != nil {
 			return nil, validationErrs, err
 		}
 		return &ResolveResult[T]{
-			Object:            obj,
-			AbsoluteReference: absRef,
-			ResolvedDocument:  resolvedDoc,
+			Object:               obj,
+			AbsoluteDocumentPath: absDocPath,
+			AbsoluteReference:    Reference(absRefWithJP),
+			ResolvedDocument:     resolvedDoc,
 		}, validationErrs, nil
 	}
 
 	// Otherwise resolve the reference
 	switch finalClassification.Type {
 	case utils.ReferenceTypeURL:
-		obj, resolvedDoc, validationErrs, err := resolveAgainstURL(ctx, absRef, jp, unmarshaler, opts)
+		obj, resolvedDoc, validationErrs, err := resolveAgainstURL(ctx, absDocPath, jp, unmarshaler, opts)
 		if err != nil {
 			return nil, validationErrs, err
 		}
@@ -177,12 +187,13 @@ func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T]
 		opts.RootDocument.StoreReferencedObjectInCache(absRefWithJP, obj)
 
 		return &ResolveResult[T]{
-			Object:            obj,
-			AbsoluteReference: absRef,
-			ResolvedDocument:  resolvedDoc,
+			Object:               obj,
+			AbsoluteDocumentPath: absDocPath,
+			AbsoluteReference:    Reference(absRefWithJP),
+			ResolvedDocument:     resolvedDoc,
 		}, validationErrs, nil
 	case utils.ReferenceTypeFilePath:
-		obj, resolvedDoc, validationErrs, err := resolveAgainstFilePath(ctx, absRef, jp, unmarshaler, opts)
+		obj, resolvedDoc, validationErrs, err := resolveAgainstFilePath(ctx, absDocPath, jp, unmarshaler, opts)
 		if err != nil {
 			return nil, validationErrs, err
 		}
@@ -191,9 +202,10 @@ func Resolve[T any](ctx context.Context, ref Reference, unmarshaler Unmarshal[T]
 		opts.RootDocument.StoreReferencedObjectInCache(absRefWithJP, obj)
 
 		return &ResolveResult[T]{
-			Object:            obj,
-			AbsoluteReference: absRef,
-			ResolvedDocument:  resolvedDoc,
+			Object:               obj,
+			AbsoluteDocumentPath: absDocPath,
+			AbsoluteReference:    Reference(absRefWithJP),
+			ResolvedDocument:     resolvedDoc,
 		}, validationErrs, nil
 	default:
 		return nil, nil, fmt.Errorf("unsupported reference type: %d", finalClassification.Type)
@@ -257,19 +269,35 @@ func resolveAgainstData[T any](ctx context.Context, absRef string, reader io.Rea
 		return nil, nil, nil, err
 	}
 
-	var node yaml.Node
-	if err := yaml.Unmarshal(data, &node); err != nil {
-		return nil, nil, nil, err
+	opts.RootDocument.InitCache()
+
+	// Check if we have a cached parsed YAML node for this external document
+	var node *yaml.Node
+	if cachedDoc, ok := opts.RootDocument.GetCachedExternalDocument(absRef); ok {
+		if cachedNode, ok := cachedDoc.(*yaml.Node); ok {
+			node = cachedNode
+		}
+	}
+
+	// If not cached, parse and cache the YAML node
+	if node == nil {
+		var parsedNode yaml.Node
+		if err := yaml.Unmarshal(data, &parsedNode); err != nil {
+			return nil, nil, nil, err
+		}
+		node = &parsedNode
+		// Cache the parsed YAML node so internal references can navigate it
+		opts.RootDocument.StoreExternalDocumentInCache(absRef, node)
 	}
 
 	var target any
 
 	// Handle empty JSON pointer case - if jp is empty, target the root node directly
 	if jp == "" {
-		target = &node
+		target = node
 	} else {
 		var jpErr error
-		target, jpErr = jsonpointer.GetTarget(node, jp)
+		target, jpErr = jsonpointer.GetTarget(*node, jp)
 		if jpErr != nil {
 			return nil, nil, nil, jpErr
 		}
@@ -284,6 +312,12 @@ func resolveAgainstData[T any](ctx context.Context, absRef string, reader io.Rea
 		return nil, nil, nil, fmt.Errorf("expected *yaml.Node, got %T", target)
 	}
 
+	// CRITICAL FIX: Update the TargetDocument to be the parsed YAML node
+	// This allows internal references (like #/components/schemas/...) within
+	// the resolved component to navigate through the external file's structure
+	resolveOptsWithDocument := opts
+	resolveOptsWithDocument.TargetDocument = node
+
 	resolved, validationErrs, err := unmarshaler(ctx, targetNode, opts.SkipValidation)
 	if err != nil {
 		return nil, nil, validationErrs, err
@@ -293,10 +327,9 @@ func resolveAgainstData[T any](ctx context.Context, absRef string, reader io.Rea
 		return nil, nil, validationErrs, fmt.Errorf("nil %T returned from unmarshaler", target)
 	}
 
-	opts.RootDocument.InitCache()
 	opts.RootDocument.StoreReferenceDocumentInCache(absRef, data)
 
-	return resolved, &node, validationErrs, nil
+	return resolved, node, validationErrs, nil
 }
 
 func cast[T any](target any) (*T, error) {

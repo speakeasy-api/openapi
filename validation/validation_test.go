@@ -22,31 +22,37 @@ func TestError_Error_Success(t *testing.T) {
 			name: "error with valid node",
 			err: &Error{
 				UnderlyingError: errors.New("test error"),
+				Severity:        SeverityError,
+				Rule:            RuleValidationTypeMismatch,
 				Node: &yaml.Node{
 					Line:   10,
 					Column: 5,
 				},
 			},
-			expected: "[10:5] test error",
+			expected: "[10:5] error validation-type-mismatch test error",
 		},
 		{
 			name: "error with nil node",
 			err: &Error{
 				UnderlyingError: errors.New("test error"),
+				Severity:        SeverityWarning,
+				Rule:            RuleValidationInvalidFormat,
 				Node:            nil,
 			},
-			expected: "[-1:-1] test error",
+			expected: "[-1:-1] warning validation-invalid-format test error",
 		},
 		{
 			name: "error with zero line/column",
 			err: &Error{
 				UnderlyingError: errors.New("test error"),
+				Severity:        SeverityError,
+				Rule:            RuleValidationRequiredField,
 				Node: &yaml.Node{
 					Line:   0,
 					Column: 0,
 				},
 			},
-			expected: "[0:0] test error",
+			expected: "[0:0] error validation-required-field test error",
 		},
 	}
 
@@ -162,12 +168,14 @@ func TestNewValidationError_Success(t *testing.T) {
 	underlyingErr := errors.New("test error")
 	node := &yaml.Node{Line: 5, Column: 10}
 
-	result := NewValidationError(underlyingErr, node)
+	result := NewValidationError(SeverityError, RuleValidationTypeMismatch, underlyingErr, node)
 
 	var validationErr *Error
 	require.ErrorAs(t, result, &validationErr, "should return *Error type")
 	assert.Equal(t, underlyingErr, validationErr.UnderlyingError)
 	assert.Equal(t, node, validationErr.Node)
+	assert.Equal(t, SeverityError, validationErr.Severity)
+	assert.Equal(t, RuleValidationTypeMismatch, validationErr.Rule)
 }
 
 // Mock types for testing the error creation functions
@@ -270,12 +278,14 @@ func TestNewValueError_Success(t *testing.T) {
 			t.Parallel()
 
 			underlyingErr := errors.New("test error")
-			result := NewValueError(underlyingErr, tt.core, tt.nodeGetter)
+			result := NewValueError(SeverityError, RuleValidationTypeMismatch, underlyingErr, tt.core, tt.nodeGetter)
 
 			var validationErr *Error
 			require.ErrorAs(t, result, &validationErr, "should return *Error type")
 			assert.Equal(t, underlyingErr, validationErr.UnderlyingError)
 			assert.Equal(t, tt.expectedNode, validationErr.Node)
+			assert.Equal(t, SeverityError, validationErr.Severity)
+			assert.Equal(t, RuleValidationTypeMismatch, validationErr.Rule)
 		})
 	}
 }
@@ -320,12 +330,14 @@ func TestNewSliceError_Success(t *testing.T) {
 			t.Parallel()
 
 			underlyingErr := errors.New("slice error")
-			result := NewSliceError(underlyingErr, tt.core, tt.nodeGetter, tt.index)
+			result := NewSliceError(SeverityError, RuleValidationTypeMismatch, underlyingErr, tt.core, tt.nodeGetter, tt.index)
 
 			var validationErr *Error
 			require.ErrorAs(t, result, &validationErr, "should return *Error type")
 			assert.Equal(t, underlyingErr, validationErr.UnderlyingError)
 			assert.Equal(t, tt.expectedNode, validationErr.Node)
+			assert.Equal(t, SeverityError, validationErr.Severity)
+			assert.Equal(t, RuleValidationTypeMismatch, validationErr.Rule)
 		})
 	}
 }
@@ -370,12 +382,14 @@ func TestNewMapKeyError_Success(t *testing.T) {
 			t.Parallel()
 
 			underlyingErr := errors.New("map key error")
-			result := NewMapKeyError(underlyingErr, tt.core, tt.nodeGetter, tt.key)
+			result := NewMapKeyError(SeverityError, RuleValidationTypeMismatch, underlyingErr, tt.core, tt.nodeGetter, tt.key)
 
 			var validationErr *Error
 			require.ErrorAs(t, result, &validationErr, "should return *Error type")
 			assert.Equal(t, underlyingErr, validationErr.UnderlyingError)
 			assert.Equal(t, tt.expectedNode, validationErr.Node)
+			assert.Equal(t, SeverityError, validationErr.Severity)
+			assert.Equal(t, RuleValidationTypeMismatch, validationErr.Rule)
 		})
 	}
 }
@@ -420,7 +434,7 @@ func TestNewMapValueError_Success(t *testing.T) {
 			t.Parallel()
 
 			underlyingErr := errors.New("map value error")
-			result := NewMapValueError(underlyingErr, tt.core, tt.nodeGetter, tt.key)
+			result := NewMapValueError(SeverityError, RuleValidationTypeMismatch, underlyingErr, tt.core, tt.nodeGetter, tt.key)
 
 			var validationErr *Error
 			require.ErrorAs(t, result, &validationErr, "should return *Error type")
@@ -471,27 +485,29 @@ func TestTypeMismatchError_Success(t *testing.T) {
 	}
 }
 
-// Test MissingFieldError
-func TestMissingFieldError_Success(t *testing.T) {
+// Test Severity.String() method
+func TestSeverity_String_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
-		msg      string
-		args     []any
+		severity Severity
 		expected string
 	}{
 		{
-			name:     "simple missing field message",
-			msg:      "required field missing",
-			args:     nil,
-			expected: "required field missing",
+			name:     "error severity",
+			severity: SeverityError,
+			expected: "error",
 		},
 		{
-			name:     "missing field with field name",
-			msg:      "required field '%s' is missing",
-			args:     []any{"name"},
-			expected: "required field 'name' is missing",
+			name:     "warning severity",
+			severity: SeverityWarning,
+			expected: "warning",
+		},
+		{
+			name:     "hint severity",
+			severity: SeverityHint,
+			expected: "hint",
 		},
 	}
 
@@ -499,34 +515,45 @@ func TestMissingFieldError_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := NewMissingFieldError(tt.msg, tt.args...)
-			assert.Equal(t, tt.expected, err.Error())
-			assert.Equal(t, tt.expected, err.Msg)
+			result := tt.severity.String()
+			assert.Equal(t, tt.expected, result, "severity string should match")
 		})
 	}
 }
 
-// Test MissingValueError
-func TestMissingValueError_Success(t *testing.T) {
+// Test Severity.Rank() method
+func TestSeverity_Rank_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
-		msg      string
-		args     []any
-		expected string
+		severity Severity
+		expected int
 	}{
 		{
-			name:     "simple missing value message",
-			msg:      "value is required",
-			args:     nil,
-			expected: "value is required",
+			name:     "error severity has rank 2",
+			severity: SeverityError,
+			expected: 2,
 		},
 		{
-			name:     "missing value with context",
-			msg:      "value for field '%s' is required",
-			args:     []any{"description"},
-			expected: "value for field 'description' is required",
+			name:     "warning severity has rank 1",
+			severity: SeverityWarning,
+			expected: 1,
+		},
+		{
+			name:     "hint severity has rank 0",
+			severity: SeverityHint,
+			expected: 0,
+		},
+		{
+			name:     "unknown severity treated as error",
+			severity: Severity("unknown"),
+			expected: 2,
+		},
+		{
+			name:     "empty severity treated as error",
+			severity: Severity(""),
+			expected: 2,
 		},
 	}
 
@@ -534,40 +561,54 @@ func TestMissingValueError_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := NewMissingValueError(tt.msg, tt.args...)
-			assert.Equal(t, tt.expected, err.Error())
-			assert.Equal(t, tt.expected, err.Msg)
+			result := tt.severity.Rank()
+			assert.Equal(t, tt.expected, result, "severity rank should match")
 		})
 	}
 }
 
-// Test ValueValidationError
-func TestValueValidationError_Success(t *testing.T) {
+// Test Severity.Rank() ordering for comparison
+func TestSeverity_Rank_Ordering(t *testing.T) {
+	t.Parallel()
+
+	// Verify that error > warning > hint in terms of rank (worse severity = higher rank)
+	assert.Greater(t, SeverityError.Rank(), SeverityWarning.Rank(), "error should have higher rank than warning")
+	assert.Greater(t, SeverityWarning.Rank(), SeverityHint.Rank(), "warning should have higher rank than hint")
+	assert.Greater(t, SeverityError.Rank(), SeverityHint.Rank(), "error should have higher rank than hint")
+}
+
+// Test Error.GetSeverity() method
+func TestError_GetSeverity_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
-		msg      string
-		args     []any
-		expected string
+		err      *Error
+		expected Severity
 	}{
 		{
-			name:     "simple validation error",
-			msg:      "invalid value",
-			args:     nil,
-			expected: "invalid value",
+			name: "error severity",
+			err: &Error{
+				UnderlyingError: errors.New("test error"),
+				Severity:        SeverityError,
+			},
+			expected: SeverityError,
 		},
 		{
-			name:     "validation error with formatting",
-			msg:      "value '%s' is not valid for field '%s'",
-			args:     []any{"invalid", "status"},
-			expected: "value 'invalid' is not valid for field 'status'",
+			name: "warning severity",
+			err: &Error{
+				UnderlyingError: errors.New("test warning"),
+				Severity:        SeverityWarning,
+			},
+			expected: SeverityWarning,
 		},
 		{
-			name:     "validation error with no args but formatting placeholders",
-			msg:      "value %s is invalid",
-			args:     []any{},
-			expected: "value %s is invalid",
+			name: "hint severity",
+			err: &Error{
+				UnderlyingError: errors.New("test hint"),
+				Severity:        SeverityHint,
+			},
+			expected: SeverityHint,
 		},
 	}
 
@@ -575,9 +616,155 @@ func TestValueValidationError_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := NewValueValidationError(tt.msg, tt.args...)
-			assert.Equal(t, tt.expected, err.Error())
-			assert.Equal(t, tt.expected, err.Msg)
+			result := tt.err.GetSeverity()
+			assert.Equal(t, tt.expected, result, "severity should match")
+		})
+	}
+}
+
+// Test Error.Error() with DocumentLocation
+func TestError_Error_WithDocumentLocation(t *testing.T) {
+	t.Parallel()
+
+	err := &Error{
+		UnderlyingError:  errors.New("test error"),
+		Severity:         SeverityError,
+		Rule:             RuleValidationInvalidReference,
+		Node:             &yaml.Node{Line: 5, Column: 3},
+		DocumentLocation: "https://example.com/spec.yaml",
+	}
+
+	result := err.Error()
+	assert.Equal(t, "[5:3] error validation-invalid-reference test error (document: https://example.com/spec.yaml)", result)
+}
+
+// Test Error.GetNode() method
+func TestError_GetNode_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      *Error
+		expected *yaml.Node
+	}{
+		{
+			name: "returns node when set",
+			err: &Error{
+				Node: &yaml.Node{Line: 10, Column: 5},
+			},
+			expected: &yaml.Node{Line: 10, Column: 5},
+		},
+		{
+			name: "returns nil when node is nil",
+			err: &Error{
+				Node: nil,
+			},
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := tt.err.GetNode()
+			assert.Equal(t, tt.expected, result, "node should match expected")
+		})
+	}
+}
+
+// Test Error.GetDocumentLocation() method
+func TestError_GetDocumentLocation_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      *Error
+		expected string
+	}{
+		{
+			name: "returns document location when set",
+			err: &Error{
+				DocumentLocation: "https://example.com/spec.yaml",
+			},
+			expected: "https://example.com/spec.yaml",
+		},
+		{
+			name:     "returns empty string when not set",
+			err:      &Error{},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := tt.err.GetDocumentLocation()
+			assert.Equal(t, tt.expected, result, "document location should match expected")
+		})
+	}
+}
+
+// Test NewValidationErrorWithDocumentLocation function
+func TestNewValidationErrorWithDocumentLocation_Success(t *testing.T) {
+	t.Parallel()
+
+	underlyingErr := errors.New("remote error")
+	node := &yaml.Node{Line: 15, Column: 8}
+	docLocation := "https://example.com/components.yaml"
+
+	result := NewValidationErrorWithDocumentLocation(SeverityWarning, RuleValidationInvalidReference, underlyingErr, node, docLocation)
+
+	var validationErr *Error
+	require.ErrorAs(t, result, &validationErr, "should return *Error type")
+	assert.Equal(t, underlyingErr, validationErr.UnderlyingError, "underlying error should match")
+	assert.Equal(t, node, validationErr.Node, "node should match")
+	assert.Equal(t, SeverityWarning, validationErr.Severity, "severity should match")
+	assert.Equal(t, RuleValidationInvalidReference, validationErr.Rule, "rule should match")
+	assert.Equal(t, docLocation, validationErr.DocumentLocation, "document location should match")
+}
+
+// Test TypeMismatchError with ParentName
+func TestTypeMismatchError_WithParentName_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		parentName string
+		msg        string
+		args       []any
+		expected   string
+	}{
+		{
+			name:       "with parent name",
+			parentName: "Response",
+			msg:        "type mismatch",
+			args:       nil,
+			expected:   "Response type mismatch",
+		},
+		{
+			name:       "with parent name and formatting",
+			parentName: "Schema",
+			msg:        "expected %s, got %s",
+			args:       []any{"string", "int"},
+			expected:   "Schema expected string, got int",
+		},
+		{
+			name:       "empty parent name",
+			parentName: "",
+			msg:        "standalone error",
+			args:       nil,
+			expected:   "standalone error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := NewTypeMismatchError(tt.parentName, tt.msg, tt.args...)
+			assert.Equal(t, tt.expected, err.Error(), "error message should match")
 		})
 	}
 }

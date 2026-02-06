@@ -494,6 +494,68 @@ func (s *Schema) GetFormat() string {
 	return *s.Format
 }
 
+// IsReferenceOnly returns true if this schema only contains a $ref and no other properties.
+// This is used for the no-ref-siblings linter rule in OAS 3.0.x (in OAS 3.1+, $ref can have siblings).
+func (s *Schema) IsReferenceOnly() bool {
+	if !s.IsReference() {
+		return false
+	}
+
+	// Check all schema fields - if any are set, it's not reference-only
+	return s.Type == nil &&
+		len(s.AllOf) == 0 &&
+		len(s.OneOf) == 0 &&
+		len(s.AnyOf) == 0 &&
+		s.Discriminator == nil &&
+		len(s.Examples) == 0 &&
+		len(s.PrefixItems) == 0 &&
+		s.Contains == nil &&
+		s.MinContains == nil &&
+		s.MaxContains == nil &&
+		s.If == nil &&
+		s.Else == nil &&
+		s.Then == nil &&
+		(s.DependentSchemas == nil || s.DependentSchemas.Len() == 0) &&
+		(s.PatternProperties == nil || s.PatternProperties.Len() == 0) &&
+		s.PropertyNames == nil &&
+		s.UnevaluatedItems == nil &&
+		s.UnevaluatedProperties == nil &&
+		s.Items == nil &&
+		s.Anchor == nil &&
+		s.ID == nil &&
+		s.Not == nil &&
+		(s.Properties == nil || s.Properties.Len() == 0) &&
+		(s.Defs == nil || s.Defs.Len() == 0) &&
+		s.Title == nil &&
+		s.MultipleOf == nil &&
+		s.Maximum == nil &&
+		s.Minimum == nil &&
+		s.MaxLength == nil &&
+		s.MinLength == nil &&
+		s.Pattern == nil &&
+		s.Format == nil &&
+		s.MaxItems == nil &&
+		s.MinItems == nil &&
+		s.UniqueItems == nil &&
+		s.MaxProperties == nil &&
+		s.MinProperties == nil &&
+		len(s.Required) == 0 &&
+		len(s.Enum) == 0 &&
+		s.AdditionalProperties == nil &&
+		s.Description == nil &&
+		s.Default == nil &&
+		s.Const == nil &&
+		s.Nullable == nil &&
+		s.ReadOnly == nil &&
+		s.WriteOnly == nil &&
+		s.ExternalDocs == nil &&
+		s.Example == nil &&
+		s.Deprecated == nil &&
+		s.Schema == nil &&
+		s.XML == nil &&
+		(s.Extensions == nil || s.Extensions.Len() == 0)
+}
+
 // GetMaxItems returns the value of the MaxItems field. Returns nil if not set.
 func (s *Schema) GetMaxItems() *int64 {
 	if s == nil {

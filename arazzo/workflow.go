@@ -3,6 +3,7 @@ package arazzo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
@@ -78,7 +79,7 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 	errs := []error{}
 
 	if core.WorkflowID.Present && w.WorkflowID == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("workflow.workflowId is required"), core, core.WorkflowID))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("workflow.workflowId is required"), core, core.WorkflowID))
 	}
 
 	if w.Inputs != nil {
@@ -88,20 +89,20 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 	for i, dependsOn := range w.DependsOn {
 		if dependsOn.IsExpression() {
 			if err := dependsOn.Validate(); err != nil {
-				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow.dependsOn expression is invalid: %s", err.Error()), core, core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("workflow.dependsOn expression is invalid: %w", err), core, core.DependsOn, i))
 			}
 
 			typ, sourceDescriptionName, _, _ := dependsOn.GetParts()
 
 			if typ != expression.ExpressionTypeSourceDescriptions {
-				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow.dependsOn must be a sourceDescriptions expression if not a workflowId, got %s", typ), core, core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("workflow.dependsOn must be a sourceDescriptions expression if not a workflowId, got `%s`", typ), core, core.DependsOn, i))
 			}
 
 			if a.SourceDescriptions.Find(sourceDescriptionName) == nil {
-				errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow.dependsOn sourceDescription %s not found", sourceDescriptionName), core, core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("workflow.dependsOn sourceDescription `%s` not found", sourceDescriptionName), core, core.DependsOn, i))
 			}
 		} else if a.Workflows.Find(string(dependsOn)) == nil {
-			errs = append(errs, validation.NewSliceError(validation.NewValueValidationError("workflow.dependsOn workflowId %s not found", dependsOn), core, core.DependsOn, i))
+			errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("workflow.dependsOn workflowId `%s` not found", dependsOn), core, core.DependsOn, i))
 		}
 	}
 
@@ -119,11 +120,11 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	for name, output := range w.Outputs.All() {
 		if !outputNameRegex.MatchString(name) {
-			errs = append(errs, validation.NewMapKeyError(validation.NewValueValidationError("workflow.outputs name must be a valid name [%s]: %s", outputNameRegex.String(), name), core, core.Outputs, name))
+			errs = append(errs, validation.NewMapKeyError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("workflow.outputs name must be a valid name [`%s`]: `%s`", outputNameRegex.String(), name), core, core.Outputs, name))
 		}
 
 		if err := output.Validate(); err != nil {
-			errs = append(errs, validation.NewMapValueError(validation.NewValueValidationError("workflow.outputs expression is invalid: %s", err.Error()), core, core.Outputs, name))
+			errs = append(errs, validation.NewMapValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("workflow.outputs expression is invalid: %w", err), core, core.Outputs, name))
 		}
 	}
 

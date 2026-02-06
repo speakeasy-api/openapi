@@ -77,7 +77,7 @@ func TestResponse_Validate_Error(t *testing.T) {
 		{
 			name:     "missing_description",
 			yml:      `schema: {type: object}`,
-			wantErrs: []string{"response.description is missing"},
+			wantErrs: []string{"`response.description` is required"},
 		},
 	}
 
@@ -164,7 +164,7 @@ func TestHeader_Validate_Error(t *testing.T) {
 		{
 			name:     "missing_type",
 			yml:      `description: Some header`,
-			wantErrs: []string{"header.type is missing"},
+			wantErrs: []string{"`header.type` is required"},
 		},
 		{
 			name: "invalid_type",

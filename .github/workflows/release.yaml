@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
 
 jobs:
   goreleaser:
@@ -52,3 +53,31 @@ jobs:
             dist/
             !dist/*.txt
           retention-days: 30
+
+  npm-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        working-directory: openapi/linter/customrules/types
+        run: npm ci
+
+      - name: Set version from tag
+        working-directory: openapi/linter/customrules/types
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+
+      - name: Build
+        working-directory: openapi/linter/customrules/types
+        run: npm run build
+
+      - name: Publish
+        working-directory: openapi/linter/customrules/types
+        run: npm publish --provenance --access public

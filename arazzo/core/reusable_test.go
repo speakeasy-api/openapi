@@ -39,7 +39,7 @@ func TestReusable_Unmarshal_NonMappingNode_Error(t *testing.T) {
 	validationErrs, err := reusable.Unmarshal(t.Context(), "test", node.Content[0])
 	require.NoError(t, err, "unmarshal error should be nil")
 	require.NotEmpty(t, validationErrs, "validation errors should not be empty")
-	assert.Contains(t, validationErrs[0].Error(), "reusable expected object", "error message should match")
+	assert.Contains(t, validationErrs[0].Error(), "reusable expected `object`", "error message should match")
 	assert.False(t, reusable.GetValid(), "reusable should not be valid")
 }
 
@@ -53,7 +53,7 @@ func TestReusable_SyncChanges_NonStruct_Error(t *testing.T) {
 	reusable := Reusable[*Parameter]{}
 	_, err = reusable.SyncChanges(t.Context(), "not a struct", node.Content[0])
 	require.Error(t, err, "SyncChanges should fail")
-	assert.Contains(t, err.Error(), "Reusable.SyncChanges expected a struct, got string", "error message should match")
+	assert.Contains(t, err.Error(), "Reusable.SyncChanges expected a struct, got `string`", "error message should match")
 }
 
 func TestReusable_Unmarshal_NilNode_Error(t *testing.T) {

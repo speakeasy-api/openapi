@@ -3,6 +3,7 @@ package arazzo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
@@ -64,16 +65,16 @@ func (s *SuccessAction) Validate(ctx context.Context, opts ...validation.Option)
 	errs := []error{}
 
 	if core.Name.Present && s.Name == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("successAction.name is required"), core, core.Name))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("successAction.name is required"), core, core.Name))
 	}
 
 	switch s.Type {
 	case SuccessActionTypeEnd:
 		if s.WorkflowID != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("successAction.workflowId is not allowed when type: end is specified"), core, core.WorkflowID))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("successAction.workflowId is not allowed when type: end is specified"), core, core.WorkflowID))
 		}
 		if s.StepID != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("successAction.stepId is not allowed when type: end is specified"), core, core.StepID))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("successAction.stepId is not allowed when type: end is specified"), core, core.StepID))
 		}
 	case SuccessActionTypeGoto:
 		workflowIDNode := core.WorkflowID.GetKeyNodeOrRoot(core.RootNode)
@@ -90,7 +91,7 @@ func (s *SuccessAction) Validate(ctx context.Context, opts ...validation.Option)
 			required:       true,
 		}, opts...)...)
 	default:
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("successAction.type must be one of [%s]", strings.Join([]string{string(SuccessActionTypeEnd), string(SuccessActionTypeGoto)}, ", ")), core, core.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("successAction.type must be one of [`%s`]", strings.Join([]string{string(SuccessActionTypeEnd), string(SuccessActionTypeGoto)}, ", ")), core, core.Type))
 	}
 
 	for i := range s.Criteria {
@@ -120,28 +121,28 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, parentName string,
 	errs := []error{}
 
 	if params.required && params.workflowID == nil && params.stepID == nil {
-		errs = append(errs, validation.NewValidationError(validation.NewMissingValueError("%s.workflowId or stepId is required", parentName), params.workflowIDNode))
+		errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("`%s`.workflowId or stepId is required", parentName), params.workflowIDNode))
 	}
 	if params.workflowID != nil && params.stepID != nil {
-		errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s.workflowId and stepId are mutually exclusive, only one can be specified", parentName), params.workflowIDNode))
+		errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, fmt.Errorf("`%s`.workflowId and stepId are mutually exclusive, only one can be specified", parentName), params.workflowIDNode))
 	}
 	if params.workflowID != nil {
 		if params.workflowID.IsExpression() {
 			if err := params.workflowID.Validate(); err != nil {
-				errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s.workflowId expression is invalid: %s", parentName, err.Error()), params.workflowIDNode))
+				errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("`%s`.workflowId expression is invalid: %w", parentName, err), params.workflowIDNode))
 			}
 
 			typ, sourceDescriptionName, _, _ := params.workflowID.GetParts()
 
 			if typ != expression.ExpressionTypeSourceDescriptions {
-				errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s.workflowId must be a sourceDescriptions expression, got %s", parentName, typ), params.workflowIDNode))
+				errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("`%s`.workflowId must be a sourceDescriptions expression, got `%s`", parentName, typ), params.workflowIDNode))
 			}
 
 			if params.arazzo.SourceDescriptions.Find(sourceDescriptionName) == nil {
-				errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s.sourceDescription value %s not found", parentName, sourceDescriptionName), params.workflowIDNode))
+				errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("`%s`.sourceDescription value `%s` not found", parentName, sourceDescriptionName), params.workflowIDNode))
 			}
 		} else if params.arazzo.Workflows.Find(pointer.Value(params.workflowID).String()) == nil {
-			errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s.workflowId value %s does not exist", parentName, *params.workflowID), params.workflowIDNode))
+			errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("`%s`.workflowId value `%s` does not exist", parentName, *params.workflowID), params.workflowIDNode))
 		}
 	}
 	if params.stepID != nil {
@@ -206,11 +207,11 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, parentName string,
 				}
 
 				if !foundStepId {
-					errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s.stepId value %s does not exist in any parent workflows", parentName, pointer.Value(params.stepID)), params.workflowIDNode))
+					errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("`%s`.stepId value `%s` does not exist in any parent workflows", parentName, pointer.Value(params.stepID)), params.workflowIDNode))
 				}
 			}
 		} else if w.Steps.Find(pointer.Value(params.stepID)) == nil {
-			errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("%s.stepId value %s does not exist in workflow %s", parentName, pointer.Value(params.stepID), w.WorkflowID), params.workflowIDNode))
+			errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("`%s`.stepId value `%s` does not exist in workflow `%s`", parentName, pointer.Value(params.stepID), w.WorkflowID), params.workflowIDNode))
 		}
 	}
 

@@ -227,7 +227,7 @@ func TestJSONSchema_Validate_Error(t *testing.T) {
 			name: "schema fails direct validation",
 			yml: `
 "test"`,
-			wantErrs: []string{"[2:1] failed to validate either Schema [expected object, got `te...`] or bool [line 2: cannot unmarshal !!str `test` into bool]"},
+			wantErrs: []string{"[2:1] error validation-type-mismatch failed to validate either Schema [expected `object`, got `te...`] or bool [line 2: cannot unmarshal !!str `test` into bool]"},
 		},
 		{
 			name: "child schema fails validation",
@@ -243,8 +243,8 @@ description:
     $ref: "#/components/schemas/stream/properties/profiles/description"
 `,
 			wantErrs: []string{
-				"[2:1] schema.description expected string, got object",
-				"[10:5] schema.description expected string, got object",
+				"[2:1] error validation-type-mismatch schema.description expected `string`, got `object`",
+				"[10:5] error validation-type-mismatch schema.description expected `string`, got `object`",
 			},
 		},
 		{
@@ -253,8 +253,8 @@ description:
 type: invalid_type
 `,
 			wantErrs: []string{
-				"[2:7] schema.type expected array, got string",
-				"[2:7] schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"[2:7] error validation-invalid-schema schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"[2:7] error validation-type-mismatch schema.type expected `array`, got `string`",
 			},
 		},
 	}

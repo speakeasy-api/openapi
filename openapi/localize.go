@@ -25,6 +25,8 @@ const (
 	LocalizeNamingPathBased LocalizeNamingStrategy = iota
 	// LocalizeNamingCounter uses counter-based suffixes like "address_1.yaml" for conflicts
 	LocalizeNamingCounter
+	// LocalizeNamingCustom uses a user-provided function for naming
+	LocalizeNamingCustom
 )
 
 // LocalizeOptions represents the options available when localizing an OpenAPI document.
@@ -39,6 +41,11 @@ type LocalizeOptions struct {
 	HTTPClient system.Client
 	// NamingStrategy determines how external reference files are named when localized.
 	NamingStrategy LocalizeNamingStrategy
+	// CustomNamingFunc is used when NamingStrategy is LocalizeNamingCustom.
+	// It receives the original reference path and the resolved file content,
+	// and should return the desired filename for the localized file.
+	// The caller is responsible for ensuring filenames are unique.
+	CustomNamingFunc func(originalRef string, content []byte) string
 }
 
 // Localize transforms an OpenAPI document by copying all external reference files to a target directory
@@ -143,7 +150,7 @@ func Localize(ctx context.Context, doc *OpenAPI, opts LocalizeOptions) error {
 	}
 
 	// Phase 2: Generate conflict-free filenames for all external references
-	generateLocalizedFilenames(localizeStorage, opts.NamingStrategy)
+	generateLocalizedFilenames(localizeStorage, opts.NamingStrategy, opts.CustomNamingFunc)
 
 	// Phase 3: Copy external files to target directory
 	if err := copyExternalFiles(ctx, localizeStorage, opts); err != nil {
@@ -241,7 +248,7 @@ func discoverSchemaReference(ctx context.Context, schema *oas3.JSONSchema[oas3.R
 		if resolutionInfo != nil {
 			storage.externalRefs.Set(normalizedFilePath, "") // Will be filled in filename generation phase
 
-			if data, found := opts.RootDocument.GetCachedReferenceDocument(resolutionInfo.AbsoluteReference); found {
+			if data, found := opts.RootDocument.GetCachedReferenceDocument(resolutionInfo.AbsoluteDocumentPath); found {
 				storage.resolvedContent[normalizedFilePath] = data
 			} else {
 				return fmt.Errorf("failed to get cached content for reference %s", normalizedFilePath)
@@ -266,7 +273,7 @@ func discoverSchemaReference(ctx context.Context, schema *oas3.JSONSchema[oas3.R
 					return discoverSchemaReference(ctx, s, ResolveOptions{
 						RootDocument:   opts.RootDocument,
 						TargetDocument: targetDocInfo.ResolvedDocument,
-						TargetLocation: targetDocInfo.AbsoluteReference,
+						TargetLocation: targetDocInfo.AbsoluteDocumentPath,
 						VirtualFS:      opts.VirtualFS,
 						HTTPClient:     opts.HTTPClient,
 					}, storage)
@@ -320,7 +327,7 @@ func discoverGenericReference[T any, V interfaces.Validator[T], C marshaller.Cor
 	if resolutionInfo != nil {
 		storage.externalRefs.Set(normalizedFilePath, "") // Will be filled in filename generation phase
 
-		if data, found := opts.RootDocument.GetCachedReferenceDocument(resolutionInfo.AbsoluteReference); found {
+		if data, found := opts.RootDocument.GetCachedReferenceDocument(resolutionInfo.AbsoluteDocumentPath); found {
 			storage.resolvedContent[normalizedFilePath] = data
 		} else {
 			return fmt.Errorf("failed to get cached content for reference %s", normalizedFilePath)
@@ -337,7 +344,7 @@ func discoverGenericReference[T any, V interfaces.Validator[T], C marshaller.Cor
 		resolveOpts := ResolveOptions{
 			RootDocument:   opts.RootDocument,
 			TargetDocument: targetDocInfo.ResolvedDocument,
-			TargetLocation: targetDocInfo.AbsoluteReference,
+			TargetLocation: targetDocInfo.AbsoluteDocumentPath,
 			VirtualFS:      opts.VirtualFS,
 			HTTPClient:     opts.HTTPClient,
 		}
@@ -386,7 +393,18 @@ func discoverGenericReference[T any, V interfaces.Validator[T], C marshaller.Cor
 }
 
 // generateLocalizedFilenames creates conflict-free filenames for all external references
-func generateLocalizedFilenames(storage *localizeStorage, strategy LocalizeNamingStrategy) {
+func generateLocalizedFilenames(storage *localizeStorage, strategy LocalizeNamingStrategy, customNamingFunc func(string, []byte) string) {
+	// Custom naming: delegate entirely to the caller's function
+	if strategy == LocalizeNamingCustom && customNamingFunc != nil {
+		for ref := range storage.externalRefs.All() {
+			content := storage.resolvedContent[ref]
+			filename := customNamingFunc(ref, content)
+			storage.externalRefs.Set(ref, filename)
+			storage.usedFilenames[filename] = true
+		}
+		return
+	}
+
 	// First pass: collect all base filenames to detect conflicts
 	baseFilenames := make(map[string][]string) // base filename -> list of full paths
 	for ref := range storage.externalRefs.All() {

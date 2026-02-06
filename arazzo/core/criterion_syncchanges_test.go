@@ -41,5 +41,5 @@ func TestCriterionTypeUnion_SyncChanges_NonStruct_Error(t *testing.T) {
 	ctu := CriterionTypeUnion{}
 	_, err = ctu.SyncChanges(t.Context(), "not a struct", node.Content[0])
 	require.Error(t, err, "SyncChanges should fail")
-	assert.Contains(t, err.Error(), "CriterionTypeUnion.SyncChanges expected a struct, got string", "error message should match")
+	assert.Contains(t, err.Error(), "CriterionTypeUnion.SyncChanges expected a struct, got `string`", "error message should match")
 }

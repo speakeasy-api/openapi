@@ -20,13 +20,8 @@ func init() {
 		return &core.EitherValue[[]marshaller.Node[string], string]{}
 	})
 
-	// Register Node-wrapped EitherValue for additionalProperties
-	marshaller.RegisterType(func() *marshaller.Node[*core.EitherValue[Schema, bool]] {
-		return &marshaller.Node[*core.EitherValue[Schema, bool]]{}
-	})
-
-	// Register sequencedmap for additionalProperties (used in properties field)
-	marshaller.RegisterType(func() *sequencedmap.Map[string, marshaller.Node[*core.EitherValue[Schema, bool]]] {
-		return &sequencedmap.Map[string, marshaller.Node[*core.EitherValue[Schema, bool]]]{}
+	// Register sequencedmap for properties and similar fields
+	marshaller.RegisterType(func() *sequencedmap.Map[string, *core.EitherValue[Schema, bool]] {
+		return &sequencedmap.Map[string, *core.EitherValue[Schema, bool]]{}
 	})
 }

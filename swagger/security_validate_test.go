@@ -99,7 +99,7 @@ func TestSecurityScheme_Validate_Error(t *testing.T) {
 		{
 			name:     "missing_type",
 			yml:      `description: Some security scheme`,
-			wantErrs: []string{"securityScheme.type is missing"},
+			wantErrs: []string{"`securityScheme.type` is required"},
 		},
 		{
 			name: "invalid_type",
@@ -111,13 +111,13 @@ description: Test`,
 			name: "apiKey_missing_name",
 			yml: `type: apiKey
 in: header`,
-			wantErrs: []string{"securityScheme.name is required for type=apiKey"},
+			wantErrs: []string{"`securityScheme.name` is required for type=apiKey"},
 		},
 		{
 			name: "apiKey_missing_in",
 			yml: `type: apiKey
 name: X-API-Key`,
-			wantErrs: []string{"securityScheme.in is required for type=apiKey"},
+			wantErrs: []string{"`securityScheme.in` is required for type=apiKey"},
 		},
 		{
 			name: "apiKey_invalid_in",
@@ -131,7 +131,7 @@ in: invalid`,
 			yml: `type: oauth2
 scopes:
   read: Read access`,
-			wantErrs: []string{"securityScheme.flow is required for type=oauth2"},
+			wantErrs: []string{"`securityScheme.flow` is required for type=oauth2"},
 		},
 		{
 			name: "oauth2_invalid_flow",
@@ -180,7 +180,7 @@ scopes:
 			yml: `type: oauth2
 flow: password
 tokenUrl: https://example.com/token`,
-			wantErrs: []string{"securityScheme.scopes is required for type=oauth2"},
+			wantErrs: []string{"`securityScheme.scopes` is required for type=oauth2"},
 		},
 	}
 

@@ -128,7 +128,7 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 	t = getUnderlyingValue(t)
 
 	if sUnderlying.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("syncChanges expected struct, got %s", s.Type())
+		return nil, fmt.Errorf("syncChanges expected `struct`, got `%s`", s.Type())
 	}
 
 	valid := true

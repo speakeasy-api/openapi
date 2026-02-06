@@ -100,7 +100,7 @@ func PopulateModelWithContext(source any, target any, ctx *PopulationContext) er
 	}
 
 	if s.Kind() != reflect.Struct {
-		return fmt.Errorf("expected struct, got %s", s.Kind())
+		return fmt.Errorf("expected `struct`, got `%s`", s.Kind())
 	}
 
 	sType := s.Type()

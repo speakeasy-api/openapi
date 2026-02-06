@@ -105,9 +105,9 @@ func TestEitherValue_BothTypesFailValidation(t *testing.T) {
 	foundTypeMismatchError := false
 	for _, validationErr := range validationErrs {
 		errStr := validationErr.Error()
-		// Check for type mismatch patterns like "expected X, got Y"
-		if (strings.Contains(errStr, "expected string") || strings.Contains(errStr, "expected bool")) &&
-			strings.Contains(errStr, "got sequence") {
+		// Check for type mismatch patterns like "expected `X`, got `Y`"
+		if (strings.Contains(errStr, "expected `string`") || strings.Contains(errStr, "expected `bool`")) &&
+			strings.Contains(errStr, "got `sequence`") {
 			foundTypeMismatchError = true
 			break
 		}
@@ -222,7 +222,7 @@ func TestEitherValue_SyncChanges_Error(t *testing.T) {
 			name:        "non-struct model",
 			model:       "not a struct",
 			expectError: true,
-			errorMsg:    "expected struct, got string",
+			errorMsg:    "expected `struct`, got `string`",
 		},
 		{
 			name:        "both left and right nil",
@@ -349,22 +349,22 @@ func TestHasTypeMismatchErrors_Success(t *testing.T) {
 		{
 			name: "contains type mismatch error",
 			errors: []error{
-				validation.NewValidationError(validation.NewTypeMismatchError("", "expected string but got number"), nil),
+				validation.NewTypeMismatchError("", "expected string but got number"),
 			},
 			expected: true,
 		},
 		{
 			name: "contains type mismatch error with parent name",
 			errors: []error{
-				validation.NewValidationError(validation.NewTypeMismatchError("", "expected object but received array"), nil),
+				validation.NewTypeMismatchError("", "expected object but received array"),
 			},
 			expected: true,
 		},
 		{
 			name: "no type mismatch errors",
 			errors: []error{
-				validation.NewValidationError(validation.NewValueValidationError("some other validation error"), nil),
-				validation.NewValidationError(validation.NewMissingFieldError("missing required field"), nil),
+				errors.New("some other validation error"),
+				errors.New("missing required field"),
 			},
 			expected: false,
 		},

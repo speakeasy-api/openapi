@@ -72,7 +72,7 @@ func TestCriterionExpressionType_Validate_Error(t *testing.T) {
 				Type:    criterion.CriterionTypeJsonPath,
 				Version: "invalid-version",
 			},
-			expectedError: "version must be one of [draft-goessner-dispatch-jsonpath-00]",
+			expectedError: "version must be one of [`draft-goessner-dispatch-jsonpath-00`]",
 		},
 		{
 			name: "invalid xpath version",
@@ -80,7 +80,7 @@ func TestCriterionExpressionType_Validate_Error(t *testing.T) {
 				Type:    criterion.CriterionTypeXPath,
 				Version: "invalid-version",
 			},
-			expectedError: "version must be one of [xpath-30, xpath-20, xpath-10]",
+			expectedError: "version must be one of [`xpath-30, xpath-20, xpath-10`]",
 		},
 		{
 			name: "invalid type",
@@ -88,7 +88,7 @@ func TestCriterionExpressionType_Validate_Error(t *testing.T) {
 				Type:    "invalid-type",
 				Version: criterion.CriterionTypeVersionNone,
 			},
-			expectedError: "type must be one of [jsonpath, xpath]",
+			expectedError: "type must be one of [`jsonpath, xpath`]",
 		},
 	}
 

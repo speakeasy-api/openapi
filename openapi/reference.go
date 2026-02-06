@@ -340,6 +340,29 @@ func (r *Reference[T, V, C]) GetDescription() string {
 	return *r.Description
 }
 
+// GetRootNode returns the root YAML node of the referenced object if it exists.
+// Returns nil if the object is not resolved or doesn't have a root node.
+func (r *Reference[T, V, C]) GetRootNode() *yaml.Node {
+	if r == nil {
+		return nil
+	}
+
+	obj := r.GetObject()
+	if obj == nil {
+		return nil
+	}
+
+	// Try to get the root node from the object via GetRootNode method
+	type nodeWithRootNode interface {
+		GetRootNode() *yaml.Node
+	}
+	if nodeWithRoot, ok := any(obj).(nodeWithRootNode); ok {
+		return nodeWithRoot.GetRootNode()
+	}
+
+	return nil
+}
+
 // GetParent returns the immediate parent reference if this reference was resolved via a reference chain.
 //
 // Returns nil if:
@@ -413,7 +436,7 @@ func (r *Reference[T, V, C]) Validate(ctx context.Context, opts ...validation.Op
 
 	if core.Reference.Present {
 		if err := r.Reference.Validate(); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("reference.$ref is invalid: %s", err.Error()), core, core.Reference))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("reference.$ref is invalid: %w", err), core, core.Reference))
 		}
 	} else if r.Object != nil {
 		// Use the validator interface V to validate the object
@@ -617,7 +640,7 @@ func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.Co
 		ref.ensureMutex()
 		ref.cacheMutex.RLock()
 		targetDoc := ref.referenceResolutionCache.ResolvedDocument
-		targetLoc := ref.referenceResolutionCache.AbsoluteReference
+		targetLoc := ref.referenceResolutionCache.AbsoluteDocumentPath
 		ref.cacheMutex.RUnlock()
 
 		opts.TargetDocument = targetDoc

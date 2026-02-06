@@ -2,6 +2,7 @@ package criterion
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/expression"
@@ -81,21 +82,21 @@ func (s *Condition) Validate(valueNode *yaml.Node, opts ...validation.Option) []
 	errs := []error{}
 
 	if s.Expression == "" {
-		errs = append(errs, validation.NewValidationError(validation.NewMissingValueError("expression is required"), valueNode))
+		errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("expression is required"), valueNode))
 	}
 
 	if err := s.Expression.Validate(); err != nil {
-		errs = append(errs, validation.NewValidationError(validation.NewValueValidationError(err.Error()), valueNode))
+		errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("%s", err.Error()), valueNode))
 	}
 
 	switch s.Operator {
 	case OperatorLT, OperatorLTE, OperatorGT, OperatorGTE, OperatorEQ, OperatorNE, OperatorNot, OperatorAnd, OperatorOr:
 	default:
-		errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("operator must be one of [%s]", strings.Join([]string{string(OperatorLT), string(OperatorLTE), string(OperatorGT), string(OperatorGTE), string(OperatorEQ), string(OperatorNE), string(OperatorNot), string(OperatorAnd), string(OperatorOr)}, ", ")), valueNode))
+		errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("operator must be one of [`%s`]", strings.Join([]string{string(OperatorLT), string(OperatorLTE), string(OperatorGT), string(OperatorGTE), string(OperatorEQ), string(OperatorNE), string(OperatorNot), string(OperatorAnd), string(OperatorOr)}, ", ")), valueNode))
 	}
 
 	if s.Value == "" {
-		errs = append(errs, validation.NewValidationError(validation.NewMissingValueError("value is required"), valueNode))
+		errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("value is required"), valueNode))
 	}
 
 	return errs

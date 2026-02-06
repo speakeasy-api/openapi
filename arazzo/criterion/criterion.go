@@ -2,6 +2,7 @@ package criterion
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -59,7 +60,7 @@ func (c *CriterionExpressionType) Validate(opts ...validation.Option) []error {
 		switch c.Version {
 		case CriterionTypeVersionDraftGoessnerDispatchJsonPath00:
 		default:
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionDraftGoessnerDispatchJsonPath00)}, ", ")), core, core.Version))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("version must be one of [`%s`]", strings.Join([]string{string(CriterionTypeVersionDraftGoessnerDispatchJsonPath00)}, ", ")), core, core.Version))
 		}
 	case CriterionTypeXPath:
 		switch c.Version {
@@ -67,10 +68,10 @@ func (c *CriterionExpressionType) Validate(opts ...validation.Option) []error {
 		case CriterionTypeVersionXPath20:
 		case CriterionTypeVersionXPath10:
 		default:
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionXPath30), string(CriterionTypeVersionXPath20), string(CriterionTypeVersionXPath10)}, ", ")), core, core.Version))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("version must be one of [`%s`]", strings.Join([]string{string(CriterionTypeVersionXPath30), string(CriterionTypeVersionXPath20), string(CriterionTypeVersionXPath10)}, ", ")), core, core.Version))
 		}
 	default:
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("type must be one of [%s]", strings.Join([]string{string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("type must be one of [`%s`]", strings.Join([]string{string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
 	}
 
 	if len(errs) == 0 {
@@ -190,7 +191,7 @@ func (c *Criterion) Validate(opts ...validation.Option) []error {
 	errs := []error{}
 
 	if c.Condition == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("condition is required"), core, core.Condition))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("condition is required"), core, core.Condition))
 	}
 
 	if c.Type.Type != nil {
@@ -200,19 +201,19 @@ func (c *Criterion) Validate(opts ...validation.Option) []error {
 		case CriterionTypeJsonPath:
 		case CriterionTypeXPath:
 		default:
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("type must be one of [%s]", strings.Join([]string{string(CriterionTypeSimple), string(CriterionTypeRegex), string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("type must be one of [`%s`]", strings.Join([]string{string(CriterionTypeSimple), string(CriterionTypeRegex), string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
 		}
 	} else if c.Type.ExpressionType != nil {
 		errs = append(errs, c.Type.ExpressionType.Validate(opts...)...)
 	}
 
 	if c.Type.IsTypeProvided() && c.Context == nil {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("context is required, if type is set"), core, core.Context))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("context is required, if type is set"), core, core.Context))
 	}
 
 	if c.Context != nil {
 		if err := c.Context.Validate(); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Context))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("%s", err.Error()), core, core.Context))
 		}
 	}
 
@@ -235,18 +236,18 @@ func (c *Criterion) validateCondition(opts ...validation.Option) []error {
 	case CriterionTypeSimple:
 		cond, err := newCondition(c.Condition)
 		if err != nil && c.Context == nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError(err.Error()), core, core.Condition))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("%s", err.Error()), core, core.Condition))
 		} else if cond != nil {
 			errs = append(errs, cond.Validate(valueNode, opts...)...)
 		}
 	case CriterionTypeRegex:
 		_, err := regexp.Compile(c.Condition)
 		if err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("invalid regex expression: %s", err.Error()), core, core.Condition))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("invalid regex expression: %w", err), core, core.Condition))
 		}
 	case CriterionTypeJsonPath:
 		if _, err := jsonpath.NewPath(c.Condition); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("invalid jsonpath expression: %s", err), core, core.Condition))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("invalid jsonpath expression: %w", err), core, core.Condition))
 		}
 	case CriterionTypeXPath:
 		// TODO validate xpath

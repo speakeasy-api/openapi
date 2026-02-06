@@ -1,0 +1,15 @@
+extends:
+  - ["spectral:oas", "all"]
+
+rules:
+  operation-operationId: error
+  tag-description: warn
+
+  check-server-url:
+    description: "Server URLs must start with https"
+    severity: error
+    given: "$.servers[*].url"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^https://"

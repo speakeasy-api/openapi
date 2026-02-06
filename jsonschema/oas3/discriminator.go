@@ -2,6 +2,7 @@ package oas3
 
 import (
 	"context"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
@@ -72,17 +73,13 @@ func (d *Discriminator) Validate(ctx context.Context, opts ...validation.Option)
 	errs := []error{}
 
 	// propertyName is REQUIRED in all OpenAPI versions
-	if core.PropertyName.Present {
-		if core.PropertyName.Value == "" {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("discriminator.propertyName is required"), core, core.PropertyName))
-		}
-	} else {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("discriminator.propertyName is required"), core, core.PropertyName))
+	if core.PropertyName.Present && d.PropertyName == "" {
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`discriminator.propertyName` is required"), core, core.PropertyName))
 	}
 
 	// defaultMapping validation - must not be empty if present
-	if core.DefaultMapping.Present && (core.DefaultMapping.Value == nil || *core.DefaultMapping.Value == "") {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("discriminator.defaultMapping cannot be empty"), core, core.DefaultMapping))
+	if core.DefaultMapping.Present && d.GetDefaultMapping() == "" {
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationEmptyValue, errors.New("discriminator.defaultMapping cannot be empty"), core, core.DefaultMapping))
 	}
 
 	d.Valid = len(errs) == 0 && core.GetValid()

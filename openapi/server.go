@@ -87,16 +87,23 @@ func (s *Server) Validate(ctx context.Context, opts ...validation.Option) []erro
 	if core.URL.Present {
 		switch {
 		case s.URL == "":
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("server.url is required"), core, core.URL))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`server.url` is required"), core, core.URL))
 		case !strings.Contains(s.URL, "{"):
 			if _, err := url.Parse(s.URL); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("server.url is not a valid uri: %s", err), core, core.URL))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("`server.url` is not a valid uri: %w", err), core, core.URL))
 			}
 		default:
-			if resolvedURL, err := resolveServerVariables(s.URL, s.Variables); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("server.url is not a valid uri: %s", err), core, core.URL))
+			resolvedURL, resolveErrs := resolveServerVariables(s.URL, s.Variables)
+			if len(resolveErrs) > 0 {
+				for _, resolveErr := range resolveErrs {
+					err := resolveErr
+					if err == nil {
+						continue
+					}
+					errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, err, core, core.URL))
+				}
 			} else if _, err := url.Parse(resolvedURL); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("server.url is not a valid uri: %s", err), core, core.URL))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("`server.url` is not a valid uri: %w", err), core, core.URL))
 			}
 		}
 	}
@@ -157,12 +164,12 @@ func (v *ServerVariable) Validate(ctx context.Context, opts ...validation.Option
 	errs := []error{}
 
 	if core.Default.Present && v.Default == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("serverVariable.default is required"), core, core.Default))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`serverVariable.default` is required"), core, core.Default))
 	}
 
 	if core.Enum.Present {
 		if !slices.Contains(v.Enum, v.Default) {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("serverVariable.default must be one of [%s]", strings.Join(v.Enum, ", ")), core, core.Enum))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("serverVariable.default must be one of [`%s`]", strings.Join(v.Enum, ", ")), core, core.Default))
 		}
 	}
 
@@ -171,12 +178,14 @@ func (v *ServerVariable) Validate(ctx context.Context, opts ...validation.Option
 	return errs
 }
 
-func resolveServerVariables(serverURL string, variables *sequencedmap.Map[string, *ServerVariable]) (string, error) {
+func resolveServerVariables(serverURL string, variables *sequencedmap.Map[string, *ServerVariable]) (string, []error) {
 	if variables.Len() == 0 {
-		return "", errors.New("serverURL contains variables but no variables are defined")
+		return "", []error{errors.New("serverURL contains variables but no variables are defined")}
 	}
 
 	resolvedURL := serverURL
+
+	var resolveErrs []error
 
 	matches := variablePattern.FindAllStringSubmatch(serverURL, -1)
 	for _, match := range matches {
@@ -189,15 +198,39 @@ func resolveServerVariables(serverURL string, variables *sequencedmap.Map[string
 
 		variable, exists := variables.Get(variableName)
 		if !exists {
-			return "", fmt.Errorf("server variable '%s' is not defined", variableName)
+			err := fmt.Errorf("server variable `%s` is not defined%s", formatServerVariableName(variableName), doubleCurlyBraceHint(serverURL))
+			resolveErrs = append(resolveErrs, err)
+			continue
 		}
 
 		if variable.Default == "" {
-			return "", fmt.Errorf("server variable '%s' has no default value", variableName)
+			err := fmt.Errorf("server variable `%s` has no default value", formatServerVariableName(variableName))
+			resolveErrs = append(resolveErrs, err)
+			continue
 		}
 
 		resolvedURL = strings.ReplaceAll(resolvedURL, placeholder, variable.Default)
 	}
 
+	if len(resolveErrs) > 0 {
+		return "", resolveErrs
+	}
+
 	return resolvedURL, nil
+}
+
+func formatServerVariableName(variableName string) string {
+	if strings.HasPrefix(variableName, "{") {
+		return "{" + strings.TrimPrefix(variableName, "{") + "}"
+	}
+
+	return variableName
+}
+
+func doubleCurlyBraceHint(serverURL string) string {
+	if strings.Contains(serverURL, "{{") || strings.Contains(serverURL, "}}") {
+		return ". Use single curly braces for variable substitution"
+	}
+
+	return ""
 }

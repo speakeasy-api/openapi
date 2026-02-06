@@ -85,7 +85,7 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 	// Validate reference string if present
 	if js.IsReference() {
 		if err := js.GetRef().Validate(); err != nil {
-			errs = append(errs, validation.NewValidationError(err, js.GetCore().Ref.GetKeyNodeOrRoot(js.GetRootNode())))
+			errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidReference, err, js.GetCore().Ref.GetKeyNodeOrRoot(js.GetRootNode())))
 		}
 	}
 
@@ -129,14 +129,14 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	if err := json.YAMLToJSON(core.RootNode, 0, buf); err != nil {
 		return []error{
-			validation.NewValidationError(fmt.Errorf("schema is not valid json: %w", err), core.RootNode),
+			validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("schema is not valid json: %w", err), core.RootNode),
 		}
 	}
 
 	jsAny, err := jsValidator.UnmarshalJSON(buf)
 	if err != nil {
 		return []error{
-			validation.NewValidationError(fmt.Errorf("schema is not valid json: %w", err), core.RootNode),
+			validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("schema is not valid json: %w", err), core.RootNode),
 		}
 	}
 
@@ -146,7 +146,7 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 		if errors.As(err, &validationErr) {
 			errs = append(errs, getRootCauses(validationErr, *core)...)
 		} else {
-			errs = append(errs, validation.NewValidationError(validation.NewValueValidationError("schema invalid: %s", err.Error()), core.RootNode))
+			errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSchema, fmt.Errorf("schema invalid: %s", err.Error()), core.RootNode))
 		}
 	}
 
@@ -172,7 +172,7 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 
 			t, err := jsonpointer.GetTarget(js, errJP, jsonpointer.WithStructTags("key"))
 			if err != nil {
-				errs = append(errs, validation.NewValidationError(err, js.GetRootNode()))
+				errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidTarget, err, js.GetRootNode()))
 				continue
 			}
 
@@ -199,18 +199,25 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 			case *kind.Type:
 				var want string
 				if len(t.Want) == 1 {
-					want = t.Want[0]
+					want = "`" + t.Want[0] + "`"
 				} else {
-					want = fmt.Sprintf("one of [%s]", strings.Join(t.Want, ", "))
+					// Wrap each type in backticks
+					wrappedTypes := make([]string, len(t.Want))
+					for i, typ := range t.Want {
+						wrappedTypes[i] = "`" + typ + "`"
+					}
+					want = fmt.Sprintf("one of [%s]", strings.Join(wrappedTypes, ", "))
 				}
 
-				msg = fmt.Sprintf("expected %s, got %s", want, t.Got)
+				msg = fmt.Sprintf("expected %s, got `%s`", want, t.Got)
 
-				newErr = validation.NewValidationError(validation.NewTypeMismatchError(parentName, msg), valueNode)
+				newErr = validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, msg), valueNode)
 			case *kind.Required:
-				newErr = validation.NewValidationError(validation.NewMissingFieldError("%s %s", parentName, msg), valueNode)
+				// Replace single quotes with backticks in the message
+				msg = strings.ReplaceAll(msg, "'", "`")
+				newErr = validation.NewValidationError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("`%s` %s", parentName, msg), valueNode)
 			default:
-				newErr = validation.NewValidationError(validation.NewValueValidationError("%s %s", parentName, msg), valueNode)
+				newErr = validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSchema, fmt.Errorf("%s %s", parentName, msg), valueNode)
 			}
 			if newErr != nil {
 				errs = append(errs, newErr)

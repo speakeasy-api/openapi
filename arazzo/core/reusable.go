@@ -34,10 +34,8 @@ func (r *Reusable[T]) Unmarshal(ctx context.Context, parentName string, node *ya
 	if resolvedNode.Kind != yaml.MappingNode {
 		r.SetValid(false, false)
 
-		r.SetValid(false, false)
-
 		return []error{
-			validation.NewValidationError(validation.NewTypeMismatchError(parentName, "reusable expected object, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
+			validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, "reusable expected `object`, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode),
 		}, nil
 	}
 
@@ -65,7 +63,7 @@ func (r *Reusable[T]) SyncChanges(ctx context.Context, model any, valueNode *yam
 	}
 
 	if mv.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("Reusable.SyncChanges expected a struct, got %s", mv.Kind())
+		return nil, fmt.Errorf("Reusable.SyncChanges expected a struct, got `%s`", mv.Kind())
 	}
 
 	of := mv.FieldByName("Object")

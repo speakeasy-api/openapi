@@ -75,11 +75,14 @@ func (v *EitherValue[L, R]) Unmarshal(ctx context.Context, parentName string, no
 				name += " "
 			}
 
-			validationError = validation.NewValueValidationError(fmt.Sprintf("%s%s", name, msg))
+			validationError = fmt.Errorf("%s%s", name, msg)
 		}
 
+		// Get severity and rule from the worst error
+		severity, rule := getWorstSeverityAndRule(allParentErrs)
+
 		// Return the validation error along with all child errors separately
-		result := []error{validation.NewValidationError(validationError, node)}
+		result := []error{validation.NewValidationError(severity, rule, validationError, node)}
 		result = append(result, leftChildErrs...)
 		result = append(result, rightChildErrs...)
 
@@ -155,7 +158,7 @@ func (v *EitherValue[L, R]) SyncChanges(ctx context.Context, model any, valueNod
 	}
 
 	if mv.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("expected struct, got %s", mv.Kind())
+		return nil, fmt.Errorf("expected `struct`, got `%s`", mv.Kind())
 	}
 
 	lf := mv.FieldByName("Left")
@@ -251,4 +254,35 @@ func typeToName[T any]() string {
 	}
 
 	return name
+}
+
+// getWorstSeverityAndRule finds the worst severity and its first rule from a list of errors.
+// Severity order (worst to best): error > warning > hint
+// Returns the severity and rule of the first error with the worst severity.
+// If no validation errors are found, returns SeverityError and RuleValidationTypeMismatch as defaults.
+func getWorstSeverityAndRule(errs []error) (validation.Severity, string) {
+	var worstSeverity validation.Severity
+	var worstRule string
+	worstSeverityRank := -1 // -1 means no validation error found yet
+
+	for _, err := range errs {
+		var validationErr *validation.Error
+		if !errors.As(err, &validationErr) {
+			continue
+		}
+
+		rank := validationErr.Severity.Rank()
+		if rank > worstSeverityRank {
+			worstSeverityRank = rank
+			worstSeverity = validationErr.Severity
+			worstRule = validationErr.Rule
+		}
+	}
+
+	// Default to error severity and type mismatch rule if no validation errors found
+	if worstSeverityRank == -1 {
+		return validation.SeverityError, validation.RuleValidationTypeMismatch
+	}
+
+	return worstSeverity, worstRule
 }

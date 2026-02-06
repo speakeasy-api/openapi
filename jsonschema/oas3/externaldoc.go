@@ -2,6 +2,8 @@ package oas3
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/url"
 	"reflect"
 
@@ -86,10 +88,10 @@ func (e *ExternalDocumentation) Validate(ctx context.Context, opts ...validation
 
 	if core.URL.Present {
 		if core.URL.Value == "" {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("externalDocumentation.url is required"), core, core.URL))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`externalDocumentation.url` is required"), core, core.URL))
 		} else {
 			if _, err := url.Parse(core.URL.Value); err != nil {
-				errs = append(errs, validation.NewValueError(validation.NewValueValidationError("externalDocumentation.url is not a valid uri: %s", err), core, core.URL))
+				errs = append(errs, validation.NewValueError(validation.SeverityWarning, validation.RuleValidationInvalidFormat, fmt.Errorf("externalDocumentation.url is not a valid uri: %w", err), core, core.URL))
 			}
 		}
 	}

@@ -2,6 +2,7 @@ package swagger
 
 import (
 	"context"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
@@ -58,7 +59,9 @@ func (r *Responses) Validate(ctx context.Context, opts ...validation.Option) []e
 	hasResponse := (c.Default.Present && r.Default != nil) || (r.Map != nil && r.Len() > 0)
 	if !hasResponse {
 		errs = append(errs, validation.NewValueError(
-			validation.NewMissingValueError("responses must contain at least one response code or default"),
+			validation.SeverityError,
+			validation.RuleValidationRequiredField,
+			errors.New("responses must contain at least one response code or default"),
 			c, c.Default))
 	}
 
@@ -139,7 +142,7 @@ func (r *Response) Validate(ctx context.Context, opts ...validation.Option) []er
 	errs := []error{}
 
 	if c.Description.Present && r.Description == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("response.description is required"), c, c.Description))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`response.description` is required"), c, c.Description))
 	}
 
 	for _, header := range r.Headers.All() {
@@ -228,7 +231,7 @@ func (h *Header) Validate(ctx context.Context, opts ...validation.Option) []erro
 	errs := []error{}
 
 	if c.Type.Present && h.Type == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("header.type is required"), c, c.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`header.type` is required"), c, c.Type))
 	} else if c.Type.Present {
 		validTypes := []string{"string", "number", "integer", "boolean", "array"}
 		valid := false
@@ -239,12 +242,12 @@ func (h *Header) Validate(ctx context.Context, opts ...validation.Option) []erro
 			}
 		}
 		if !valid {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("header.type must be one of [string, number, integer, boolean, array]"), c, c.Type))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, errors.New("header.type must be one of [string, number, integer, boolean, array]"), c, c.Type))
 		}
 
 		// Array type requires items
 		if h.Type == "array" && !c.Items.Present {
-			errs = append(errs, validation.NewValueError(validation.NewMissingValueError("header.items is required when type=array"), c, c.Items))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("header.items is required when type=array"), c, c.Items))
 		}
 	}
 

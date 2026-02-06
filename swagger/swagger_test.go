@@ -79,13 +79,13 @@ func TestUnmarshal_ValidationErrors(t *testing.T) {
   title: Test API
   version: 1.0.0
 paths: {}`,
-			expectedError: "swagger is missing",
+			expectedError: "`swagger.swagger` is required",
 		},
 		{
 			name: "missing info field",
 			yaml: `swagger: "2.0"
 paths: {}`,
-			expectedError: "info is missing",
+			expectedError: "`swagger.info` is required",
 		},
 		{
 			name: "missing paths field",
@@ -93,7 +93,7 @@ paths: {}`,
 info:
   title: Test API
   version: 1.0.0`,
-			expectedError: "paths is missing",
+			expectedError: "`swagger.paths` is required",
 		},
 		{
 			name: "missing info.title",
@@ -101,7 +101,7 @@ info:
 info:
   version: 1.0.0
 paths: {}`,
-			expectedError: "info.title is missing",
+			expectedError: "`info.title` is required",
 		},
 		{
 			name: "missing info.version",
@@ -109,7 +109,7 @@ paths: {}`,
 info:
   title: Test API
 paths: {}`,
-			expectedError: "info.version is missing",
+			expectedError: "`info.version` is required",
 		},
 		{
 			name: "invalid swagger version",

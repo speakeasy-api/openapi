@@ -379,8 +379,8 @@ externalDocs:
   description: More information
 `,
 			wantErrs: []string{
-				"[2:1] schema.externalDocs missing property 'url'",
-				"[5:3] externalDocumentation.url is missing",
+				"[2:1] error validation-required-field `schema.externalDocs` missing property `url`",
+				"[5:3] error validation-required-field `externalDocumentation.url` is required",
 			},
 		},
 		{
@@ -390,8 +390,8 @@ type: invalid_type
 title: Invalid Type
 `,
 			wantErrs: []string{
-				"[2:7] schema.type expected array, got string",
-				"[2:7] schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"[2:7] error validation-invalid-schema schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
+				"[2:7] error validation-type-mismatch schema.type expected `array`, got `string`",
 			},
 		},
 		{
@@ -400,7 +400,7 @@ title: Invalid Type
 type: string
 minLength: -1
 `,
-			wantErrs: []string{"[3:12] schema.minLength minimum: got -1, want 0"},
+			wantErrs: []string{"[3:12] error validation-invalid-schema schema.minLength minimum: got -1, want 0"},
 		},
 		{
 			name: "negative multipleOf",
@@ -408,7 +408,7 @@ minLength: -1
 type: number
 multipleOf: -1
 `,
-			wantErrs: []string{"[3:13] schema.multipleOf exclusiveMinimum: got -1, want 0"},
+			wantErrs: []string{"[3:13] error validation-invalid-schema schema.multipleOf exclusiveMinimum: got -1, want 0"},
 		},
 		{
 			name: "zero multipleOf",
@@ -416,7 +416,7 @@ multipleOf: -1
 type: number
 multipleOf: 0
 `,
-			wantErrs: []string{"[3:13] schema.multipleOf exclusiveMinimum: got 0, want 0"},
+			wantErrs: []string{"[3:13] error validation-invalid-schema schema.multipleOf exclusiveMinimum: got 0, want 0"},
 		},
 		{
 			name: "invalid additionalProperties type",
@@ -425,9 +425,9 @@ type: object
 additionalProperties: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] schema.additionalProperties expected one of [boolean, object], got string",
-				"[2:1] schema.additionalProperties expected one of [boolean, object], got string",
-				"[3:23] schema.additionalProperties failed to validate either Schema [schema.additionalProperties expected object, got `invalid`] or bool [schema.additionalProperties line 3: cannot unmarshal !!str `invalid` into bool]",
+				"[2:1] error validation-type-mismatch schema.additionalProperties expected one of [`boolean`, `object`], got `string`",
+				"[2:1] error validation-type-mismatch schema.additionalProperties expected one of [`boolean`, `object`], got `string`",
+				"[3:23] error validation-type-mismatch schema.additionalProperties failed to validate either Schema [schema.additionalProperties expected `object`, got `invalid`] or bool [schema.additionalProperties line 3: cannot unmarshal !!str `invalid` into bool]",
 			},
 		},
 		{
@@ -436,7 +436,7 @@ additionalProperties: "invalid"
 type: array
 minItems: -1
 `,
-			wantErrs: []string{"[3:11] schema.minItems minimum: got -1, want 0"},
+			wantErrs: []string{"[3:11] error validation-invalid-schema schema.minItems minimum: got -1, want 0"},
 		},
 		{
 			name: "negative minProperties",
@@ -444,7 +444,7 @@ minItems: -1
 type: object
 minProperties: -1
 `,
-			wantErrs: []string{"[3:16] schema.minProperties minimum: got -1, want 0"},
+			wantErrs: []string{"[3:16] error validation-invalid-schema schema.minProperties minimum: got -1, want 0"},
 		},
 		{
 			name: "invalid items type",
@@ -453,9 +453,9 @@ type: array
 items: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] schema.items expected one of [boolean, object], got string",
-				"[2:1] schema.items expected one of [boolean, object], got string",
-				"[3:8] schema.items failed to validate either Schema [schema.items expected object, got `invalid`] or bool [schema.items line 3: cannot unmarshal !!str `invalid` into bool]",
+				"[2:1] error validation-type-mismatch schema.items expected one of [`boolean`, `object`], got `string`",
+				"[2:1] error validation-type-mismatch schema.items expected one of [`boolean`, `object`], got `string`",
+				"[3:8] error validation-type-mismatch schema.items failed to validate either Schema [schema.items expected `object`, got `invalid`] or bool [schema.items line 3: cannot unmarshal !!str `invalid` into bool]",
 			},
 		},
 		{
@@ -465,8 +465,8 @@ type: object
 required: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] schema.required expected array, got string",
-				"[3:11] schema.required expected sequence, got `invalid`",
+				"[2:1] error validation-type-mismatch schema.required expected `array`, got `string`",
+				"[3:11] error validation-type-mismatch schema.required expected `sequence`, got `invalid`",
 			},
 		},
 		{
@@ -475,8 +475,8 @@ required: "invalid"
 allOf: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] schema.allOf expected array, got string",
-				"[2:8] schema.allOf expected sequence, got `invalid`",
+				"[2:1] error validation-type-mismatch schema.allOf expected `array`, got `string`",
+				"[2:8] error validation-type-mismatch schema.allOf expected `sequence`, got `invalid`",
 			},
 		},
 		{
@@ -485,8 +485,8 @@ allOf: "invalid"
 anyOf: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] schema.anyOf expected array, got string",
-				"[2:8] schema.anyOf expected sequence, got `invalid`",
+				"[2:1] error validation-type-mismatch schema.anyOf expected `array`, got `string`",
+				"[2:8] error validation-type-mismatch schema.anyOf expected `sequence`, got `invalid`",
 			},
 		},
 		{
@@ -495,8 +495,8 @@ anyOf: "invalid"
 oneOf: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] schema.oneOf expected array, got string",
-				"[2:8] schema.oneOf expected sequence, got `invalid`",
+				"[2:1] error validation-type-mismatch schema.oneOf expected `array`, got `string`",
+				"[2:8] error validation-type-mismatch schema.oneOf expected `sequence`, got `invalid`",
 			},
 		},
 		{
@@ -506,49 +506,49 @@ $schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
 $ref: "#/components/schemas/User"
 required: ["name", "email"]
 `,
-			wantErrs: []string{"[2:1] schema. additional properties '$ref' not allowed"},
+			wantErrs: []string{"[2:1] error validation-invalid-schema schema. additional properties '$ref' not allowed"},
 		},
 		{
 			name: "empty component name in $ref",
 			yml: `
 $ref: "#/components/schemas/"
 `,
-			wantErrs: []string{"[2:1] invalid reference: component name cannot be empty"},
+			wantErrs: []string{"[2:1] error validation-invalid-reference invalid reference: component name cannot be empty"},
 		},
 		{
 			name: "missing component name in $ref",
 			yml: `
 $ref: "#/components/schemas"
 `,
-			wantErrs: []string{"[2:1] invalid reference: component name cannot be empty"},
+			wantErrs: []string{"[2:1] error validation-invalid-reference invalid reference: component name cannot be empty"},
 		},
 		{
 			name: "component name with invalid characters in $ref",
 			yml: `
 $ref: "#/components/schemas/User@Schema"
 `,
-			wantErrs: []string{`[2:1] invalid reference: component name "User@Schema" must match pattern ^[a-zA-Z0-9.\-_]+$`},
+			wantErrs: []string{`[2:1] error validation-invalid-reference invalid reference: component name "User@Schema" must match pattern ^[a-zA-Z0-9.\-_]+$`},
 		},
 		{
 			name: "component name with space in $ref",
 			yml: `
 $ref: "#/components/schemas/User Schema"
 `,
-			wantErrs: []string{`[2:1] invalid reference: component name "User Schema" must match pattern ^[a-zA-Z0-9.\-_]+$`},
+			wantErrs: []string{`[2:1] error validation-invalid-reference invalid reference: component name "User Schema" must match pattern ^[a-zA-Z0-9.\-_]+$`},
 		},
 		{
 			name: "invalid JSON pointer - missing leading slash in $ref",
 			yml: `
 $ref: "#components/schemas/User"
 `,
-			wantErrs: []string{"[2:1] invalid reference JSON pointer: validation error -- jsonpointer must start with /: components/schemas/User"},
+			wantErrs: []string{"[2:1] error validation-invalid-reference invalid reference JSON pointer: validation error -- jsonpointer must start with /: components/schemas/User"},
 		},
 		{
 			name: "empty JSON pointer in $ref",
 			yml: `
 $ref: "#"
 `,
-			wantErrs: []string{"[2:1] invalid reference JSON pointer: empty"},
+			wantErrs: []string{"[2:1] error validation-invalid-reference invalid reference JSON pointer: empty"},
 		},
 	}
 

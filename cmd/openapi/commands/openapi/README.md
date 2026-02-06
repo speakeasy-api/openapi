@@ -9,6 +9,9 @@ OpenAPI specifications define REST APIs in a standard format. These commands hel
 - [Table of Contents](#table-of-contents)
 - [Available Commands](#available-commands)
   - [`validate`](#validate)
+  - [`lint`](#lint)
+    - [Configuration File](#configuration-file)
+    - [Custom Rules](#custom-rules)
   - [`upgrade`](#upgrade)
   - [`inline`](#inline)
   - [`clean`](#clean)
@@ -47,6 +50,282 @@ This command checks for:
 - Schema compliance and consistency
 - Reference resolution and validity
 - Best practice recommendations
+
+### `lint`
+
+Lint an OpenAPI specification document for style, consistency, and best practices.
+
+```bash
+# Lint a specification file
+openapi spec lint ./spec.yaml
+
+# Lint with JSON output
+openapi spec lint -f json ./spec.yaml
+
+# Lint with a custom configuration file
+openapi spec lint -c ./lint.yaml ./spec.yaml
+
+# Lint with specific rules disabled
+openapi spec lint -d rule-id-1 -d rule-id-2 ./spec.yaml
+```
+
+**Flags:**
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--format` | `-f` | Output format: `text` (default) or `json` |
+| `--config` | `-c` | Path to lint configuration file |
+| `--ruleset` | `-r` | Ruleset to use (default: `all`) |
+| `--disable` | `-d` | Rules to disable (can be specified multiple times) |
+
+**What lint checks:**
+
+- All validation errors (structural validity, schema compliance, references)
+- Path parameter validation
+- Operation ID requirements
+- Consistent naming conventions
+- Security best practices
+- Additional style and consistency rules
+
+**Default Configuration Path:**
+
+If no `--config` flag is provided, the linter looks for a configuration file at `~/.openapi/lint.yaml`.
+
+#### Configuration File
+
+Create a YAML configuration file to customize linting behavior:
+
+```yaml
+# lint.yaml
+
+# Extend from a base ruleset (optional)
+extends:
+  - recommended
+
+# Configure individual rules
+rules:
+  # Disable a rule entirely
+  - id: operation-operationId
+    disabled: true
+
+  # Change the severity of a rule
+  - id: path-params
+    severity: error  # error, warning, or hint
+
+  # Use match patterns for bulk configuration
+  - match: "^oas3-.*"
+    severity: warning
+
+  # Disable rules matching a pattern
+  - match: "^oas2-.*"
+    disabled: true
+
+# Configure rules by category
+categories:
+  validation:
+    severity: error
+  style:
+    severity: warning
+    disabled: false
+
+# Custom rules configuration (requires TypeScript/JavaScript rules)
+custom_rules:
+  paths:
+    - ./rules/*.ts
+    - ./rules/**/*.ts
+
+# Output format (text or json)
+output_format: text
+```
+
+**Configuration Options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `extends` | `string[]` | Rulesets to extend from (`all`, `recommended`, `security`) |
+| `rules` | `RuleEntry[]` | Individual rule configurations |
+| `categories` | `map[string]CategoryConfig` | Category-level configurations |
+| `custom_rules` | `CustomRulesConfig` | Custom TypeScript/JavaScript rules |
+| `output_format` | `string` | Output format (`text` or `json`) |
+
+**Available Rulesets:**
+
+| Ruleset | Description |
+|---------|-------------|
+| `all` | All available rules (default) |
+| `recommended` | Balanced ruleset - semantic rules, essential style, basic security |
+| `security` | Comprehensive OWASP security rules |
+
+**Rule Entry Options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `id` | `string` | Exact rule ID to configure |
+| `match` | `string` | Regex pattern to match rule IDs |
+| `severity` | `string` | `error`, `warning`, or `hint` |
+| `disabled` | `bool` | Set to `true` to disable the rule |
+
+#### Custom Rules
+
+Custom rules allow you to write linting rules in TypeScript or JavaScript. Rules are loaded when you specify paths in the configuration file.
+
+**Setup:**
+
+**Step 1:** Install the types package in your rules directory:
+
+```bash
+cd ./rules
+npm init -y
+npm install @anthropic/openapi-linter-types
+```
+
+**Step 2:** Create a TypeScript rule file:
+
+```typescript
+// rules/require-operation-summary.ts
+import {
+  Rule,
+  createError,
+  type Context,
+  type DocumentInfo,
+  type RuleConfig,
+  type Severity,
+  type ValidationError,
+} from '@anthropic/openapi-linter-types';
+
+class RequireOperationSummary extends Rule {
+  id(): string {
+    return 'custom-require-operation-summary';
+  }
+
+  category(): string {
+    return 'style';
+  }
+
+  description(): string {
+    return 'All operations must have a summary for documentation.';
+  }
+
+  summary(): string {
+    return 'Operations must have summary';
+  }
+
+  defaultSeverity(): Severity {
+    return 'warning';
+  }
+
+  run(ctx: Context, docInfo: DocumentInfo, config: RuleConfig): ValidationError[] {
+    const errors: ValidationError[] = [];
+
+    // Access all operations via the index
+    for (const opNode of docInfo.getIndex().getOperations()) {
+      const op = opNode.getNode();
+      if (!op.getSummary()) {
+        errors.push(
+          createError(
+            config.getSeverity(this.defaultSeverity()),
+            this.id(),
+            `Operation "${op.getOperationID() || 'unnamed'}" is missing a summary`,
+            op.getRootNode()
+          )
+        );
+      }
+    }
+
+    return errors;
+  }
+}
+
+// Register the rule with the linter
+registerRule(new RequireOperationSummary());
+```
+
+**Step 3:** Configure the linter to load your rules:
+
+```yaml
+# lint.yaml
+custom_rules:
+  paths:
+    - ./rules/*.ts
+
+rules:
+  # Optionally configure your custom rules
+  - id: custom-require-operation-summary
+    severity: error
+```
+
+**Step 4:** Run the linter:
+
+```bash
+openapi spec lint -c ./lint.yaml ./spec.yaml
+```
+
+**Custom Rule API:**
+
+Your rule class must implement the `RuleRunner` interface:
+
+| Method | Required | Description |
+|--------|----------|-------------|
+| `id()` | Yes | Unique rule identifier |
+| `category()` | Yes | Rule category (e.g., `style`, `security`) |
+| `description()` | Yes | Full description of the rule |
+| `summary()` | Yes | Short summary for output |
+| `link()` | No | URL to documentation |
+| `defaultSeverity()` | No | Default severity (`error`, `warning`, `hint`) |
+| `versions()` | No | OpenAPI versions this rule applies to |
+| `run()` | Yes | Execute the rule and return validation errors |
+
+**Accessing Document Data:**
+
+The `DocumentInfo` object provides access to the parsed OpenAPI document:
+
+```typescript
+// Get the OpenAPI document
+const doc = docInfo.getDocument();
+
+// Get the pre-built index for efficient traversal
+const index = docInfo.getIndex();
+
+// Access indexed collections
+index.getOperations();           // All operations
+index.getComponentSchemas();     // Component schemas
+index.getInlineRequestBodies();  // Inline request bodies
+index.getInlineResponses();      // Inline responses
+index.getInlineParameters();     // Inline parameters
+index.getInlineHeaders();        // Inline headers
+index.getInlineSchemas();        // Inline schemas
+index.getPathItems();            // Path items
+index.getSecurityRequirements(); // Security requirements
+index.getCallbacks();            // Callbacks
+```
+
+**Creating Validation Errors:**
+
+Use the `createError` helper to create validation errors with proper source location:
+
+```typescript
+import { createError, Severity } from '@anthropic/openapi-linter-types';
+
+// Create an error at a specific node location
+const error = createError(
+  'warning',                    // severity
+  'my-rule-id',                 // rule ID
+  'Description of the issue',  // message
+  node.getRootNode()           // YAML node for location
+);
+```
+
+**Console Logging:**
+
+Use `console.log`, `console.warn`, and `console.error` for debugging:
+
+```typescript
+run(ctx: Context, docInfo: DocumentInfo, config: RuleConfig): ValidationError[] {
+  console.log('Running custom rule...');
+  console.log('Operations count:', docInfo.getIndex().getOperations().length);
+  // ...
+}
+```
 
 ### `upgrade`
 

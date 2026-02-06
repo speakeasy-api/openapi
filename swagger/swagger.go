@@ -2,6 +2,8 @@ package swagger
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"mime"
 	"strings"
 
@@ -191,9 +193,9 @@ func (s *Swagger) Validate(ctx context.Context, opts ...validation.Option) []err
 	errs := []error{}
 
 	if c.Swagger.Present && s.Swagger == "" {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("swagger is required"), c, c.Swagger))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`swagger` is required"), c, c.Swagger))
 	} else if c.Swagger.Present && s.Swagger != "2.0" {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("swagger must be '2.0'"), c, c.Swagger))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationSupportedVersion, errors.New("swagger must be '2.0'"), c, c.Swagger))
 	}
 
 	if c.Info.Present {
@@ -204,7 +206,9 @@ func (s *Swagger) Validate(ctx context.Context, opts ...validation.Option) []err
 	if c.BasePath.Present && s.BasePath != nil && *s.BasePath != "" {
 		if !strings.HasPrefix(*s.BasePath, "/") {
 			errs = append(errs, validation.NewValueError(
-				validation.NewValueValidationError("basePath must start with a leading slash '/'"),
+				validation.SeverityError,
+				validation.RuleValidationInvalidSyntax,
+				errors.New("basePath must start with a leading slash '/'"),
 				c, c.BasePath))
 		}
 	}
@@ -222,7 +226,9 @@ func (s *Swagger) Validate(ctx context.Context, opts ...validation.Option) []err
 			}
 			if !valid {
 				errs = append(errs, validation.NewValueError(
-					validation.NewValueValidationError("scheme must be one of [http, https, ws, wss], got '%s'", scheme),
+					validation.SeverityError,
+					validation.RuleValidationAllowedValues,
+					fmt.Errorf("scheme must be one of [http, https, ws, wss], got `%s`", scheme),
 					c, c.Schemes))
 			}
 		}
@@ -233,7 +239,9 @@ func (s *Swagger) Validate(ctx context.Context, opts ...validation.Option) []err
 		for _, mimeType := range s.Consumes {
 			if _, _, err := mime.ParseMediaType(mimeType); err != nil {
 				errs = append(errs, validation.NewValueError(
-					validation.NewValueValidationError("consumes contains invalid MIME type '%s': %s", mimeType, err),
+					validation.SeverityError,
+					validation.RuleValidationInvalidFormat,
+					fmt.Errorf("consumes contains invalid MIME type `%s`: %w", mimeType, err),
 					c, c.Consumes))
 			}
 		}
@@ -244,7 +252,9 @@ func (s *Swagger) Validate(ctx context.Context, opts ...validation.Option) []err
 		for _, mimeType := range s.Produces {
 			if _, _, err := mime.ParseMediaType(mimeType); err != nil {
 				errs = append(errs, validation.NewValueError(
-					validation.NewValueValidationError("produces contains invalid MIME type '%s': %s", mimeType, err),
+					validation.SeverityError,
+					validation.RuleValidationInvalidFormat,
+					fmt.Errorf("produces contains invalid MIME type `%s`: %w", mimeType, err),
 					c, c.Produces))
 			}
 		}
@@ -261,7 +271,9 @@ func (s *Swagger) Validate(ctx context.Context, opts ...validation.Option) []err
 		if tag != nil && tag.Name != "" {
 			if tagNames[tag.Name] {
 				errs = append(errs, validation.NewValueError(
-					validation.NewValueValidationError("tag name '%s' must be unique", tag.Name),
+					validation.SeverityError,
+					validation.RuleValidationDuplicateKey,
+					fmt.Errorf("tag name `%s` must be unique", tag.Name),
 					c, c.Tags))
 			}
 			tagNames[tag.Name] = true
@@ -320,7 +332,9 @@ func (s *Swagger) validateOperationIDUniqueness(c *core.Swagger) []error {
 			opID := *operation.OperationID
 			if operationIDs[opID] {
 				errs = append(errs, validation.NewValueError(
-					validation.NewValueValidationError("operationId '%s' must be unique among all operations", opID),
+					validation.SeverityError,
+					validation.RuleValidationDuplicateKey,
+					fmt.Errorf("operationId `%s` must be unique among all operations", opID),
 					c, c.Paths))
 			}
 			operationIDs[opID] = true

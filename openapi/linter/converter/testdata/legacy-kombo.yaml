@@ -1,0 +1,16 @@
+lintVersion: 1.0.0
+defaultRuleset: speakeasy-generation
+rulesets:
+  kombo:
+    rulesets:
+      - speakeasy-recommended
+    rules:
+      require-endpoint-renamings:
+        description: All operations must have both `x-speakeasy-group` and `x-speakeasy-name-override`
+        severity: error
+        given: "$.paths.*[?(@['x-speakeasy-ignore'] != true)]"
+        then:
+          - field: "x-speakeasy-group"
+            function: truthy
+          - field: "x-speakeasy-name-override"
+            function: truthy

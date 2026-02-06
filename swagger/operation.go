@@ -2,6 +2,8 @@ package swagger
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"mime"
 
 	"github.com/speakeasy-api/openapi/extensions"
@@ -155,7 +157,7 @@ func (o *Operation) Validate(ctx context.Context, opts ...validation.Option) []e
 	errs := []error{}
 
 	if !c.Responses.Present {
-		errs = append(errs, validation.NewValueError(validation.NewMissingValueError("operation.responses is required"), c, c.Responses))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`operation.responses` is required"), c, c.Responses))
 	} else if o.Responses != nil {
 		errs = append(errs, o.Responses.Validate(ctx, opts...)...)
 	}
@@ -173,7 +175,9 @@ func (o *Operation) Validate(ctx context.Context, opts ...validation.Option) []e
 			}
 			if !valid {
 				errs = append(errs, validation.NewValueError(
-					validation.NewValueValidationError("operation.scheme must be one of [http, https, ws, wss], got '%s'", scheme),
+					validation.SeverityError,
+					validation.RuleValidationAllowedValues,
+					fmt.Errorf("operation.scheme must be one of [http, https, ws, wss], got `%s`", scheme),
 					c, c.Schemes))
 			}
 		}
@@ -184,7 +188,9 @@ func (o *Operation) Validate(ctx context.Context, opts ...validation.Option) []e
 		for _, mimeType := range o.Consumes {
 			if _, _, err := mime.ParseMediaType(mimeType); err != nil {
 				errs = append(errs, validation.NewValueError(
-					validation.NewValueValidationError("operation.consumes contains invalid MIME type '%s': %s", mimeType, err),
+					validation.SeverityError,
+					validation.RuleValidationInvalidFormat,
+					fmt.Errorf("operation.consumes contains invalid MIME type `%s`: %w", mimeType, err),
 					c, c.Consumes))
 			}
 		}
@@ -195,7 +201,9 @@ func (o *Operation) Validate(ctx context.Context, opts ...validation.Option) []e
 		for _, mimeType := range o.Produces {
 			if _, _, err := mime.ParseMediaType(mimeType); err != nil {
 				errs = append(errs, validation.NewValueError(
-					validation.NewValueValidationError("operation.produces contains invalid MIME type '%s': %s", mimeType, err),
+					validation.SeverityError,
+					validation.RuleValidationInvalidFormat,
+					fmt.Errorf("operation.produces contains invalid MIME type `%s`: %w", mimeType, err),
 					c, c.Produces))
 			}
 		}

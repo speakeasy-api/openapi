@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -95,7 +96,7 @@ func runSnip(cmd *cobra.Command, args []string) error {
 
 	// If -w is specified without any operation selection flags, error
 	if snipWriteInPlace && !(hasRemoveFlags || hasKeepFlags) {
-		return fmt.Errorf("--write flag requires specifying operations via --operationId/--operation or --keepOperationId/--keepOperation")
+		return errors.New("--write flag requires specifying operations via --operationId/--operation or --keepOperationId/--keepOperation")
 	}
 
 	// Interactive mode when no flags provided
@@ -105,7 +106,7 @@ func runSnip(cmd *cobra.Command, args []string) error {
 
 	// Disallow mixing keep + remove flags; ambiguous intent
 	if hasRemoveFlags && hasKeepFlags {
-		return fmt.Errorf("cannot combine keep and remove flags; use either --operationId/--operation or --keepOperationId/--keepOperation")
+		return errors.New("cannot combine keep and remove flags; use either --operationId/--operation or --keepOperationId/--keepOperation")
 	}
 
 	// CLI mode
@@ -138,7 +139,7 @@ func runSnipCLI(ctx context.Context, inputFile, outputFile string) error {
 	}
 
 	if len(operationsToRemove) == 0 {
-		return fmt.Errorf("no operations specified for removal")
+		return errors.New("no operations specified for removal")
 	}
 
 	// Perform the snip
@@ -175,7 +176,7 @@ func runSnipCLIKeep(ctx context.Context, inputFile, outputFile string) error {
 		return err
 	}
 	if len(keepOps) == 0 {
-		return fmt.Errorf("no operations specified to keep")
+		return errors.New("no operations specified to keep")
 	}
 
 	// Collect all operations from the document
@@ -184,7 +185,7 @@ func runSnipCLIKeep(ctx context.Context, inputFile, outputFile string) error {
 		return fmt.Errorf("failed to collect operations: %w", err)
 	}
 	if len(allOps) == 0 {
-		return fmt.Errorf("no operations found in the OpenAPI document")
+		return errors.New("no operations found in the OpenAPI document")
 	}
 
 	// Build lookup sets for keep filters
@@ -248,7 +249,7 @@ func runSnipInteractive(ctx context.Context, inputFile, outputFile string) error
 	}
 
 	if len(operations) == 0 {
-		return fmt.Errorf("no operations found in the OpenAPI document")
+		return errors.New("no operations found in the OpenAPI document")
 	}
 
 	// Get document info
@@ -296,7 +297,7 @@ func runSnipInteractive(ctx context.Context, inputFile, outputFile string) error
 	// Get the final model state
 	tuiModel, ok := finalModel.(tui.Model)
 	if !ok {
-		return fmt.Errorf("unexpected model type")
+		return errors.New("unexpected model type")
 	}
 
 	// Check if user performed an action or just quit

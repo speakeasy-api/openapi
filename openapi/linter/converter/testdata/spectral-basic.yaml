@@ -1,0 +1,25 @@
+extends:
+  - ["spectral:oas", "recommended"]
+
+rules:
+  operation-tags: error
+  operation-operationId: warn
+  operation-description: off
+
+  custom-header-check:
+    description: "All responses must include X-Request-ID header"
+    message: "Response {{property}} is missing X-Request-ID header"
+    severity: warn
+    given: "$.paths[*][*].responses[*]"
+    then:
+      field: "headers.X-Request-ID"
+      function: truthy
+
+  custom-path-casing:
+    description: "Path segments must use kebab-case"
+    severity: error
+    given: "$.paths[*]~"
+    then:
+      function: casing
+      functionOptions:
+        type: kebab-case

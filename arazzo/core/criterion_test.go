@@ -250,5 +250,5 @@ func TestCriterionTypeUnion_SyncChanges_Int_Error(t *testing.T) {
 
 	_, err := union.SyncChanges(t.Context(), 42, nil)
 	require.Error(t, err, "should return error for int model")
-	require.Contains(t, err.Error(), "expected a struct", "error should mention struct expectation")
+	require.Contains(t, err.Error(), "expected a struct, got `int`", "error should mention struct expectation")
 }

@@ -64,7 +64,7 @@ func (j *JSONSchema[Referenceable]) GetAbsRef() references.Reference {
 	if j.referenceResolutionCache == nil {
 		return ref
 	}
-	return references.Reference(j.referenceResolutionCache.AbsoluteReference + "#" + ref.GetJSONPointer().String())
+	return references.Reference(j.referenceResolutionCache.AbsoluteDocumentPath + "#" + ref.GetJSONPointer().String())
 }
 
 // Resolve will fully resolve the reference and return the JSONSchema referenced. This will recursively resolve any intermediate references as well.
@@ -180,7 +180,7 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 		// The ResolveResult.ResolvedDocument should be used as the new TargetDocument
 		if s.referenceResolutionCache.ResolvedDocument != nil {
 			opts.TargetDocument = s.referenceResolutionCache.ResolvedDocument
-			opts.TargetLocation = s.referenceResolutionCache.AbsoluteReference
+			opts.TargetLocation = s.referenceResolutionCache.AbsoluteDocumentPath
 		}
 	}
 
@@ -195,7 +195,7 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 	if result := s.tryResolveViaRegistry(ctx, ref, opts); result != nil {
 		// Compute absolute reference for circular detection
 		// Use the result's AbsoluteReference combined with any anchor/fragment
-		absRef := result.AbsoluteReference
+		absRef := result.AbsoluteDocumentPath
 		if anchor := ExtractAnchor(string(ref)); anchor != "" {
 			absRef = absRef + "#" + anchor
 		} else if jp := ref.GetJSONPointer(); jp != "" {
@@ -279,7 +279,7 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 	// Use $id as base URI if present in the resolved schema (JSON Schema spec)
 	// The $id keyword identifies a schema resource with its canonical URI
 	// and serves as the base URI for relative references within that schema
-	baseURI := result.AbsoluteReference
+	baseURI := result.AbsoluteDocumentPath
 	if !schema.IsBool() && schema.GetSchema() != nil {
 		if schemaID := schema.GetSchema().GetID(); schemaID != "" {
 			baseURI = schemaID
@@ -289,6 +289,9 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 	// Set up the schema registry for remote schemas
 	// This enables $id and $anchor resolution within the fetched document
 	setupRemoteSchemaRegistry(ctx, schema, baseURI)
+
+	// Collect nested reference schemas that need parent links set
+	var nestedRefs []*JSONSchemaReferenceable
 
 	for item := range Walk(ctx, schema) {
 		_ = item.Match(SchemaMatcher{
@@ -301,14 +304,34 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 							localBaseURI = jsID
 						}
 					}
+					// Get the ref to build absolute reference with fragment
+					jsRef := js.GetRef()
+					absRef := utils.BuildAbsoluteReference(localBaseURI, string(jsRef.GetJSONPointer()))
 					js.referenceResolutionCache = &references.ResolveResult[JSONSchemaReferenceable]{
-						AbsoluteReference: localBaseURI,
-						ResolvedDocument:  result.ResolvedDocument,
+						AbsoluteDocumentPath: localBaseURI,
+						AbsoluteReference:    references.Reference(absRef),
+						ResolvedDocument:     result.ResolvedDocument,
 					}
+
+					// Collect this reference for setting parent links after the walk
+					nestedRefs = append(nestedRefs, js)
 				}
 				return nil
 			},
 		})
+	}
+
+	// Set parent links for all nested references found during the walk
+	// This maintains reference chain tracking when accessing properties of resolved schemas
+	var topLevel *JSONSchemaReferenceable
+	if s.topLevelParent != nil {
+		topLevel = s.topLevelParent
+	} else {
+		topLevel = (*JSONSchemaReferenceable)(s)
+	}
+	for _, js := range nestedRefs {
+		js.SetParent((*JSONSchemaReferenceable)(s))
+		js.SetTopLevelParent(topLevel)
 	}
 
 	s.referenceResolutionCache = result

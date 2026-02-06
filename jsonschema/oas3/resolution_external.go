@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/references"
@@ -33,7 +34,7 @@ func (s *JSONSchema[Referenceable]) resolveExternalAnchorReference(ctx context.C
 	// Use $id as base URI if present in the resolved schema (JSON Schema spec)
 	// The $id keyword identifies a schema resource with its canonical URI
 	// and serves as the base URI for anchor lookups within that schema
-	baseURI := docResult.AbsoluteReference
+	baseURI := docResult.AbsoluteDocumentPath
 	if !externalDoc.IsBool() && externalDoc.GetSchema() != nil {
 		if schemaID := externalDoc.GetSchema().GetID(); schemaID != "" {
 			baseURI = schemaID
@@ -60,8 +61,8 @@ func (s *JSONSchema[Referenceable]) resolveExternalAnchorReference(ctx context.C
 	// This handles the case where the reference uses the retrieval URL instead of the canonical $id
 	// Example: fetch https://example.com/a.json, but $id is https://cdn.example.com/canonical.json
 	// A reference to "https://example.com/a.json#foo" should still resolve
-	if resolved == nil && docResult.AbsoluteReference != "" && docResult.AbsoluteReference != baseURI {
-		resolved = registry.LookupByAnchor(docResult.AbsoluteReference, anchor)
+	if resolved == nil && docResult.AbsoluteDocumentPath != "" && docResult.AbsoluteDocumentPath != baseURI {
+		resolved = registry.LookupByAnchor(docResult.AbsoluteDocumentPath, anchor)
 	}
 
 	// Fallback: try with empty base URI
@@ -73,10 +74,12 @@ func (s *JSONSchema[Referenceable]) resolveExternalAnchorReference(ctx context.C
 		return nil, validationErrs, fmt.Errorf("anchor not found in external document: %s#%s", ref.GetURI(), anchor)
 	}
 
+	absRef := utils.BuildAbsoluteReference(baseURI, "#"+anchor)
 	return &references.ResolveResult[JSONSchemaReferenceable]{
-		Object:            resolved,
-		AbsoluteReference: baseURI,
-		ResolvedDocument:  docResult.ResolvedDocument,
+		Object:               resolved,
+		AbsoluteDocumentPath: baseURI,
+		AbsoluteReference:    references.Reference(absRef),
+		ResolvedDocument:     docResult.ResolvedDocument,
 	}, validationErrs, nil
 }
 
@@ -105,7 +108,7 @@ func (s *JSONSchema[Referenceable]) resolveExternalRefWithFragment(ctx context.C
 	// Use $id as base URI if present in the resolved schema (JSON Schema spec)
 	// The $id keyword identifies a schema resource with its canonical URI
 	// and serves as the base URI for relative references within that schema
-	baseURI := docResult.AbsoluteReference
+	baseURI := docResult.AbsoluteDocumentPath
 	if !externalDoc.IsBool() && externalDoc.GetSchema() != nil {
 		if schemaID := externalDoc.GetSchema().GetID(); schemaID != "" {
 			baseURI = schemaID
@@ -119,9 +122,10 @@ func (s *JSONSchema[Referenceable]) resolveExternalRefWithFragment(ctx context.C
 	if jp == "" {
 		// No fragment, return the whole document with canonical base URI
 		return &references.ResolveResult[JSONSchemaReferenceable]{
-			Object:            externalDoc,
-			AbsoluteReference: baseURI,
-			ResolvedDocument:  docResult.ResolvedDocument,
+			Object:               externalDoc,
+			AbsoluteDocumentPath: baseURI,
+			AbsoluteReference:    references.Reference(baseURI),
+			ResolvedDocument:     docResult.ResolvedDocument,
 		}, validationErrs, nil
 	}
 
@@ -150,10 +154,12 @@ func (s *JSONSchema[Referenceable]) resolveExternalRefWithFragment(ctx context.C
 		target.GetSchema().SetEffectiveBaseURI(baseURI)
 	}
 
+	absRef := utils.BuildAbsoluteReference(baseURI, string(jp))
 	return &references.ResolveResult[JSONSchemaReferenceable]{
-		Object:            target,
-		AbsoluteReference: baseURI,
-		ResolvedDocument:  docResult.ResolvedDocument,
+		Object:               target,
+		AbsoluteDocumentPath: baseURI,
+		AbsoluteReference:    references.Reference(absRef),
+		ResolvedDocument:     docResult.ResolvedDocument,
 	}, validationErrs, nil
 }
 

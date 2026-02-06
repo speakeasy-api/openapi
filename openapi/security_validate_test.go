@@ -2,6 +2,7 @@ package openapi_test
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -160,7 +161,7 @@ func TestSecurityScheme_Validate_Error(t *testing.T) {
 			yml: `
 description: Some security scheme
 `,
-			wantErrs: []string{"[2:1] securityScheme.type is missing"},
+			wantErrs: []string{"[2:1] error validation-required-field `securityScheme.type` is required"},
 		},
 		{
 			name: "invalid_type",
@@ -175,7 +176,7 @@ type: invalid
 type: apiKey
 in: header
 `,
-			wantErrs: []string{"name is required for type=apiKey"},
+			wantErrs: []string{"`securityScheme.name` is required for type=apiKey"},
 		},
 		{
 			name: "api_key_missing_in",
@@ -183,7 +184,7 @@ in: header
 type: apiKey
 name: X-API-Key
 `,
-			wantErrs: []string{"in is required for type=apiKey"},
+			wantErrs: []string{"`securityScheme.in` is required for type=apiKey"},
 		},
 		{
 			name: "api_key_invalid_in",
@@ -192,28 +193,28 @@ type: apiKey
 name: X-API-Key
 in: invalid
 `,
-			wantErrs: []string{"in must be one of"},
+			wantErrs: []string{"securityScheme.in must be one of"},
 		},
 		{
 			name: "http_missing_scheme",
 			yml: `
 type: http
 `,
-			wantErrs: []string{"scheme is required for type=http"},
+			wantErrs: []string{"`securityScheme.scheme` is required for type=http"},
 		},
 		{
 			name: "oauth2_missing_flows",
 			yml: `
 type: oauth2
 `,
-			wantErrs: []string{"flows is required for type=oauth2"},
+			wantErrs: []string{"`securityScheme.flows` is required for type=oauth2"},
 		},
 		{
 			name: "openid_missing_url",
 			yml: `
 type: openIdConnect
 `,
-			wantErrs: []string{"openIdConnectUrl is required for type=openIdConnect"},
+			wantErrs: []string{"`securityScheme.openIdConnectUrl` is required for type=openIdConnect"},
 		},
 		{
 			name: "oauth2_invalid_metadata_url",
@@ -227,7 +228,27 @@ flows:
       read: Read access
 oauth2MetadataUrl: ://invalid-url
 `,
-			wantErrs: []string{"oauth2MetadataUrl is not a valid uri"},
+			wantErrs: []string{"`securityScheme.oauth2MetadataUrl` is not a valid uri"},
+		},
+		{
+			name: "oauth2_flow_invalid_authorization_url",
+			yml: `
+type: oauth2
+flows:
+  implicit:
+    authorizationUrl: http:// blah.
+    scopes:
+      read: Read access
+`,
+			wantErrs: []string{"oAuthFlow.authorizationUrl is not a valid uri"},
+		},
+		{
+			name: "openid_invalid_url",
+			yml: `
+type: openIdConnect
+openIdConnectUrl: http:// blah.
+`,
+			wantErrs: []string{"`securityScheme.openIdConnectUrl` is not a valid uri"},
 		},
 	}
 
@@ -258,6 +279,191 @@ oauth2MetadataUrl: ://invalid-url
 					}
 				}
 				require.True(t, found, "Expected error containing '%s' not found in: %v", wantErr, allErrors)
+			}
+		})
+	}
+}
+
+func TestSecurityScheme_Validate_UnusedProperties(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		yml          string
+		wantWarnings []string
+	}{
+		{
+			name: "http_with_in_property",
+			yml: `
+type: http
+scheme: bearer
+in: header
+`,
+			wantWarnings: []string{"in is not used for type=http"},
+		},
+		{
+			name: "http_with_name_property",
+			yml: `
+type: http
+scheme: bearer
+name: X-API-Key
+`,
+			wantWarnings: []string{"name is not used for type=http"},
+		},
+		{
+			name: "http_with_flows_property",
+			yml: `
+type: http
+scheme: bearer
+flows:
+  implicit:
+    authorizationUrl: https://example.com/oauth/authorize
+    scopes: {}
+`,
+			wantWarnings: []string{"flows is not used for type=http"},
+		},
+		{
+			name: "apiKey_with_scheme_property",
+			yml: `
+type: apiKey
+name: X-API-Key
+in: header
+scheme: bearer
+`,
+			wantWarnings: []string{"scheme is not used for type=apiKey"},
+		},
+		{
+			name: "apiKey_with_bearerFormat_property",
+			yml: `
+type: apiKey
+name: X-API-Key
+in: header
+bearerFormat: JWT
+`,
+			wantWarnings: []string{"bearerFormat is not used for type=apiKey"},
+		},
+		{
+			name: "apiKey_with_flows_property",
+			yml: `
+type: apiKey
+name: X-API-Key
+in: header
+flows:
+  implicit:
+    authorizationUrl: https://example.com/oauth/authorize
+    scopes: {}
+`,
+			wantWarnings: []string{"flows is not used for type=apiKey"},
+		},
+		{
+			name: "mutualTLS_with_scheme_property",
+			yml: `
+type: mutualTLS
+scheme: bearer
+`,
+			wantWarnings: []string{"scheme is not used for type=mutualTLS"},
+		},
+		{
+			name: "mutualTLS_with_name_and_in_properties",
+			yml: `
+type: mutualTLS
+name: X-API-Key
+in: header
+`,
+			wantWarnings: []string{
+				"name is not used for type=mutualTLS",
+				"in is not used for type=mutualTLS",
+			},
+		},
+		{
+			name: "oauth2_with_scheme_property",
+			yml: `
+type: oauth2
+flows:
+  authorizationCode:
+    authorizationUrl: https://example.com/oauth/authorize
+    tokenUrl: https://example.com/oauth/token
+    scopes: {}
+scheme: bearer
+`,
+			wantWarnings: []string{"scheme is not used for type=oauth2"},
+		},
+		{
+			name: "oauth2_with_name_and_in_properties",
+			yml: `
+type: oauth2
+flows:
+  authorizationCode:
+    authorizationUrl: https://example.com/oauth/authorize
+    tokenUrl: https://example.com/oauth/token
+    scopes: {}
+name: X-API-Key
+in: header
+`,
+			wantWarnings: []string{
+				"name is not used for type=oauth2",
+				"in is not used for type=oauth2",
+			},
+		},
+		{
+			name: "openIdConnect_with_scheme_property",
+			yml: `
+type: openIdConnect
+openIdConnectUrl: https://example.com/.well-known/openid-configuration
+scheme: bearer
+`,
+			wantWarnings: []string{"scheme is not used for type=openIdConnect"},
+		},
+		{
+			name: "openIdConnect_with_flows_property",
+			yml: `
+type: openIdConnect
+openIdConnectUrl: https://example.com/.well-known/openid-configuration
+flows:
+  implicit:
+    authorizationUrl: https://example.com/oauth/authorize
+    scopes: {}
+`,
+			wantWarnings: []string{"flows is not used for type=openIdConnect"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var securityScheme openapi.SecurityScheme
+
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &securityScheme)
+			require.NoError(t, err)
+
+			errs := securityScheme.Validate(t.Context())
+
+			// Combine unmarshalling and validation errors
+			validationErrs = append(validationErrs, errs...)
+
+			// Extract warnings (severity = warning)
+			var warnings []error
+			for _, e := range validationErrs {
+				var verr *validation.Error
+				if errors.As(e, &verr) && verr.Severity == validation.SeverityWarning {
+					warnings = append(warnings, e)
+				}
+			}
+
+			require.NotEmpty(t, warnings, "Expected validation warnings")
+			require.Len(t, warnings, len(tt.wantWarnings), "Expected %d warnings, got %d: %v", len(tt.wantWarnings), len(warnings), warnings)
+
+			// Check that all expected warnings are present
+			for _, wantWarning := range tt.wantWarnings {
+				found := false
+				for _, gotWarning := range warnings {
+					if gotWarning != nil && strings.Contains(gotWarning.Error(), wantWarning) {
+						found = true
+						break
+					}
+				}
+				require.True(t, found, "Expected warning containing '%s' not found in: %v", wantWarning, warnings)
 			}
 		})
 	}

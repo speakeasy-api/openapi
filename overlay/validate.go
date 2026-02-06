@@ -17,7 +17,7 @@ var (
 // Errors
 var (
 	ErrOverlayVersionInvalid                   = errors.New("overlay version is invalid")
-	ErrOverlayVersionNotSupported              = fmt.Errorf("overlay version must be one of: %s", strings.Join(sliceutil.Map(SupportedVersions, func(v *version.Version) string { return v.String() }), ", "))
+	ErrOverlayVersionNotSupported              = fmt.Errorf("overlay version must be one of: `%s`", strings.Join(sliceutil.Map(SupportedVersions, func(v *version.Version) string { return v.String() }), ", "))
 	ErrOverlayVersionMustBeDefined             = errors.New("overlay version must be defined")
 	ErrOverlayInfoTitleMustBeDefined           = errors.New("overlay info title must be defined")
 	ErrOverlayInfoVersionMustBeDefined         = errors.New("overlay info version must be defined")

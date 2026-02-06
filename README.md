@@ -72,7 +72,9 @@ The `arazzo` package provides an API for working with Arazzo documents including
 
 ### [openapi](./openapi)
 
-The `openapi` package provides an API for working with OpenAPI documents including reading, creating, mutating, walking, validating and upgrading them. Supports OpenAPI 3.0.x, 3.1.x, and 3.2.x specifications.
+The `openapi` package provides an API for working with OpenAPI documents including reading, creating, mutating, walking, validating, upgrading, and linting them. Supports OpenAPI 3.0.x, 3.1.x, and 3.2.x specifications.
+
+The [`openapi/linter`](./openapi/linter) subpackage provides a configurable linter with 60+ built-in rules covering style, security (OWASP), and semantic validation. Custom rules can be written in TypeScript/JavaScript using the [`@speakeasy-api/openapi-linter-types`](https://www.npmjs.com/package/@speakeasy-api/openapi-linter-types) package.
 
 ### [swagger](./swagger)
 
@@ -125,6 +127,7 @@ The CLI provides four main command groups:
   - `explore` - Interactively explore an OpenAPI specification in the terminal
   - `inline` - Inline all references in an OpenAPI specification
   - `join` - Join multiple OpenAPI documents into a single document
+  - `lint` - Lint an OpenAPI specification for style, security, and best practices
   - `localize` - Localize an OpenAPI specification by copying external references to a target directory
   - `optimize` - Optimize an OpenAPI specification by deduplicating inline schemas
   - `sanitize` - Remove unwanted elements from an OpenAPI specification
@@ -149,6 +152,12 @@ The CLI provides four main command groups:
 ```bash
 # Validate an OpenAPI specification
 openapi spec validate ./spec.yaml
+
+# Lint for style, security, and best practices
+openapi spec lint ./spec.yaml
+
+# Lint with custom configuration
+openapi spec lint --config lint.yaml ./spec.yaml
 
 # Bundle external references into components section
 openapi spec bundle ./spec.yaml ./bundled-spec.yaml

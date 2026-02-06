@@ -2,7 +2,9 @@ package openapi
 
 import (
 	"context"
+	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
@@ -13,6 +15,7 @@ import (
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
+	"gopkg.in/yaml.v3"
 )
 
 // Version is the version of the OpenAPI Specification that this package conforms to.
@@ -219,11 +222,11 @@ func (o *OpenAPI) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	docVersion, err := version.Parse(o.OpenAPI)
 	if err != nil {
-		errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi.openapi invalid OpenAPI version %s: %s", o.OpenAPI, err.Error()), core, core.OpenAPI))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationSupportedVersion, fmt.Errorf("openapi.openapi invalid OpenAPI version %s: %w", o.OpenAPI, err), core, core.OpenAPI))
 	}
 	if docVersion != nil {
 		if docVersion.LessThan(*MinimumSupportedVersion) || docVersion.GreaterThan(*MaximumSupportedVersion) {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi.openapi only OpenAPI versions between %s and %s are supported", MinimumSupportedVersion, MaximumSupportedVersion), core, core.OpenAPI))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationSupportedVersion, fmt.Errorf("openapi.openapi only OpenAPI versions between %s and %s are supported", MinimumSupportedVersion, MaximumSupportedVersion), core, core.OpenAPI))
 		}
 	}
 
@@ -259,17 +262,191 @@ func (o *OpenAPI) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	if core.Self.Present && o.Self != nil {
 		if _, err := url.Parse(*o.Self); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi.$self is not a valid uri reference: %s", err), core, core.Self))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("openapi.$self is not a valid uri reference: %w", err), core, core.Self))
 		}
 	}
 
 	if core.JSONSchemaDialect.Present && o.JSONSchemaDialect != nil {
 		if _, err := url.Parse(*o.JSONSchemaDialect); err != nil {
-			errs = append(errs, validation.NewValueError(validation.NewValueValidationError("openapi.jsonSchemaDialect is not a valid uri: %s", err), core, core.JSONSchemaDialect))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("`openapi.jsonSchemaDialect` is not a valid uri: %w", err), core, core.JSONSchemaDialect))
 		}
 	}
 
+	operationIdErrs := validateOperationIDUniqueness(ctx, o)
+	errs = append(errs, operationIdErrs...)
+
+	operationParameterErrs := validateOperationParameterUniqueness(ctx, o)
+	errs = append(errs, operationParameterErrs...)
+
 	o.Valid = len(errs) == 0 && core.GetValid()
+
+	return errs
+}
+
+func validateOperationIDUniqueness(ctx context.Context, doc *OpenAPI) []error {
+	if doc == nil {
+		return nil
+	}
+
+	seen := make(map[string]struct{})
+	var errs []error
+
+	for item := range Walk(ctx, doc) {
+		if err := item.Match(Matcher{
+			Operation: func(op *Operation) error {
+				method, path := ExtractMethodAndPath(item.Location)
+				if method == "" || path == "" {
+					return nil
+				}
+
+				operationID := op.GetOperationID()
+				if operationID == "" {
+					return nil
+				}
+
+				if _, ok := seen[operationID]; ok {
+					errNode := getOperationIDValueNode(op)
+					if errNode == nil {
+						errNode = op.GetRootNode()
+					}
+					err := validation.NewValidationError(
+						validation.SeverityError,
+						validation.RuleValidationOperationIdUnique,
+						fmt.Errorf("the `%s` operation at path `%s` contains a duplicate operationId `%s`", method, path, operationID),
+						errNode,
+					)
+					errs = append(errs, err)
+					return nil
+				}
+
+				seen[operationID] = struct{}{}
+				return nil
+			},
+		}); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
+}
+
+func getOperationIDValueNode(op *Operation) *yaml.Node {
+	if op == nil {
+		return nil
+	}
+
+	core := op.GetCore()
+	if core == nil || !core.OperationID.Present {
+		return nil
+	}
+
+	return core.OperationID.ValueNode
+}
+
+// validateParameterUniqueness checks for duplicate parameters in a list
+// methodOrLevel should be the HTTP method (GET, POST, etc.) or "TOP" for path-level
+func validateParameterUniqueness(parameters []*ReferencedParameter, methodOrLevel, path string, fallbackNode *yaml.Node) []error {
+	if len(parameters) == 0 {
+		return nil
+	}
+
+	var errs []error
+	seen := make(map[string]bool)
+
+	for _, paramRef := range parameters {
+		param := paramRef.GetObject()
+		if param == nil {
+			continue
+		}
+
+		paramName := param.GetName()
+		paramIn := param.GetIn().String()
+		if paramName == "" || paramIn == "" {
+			continue
+		}
+
+		key := paramName + "::" + paramIn
+		if seen[key] {
+			core := param.GetCore()
+			errNode := core.GetRootNode()
+			if errNode == nil {
+				errNode = fallbackNode
+			}
+
+			var errMsg string
+			if methodOrLevel == "TOP" {
+				errMsg = fmt.Sprintf("parameter %q is duplicated in path %q", paramName, path)
+			} else {
+				errMsg = fmt.Sprintf("parameter %q is duplicated in %s operation at path %q", paramName, methodOrLevel, path)
+			}
+
+			err := validation.NewValidationError(
+				validation.SeverityError,
+				validation.RuleValidationOperationParameters,
+				fmt.Errorf("%s", errMsg),
+				errNode,
+			)
+			errs = append(errs, err)
+		}
+		seen[key] = true
+	}
+
+	return errs
+}
+
+func validateOperationParameterUniqueness(ctx context.Context, doc *OpenAPI) []error {
+	if doc == nil {
+		return nil
+	}
+
+	var errs []error
+
+	for item := range Walk(ctx, doc) {
+		if err := item.Match(Matcher{
+			// Check duplicate parameters at Operation level
+			Operation: func(op *Operation) error {
+				method, path := ExtractMethodAndPath(item.Location)
+				if method == "" || path == "" {
+					return nil
+				}
+
+				paramErrs := validateParameterUniqueness(
+					op.GetParameters(),
+					strings.ToUpper(method),
+					path,
+					op.GetRootNode(),
+				)
+				errs = append(errs, paramErrs...)
+
+				return nil
+			},
+			// Check duplicate parameters at PathItem level
+			ReferencedPathItem: func(refPathItem *ReferencedPathItem) error {
+				pathItem := refPathItem.GetObject()
+				if pathItem == nil {
+					return nil
+				}
+
+				// Get the path from the location (parent key)
+				path := item.Location.ParentKey()
+				if path == "" {
+					return nil
+				}
+
+				paramErrs := validateParameterUniqueness(
+					pathItem.Parameters,
+					"TOP",
+					path,
+					pathItem.GetRootNode(),
+				)
+				errs = append(errs, paramErrs...)
+
+				return nil
+			},
+		}); err != nil {
+			errs = append(errs, err)
+		}
+	}
 
 	return errs
 }
