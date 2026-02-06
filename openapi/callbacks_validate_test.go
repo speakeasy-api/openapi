@@ -251,7 +251,7 @@ func TestCallback_Validate_Error(t *testing.T) {
       '200':
         description: Webhook received
 `,
-			wantErrs: []string{"[4:7] error validation-required-field server.url is required"},
+			wantErrs: []string{"[4:7] error validation-required-field `server.url` is required"},
 		},
 	}
 

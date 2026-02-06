@@ -93,7 +93,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("step.stepId is required"), core, core.StepID))
 	} else if s.StepID != "" {
 		if !stepIDRegex.MatchString(s.StepID) {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("step.stepId must be a valid name [%s]: %s", stepIDRegex.String(), s.StepID), core, core.StepID))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("step.stepId must be a valid name [`%s`]: `%s`", stepIDRegex.String(), s.StepID), core, core.StepID))
 		}
 
 		numStepsWithID := 0
@@ -103,7 +103,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 			}
 		}
 		if numStepsWithID > 1 {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.stepId must be unique within the workflow, found %d steps with the same stepId", numStepsWithID), core, core.StepID))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.stepId must be unique within the workflow, found `%d` steps with the same stepId", numStepsWithID), core, core.StepID))
 		}
 	}
 
@@ -145,11 +145,11 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 			typ, sourceDescriptionName, _, _ := s.OperationID.GetParts()
 
 			if typ != expression.ExpressionTypeSourceDescriptions {
-				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("step.operationId must be a sourceDescriptions expression, got %s", typ), core, core.OperationID))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("step.operationId must be a sourceDescriptions expression, got `%s`", typ), core, core.OperationID))
 			}
 
 			if a.SourceDescriptions.Find(sourceDescriptionName) == nil {
-				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.operationId referencing sourceDescription %s not found", sourceDescriptionName), core, core.OperationID))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.operationId referencing sourceDescription `%s` not found", sourceDescriptionName), core, core.OperationID))
 			}
 		}
 	}
@@ -162,11 +162,11 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 		typ, sourceDescriptionName, expressionParts, jp := s.OperationPath.GetParts()
 
 		if typ != expression.ExpressionTypeSourceDescriptions {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("step.operationPath must be a sourceDescriptions expression, got %s", typ), core, core.OperationPath))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("step.operationPath must be a sourceDescriptions expression, got `%s`", typ), core, core.OperationPath))
 		}
 
 		if a.SourceDescriptions.Find(sourceDescriptionName) == nil {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.operationPath referencing sourceDescription %s not found", sourceDescriptionName), core, core.OperationPath))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.operationPath referencing sourceDescription `%s` not found", sourceDescriptionName), core, core.OperationPath))
 		}
 
 		if len(expressionParts) != 1 || expressionParts[0] != "url" {
@@ -186,14 +186,14 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 			typ, sourceDescriptionName, _, _ := s.WorkflowID.GetParts()
 
 			if typ != expression.ExpressionTypeSourceDescriptions {
-				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("step.workflowId must be a sourceDescriptions expression, got %s", typ), core, core.WorkflowID))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("step.workflowId must be a sourceDescriptions expression, got `%s`", typ), core, core.WorkflowID))
 			}
 
 			if a.SourceDescriptions.Find((sourceDescriptionName)) == nil {
-				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.workflowId referencing sourceDescription %s not found", sourceDescriptionName), core, core.WorkflowID))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.workflowId referencing sourceDescription `%s` not found", sourceDescriptionName), core, core.WorkflowID))
 			}
 		} else if a.Workflows.Find(pointer.Value(s.WorkflowID).String()) == nil {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.workflowId referencing workflow %s not found", *s.WorkflowID), core, core.WorkflowID))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.workflowId referencing workflow `%s` not found", *s.WorkflowID), core, core.WorkflowID))
 		}
 	}
 
@@ -206,14 +206,14 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 		if parameter.Reference != nil {
 			_, ok := parameterRefs[string(*parameter.Reference)]
 			if ok {
-				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.parameters duplicate parameter found with reference %s", *parameter.Reference), core, core.Parameters, i))
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.parameters duplicate parameter found with reference `%s`", *parameter.Reference), core, core.Parameters, i))
 			}
 			parameterRefs[string(*parameter.Reference)] = true
 		} else if parameter.Object != nil {
 			id := fmt.Sprintf("%s.%v", parameter.Object.Name, parameter.Object.In)
 			_, ok := parameters[id]
 			if ok {
-				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.parameters duplicate parameter found with name %s and in %v", parameter.Object.Name, parameter.Object.In), core, core.Parameters, i))
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.parameters duplicate parameter found with name `%s` and in `%v`", parameter.Object.Name, parameter.Object.In), core, core.Parameters, i))
 			}
 			parameters[id] = true
 		}
@@ -240,14 +240,14 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 		if onSuccess.Reference != nil {
 			_, ok := successActionRefs[string(*onSuccess.Reference)]
 			if ok {
-				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.onSuccess duplicate successAction found with reference %s", *onSuccess.Reference), core, core.OnSuccess, i))
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.onSuccess duplicate successAction found with reference `%s`", *onSuccess.Reference), core, core.OnSuccess, i))
 			}
 			successActionRefs[string(*onSuccess.Reference)] = true
 		} else if onSuccess.Object != nil {
 			id := fmt.Sprintf("%s.%v", onSuccess.Object.Name, onSuccess.Object.Type)
 			_, ok := successActions[id]
 			if ok {
-				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.onSuccess duplicate successAction found with name %s and type %v", onSuccess.Object.Name, onSuccess.Object.Type), core, core.OnSuccess, i))
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.onSuccess duplicate successAction found with name `%s` and type `%v`", onSuccess.Object.Name, onSuccess.Object.Type), core, core.OnSuccess, i))
 			}
 			successActions[id] = true
 		}
@@ -262,14 +262,14 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 		if onFailure.Reference != nil {
 			_, ok := failureActionRefs[string(*onFailure.Reference)]
 			if ok {
-				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.onFailure duplicate failureAction found with reference %s", *onFailure.Reference), core, core.OnFailure, i))
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.onFailure duplicate failureAction found with reference `%s`", *onFailure.Reference), core, core.OnFailure, i))
 			}
 			failureActionRefs[string(*onFailure.Reference)] = true
 		} else if onFailure.Object != nil {
 			id := fmt.Sprintf("%s.%v", onFailure.Object.Name, onFailure.Object.Type)
 			_, ok := failureActions[id]
 			if ok {
-				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.onFailure duplicate failureAction found with name %s and type %v", onFailure.Object.Name, onFailure.Object.Type), core, core.OnFailure, i))
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("step.onFailure duplicate failureAction found with name `%s` and type `%v`", onFailure.Object.Name, onFailure.Object.Type), core, core.OnFailure, i))
 			}
 			failureActions[id] = true
 		}
@@ -277,7 +277,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 
 	for name, output := range s.Outputs.All() {
 		if !outputNameRegex.MatchString(name) {
-			errs = append(errs, validation.NewMapKeyError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("step.outputs name must be a valid name [%s]: %s", outputNameRegex.String(), name), core, core.Outputs, name))
+			errs = append(errs, validation.NewMapKeyError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("step.outputs name must be a valid name [`%s`]: `%s`", outputNameRegex.String(), name), core, core.Outputs, name))
 		}
 
 		if err := output.Validate(); err != nil {

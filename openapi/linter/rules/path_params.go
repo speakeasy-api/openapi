@@ -94,7 +94,7 @@ func (r *PathParamsRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						RuleSemanticPathParams,
-						fmt.Errorf("path parameter {%s} is not defined in operation parameters", tmplParam),
+						fmt.Errorf("path parameter `{%s}` is not defined in operation parameters", tmplParam),
 						op.GetRootNode(),
 					))
 				}
@@ -113,7 +113,7 @@ func (r *PathParamsRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						RuleSemanticPathParams,
-						fmt.Errorf("parameter %q is declared as path parameter but not used in path template %q", paramName, path),
+						fmt.Errorf("parameter `%s` is declared as path parameter but not used in path template `%s`", paramName, path),
 						op.GetRootNode(),
 					))
 				}
@@ -152,7 +152,7 @@ func getPathParameters(ctx context.Context, params []*openapi.ReferencedParamete
 				resolutionErrs = append(resolutionErrs, validation.NewValidationError(
 					validation.SeverityError,
 					RuleSemanticPathParams,
-					fmt.Errorf("failed to resolve parameter reference %s: %w", refParam.GetReference(), err),
+					fmt.Errorf("failed to resolve parameter reference `%s`: %w", refParam.GetReference(), err),
 					refParam.GetRootNode(),
 				))
 				continue

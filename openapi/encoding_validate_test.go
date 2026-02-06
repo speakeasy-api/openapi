@@ -146,7 +146,7 @@ func TestEncoding_Validate_Error(t *testing.T) {
 			yml: `
 style: invalidStyle
 `,
-			expectedErr: "style must be one of [form, spaceDelimited, pipeDelimited, deepObject]",
+			expectedErr: "style must be one of [`form, spaceDelimited, pipeDelimited, deepObject`]",
 		},
 	}
 

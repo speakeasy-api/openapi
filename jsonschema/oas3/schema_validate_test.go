@@ -379,8 +379,8 @@ externalDocs:
   description: More information
 `,
 			wantErrs: []string{
-				"[2:1] error validation-required-field schema.externalDocs missing property 'url'",
-				"[5:3] error validation-required-field externalDocumentation.url is required",
+				"[2:1] error validation-required-field `schema.externalDocs` missing property `url`",
+				"[5:3] error validation-required-field `externalDocumentation.url` is required",
 			},
 		},
 		{
@@ -391,7 +391,7 @@ title: Invalid Type
 `,
 			wantErrs: []string{
 				"[2:7] error validation-invalid-schema schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
-				"[2:7] error validation-type-mismatch schema.type expected array, got string",
+				"[2:7] error validation-type-mismatch schema.type expected `array`, got `string`",
 			},
 		},
 		{
@@ -425,9 +425,9 @@ type: object
 additionalProperties: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] error validation-type-mismatch schema.additionalProperties expected one of [boolean, object], got string",
-				"[2:1] error validation-type-mismatch schema.additionalProperties expected one of [boolean, object], got string",
-				"[3:23] error validation-type-mismatch schema.additionalProperties failed to validate either Schema [schema.additionalProperties expected object, got `invalid`] or bool [schema.additionalProperties line 3: cannot unmarshal !!str `invalid` into bool]",
+				"[2:1] error validation-type-mismatch schema.additionalProperties expected one of [`boolean`, `object`], got `string`",
+				"[2:1] error validation-type-mismatch schema.additionalProperties expected one of [`boolean`, `object`], got `string`",
+				"[3:23] error validation-type-mismatch schema.additionalProperties failed to validate either Schema [schema.additionalProperties expected `object`, got `invalid`] or bool [schema.additionalProperties line 3: cannot unmarshal !!str `invalid` into bool]",
 			},
 		},
 		{
@@ -453,9 +453,9 @@ type: array
 items: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] error validation-type-mismatch schema.items expected one of [boolean, object], got string",
-				"[2:1] error validation-type-mismatch schema.items expected one of [boolean, object], got string",
-				"[3:8] error validation-type-mismatch schema.items failed to validate either Schema [schema.items expected object, got `invalid`] or bool [schema.items line 3: cannot unmarshal !!str `invalid` into bool]",
+				"[2:1] error validation-type-mismatch schema.items expected one of [`boolean`, `object`], got `string`",
+				"[2:1] error validation-type-mismatch schema.items expected one of [`boolean`, `object`], got `string`",
+				"[3:8] error validation-type-mismatch schema.items failed to validate either Schema [schema.items expected `object`, got `invalid`] or bool [schema.items line 3: cannot unmarshal !!str `invalid` into bool]",
 			},
 		},
 		{
@@ -465,8 +465,8 @@ type: object
 required: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] error validation-type-mismatch schema.required expected array, got string",
-				"[3:11] error validation-type-mismatch schema.required expected sequence, got `invalid`",
+				"[2:1] error validation-type-mismatch schema.required expected `array`, got `string`",
+				"[3:11] error validation-type-mismatch schema.required expected `sequence`, got `invalid`",
 			},
 		},
 		{
@@ -475,8 +475,8 @@ required: "invalid"
 allOf: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] error validation-type-mismatch schema.allOf expected array, got string",
-				"[2:8] error validation-type-mismatch schema.allOf expected sequence, got `invalid`",
+				"[2:1] error validation-type-mismatch schema.allOf expected `array`, got `string`",
+				"[2:8] error validation-type-mismatch schema.allOf expected `sequence`, got `invalid`",
 			},
 		},
 		{
@@ -485,8 +485,8 @@ allOf: "invalid"
 anyOf: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] error validation-type-mismatch schema.anyOf expected array, got string",
-				"[2:8] error validation-type-mismatch schema.anyOf expected sequence, got `invalid`",
+				"[2:1] error validation-type-mismatch schema.anyOf expected `array`, got `string`",
+				"[2:8] error validation-type-mismatch schema.anyOf expected `sequence`, got `invalid`",
 			},
 		},
 		{
@@ -495,8 +495,8 @@ anyOf: "invalid"
 oneOf: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] error validation-type-mismatch schema.oneOf expected array, got string",
-				"[2:8] error validation-type-mismatch schema.oneOf expected sequence, got `invalid`",
+				"[2:1] error validation-type-mismatch schema.oneOf expected `array`, got `string`",
+				"[2:8] error validation-type-mismatch schema.oneOf expected `sequence`, got `invalid`",
 			},
 		},
 		{

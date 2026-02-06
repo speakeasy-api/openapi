@@ -140,7 +140,7 @@ func (e *Encoding) Validate(ctx context.Context, opts ...validation.Option) []er
 	if core.Style.Present {
 		allowedStyles := []string{string(SerializationStyleForm), string(SerializationStyleSpaceDelimited), string(SerializationStylePipeDelimited), string(SerializationStyleDeepObject)}
 		if !slices.Contains(allowedStyles, string(*e.Style)) {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("encoding.style must be one of [%s]", strings.Join(allowedStyles, ", ")), core, core.Style))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("encoding.style must be one of [`%s`]", strings.Join(allowedStyles, ", ")), core, core.Style))
 		}
 	}
 

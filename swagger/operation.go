@@ -157,7 +157,7 @@ func (o *Operation) Validate(ctx context.Context, opts ...validation.Option) []e
 	errs := []error{}
 
 	if !c.Responses.Present {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("operation.responses is required"), c, c.Responses))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`operation.responses` is required"), c, c.Responses))
 	} else if o.Responses != nil {
 		errs = append(errs, o.Responses.Validate(ctx, opts...)...)
 	}
@@ -177,7 +177,7 @@ func (o *Operation) Validate(ctx context.Context, opts ...validation.Option) []e
 				errs = append(errs, validation.NewValueError(
 					validation.SeverityError,
 					validation.RuleValidationAllowedValues,
-					fmt.Errorf("operation.scheme must be one of [http, https, ws, wss], got '%s'", scheme),
+					fmt.Errorf("operation.scheme must be one of [http, https, ws, wss], got `%s`", scheme),
 					c, c.Schemes))
 			}
 		}
@@ -190,7 +190,7 @@ func (o *Operation) Validate(ctx context.Context, opts ...validation.Option) []e
 				errs = append(errs, validation.NewValueError(
 					validation.SeverityError,
 					validation.RuleValidationInvalidFormat,
-					fmt.Errorf("operation.consumes contains invalid MIME type '%s': %w", mimeType, err),
+					fmt.Errorf("operation.consumes contains invalid MIME type `%s`: %w", mimeType, err),
 					c, c.Consumes))
 			}
 		}
@@ -203,7 +203,7 @@ func (o *Operation) Validate(ctx context.Context, opts ...validation.Option) []e
 				errs = append(errs, validation.NewValueError(
 					validation.SeverityError,
 					validation.RuleValidationInvalidFormat,
-					fmt.Errorf("operation.produces contains invalid MIME type '%s': %w", mimeType, err),
+					fmt.Errorf("operation.produces contains invalid MIME type `%s`: %w", mimeType, err),
 					c, c.Produces))
 			}
 		}

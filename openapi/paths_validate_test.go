@@ -309,7 +309,7 @@ get:
     '200':
       description: Successful response
 `,
-			wantErrs: []string{"[3:5] error validation-required-field server.url is required"},
+			wantErrs: []string{"[3:5] error validation-required-field `server.url` is required"},
 		},
 		{
 			name: "invalid_parameter",
@@ -324,7 +324,7 @@ get:
     '200':
       description: Successful response
 `,
-			wantErrs: []string{"[3:5] error validation-required-field parameter.name is required"},
+			wantErrs: []string{"[3:5] error validation-required-field `parameter.name` is required"},
 		},
 		{
 			name:           "unexpected_additional_operations",

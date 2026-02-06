@@ -28,7 +28,7 @@ func (r *OASSchemaCheckRule) Category() string {
 }
 
 func (r *OASSchemaCheckRule) Description() string {
-	return "Schemas must use type-appropriate constraints and have valid constraint values. For example, string types should use minLength/maxLength/pattern, numbers should use minimum/maximum/multipleOf, and constraint values must be logically valid (e.g., maxLength >= minLength)."
+	return "Schemas must use type-appropriate constraints and have valid constraint values. For example, `string` types should use `minLength`/`maxLength`/`pattern`, numbers should use `minimum`/`maximum`/`multipleOf`, and constraint values must be logically valid (e.g., `maxLength` >= `minLength`)."
 }
 
 func (r *OASSchemaCheckRule) Summary() string {
@@ -36,7 +36,7 @@ func (r *OASSchemaCheckRule) Summary() string {
 }
 
 func (r *OASSchemaCheckRule) HowToFix() string {
-	return "Add or correct constraints appropriate to each schema type (e.g., minLength/maxLength for strings, minimum/maximum for numbers)."
+	return "Add or correct constraints appropriate to each schema type (e.g., `minLength`/`maxLength` for strings, `minimum`/`maximum` for numbers)."
 }
 
 func (r *OASSchemaCheckRule) Link() string {
@@ -675,10 +675,10 @@ func (r *OASSchemaCheckRule) validateConst(_ context.Context, schema *oas3.Schem
 	}
 
 	if !isValid {
-		// Convert SchemaType slice to string slice for Join
+		// Convert SchemaType slice to string slice for Join with backticks
 		typeStrs := make([]string, len(schemaTypes))
 		for i, t := range schemaTypes {
-			typeStrs[i] = string(t)
+			typeStrs[i] = "`" + string(t) + "`"
 		}
 		typeList := fmt.Sprintf("[%s]", strings.Join(typeStrs, ", "))
 		if rootNode := refSchema.GetRootNode(); rootNode != nil {

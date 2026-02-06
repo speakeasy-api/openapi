@@ -151,7 +151,7 @@ servers:
   - url: ":invalid"
     description: Invalid server
 `,
-			wantErrs: []string{"[6:10] error validation-invalid-format server.url is not a valid uri: parse \":invalid\": missing protocol scheme"},
+			wantErrs: []string{"[6:10] error validation-invalid-format `server.url` is not a valid uri: parse \":invalid\": missing protocol scheme"},
 		},
 	}
 

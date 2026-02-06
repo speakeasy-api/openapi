@@ -58,7 +58,7 @@ func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) [
 	errs := []error{}
 
 	if core.Content.Present && r.Content.Len() == 0 {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("requestBody.content is required"), core, core.Content))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`requestBody.content` is required"), core, core.Content))
 	}
 
 	for mediaType, content := range r.Content.All() {

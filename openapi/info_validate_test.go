@@ -108,7 +108,7 @@ func TestInfo_Validate_Error(t *testing.T) {
 			yml: `
 version: 1.0.0
 `,
-			wantErrs: []string{"[2:1] error validation-required-field info.title is required"},
+			wantErrs: []string{"[2:1] error validation-required-field `info.title` is required"},
 		},
 		{
 			name: "empty title",
@@ -116,14 +116,14 @@ version: 1.0.0
 title: ""
 version: 1.0.0
 `,
-			wantErrs: []string{"[2:8] error validation-required-field info.title is required"},
+			wantErrs: []string{"[2:8] error validation-required-field `info.title` is required"},
 		},
 		{
 			name: "missing version",
 			yml: `
 title: Test API
 `,
-			wantErrs: []string{"[2:1] error validation-required-field info.version is required"},
+			wantErrs: []string{"[2:1] error validation-required-field `info.version` is required"},
 		},
 		{
 			name: "empty version",
@@ -131,7 +131,7 @@ title: Test API
 title: Test API
 version: ""
 `,
-			wantErrs: []string{"[3:10] error validation-required-field info.version is required"},
+			wantErrs: []string{"[3:10] error validation-required-field `info.version` is required"},
 		},
 		{
 			name: "invalid termsOfService URI",
@@ -140,7 +140,7 @@ title: Test API
 version: 1.0.0
 termsOfService: ":invalid"
 `,
-			wantErrs: []string{"[4:17] error validation-invalid-format info.termsOfService is not a valid uri: parse \":invalid\": missing protocol scheme"},
+			wantErrs: []string{"[4:17] error validation-invalid-format `info.termsOfService` is not a valid uri: parse \":invalid\": missing protocol scheme"},
 		},
 		{
 			name: "invalid contact URL",
@@ -183,7 +183,7 @@ version: 1.0.0
 license:
   url: https://opensource.org/licenses/MIT
 `,
-			wantErrs: []string{"[5:3] error validation-required-field license.name is required"},
+			wantErrs: []string{"[5:3] error validation-required-field `license.name` is required"},
 		},
 		{
 			name: "multiple validation errors",
@@ -196,10 +196,10 @@ license:
   name: ""
 `,
 			wantErrs: []string{
-				"[2:8] error validation-required-field info.title is required",
-				"[3:10] error validation-required-field info.version is required",
+				"[2:8] error validation-required-field `info.title` is required",
+				"[3:10] error validation-required-field `info.version` is required",
 				"[5:10] error validation-invalid-format contact.email is not a valid email address: mail: missing '@' or angle-addr",
-				"[7:9] error validation-required-field license.name is required",
+				"[7:9] error validation-required-field `license.name` is required",
 			},
 		},
 	}
@@ -476,7 +476,7 @@ func TestLicense_Validate_Error(t *testing.T) {
 			yml: `
 url: https://opensource.org/licenses/MIT
 `,
-			wantErrs: []string{"[2:1] error validation-required-field license.name is required"},
+			wantErrs: []string{"[2:1] error validation-required-field `license.name` is required"},
 		},
 		{
 			name: "empty name",
@@ -484,7 +484,7 @@ url: https://opensource.org/licenses/MIT
 name: ""
 url: https://opensource.org/licenses/MIT
 `,
-			wantErrs: []string{"[2:7] error validation-required-field license.name is required"},
+			wantErrs: []string{"[2:7] error validation-required-field `license.name` is required"},
 		},
 		{
 			name: "invalid URL",
@@ -509,7 +509,7 @@ name: ""
 url: ":invalid"
 `,
 			wantErrs: []string{
-				"[2:7] error validation-required-field license.name is required",
+				"[2:7] error validation-required-field `license.name` is required",
 				"[3:6] error validation-invalid-format license.url is not a valid uri: parse \":invalid\": missing protocol scheme",
 			},
 		},

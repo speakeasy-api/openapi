@@ -95,14 +95,14 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 			typ, sourceDescriptionName, _, _ := dependsOn.GetParts()
 
 			if typ != expression.ExpressionTypeSourceDescriptions {
-				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("workflow.dependsOn must be a sourceDescriptions expression if not a workflowId, got %s", typ), core, core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("workflow.dependsOn must be a sourceDescriptions expression if not a workflowId, got `%s`", typ), core, core.DependsOn, i))
 			}
 
 			if a.SourceDescriptions.Find(sourceDescriptionName) == nil {
-				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("workflow.dependsOn sourceDescription %s not found", sourceDescriptionName), core, core.DependsOn, i))
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("workflow.dependsOn sourceDescription `%s` not found", sourceDescriptionName), core, core.DependsOn, i))
 			}
 		} else if a.Workflows.Find(string(dependsOn)) == nil {
-			errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("workflow.dependsOn workflowId %s not found", dependsOn), core, core.DependsOn, i))
+			errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("workflow.dependsOn workflowId `%s` not found", dependsOn), core, core.DependsOn, i))
 		}
 	}
 
@@ -120,7 +120,7 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 
 	for name, output := range w.Outputs.All() {
 		if !outputNameRegex.MatchString(name) {
-			errs = append(errs, validation.NewMapKeyError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("workflow.outputs name must be a valid name [%s]: %s", outputNameRegex.String(), name), core, core.Outputs, name))
+			errs = append(errs, validation.NewMapKeyError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("workflow.outputs name must be a valid name [`%s`]: `%s`", outputNameRegex.String(), name), core, core.Outputs, name))
 		}
 
 		if err := output.Validate(); err != nil {

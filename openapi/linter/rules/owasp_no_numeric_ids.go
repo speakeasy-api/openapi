@@ -95,7 +95,7 @@ func (r *OwaspNoNumericIDsRule) Run(ctx context.Context, docInfo *linter.Documen
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						RuleOwaspNoNumericIDs,
-						fmt.Errorf("parameter '%s' uses integer type for ID - use random IDs like UUIDs instead of numeric IDs", name),
+						fmt.Errorf("parameter `%s` uses integer type for ID - use random IDs like UUIDs instead of numeric IDs", name),
 						rootNode,
 					))
 				}

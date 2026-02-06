@@ -20,13 +20,13 @@ func (r *OwaspStringRestrictedRule) Category() string {
 	return CategorySecurity
 }
 func (r *OwaspStringRestrictedRule) Description() string {
-	return "String schemas must specify format, const, enum, or pattern to restrict content. String restrictions prevent injection attacks and ensure data conforms to expected formats."
+	return "String schemas must specify `format`, `const`, `enum`, or `pattern` to restrict content. String restrictions prevent injection attacks and ensure data conforms to expected formats."
 }
 func (r *OwaspStringRestrictedRule) Summary() string {
-	return "String schemas must specify format, const, enum, or pattern."
+	return "String schemas must specify `format`, `const`, `enum`, or `pattern`."
 }
 func (r *OwaspStringRestrictedRule) HowToFix() string {
-	return "Add format, const, enum, or pattern constraints to string schemas."
+	return "Add `format`, `const`, `enum`, or `pattern` constraints to string schemas."
 }
 func (r *OwaspStringRestrictedRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-string-restricted"
@@ -79,7 +79,7 @@ func (r *OwaspStringRestrictedRule) Run(ctx context.Context, docInfo *linter.Doc
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					RuleOwaspStringRestricted,
-					errors.New("schema of type 'string' must specify format, const, enum, or pattern to restrict content"),
+					errors.New("schema of type `string` must specify `format`, `const`, `enum`, or `pattern` to restrict content"),
 					rootNode,
 				))
 			}

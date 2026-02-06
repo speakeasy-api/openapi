@@ -31,7 +31,7 @@ func (r *Reference[T]) Unmarshal(ctx context.Context, parentName string, node *y
 
 	if resolvedNode.Kind != yaml.MappingNode {
 		r.SetValid(false, false)
-		return []error{validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, "reference expected object, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode)}, nil
+		return []error{validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, "reference expected `object`, got %s", yml.NodeKindToString(resolvedNode.Kind)), resolvedNode)}, nil
 	}
 
 	if _, _, ok := yml.GetMapElementNodes(ctx, resolvedNode, "$ref"); ok {

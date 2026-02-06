@@ -132,7 +132,7 @@ func (h *Header) Validate(ctx context.Context, opts ...validation.Option) []erro
 	if core.Style.Present {
 		allowedStyles := []string{string(SerializationStyleSimple)}
 		if !slices.Contains(allowedStyles, string(*h.Style)) {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("header.style must be one of [%s]", strings.Join(allowedStyles, ", ")), core, core.Style))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("header.style must be one of [`%s`]", strings.Join(allowedStyles, ", ")), core, core.Style))
 		}
 	}
 

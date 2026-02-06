@@ -197,7 +197,7 @@ paths:
 
 			require.Len(t, errs, tt.expectedCount)
 			for _, err := range errs {
-				assert.Contains(t, err.Error(), "must specify format as 'int32' or 'int64'")
+				assert.Contains(t, err.Error(), "must specify `format` as `int32` or `int64`")
 			}
 		})
 	}

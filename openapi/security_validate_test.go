@@ -161,7 +161,7 @@ func TestSecurityScheme_Validate_Error(t *testing.T) {
 			yml: `
 description: Some security scheme
 `,
-			wantErrs: []string{"[2:1] error validation-required-field securityScheme.type is required"},
+			wantErrs: []string{"[2:1] error validation-required-field `securityScheme.type` is required"},
 		},
 		{
 			name: "invalid_type",
@@ -176,7 +176,7 @@ type: invalid
 type: apiKey
 in: header
 `,
-			wantErrs: []string{"name is required for type=apiKey"},
+			wantErrs: []string{"`securityScheme.name` is required for type=apiKey"},
 		},
 		{
 			name: "api_key_missing_in",
@@ -184,7 +184,7 @@ in: header
 type: apiKey
 name: X-API-Key
 `,
-			wantErrs: []string{"in is required for type=apiKey"},
+			wantErrs: []string{"`securityScheme.in` is required for type=apiKey"},
 		},
 		{
 			name: "api_key_invalid_in",
@@ -193,28 +193,28 @@ type: apiKey
 name: X-API-Key
 in: invalid
 `,
-			wantErrs: []string{"in must be one of"},
+			wantErrs: []string{"securityScheme.in must be one of"},
 		},
 		{
 			name: "http_missing_scheme",
 			yml: `
 type: http
 `,
-			wantErrs: []string{"scheme is required for type=http"},
+			wantErrs: []string{"`securityScheme.scheme` is required for type=http"},
 		},
 		{
 			name: "oauth2_missing_flows",
 			yml: `
 type: oauth2
 `,
-			wantErrs: []string{"flows is required for type=oauth2"},
+			wantErrs: []string{"`securityScheme.flows` is required for type=oauth2"},
 		},
 		{
 			name: "openid_missing_url",
 			yml: `
 type: openIdConnect
 `,
-			wantErrs: []string{"openIdConnectUrl is required for type=openIdConnect"},
+			wantErrs: []string{"`securityScheme.openIdConnectUrl` is required for type=openIdConnect"},
 		},
 		{
 			name: "oauth2_invalid_metadata_url",
@@ -228,7 +228,7 @@ flows:
       read: Read access
 oauth2MetadataUrl: ://invalid-url
 `,
-			wantErrs: []string{"oauth2MetadataUrl is not a valid uri"},
+			wantErrs: []string{"`securityScheme.oauth2MetadataUrl` is not a valid uri"},
 		},
 		{
 			name: "oauth2_flow_invalid_authorization_url",
@@ -240,7 +240,7 @@ flows:
     scopes:
       read: Read access
 `,
-			wantErrs: []string{"authorizationUrl is not a valid uri"},
+			wantErrs: []string{"oAuthFlow.authorizationUrl is not a valid uri"},
 		},
 		{
 			name: "openid_invalid_url",
@@ -248,7 +248,7 @@ flows:
 type: openIdConnect
 openIdConnectUrl: http:// blah.
 `,
-			wantErrs: []string{"openIdConnectUrl is not a valid uri"},
+			wantErrs: []string{"`securityScheme.openIdConnectUrl` is not a valid uri"},
 		},
 	}
 

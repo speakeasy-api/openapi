@@ -51,7 +51,7 @@ func (p *Paths) Validate(ctx context.Context, opts ...validation.Option) []error
 			errs = append(errs, validation.NewValidationError(
 				validation.SeverityError,
 				validation.RuleValidationInvalidSyntax,
-				fmt.Errorf("path '%s' must begin with a slash '/'", path),
+				fmt.Errorf("path `%s` must begin with a slash '/'", path),
 				pathKeyNode))
 		}
 		errs = append(errs, pathItem.Validate(ctx, opts...)...)

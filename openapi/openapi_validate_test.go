@@ -217,7 +217,7 @@ info:
   version: 1.0.0
 paths: {}
 `,
-			wantErrs: []string{"[4:3] error validation-required-field info.title is required"},
+			wantErrs: []string{"[4:3] error validation-required-field `info.title` is required"},
 		},
 		{
 			name: "invalid_info_missing_version",
@@ -227,7 +227,7 @@ info:
   title: Test API
 paths: {}
 `,
-			wantErrs: []string{"[4:3] error validation-required-field info.version is required"},
+			wantErrs: []string{"[4:3] error validation-required-field `info.version` is required"},
 		},
 		{
 			name: "invalid_server",
@@ -240,7 +240,7 @@ servers:
   - description: Invalid server without URL
 paths: {}
 `,
-			wantErrs: []string{"[7:5] error validation-required-field server.url is required"},
+			wantErrs: []string{"[7:5] error validation-required-field `server.url` is required"},
 		},
 		{
 			name: "invalid_tag",
@@ -253,7 +253,7 @@ tags:
   - description: Tag without name
 paths: {}
 `,
-			wantErrs: []string{"[7:5] error validation-required-field tag.name is required"},
+			wantErrs: []string{"[7:5] error validation-required-field `tag.name` is required"},
 		},
 		{
 			name: "invalid_external_docs",
@@ -266,7 +266,7 @@ externalDocs:
   description: External docs without URL
 paths: {}
 `,
-			wantErrs: []string{"[7:3] error validation-required-field externalDocumentation.url is required"},
+			wantErrs: []string{"[7:3] error validation-required-field `externalDocumentation.url` is required"},
 		},
 		{
 			name: "invalid_self_not_uri",
@@ -301,7 +301,7 @@ paths:
         '200':
           description: ok
 `,
-			wantErrs: []string{"error validation-operation-id-unique the 'get' operation at path '/ember' contains a duplicate operationId 'littleSong'"},
+			wantErrs: []string{"error validation-operation-id-unique the `get` operation at path `/ember` contains a duplicate operationId `littleSong`"},
 		},
 		{
 			name: "duplicate_operation_parameter",

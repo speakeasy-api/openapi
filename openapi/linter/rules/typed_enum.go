@@ -19,7 +19,7 @@ type TypedEnumRule struct{}
 func (r *TypedEnumRule) ID() string       { return RuleSemanticTypedEnum }
 func (r *TypedEnumRule) Category() string { return CategorySemantic }
 func (r *TypedEnumRule) Description() string {
-	return "Enum values must match the specified type - for example, if type is 'string', all enum values must be strings. Type mismatches in enums cause validation failures and break code generation tools."
+	return "Enum values must match the specified type - for example, if type is `string`, all enum values must be strings. Type mismatches in enums cause validation failures and break code generation tools."
 }
 func (r *TypedEnumRule) Summary() string {
 	return "Enum values must match the specified schema type."
@@ -94,15 +94,15 @@ func createTypeMismatchError(index int, node *yaml.Node, schemaTypes []oas3.Sche
 		// Special error message for null values without proper nullable declaration
 		if len(openapiVersion) >= 3 && openapiVersion[:3] == "3.0" {
 			// OpenAPI 3.0.x - suggest nullable: true
-			return fmt.Sprintf("enum contains null at index %d but schema does not have 'nullable: true'. Add 'nullable: true' to allow null values", index)
+			return fmt.Sprintf("enum contains null at index `%d` but schema does not have `nullable: true`. Add `nullable: true` to allow null values", index)
 		}
 		// OpenAPI 3.1.x or later - suggest type array with null
 		typeWithNull := formatTypeArrayWithNull(schemaTypes)
-		return fmt.Sprintf("enum contains null at index %d but schema type does not include null. Change 'type: %v' to 'type: %s' to allow null values", index, schemaTypes, typeWithNull)
+		return fmt.Sprintf("enum contains null at index `%d` but schema type does not include null. Change `type: %s` to `type: %s` to allow null values", index, formatTypeArray(schemaTypes), typeWithNull)
 	}
 
 	// Generic type mismatch error
-	return fmt.Sprintf("enum value at index %d does not match schema type %v", index, schemaTypes)
+	return fmt.Sprintf("enum value at index `%d` does not match schema type %s", index, formatTypeArray(schemaTypes))
 }
 
 // isNullNode checks if a YAML node represents a null value
@@ -114,6 +114,29 @@ func isNullNode(node *yaml.Node) bool {
 		return true
 	}
 	return node.Tag == "!!null"
+}
+
+// formatTypeArray formats a type array for display in error messages
+func formatTypeArray(schemaTypes []oas3.SchemaType) string {
+	if len(schemaTypes) == 0 {
+		return "[]"
+	}
+	if len(schemaTypes) == 1 {
+		return fmt.Sprintf("[`%s`]", schemaTypes[0])
+	}
+	// Multiple types
+	var result strings.Builder
+	result.WriteString("[")
+	for i, t := range schemaTypes {
+		if i > 0 {
+			result.WriteString(", ")
+		}
+		result.WriteString("`")
+		result.WriteString(string(t))
+		result.WriteString("`")
+	}
+	result.WriteString("]")
+	return result.String()
 }
 
 // formatTypeArrayWithNull formats a type array suggestion with null included

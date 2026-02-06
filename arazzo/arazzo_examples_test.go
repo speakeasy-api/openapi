@@ -190,6 +190,6 @@ func Example_validating() {
 		fmt.Printf("%s\n", err.Error())
 	}
 	// Output:
-	// [3:3] error validation-required-field info.version is required
+	// [3:3] error validation-required-field `info.version` is required
 	// [13:9] error validation-required-field step at least one of operationId, operationPath or workflowId fields must be set
 }

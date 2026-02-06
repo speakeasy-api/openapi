@@ -142,7 +142,7 @@ func (r *Response) Validate(ctx context.Context, opts ...validation.Option) []er
 	errs := []error{}
 
 	if c.Description.Present && r.Description == "" {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("response.description is required"), c, c.Description))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`response.description` is required"), c, c.Description))
 	}
 
 	for _, header := range r.Headers.All() {
@@ -231,7 +231,7 @@ func (h *Header) Validate(ctx context.Context, opts ...validation.Option) []erro
 	errs := []error{}
 
 	if c.Type.Present && h.Type == "" {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("header.type is required"), c, c.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`header.type` is required"), c, c.Type))
 	} else if c.Type.Present {
 		validTypes := []string{"string", "number", "integer", "boolean", "array"}
 		valid := false

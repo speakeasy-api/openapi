@@ -87,7 +87,7 @@ func (r *OwaspJWTBestPracticesRule) Run(ctx context.Context, docInfo *linter.Doc
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						RuleOwaspJWTBestPractices,
-						fmt.Errorf("security scheme '%s' must explicitly declare support for RFC8725 in the description", name),
+						fmt.Errorf("security scheme `%s` must explicitly declare support for RFC8725 in the description", name),
 						descNode,
 					))
 				} else {
@@ -95,7 +95,7 @@ func (r *OwaspJWTBestPracticesRule) Run(ctx context.Context, docInfo *linter.Doc
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						RuleOwaspJWTBestPractices,
-						fmt.Errorf("security scheme '%s' must explicitly declare support for RFC8725 in the description", name),
+						fmt.Errorf("security scheme `%s` must explicitly declare support for RFC8725 in the description", name),
 						rootNode,
 					))
 				}

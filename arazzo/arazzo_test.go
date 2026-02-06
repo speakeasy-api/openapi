@@ -300,11 +300,11 @@ sourceDescriptions:
 		column          int
 		underlyingError error
 	}{
-		{line: 1, column: 1, underlyingError: errors.New("arazzo.workflows is required")},
-		{line: 1, column: 9, underlyingError: errors.New("arazzo.version only Arazzo versions between 1.0.0 and 1.0.1 are supported")},
-		{line: 4, column: 3, underlyingError: errors.New("info.version is required")},
-		{line: 6, column: 5, underlyingError: errors.New("sourceDescription.url is required")},
-		{line: 7, column: 11, underlyingError: errors.New("sourceDescription.type must be one of [openapi, arazzo]")},
+		{line: 1, column: 1, underlyingError: errors.New("`arazzo.workflows` is required")},
+		{line: 1, column: 9, underlyingError: errors.New("arazzo.version only Arazzo versions between `1.0.0` and `1.0.1` are supported")},
+		{line: 4, column: 3, underlyingError: errors.New("`info.version` is required")},
+		{line: 6, column: 5, underlyingError: errors.New("`sourceDescription.url` is required")},
+		{line: 7, column: 11, underlyingError: errors.New("sourceDescription.type must be one of [`openapi, arazzo`]")},
 	}
 
 	require.Len(t, validationErrs, len(expectedErrors), "number of validation errors should match")
@@ -632,7 +632,7 @@ var stressTests = []struct {
 		args: args{
 			location: "https://raw.githubusercontent.com/frankkilcommins/simple-spectral-arazzo-GA/4ec8856f1cf21c0f77597c715c150ef3e2772a89/apis/OnlineStore.arazzo.yaml",
 			validationIgnores: []string{
-				"info.title is required", // legit issue
+				"`info.title` is required", // legit issue
 				"operationId must be a valid expression if there are multiple OpenAPI source descriptions", // legit issue
 				"$responses.body.menuItems[0].subcategories[0].id",                                         // legit issue
 			},
@@ -681,7 +681,7 @@ var stressTests = []struct {
 		args: args{
 			location: "https://raw.githubusercontent.com/API-Flows/openapi-workflow-registry/75c237ce1b155ba9f8dc7f065759df7ae1cbbbe5/root/adyen/adyen-giving.yaml",
 			validationIgnores: []string{
-				"in must be one of [path, query, header, cookie] but was body",
+				"in must be one of [`path, query, header, cookie`] but was `body`",
 			},
 		},
 		wantTitle: "Adyen Giving",

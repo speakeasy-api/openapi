@@ -105,9 +105,9 @@ func TestEitherValue_BothTypesFailValidation(t *testing.T) {
 	foundTypeMismatchError := false
 	for _, validationErr := range validationErrs {
 		errStr := validationErr.Error()
-		// Check for type mismatch patterns like "expected X, got Y"
-		if (strings.Contains(errStr, "expected string") || strings.Contains(errStr, "expected bool")) &&
-			strings.Contains(errStr, "got sequence") {
+		// Check for type mismatch patterns like "expected `X`, got `Y`"
+		if (strings.Contains(errStr, "expected `string`") || strings.Contains(errStr, "expected `bool`")) &&
+			strings.Contains(errStr, "got `sequence`") {
 			foundTypeMismatchError = true
 			break
 		}
@@ -222,7 +222,7 @@ func TestEitherValue_SyncChanges_Error(t *testing.T) {
 			name:        "non-struct model",
 			model:       "not a struct",
 			expectError: true,
-			errorMsg:    "expected struct, got string",
+			errorMsg:    "expected `struct`, got `string`",
 		},
 		{
 			name:        "both left and right nil",

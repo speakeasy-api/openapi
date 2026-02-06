@@ -268,7 +268,7 @@ func (o *OpenAPI) Validate(ctx context.Context, opts ...validation.Option) []err
 
 	if core.JSONSchemaDialect.Present && o.JSONSchemaDialect != nil {
 		if _, err := url.Parse(*o.JSONSchemaDialect); err != nil {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("openapi.jsonSchemaDialect is not a valid uri: %w", err), core, core.JSONSchemaDialect))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("`openapi.jsonSchemaDialect` is not a valid uri: %w", err), core, core.JSONSchemaDialect))
 		}
 	}
 
@@ -312,7 +312,7 @@ func validateOperationIDUniqueness(ctx context.Context, doc *OpenAPI) []error {
 					err := validation.NewValidationError(
 						validation.SeverityError,
 						validation.RuleValidationOperationIdUnique,
-						fmt.Errorf("the '%s' operation at path '%s' contains a duplicate operationId '%s'", method, path, operationID),
+						fmt.Errorf("the `%s` operation at path `%s` contains a duplicate operationId `%s`", method, path, operationID),
 						errNode,
 					)
 					errs = append(errs, err)

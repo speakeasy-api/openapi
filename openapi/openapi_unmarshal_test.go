@@ -120,7 +120,7 @@ func TestOpenAPI_Unmarshal_Error(t *testing.T) {
   version: 1.0.0
 paths: {}`,
 			wantErrs: []string{
-				"[1:1] error validation-required-field openapi.openapi is required",
+				"[1:1] error validation-required-field `openapi.openapi` is required",
 				"[1:1] error validation-supported-version openapi.openapi invalid OpenAPI version : invalid version ",
 			},
 		},
@@ -128,7 +128,7 @@ paths: {}`,
 			name: "missing info field",
 			yaml: `openapi: 3.1.0
 paths: {}`,
-			wantErrs: []string{"[1:1] error validation-required-field openapi.info is required"},
+			wantErrs: []string{"[1:1] error validation-required-field `openapi.info` is required"},
 		},
 		{
 			name: "invalid openapi version",

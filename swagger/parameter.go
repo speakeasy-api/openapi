@@ -170,7 +170,7 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 	errs := []error{}
 
 	if c.Name.Present && p.Name == "" {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.name is required"), c, c.Name))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`parameter.name` is required"), c, c.Name))
 	}
 
 	if c.In.Present && p.In == "" {
@@ -237,7 +237,7 @@ func (p *Parameter) validateIn(c *core.Parameter) []error {
 		}
 	}
 	if !valid {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.in must be one of [%s]", strings.Join([]string{string(ParameterInQuery), string(ParameterInHeader), string(ParameterInPath), string(ParameterInFormData), string(ParameterInBody)}, ", ")), c, c.In))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.in must be one of [`%s`]", strings.Join([]string{string(ParameterInQuery), string(ParameterInHeader), string(ParameterInPath), string(ParameterInFormData), string(ParameterInBody)}, ", ")), c, c.In))
 	}
 
 	return errs
@@ -282,7 +282,7 @@ func (p *Parameter) validateParameterType(ctx context.Context, c *core.Parameter
 			}
 		}
 		if !valid {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.type must be one of [%s]", strings.Join(validTypes, ", ")), c, c.Type))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.type must be one of [`%s`]", strings.Join(validTypes, ", ")), c, c.Type))
 		}
 
 		// File type only allowed for formData
@@ -377,7 +377,7 @@ func (i *Items) Validate(ctx context.Context, opts ...validation.Option) []error
 	errs := []error{}
 
 	if c.Type.Present && i.Type == "" {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("items.type is required"), c, c.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`items.type` is required"), c, c.Type))
 	} else if c.Type.Present {
 		validTypes := []string{"string", "number", "integer", "boolean", "array"}
 		valid := false
@@ -388,7 +388,7 @@ func (i *Items) Validate(ctx context.Context, opts ...validation.Option) []error
 			}
 		}
 		if !valid {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("items.type must be one of [%s]", strings.Join(validTypes, ", ")), c, c.Type))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("items.type must be one of [`%s`]", strings.Join(validTypes, ", ")), c, c.Type))
 		}
 
 		// Array type requires items

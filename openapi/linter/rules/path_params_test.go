@@ -455,7 +455,7 @@ paths:
           description: ok
 `,
 			expectedErrors: []string{
-				"[9:7] error semantic-path-params path parameter {userId} is not defined in operation parameters",
+				"[9:7] error semantic-path-params path parameter `{userId}` is not defined in operation parameters",
 			},
 		},
 		{
@@ -479,7 +479,7 @@ paths:
           description: ok
 `,
 			expectedErrors: []string{
-				"[9:7] error semantic-path-params path parameter {postId} is not defined in operation parameters",
+				"[9:7] error semantic-path-params path parameter `{postId}` is not defined in operation parameters",
 			},
 		},
 		{
@@ -497,8 +497,8 @@ paths:
           description: ok
 `,
 			expectedErrors: []string{
-				"[9:7] error semantic-path-params path parameter {userId} is not defined in operation parameters",
-				"[9:7] error semantic-path-params path parameter {postId} is not defined in operation parameters",
+				"[9:7] error semantic-path-params path parameter `{userId}` is not defined in operation parameters",
+				"[9:7] error semantic-path-params path parameter `{postId}` is not defined in operation parameters",
 			},
 		},
 		{
@@ -526,7 +526,7 @@ paths:
           description: created
 `,
 			expectedErrors: []string{
-				"[19:7] error semantic-path-params path parameter {userId} is not defined in operation parameters",
+				"[19:7] error semantic-path-params path parameter `{userId}` is not defined in operation parameters",
 			},
 		},
 		{
@@ -550,8 +550,8 @@ paths:
           description: ok
 `,
 			expectedErrors: []string{
-				"[9:7] error semantic-path-params path parameter {userId} is not defined in operation parameters",
-				`[9:7] error semantic-path-params parameter "userid" is declared as path parameter but not used in path template "/users/{userId}"`,
+				"[9:7] error semantic-path-params path parameter `{userId}` is not defined in operation parameters",
+				"[9:7] error semantic-path-params parameter `userid` is declared as path parameter but not used in path template `/users/{userId}`",
 			},
 		},
 	}
@@ -610,7 +610,7 @@ paths:
           description: ok
 `,
 			expectedErrors: []string{
-				`[9:7] error semantic-path-params parameter "userId" is declared as path parameter but not used in path template "/users"`,
+				"[9:7] error semantic-path-params parameter `userId` is declared as path parameter but not used in path template `/users`",
 			},
 		},
 		{
@@ -634,7 +634,7 @@ paths:
           description: ok
 `,
 			expectedErrors: []string{
-				`[15:7] error semantic-path-params parameter "userId" is declared as path parameter but not used in path template "/users"`,
+				"[15:7] error semantic-path-params parameter `userId` is declared as path parameter but not used in path template `/users`",
 			},
 		},
 		{
@@ -663,7 +663,7 @@ paths:
           description: ok
 `,
 			expectedErrors: []string{
-				`[9:7] error semantic-path-params parameter "postId" is declared as path parameter but not used in path template "/users/{userId}"`,
+				"[9:7] error semantic-path-params parameter `postId` is declared as path parameter but not used in path template `/users/{userId}`",
 			},
 		},
 	}
@@ -736,7 +736,7 @@ paths:
 	require.Len(t, errs, 1, "should have one error")
 
 	// Check full error string includes warning severity
-	assert.Equal(t, "[9:7] warning semantic-path-params path parameter {userId} is not defined in operation parameters", errs[0].Error())
+	assert.Equal(t, "[9:7] warning semantic-path-params path parameter `{userId}` is not defined in operation parameters", errs[0].Error())
 }
 
 func TestPathParamsRule_ExternalReferenceResolution(t *testing.T) {

@@ -67,7 +67,7 @@ func TestOverlay_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{"overlay version must be one of: 1.0.0, 1.1.0"},
+			expectedErrors: []string{"overlay version must be one of: `1.0.0, 1.1.0`"},
 		},
 		{
 			name: "empty overlay version",

@@ -199,16 +199,23 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 			case *kind.Type:
 				var want string
 				if len(t.Want) == 1 {
-					want = t.Want[0]
+					want = "`" + t.Want[0] + "`"
 				} else {
-					want = fmt.Sprintf("one of [%s]", strings.Join(t.Want, ", "))
+					// Wrap each type in backticks
+					wrappedTypes := make([]string, len(t.Want))
+					for i, typ := range t.Want {
+						wrappedTypes[i] = "`" + typ + "`"
+					}
+					want = fmt.Sprintf("one of [%s]", strings.Join(wrappedTypes, ", "))
 				}
 
-				msg = fmt.Sprintf("expected %s, got %s", want, t.Got)
+				msg = fmt.Sprintf("expected %s, got `%s`", want, t.Got)
 
 				newErr = validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, msg), valueNode)
 			case *kind.Required:
-				newErr = validation.NewValidationError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("%s %s", parentName, msg), valueNode)
+				// Replace single quotes with backticks in the message
+				msg = strings.ReplaceAll(msg, "'", "`")
+				newErr = validation.NewValidationError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("`%s` %s", parentName, msg), valueNode)
 			default:
 				newErr = validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSchema, fmt.Errorf("%s %s", parentName, msg), valueNode)
 			}

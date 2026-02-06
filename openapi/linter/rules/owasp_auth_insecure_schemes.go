@@ -18,13 +18,13 @@ type OwaspAuthInsecureSchemesRule struct{}
 func (r *OwaspAuthInsecureSchemesRule) ID() string       { return RuleOwaspAuthInsecureSchemes }
 func (r *OwaspAuthInsecureSchemesRule) Category() string { return CategorySecurity }
 func (r *OwaspAuthInsecureSchemesRule) Description() string {
-	return "Authentication schemes using outdated or insecure methods must be avoided or upgraded. Insecure authentication schemes like API keys in query parameters or HTTP Basic over HTTP expose credentials and create security vulnerabilities."
+	return "Authentication schemes using outdated or insecure methods must be avoided or upgraded. Insecure authentication schemes like API keys in query parameters or `HTTP Basic` over `HTTP` expose credentials and create security vulnerabilities."
 }
 func (r *OwaspAuthInsecureSchemesRule) Summary() string {
 	return "Security schemes must not use outdated or insecure HTTP schemes."
 }
 func (r *OwaspAuthInsecureSchemesRule) HowToFix() string {
-	return "Replace insecure HTTP schemes (negotiate/oauth) with modern authentication like OAuth 2.0 or bearer tokens."
+	return "Replace insecure `HTTP` schemes (`negotiate`/`oauth`) with modern authentication like `OAuth 2.0` or `bearer` tokens."
 }
 func (r *OwaspAuthInsecureSchemesRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-auth-insecure-schemes"
@@ -85,7 +85,7 @@ func (r *OwaspAuthInsecureSchemesRule) Run(ctx context.Context, docInfo *linter.
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						RuleOwaspAuthInsecureSchemes,
-						fmt.Errorf("security scheme '%s' uses '%s' which is outdated or insecure - use modern authentication like OAuth 2.0 or bearer tokens", name, httpScheme),
+						fmt.Errorf("security scheme `%s` uses `%s` which is outdated or insecure - use modern authentication like `OAuth 2.0` or `bearer` tokens", name, httpScheme),
 						schemeValueNode,
 					))
 				}

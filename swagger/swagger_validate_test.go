@@ -584,7 +584,7 @@ tags:
   - name: users
     description: Duplicate tag
 paths: {}`,
-			wantErrs: []string{"tag name 'users' must be unique"},
+			wantErrs: []string{"tag name `users` must be unique"},
 		},
 	}
 
@@ -690,7 +690,7 @@ paths:
       responses:
         200:
           description: Success`,
-			wantErrs: []string{"operationId 'getItems' must be unique"},
+			wantErrs: []string{"operationId `getItems` must be unique"},
 		},
 	}
 
@@ -1101,17 +1101,17 @@ func TestSecurityRequirement_Validate_Error(t *testing.T) {
 		{
 			name:     "undefined_security_scheme",
 			yml:      `undefined: []`,
-			wantErrs: []string{"security requirement 'undefined' does not match any security scheme"},
+			wantErrs: []string{"security requirement `undefined` does not match any security scheme"},
 		},
 		{
 			name:     "apiKey_with_non_empty_scopes",
 			yml:      `apiKey: ["some_scope"]`,
-			wantErrs: []string{"security requirement 'apiKey' must have empty scopes array for non-oauth2"},
+			wantErrs: []string{"security requirement `apiKey` must have empty scopes array for non-oauth2"},
 		},
 		{
 			name:     "basic_with_non_empty_scopes",
 			yml:      `basic: ["some_scope"]`,
-			wantErrs: []string{"security requirement 'basic' must have empty scopes array for non-oauth2"},
+			wantErrs: []string{"security requirement `basic` must have empty scopes array for non-oauth2"},
 		},
 	}
 

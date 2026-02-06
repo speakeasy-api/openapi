@@ -60,7 +60,7 @@ func (c *CriterionExpressionType) Validate(opts ...validation.Option) []error {
 		switch c.Version {
 		case CriterionTypeVersionDraftGoessnerDispatchJsonPath00:
 		default:
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionDraftGoessnerDispatchJsonPath00)}, ", ")), core, core.Version))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("version must be one of [`%s`]", strings.Join([]string{string(CriterionTypeVersionDraftGoessnerDispatchJsonPath00)}, ", ")), core, core.Version))
 		}
 	case CriterionTypeXPath:
 		switch c.Version {
@@ -68,10 +68,10 @@ func (c *CriterionExpressionType) Validate(opts ...validation.Option) []error {
 		case CriterionTypeVersionXPath20:
 		case CriterionTypeVersionXPath10:
 		default:
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("version must be one of [%s]", strings.Join([]string{string(CriterionTypeVersionXPath30), string(CriterionTypeVersionXPath20), string(CriterionTypeVersionXPath10)}, ", ")), core, core.Version))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("version must be one of [`%s`]", strings.Join([]string{string(CriterionTypeVersionXPath30), string(CriterionTypeVersionXPath20), string(CriterionTypeVersionXPath10)}, ", ")), core, core.Version))
 		}
 	default:
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("type must be one of [%s]", strings.Join([]string{string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("type must be one of [`%s`]", strings.Join([]string{string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
 	}
 
 	if len(errs) == 0 {
@@ -201,7 +201,7 @@ func (c *Criterion) Validate(opts ...validation.Option) []error {
 		case CriterionTypeJsonPath:
 		case CriterionTypeXPath:
 		default:
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("type must be one of [%s]", strings.Join([]string{string(CriterionTypeSimple), string(CriterionTypeRegex), string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("type must be one of [`%s`]", strings.Join([]string{string(CriterionTypeSimple), string(CriterionTypeRegex), string(CriterionTypeJsonPath), string(CriterionTypeXPath)}, ", ")), core, core.Type))
 		}
 	} else if c.Type.ExpressionType != nil {
 		errs = append(errs, c.Type.ExpressionType.Validate(opts...)...)

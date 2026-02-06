@@ -158,7 +158,7 @@ func (v *EitherValue[L, R]) SyncChanges(ctx context.Context, model any, valueNod
 	}
 
 	if mv.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("expected struct, got %s", mv.Kind())
+		return nil, fmt.Errorf("expected `struct`, got `%s`", mv.Kind())
 	}
 
 	lf := mv.FieldByName("Left")

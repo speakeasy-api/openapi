@@ -18,13 +18,13 @@ type OwaspNoHttpBasicRule struct{}
 func (r *OwaspNoHttpBasicRule) ID() string       { return RuleOwaspNoHttpBasic }
 func (r *OwaspNoHttpBasicRule) Category() string { return CategorySecurity }
 func (r *OwaspNoHttpBasicRule) Description() string {
-	return "Security schemes must not use HTTP Basic authentication without additional security layers. HTTP Basic sends credentials in easily-decoded base64 encoding, making it vulnerable to interception without HTTPS."
+	return "Security schemes must not use `HTTP Basic` authentication without additional security layers. `HTTP Basic` sends credentials in easily-decoded base64 encoding, making it vulnerable to interception without `HTTPS`."
 }
 func (r *OwaspNoHttpBasicRule) Summary() string {
-	return "Security schemes must not use HTTP Basic authentication."
+	return "Security schemes must not use `HTTP Basic` authentication."
 }
 func (r *OwaspNoHttpBasicRule) HowToFix() string {
-	return "Replace HTTP Basic schemes with more secure authentication (e.g., OAuth2 or bearer tokens)."
+	return "Replace `HTTP Basic` schemes with more secure authentication (e.g., `OAuth 2.0` or `bearer` tokens)."
 }
 func (r *OwaspNoHttpBasicRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-no-http-basic"
@@ -85,7 +85,7 @@ func (r *OwaspNoHttpBasicRule) Run(ctx context.Context, docInfo *linter.Document
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						RuleOwaspNoHttpBasic,
-						fmt.Errorf("security scheme '%s' uses HTTP %s authentication, which is insecure - use OAuth 2.0 or another secure method", name, httpScheme),
+						fmt.Errorf("security scheme `%s` uses `HTTP` `%s` authentication, which is insecure - use `OAuth 2.0` or another secure method", name, httpScheme),
 						schemeValueNode,
 					))
 				}

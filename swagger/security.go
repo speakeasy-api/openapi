@@ -155,7 +155,7 @@ func (s *SecurityScheme) Validate(ctx context.Context, opts ...validation.Option
 	errs := []error{}
 
 	if c.Type.Present && s.Type == "" {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("securityScheme.type is required"), c, c.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`securityScheme.type` is required"), c, c.Type))
 	} else {
 		validTypes := []SecuritySchemeType{SecuritySchemeTypeBasic, SecuritySchemeTypeAPIKey, SecuritySchemeTypeOAuth2}
 		valid := false
@@ -166,26 +166,26 @@ func (s *SecurityScheme) Validate(ctx context.Context, opts ...validation.Option
 			}
 		}
 		if !valid {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("securityScheme.type must be one of [%s]", strings.Join([]string{string(SecuritySchemeTypeBasic), string(SecuritySchemeTypeAPIKey), string(SecuritySchemeTypeOAuth2)}, ", ")), c, c.Type))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("securityScheme.type must be one of [`%s`]", strings.Join([]string{string(SecuritySchemeTypeBasic), string(SecuritySchemeTypeAPIKey), string(SecuritySchemeTypeOAuth2)}, ", ")), c, c.Type))
 		}
 	}
 
 	// Validate apiKey specific fields
 	if s.Type == SecuritySchemeTypeAPIKey {
 		if !c.Name.Present || s.Name == nil || *s.Name == "" {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("securityScheme.name is required for type=apiKey"), c, c.Name))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`securityScheme.name` is required for type=apiKey"), c, c.Name))
 		}
 		if !c.In.Present || s.In == nil {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("securityScheme.in is required for type=apiKey"), c, c.In))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`securityScheme.in` is required for type=apiKey"), c, c.In))
 		} else if *s.In != SecuritySchemeInQuery && *s.In != SecuritySchemeInHeader {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("securityScheme.in must be one of [%s] for type=apiKey", strings.Join([]string{string(SecuritySchemeInQuery), string(SecuritySchemeInHeader)}, ", ")), c, c.In))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("securityScheme.in must be one of [`%s`] for type=apiKey", strings.Join([]string{string(SecuritySchemeInQuery), string(SecuritySchemeInHeader)}, ", ")), c, c.In))
 		}
 	}
 
 	// Validate oauth2 specific fields
 	if s.Type == SecuritySchemeTypeOAuth2 {
 		if !c.Flow.Present || s.Flow == nil {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("securityScheme.flow is required for type=oauth2"), c, c.Flow))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`securityScheme.flow` is required for type=oauth2"), c, c.Flow))
 		} else {
 			validFlows := []OAuth2Flow{OAuth2FlowImplicit, OAuth2FlowPassword, OAuth2FlowApplication, OAuth2FlowAccessCode}
 			valid := false
@@ -196,7 +196,7 @@ func (s *SecurityScheme) Validate(ctx context.Context, opts ...validation.Option
 				}
 			}
 			if !valid {
-				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("securityScheme.flow must be one of [%s] for type=oauth2", strings.Join([]string{string(OAuth2FlowImplicit), string(OAuth2FlowPassword), string(OAuth2FlowApplication), string(OAuth2FlowAccessCode)}, ", ")), c, c.Flow))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("securityScheme.flow must be one of [`%s`] for type=oauth2", strings.Join([]string{string(OAuth2FlowImplicit), string(OAuth2FlowPassword), string(OAuth2FlowApplication), string(OAuth2FlowAccessCode)}, ", ")), c, c.Flow))
 			}
 
 			if s.Flow != nil {
@@ -213,7 +213,7 @@ func (s *SecurityScheme) Validate(ctx context.Context, opts ...validation.Option
 		}
 
 		if !c.Scopes.Present {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("securityScheme.scopes is required for type=oauth2"), c, c.Scopes))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`securityScheme.scopes` is required for type=oauth2"), c, c.Scopes))
 		}
 	}
 
@@ -276,7 +276,7 @@ func (s *SecurityRequirement) Validate(ctx context.Context, opts ...validation.O
 			errs = append(errs, validation.NewValidationError(
 				validation.SeverityError,
 				validation.RuleValidationSchemeNotFound,
-				fmt.Errorf("security requirement '%s' does not match any security scheme in securityDefinitions", name),
+				fmt.Errorf("security requirement `%s` does not match any security scheme in securityDefinitions", name),
 				c.RootNode))
 			continue
 		}
@@ -287,7 +287,7 @@ func (s *SecurityRequirement) Validate(ctx context.Context, opts ...validation.O
 				errs = append(errs, validation.NewValidationError(
 					validation.SeverityError,
 					validation.RuleValidationAllowedValues,
-					fmt.Errorf("security requirement '%s' must have empty scopes array for non-oauth2 security scheme (type=%s)", name, secScheme.Type),
+					fmt.Errorf("security requirement `%s` must have empty scopes array for non-oauth2 security scheme (type=`%s`)", name, secScheme.Type),
 					c.RootNode))
 			}
 		}

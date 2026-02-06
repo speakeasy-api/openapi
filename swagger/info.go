@@ -98,11 +98,11 @@ func (i *Info) Validate(ctx context.Context, opts ...validation.Option) []error 
 	errs := []error{}
 
 	if c.Title.Present && i.Title == "" {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("info.title is required"), c, c.Title))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`info.title` is required"), c, c.Title))
 	}
 
 	if c.Version.Present && i.Version == "" {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("info.version is required"), c, c.Version))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`info.version` is required"), c, c.Version))
 	}
 
 	if c.TermsOfService.Present {
@@ -238,7 +238,7 @@ func (l *License) Validate(ctx context.Context, opts ...validation.Option) []err
 	errs := []error{}
 
 	if core.Name.Present && l.Name == "" {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("license.name is required"), core, core.Name))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`license.name` is required"), core, core.Name))
 	}
 
 	if core.URL.Present {

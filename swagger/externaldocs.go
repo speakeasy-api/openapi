@@ -57,7 +57,7 @@ func (e *ExternalDocumentation) Validate(ctx context.Context, opts ...validation
 	errs := []error{}
 
 	if c.URL.Present && e.URL == "" {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("externalDocs.url is required"), c, c.URL))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`externalDocs.url` is required"), c, c.URL))
 	}
 
 	if c.URL.Present {

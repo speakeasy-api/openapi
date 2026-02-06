@@ -193,7 +193,7 @@ func (s *Swagger) Validate(ctx context.Context, opts ...validation.Option) []err
 	errs := []error{}
 
 	if c.Swagger.Present && s.Swagger == "" {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("swagger is required"), c, c.Swagger))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`swagger` is required"), c, c.Swagger))
 	} else if c.Swagger.Present && s.Swagger != "2.0" {
 		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationSupportedVersion, errors.New("swagger must be '2.0'"), c, c.Swagger))
 	}
@@ -228,7 +228,7 @@ func (s *Swagger) Validate(ctx context.Context, opts ...validation.Option) []err
 				errs = append(errs, validation.NewValueError(
 					validation.SeverityError,
 					validation.RuleValidationAllowedValues,
-					fmt.Errorf("scheme must be one of [http, https, ws, wss], got '%s'", scheme),
+					fmt.Errorf("scheme must be one of [http, https, ws, wss], got `%s`", scheme),
 					c, c.Schemes))
 			}
 		}
@@ -241,7 +241,7 @@ func (s *Swagger) Validate(ctx context.Context, opts ...validation.Option) []err
 				errs = append(errs, validation.NewValueError(
 					validation.SeverityError,
 					validation.RuleValidationInvalidFormat,
-					fmt.Errorf("consumes contains invalid MIME type '%s': %w", mimeType, err),
+					fmt.Errorf("consumes contains invalid MIME type `%s`: %w", mimeType, err),
 					c, c.Consumes))
 			}
 		}
@@ -254,7 +254,7 @@ func (s *Swagger) Validate(ctx context.Context, opts ...validation.Option) []err
 				errs = append(errs, validation.NewValueError(
 					validation.SeverityError,
 					validation.RuleValidationInvalidFormat,
-					fmt.Errorf("produces contains invalid MIME type '%s': %w", mimeType, err),
+					fmt.Errorf("produces contains invalid MIME type `%s`: %w", mimeType, err),
 					c, c.Produces))
 			}
 		}
@@ -273,7 +273,7 @@ func (s *Swagger) Validate(ctx context.Context, opts ...validation.Option) []err
 				errs = append(errs, validation.NewValueError(
 					validation.SeverityError,
 					validation.RuleValidationDuplicateKey,
-					fmt.Errorf("tag name '%s' must be unique", tag.Name),
+					fmt.Errorf("tag name `%s` must be unique", tag.Name),
 					c, c.Tags))
 			}
 			tagNames[tag.Name] = true
@@ -334,7 +334,7 @@ func (s *Swagger) validateOperationIDUniqueness(c *core.Swagger) []error {
 				errs = append(errs, validation.NewValueError(
 					validation.SeverityError,
 					validation.RuleValidationDuplicateKey,
-					fmt.Errorf("operationId '%s' must be unique among all operations", opID),
+					fmt.Errorf("operationId `%s` must be unique among all operations", opID),
 					c, c.Paths))
 			}
 			operationIDs[opID] = true

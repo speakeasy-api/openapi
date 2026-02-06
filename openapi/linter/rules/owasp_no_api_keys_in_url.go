@@ -84,7 +84,7 @@ func (r *OwaspNoAPIKeysInURLRule) Run(ctx context.Context, docInfo *linter.Docum
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						RuleOwaspNoAPIKeysInURL,
-						fmt.Errorf("security scheme '%s' passes API key via URL %s parameter - use header instead for security", name, location),
+						fmt.Errorf("security scheme `%s` passes API key via URL `%s` parameter - use header instead for security", name, location),
 						inValueNode,
 					))
 				}

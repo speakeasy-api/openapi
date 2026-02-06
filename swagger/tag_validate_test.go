@@ -63,7 +63,7 @@ func TestTag_Validate_Error(t *testing.T) {
 		{
 			name:     "missing_name",
 			yml:      `description: Some description`,
-			wantErrs: []string{"tag.name is required"},
+			wantErrs: []string{"`tag.name` is required"},
 		},
 	}
 
@@ -142,7 +142,7 @@ func TestExternalDocumentation_Validate_Error(t *testing.T) {
 		{
 			name:     "missing_url",
 			yml:      `description: Some description`,
-			wantErrs: []string{"externalDocumentation.url is required"},
+			wantErrs: []string{"`externalDocumentation.url` is required"},
 		},
 	}
 

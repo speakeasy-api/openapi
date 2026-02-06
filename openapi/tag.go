@@ -98,7 +98,7 @@ func (t *Tag) Validate(ctx context.Context, opts ...validation.Option) []error {
 	errs := []error{}
 
 	if core.Name.Present && t.Name == "" {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("tag.name is required"), core, core.Name))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`tag.name` is required"), core, core.Name))
 	}
 
 	if t.ExternalDocs != nil {
@@ -124,14 +124,14 @@ func (t *Tag) Validate(ctx context.Context, opts ...validation.Option) []error {
 
 		if !parentExists {
 			errs = append(errs, validation.NewValueError(validation.SeverityWarning, validation.RuleValidationTagNotFound,
-				fmt.Errorf("parent tag '%s' does not exist", *t.Parent),
+				fmt.Errorf("parent tag `%s` does not exist", *t.Parent),
 				core, core.Parent))
 		}
 
 		// Check for circular references
 		if t.hasCircularParentReference(allTags, make(map[string]bool)) {
 			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationCircularReference,
-				fmt.Errorf("circular parent reference detected for tag '%s'", t.Name),
+				fmt.Errorf("circular parent reference detected for tag `%s`", t.Name),
 				core, core.Parent))
 		}
 	}

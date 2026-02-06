@@ -65,12 +65,12 @@ func TestInfo_Validate_Error(t *testing.T) {
 		{
 			name:     "missing_title",
 			yml:      `version: 1.0.0`,
-			wantErrs: []string{"info.title is required"},
+			wantErrs: []string{"`info.title` is required"},
 		},
 		{
 			name:     "missing_version",
 			yml:      `title: Test API`,
-			wantErrs: []string{"info.version is required"},
+			wantErrs: []string{"`info.version` is required"},
 		},
 		{
 			name: "invalid_contact_email",
@@ -86,7 +86,7 @@ contact:
 version: 1.0.0
 license:
   url: https://example.com/license`,
-			wantErrs: []string{"license.name is required"},
+			wantErrs: []string{"`license.name` is required"},
 		},
 	}
 
@@ -249,7 +249,7 @@ func TestLicense_Validate_Error(t *testing.T) {
 		{
 			name:     "missing_name",
 			yml:      `url: https://example.com/license`,
-			wantErrs: []string{"license.name is required"},
+			wantErrs: []string{"`license.name` is required"},
 		},
 	}
 

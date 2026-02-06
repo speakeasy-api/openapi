@@ -269,7 +269,7 @@ paths: {}
 
 			require.Len(t, errs, tt.expectedCount)
 			for _, err := range errs {
-				assert.Contains(t, err.Error(), "must specify minimum and maximum")
+				assert.Contains(t, err.Error(), "must specify `minimum` and `maximum`")
 			}
 		})
 	}

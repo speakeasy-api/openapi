@@ -171,7 +171,7 @@ paths:
             details:
               operationId: nonExistentOperation
 `,
-			expectedError: "link.operationId value nonExistentOperation does not exist in document",
+			expectedError: "link.operationId value `nonExistentOperation` does not exist in document",
 		},
 		{
 			name: "component link with invalid operationId",
@@ -192,7 +192,7 @@ components:
     InvalidLink:
       operationId: invalidOperation
 `,
-			expectedError: "link.operationId value invalidOperation does not exist in document",
+			expectedError: "link.operationId value `invalidOperation` does not exist in document",
 		},
 		{
 			name: "multiple invalid operationIds",
@@ -214,7 +214,7 @@ paths:
             link2:
               operationId: invalid2
 `,
-			expectedError: "link.operationId value invalid",
+			expectedError: "link.operationId value `invalid",
 		},
 	}
 

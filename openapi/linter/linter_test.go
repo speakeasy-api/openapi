@@ -263,7 +263,7 @@ paths:
 
 	assert.ElementsMatch(t, []string{
 		"[1:7] error validation-invalid-schema schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string' (document: /spec/schema.yaml)",
-		"[1:7] error validation-type-mismatch schema.type expected array, got string (document: /spec/schema.yaml)",
+		"[1:7] error validation-type-mismatch schema.type expected `array`, got `string` (document: /spec/schema.yaml)",
 	}, errorStrings)
 }
 
@@ -450,7 +450,7 @@ paths:
 
 	assert.ElementsMatch(t, []string{
 		"[1:7] error validation-invalid-schema schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string' (document: /spec/schema.yaml)",
-		"[1:7] error validation-type-mismatch schema.type expected array, got string (document: /spec/schema.yaml)",
+		"[1:7] error validation-type-mismatch schema.type expected `array`, got `string` (document: /spec/schema.yaml)",
 	}, documentErrors)
 }
 
@@ -596,7 +596,7 @@ func TestNewLinter_Rulesets(t *testing.T) {
 
 		// "all" should include every registered rule
 		allRules := lntr.Registry().AllRules()
-		assert.Equal(t, len(allRules), len(ruleIDs), "all ruleset should include every rule")
+		assert.Len(t, ruleIDs, len(allRules), "all ruleset should include every rule")
 	})
 
 	t.Run("AllRulesets returns available rulesets", func(t *testing.T) {

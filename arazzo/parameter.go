@@ -78,12 +78,12 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 		}
 
 		if in != "" {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.in must be one of [%s] but was %s", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", "), in), core, core.In))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("parameter.in must be one of [`%s`] but was `%s`", strings.Join([]string{string(InPath), string(InQuery), string(InHeader), string(InCookie)}, ", "), in), core, core.In))
 		}
 	}
 
 	if core.Value.Present && p.Value == nil {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("parameter.value is required"), core, core.Value))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`parameter.value` is required"), core, core.Value))
 	} else if p.Value != nil {
 		_, expression, err := expression.GetValueOrExpressionValue(p.Value)
 		if err != nil {

@@ -237,7 +237,7 @@ components:
         - active
         - 123
 `,
-			expectedError: "[12:11] warning semantic-typed-enum enum value at index 1 does not match schema type [string]",
+			expectedError: "[12:11] warning semantic-typed-enum enum value at index `1` does not match schema type [`string`]",
 		},
 		{
 			name: "integer type with string value",
@@ -254,7 +254,7 @@ components:
         - 1
         - high
 `,
-			expectedError: "[12:11] warning semantic-typed-enum enum value at index 1 does not match schema type [integer]",
+			expectedError: "[12:11] warning semantic-typed-enum enum value at index `1` does not match schema type [`integer`]",
 		},
 		{
 			name: "boolean type with string value",
@@ -271,7 +271,7 @@ components:
         - true
         - yes
 `,
-			expectedError: "[12:11] warning semantic-typed-enum enum value at index 1 does not match schema type [boolean]",
+			expectedError: "[12:11] warning semantic-typed-enum enum value at index `1` does not match schema type [`boolean`]",
 		},
 		{
 			name: "openapi 3.0 null in enum without nullable true",
@@ -289,7 +289,7 @@ components:
         - inactive
         - null
 `,
-			expectedError: "[13:11] warning semantic-typed-enum enum contains null at index 2 but schema does not have 'nullable: true'. Add 'nullable: true' to allow null values",
+			expectedError: "[13:11] warning semantic-typed-enum enum contains null at index `2` but schema does not have `nullable: true`. Add `nullable: true` to allow null values",
 		},
 		{
 			name: "openapi 3.1 null in enum without null in type",
@@ -307,7 +307,7 @@ components:
         - 2
         - null
 `,
-			expectedError: `[13:11] warning semantic-typed-enum enum contains null at index 2 but schema type does not include null. Change 'type: [integer]' to 'type: ["integer", "null"]' to allow null values`,
+			expectedError: `[13:11] warning semantic-typed-enum enum contains null at index ` + "`2`" + ` but schema type does not include null. Change ` + "`type: [`integer`]`" + ` to ` + "`type: [\"integer\", \"null\"]`" + ` to allow null values`,
 		},
 	}
 

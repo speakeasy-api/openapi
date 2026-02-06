@@ -92,7 +92,7 @@ func (s *Condition) Validate(valueNode *yaml.Node, opts ...validation.Option) []
 	switch s.Operator {
 	case OperatorLT, OperatorLTE, OperatorGT, OperatorGTE, OperatorEQ, OperatorNE, OperatorNot, OperatorAnd, OperatorOr:
 	default:
-		errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("operator must be one of [%s]", strings.Join([]string{string(OperatorLT), string(OperatorLTE), string(OperatorGT), string(OperatorGTE), string(OperatorEQ), string(OperatorNE), string(OperatorNot), string(OperatorAnd), string(OperatorOr)}, ", ")), valueNode))
+		errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("operator must be one of [`%s`]", strings.Join([]string{string(OperatorLT), string(OperatorLTE), string(OperatorGT), string(OperatorGTE), string(OperatorEQ), string(OperatorNE), string(OperatorNot), string(OperatorAnd), string(OperatorOr)}, ", ")), valueNode))
 	}
 
 	if s.Value == "" {

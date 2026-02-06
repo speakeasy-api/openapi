@@ -1084,7 +1084,7 @@ func (i *Index) checkUnknownProperties(_ context.Context, core marshaller.CoreMo
 		// Mark as reported
 		i.reportedUnknownProps[core][prop] = true
 
-		err := fmt.Errorf("unknown property '%s' found", prop)
+		err := fmt.Errorf("unknown property `%s` found", prop)
 		i.validationErrs = append(i.validationErrs, validation.NewValidationErrorWithDocumentLocation(
 			validation.SeverityWarning,
 			"validation-unknown-properties",

@@ -105,7 +105,7 @@ func (r *LinkOperationRule) Run(ctx context.Context, docInfo *linter.DocumentInf
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					validation.RuleValidationOperationNotFound,
-					fmt.Errorf("link.operationId value %s does not exist in document", operationID),
+					fmt.Errorf("link.operationId value `%s` does not exist in document", operationID),
 					node,
 				))
 			}

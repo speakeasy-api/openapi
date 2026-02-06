@@ -73,7 +73,7 @@ func (r *OwaspSecurityHostsHttpsOAS3Rule) Run(ctx context.Context, docInfo *lint
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						RuleOwaspSecurityHostsHttpsOAS3,
-						fmt.Errorf("server URL '%s' must use HTTPS protocol for security", url),
+						fmt.Errorf("server URL `%s` must use HTTPS protocol for security", url),
 						urlValueNode,
 					))
 				}

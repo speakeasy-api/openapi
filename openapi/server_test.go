@@ -141,7 +141,7 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 					return vars
 				}(),
 			},
-			expectedErrs: []string{"server variable 'host' is not defined"},
+			expectedErrs: []string{"server variable `host` is not defined"},
 		},
 		{
 			name: "variable with empty default",
@@ -153,7 +153,7 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 					return vars
 				}(),
 			},
-			expectedErrs: []string{"server variable 'host' has no default value"},
+			expectedErrs: []string{"server variable `host` has no default value"},
 		},
 		{
 			name: "multiple variables with one undefined",
@@ -165,7 +165,7 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 					return vars
 				}(),
 			},
-			expectedErrs: []string{"server variable 'port' is not defined"},
+			expectedErrs: []string{"server variable `port` is not defined"},
 		},
 		{
 			name: "multiple variables with one having empty default",
@@ -178,7 +178,7 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 					return vars
 				}(),
 			},
-			expectedErrs: []string{"server variable 'port' has no default value"},
+			expectedErrs: []string{"server variable `port` has no default value"},
 		},
 		{
 			name: "malformed nested brackets creates invalid variable name",
@@ -190,7 +190,7 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 					return vars
 				}(),
 			},
-			expectedErrs: []string{"server variable 'incomplete/path/{host' is not defined"},
+			expectedErrs: []string{"server variable `incomplete/path/{host` is not defined"},
 		},
 		{
 			name: "double curly braces produces multiple errors",
@@ -204,8 +204,8 @@ func Test_resolveServerVariables_Error(t *testing.T) {
 				}(),
 			},
 			expectedErrs: []string{
-				"server variable '{host}' is not defined. Use single curly braces for variable substitution",
-				"server variable '{port}' is not defined. Use single curly braces for variable substitution",
+				"server variable `{host}` is not defined. Use single curly braces for variable substitution",
+				"server variable `{port}` is not defined. Use single curly braces for variable substitution",
 			},
 		},
 	}

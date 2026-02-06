@@ -81,7 +81,7 @@ func TestOperation_Validate_Error(t *testing.T) {
 		{
 			name:     "missing_responses",
 			yml:      `summary: Test operation`,
-			wantErrs: []string{"operation.responses is required"},
+			wantErrs: []string{"`operation.responses` is required"},
 		},
 	}
 

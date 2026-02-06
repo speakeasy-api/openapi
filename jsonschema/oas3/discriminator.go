@@ -74,7 +74,7 @@ func (d *Discriminator) Validate(ctx context.Context, opts ...validation.Option)
 
 	// propertyName is REQUIRED in all OpenAPI versions
 	if core.PropertyName.Present && d.PropertyName == "" {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("discriminator.propertyName is required"), core, core.PropertyName))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`discriminator.propertyName` is required"), core, core.PropertyName))
 	}
 
 	// defaultMapping validation - must not be empty if present

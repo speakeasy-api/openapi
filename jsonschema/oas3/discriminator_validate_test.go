@@ -94,7 +94,7 @@ func TestDiscriminator_Validate_Error(t *testing.T) {
   dog: "#/components/schemas/Dog"
 `,
 			wantErrs: []string{
-				"[1:1] error validation-required-field discriminator.propertyName is required",
+				"[1:1] error validation-required-field `discriminator.propertyName` is required",
 			},
 		},
 		{
@@ -104,7 +104,7 @@ propertyName: ""
 mapping:
   dog: "#/components/schemas/Dog"
 `,
-			wantErrs: []string{"[2:15] error validation-required-field discriminator.propertyName is required"},
+			wantErrs: []string{"[2:15] error validation-required-field `discriminator.propertyName` is required"},
 		},
 	}
 

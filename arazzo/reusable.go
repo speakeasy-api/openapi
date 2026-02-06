@@ -137,7 +137,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, ob
 	core := r.GetCore()
 	if err := r.Reference.Validate(); err != nil {
 		return []error{
-			validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("%s.reference is invalid: %w", componentTypeToReusableType(objComponentType), err), core, core.Reference),
+			validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("`%s`.reference is invalid: %w", componentTypeToReusableType(objComponentType), err), core, core.Reference),
 		}
 	}
 
@@ -145,13 +145,13 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, ob
 
 	if typ != expression.ExpressionTypeComponents {
 		return []error{
-			validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("%s.reference must be a components expression, got %s", componentTypeToReusableType(objComponentType), r.Reference.GetType()), core, core.Reference),
+			validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("`%s`.reference must be a components expression, got `%s`", componentTypeToReusableType(objComponentType), r.Reference.GetType()), core, core.Reference),
 		}
 	}
 
 	if componentType == "" || len(references) != 1 {
 		return []error{
-			validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("%s.reference must be a components expression with 3 parts, got %s", componentTypeToReusableType(objComponentType), *r.Reference), core, core.Reference),
+			validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("`%s`.reference must be a components expression with 3 parts, got `%s`", componentTypeToReusableType(objComponentType), *r.Reference), core, core.Reference),
 		}
 	}
 
@@ -187,7 +187,7 @@ func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, ob
 		}, opts...)
 	default:
 		return []error{
-			validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("reference to %s is not valid, valid components are [parameters, successActions, failureActions]", componentType), core, core.Reference),
+			validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("reference to `%s` is not valid, valid components are [parameters, successActions, failureActions]", componentType), core, core.Reference),
 		}
 	}
 }
@@ -204,20 +204,20 @@ type validateComponentReferenceArgs[T any] struct {
 func validateComponentReference[T any, V interfaces.Validator[T]](ctx context.Context, args validateComponentReferenceArgs[V], opts ...validation.Option) []error {
 	if args.componentType != args.objComponentType {
 		return []error{
-			validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, fmt.Errorf("%s.reference expected a %s reference got %s", componentTypeToReusableType(args.objComponentType), args.objComponentType, args.componentType), args.referenceValueNode),
+			validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, fmt.Errorf("`%s`.reference expected a `%s` reference got `%s`", componentTypeToReusableType(args.objComponentType), args.objComponentType, args.componentType), args.referenceValueNode),
 		}
 	}
 
 	if args.components == nil {
 		return []error{
-			validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("%s.reference to missing component %s, components.%s not present", componentTypeToReusableType(args.objComponentType), *args.reference, args.componentType), args.referenceValueNode),
+			validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("`%s`.reference to missing component `%s`, components.`%s` not present", componentTypeToReusableType(args.objComponentType), *args.reference, args.componentType), args.referenceValueNode),
 		}
 	}
 
 	component, ok := args.components.Get(args.componentName)
 	if !ok {
 		return []error{
-			validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("%s.reference to missing component %s, components.%s.%s not present", componentTypeToReusableType(args.objComponentType), *args.reference, args.componentType, args.componentName), args.referenceValueNode),
+			validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("`%s`.reference to missing component `%s`, components.`%s`.`%s` not present", componentTypeToReusableType(args.objComponentType), *args.reference, args.componentType, args.componentName), args.referenceValueNode),
 		}
 	}
 

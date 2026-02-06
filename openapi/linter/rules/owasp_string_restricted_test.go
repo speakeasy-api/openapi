@@ -217,7 +217,7 @@ paths:
 
 			require.Len(t, errs, tt.expectedCount)
 			for _, err := range errs {
-				assert.Contains(t, err.Error(), "must specify format, const, enum, or pattern")
+				assert.Contains(t, err.Error(), "must specify `format`, `const`, `enum`, or `pattern`")
 			}
 		})
 	}

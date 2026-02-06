@@ -255,7 +255,7 @@ securitySchemes:
   InvalidScheme:
     description: Some scheme
 `,
-			wantErrs: []string{"[4:5] error validation-required-field securityScheme.type is required"},
+			wantErrs: []string{"[4:5] error validation-required-field `securityScheme.type` is required"},
 		},
 	}
 

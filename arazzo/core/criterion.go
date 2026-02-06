@@ -78,7 +78,7 @@ func (c *CriterionTypeUnion) SyncChanges(ctx context.Context, model any, valueNo
 	}
 
 	if mv.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("CriterionTypeUnion.SyncChanges expected a struct, got %s", mv.Type())
+		return nil, fmt.Errorf("CriterionTypeUnion.SyncChanges expected a struct, got `%s`", mv.Type())
 	}
 
 	tf := mv.FieldByName("Type")

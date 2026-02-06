@@ -172,7 +172,7 @@ func TestParameter_Validate_Error(t *testing.T) {
 in: query
 type: string
 `,
-			wantErrs: []string{"parameter.name is required"},
+			wantErrs: []string{"`parameter.name` is required"},
 		},
 		{
 			name: "empty name",
@@ -181,7 +181,7 @@ name: ""
 in: query
 type: string
 `,
-			wantErrs: []string{"parameter.name is required"},
+			wantErrs: []string{"`parameter.name` is required"},
 		},
 		{
 			name: "missing in",
@@ -189,7 +189,7 @@ type: string
 name: test
 type: string
 `,
-			wantErrs: []string{"parameter.in is required"},
+			wantErrs: []string{"`parameter.in` is required"},
 		},
 		{
 			name: "path parameter not required",
@@ -270,7 +270,7 @@ in: path
 required: false
 `,
 			wantErrs: []string{
-				"parameter.name is required",
+				"`parameter.name` is required",
 				"parameter.in=path requires required=true",
 			},
 		},
@@ -372,7 +372,7 @@ func TestItems_Validate_Error(t *testing.T) {
 			yml: `
 format: int32
 `,
-			wantErrs: []string{"items.type is required"},
+			wantErrs: []string{"`items.type` is required"},
 		},
 		{
 			name: "array items without nested items",

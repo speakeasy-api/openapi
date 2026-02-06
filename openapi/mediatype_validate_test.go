@@ -221,7 +221,7 @@ encoding:
 `,
 			wantErrs: []string{
 				"[13:17] error validation-invalid-schema schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string'",
-				"[13:17] error validation-type-mismatch schema.type expected array, got string",
+				"[13:17] error validation-type-mismatch schema.type expected `array`, got `string`",
 			},
 		},
 		{

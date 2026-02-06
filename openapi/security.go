@@ -170,51 +170,51 @@ func (s *SecurityScheme) Validate(ctx context.Context, opts ...validation.Option
 
 	if core.Type.Present {
 		if s.Type == "" {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("securityScheme.type is required"), core, core.Type))
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`securityScheme.type` is required"), core, core.Type))
 		} else {
 			switch s.Type {
 			case SecuritySchemeTypeAPIKey:
 				if !core.Name.Present || *s.Name == "" {
-					errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("securityScheme.name is required for type=apiKey"), core, core.Name))
+					errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`securityScheme.name` is required for type=apiKey"), core, core.Name))
 				}
 				if !core.In.Present || *s.In == "" {
-					errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("securityScheme.in is required for type=apiKey"), core, core.In))
+					errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`securityScheme.in` is required for type=apiKey"), core, core.In))
 				} else {
 					switch *s.In {
 					case SecuritySchemeInHeader:
 					case SecuritySchemeInQuery:
 					case SecuritySchemeInCookie:
 					default:
-						errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("securityScheme.in must be one of [%s] for type=apiKey", strings.Join([]string{string(SecuritySchemeInHeader), string(SecuritySchemeInQuery), string(SecuritySchemeInCookie)}, ", ")), core, core.In))
+						errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("securityScheme.in must be one of [`%s`] for type=apiKey", strings.Join([]string{string(SecuritySchemeInHeader), string(SecuritySchemeInQuery), string(SecuritySchemeInCookie)}, ", ")), core, core.In))
 					}
 				}
 			case SecuritySchemeTypeHTTP:
 				if !core.Scheme.Present || *s.Scheme == "" {
-					errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("securityScheme.scheme is required for type=http"), core, core.Scheme))
+					errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`securityScheme.scheme` is required for type=http"), core, core.Scheme))
 				}
 			case SecuritySchemeTypeMutualTLS:
 			case SecuritySchemeTypeOAuth2:
 				if !core.Flows.Present || s.Flows == nil {
-					errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("securityScheme.flows is required for type=oauth2"), core, core.Flows))
+					errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`securityScheme.flows` is required for type=oauth2"), core, core.Flows))
 				} else {
 					errs = append(errs, s.Flows.Validate(ctx, opts...)...)
 				}
 				// Validate oauth2MetadataUrl if present
 				if core.OAuth2MetadataUrl.Present && s.OAuth2MetadataUrl != nil && *s.OAuth2MetadataUrl != "" {
 					if _, err := url.Parse(*s.OAuth2MetadataUrl); err != nil {
-						errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("securityScheme.oauth2MetadataUrl is not a valid uri: %w", err), core, core.OAuth2MetadataUrl))
+						errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("`securityScheme.oauth2MetadataUrl` is not a valid uri: %w", err), core, core.OAuth2MetadataUrl))
 					}
 				}
 			case SecuritySchemeTypeOpenIDConnect:
 				if !core.OpenIdConnectUrl.Present || *s.OpenIdConnectUrl == "" {
-					errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("securityScheme.openIdConnectUrl is required for type=openIdConnect"), core, core.OpenIdConnectUrl))
+					errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`securityScheme.openIdConnectUrl` is required for type=openIdConnect"), core, core.OpenIdConnectUrl))
 				} else {
 					if _, err := url.Parse(*s.OpenIdConnectUrl); err != nil {
-						errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("securityScheme.openIdConnectUrl is not a valid uri: %w", err), core, core.OpenIdConnectUrl))
+						errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("`securityScheme.openIdConnectUrl` is not a valid uri: %w", err), core, core.OpenIdConnectUrl))
 					}
 				}
 			default:
-				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("securityScheme.type must be one of [%s]", strings.Join([]string{string(SecuritySchemeTypeAPIKey), string(SecuritySchemeTypeHTTP), string(SecuritySchemeTypeMutualTLS), string(SecuritySchemeTypeOAuth2), string(SecuritySchemeTypeOpenIDConnect)}, ", ")), core, core.Type))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("securityScheme.type must be one of [`%s`]", strings.Join([]string{string(SecuritySchemeTypeAPIKey), string(SecuritySchemeTypeHTTP), string(SecuritySchemeTypeMutualTLS), string(SecuritySchemeTypeOAuth2), string(SecuritySchemeTypeOpenIDConnect)}, ", ")), core, core.Type))
 			}
 		}
 

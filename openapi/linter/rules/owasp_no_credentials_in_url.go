@@ -78,7 +78,7 @@ func (r *OwaspNoCredentialsInURLRule) Run(ctx context.Context, docInfo *linter.D
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						RuleOwaspNoCredentialsInURL,
-						fmt.Errorf("URL parameter '%s' appears to contain credentials - avoid passing sensitive data in URLs", paramName),
+						fmt.Errorf("URL parameter `%s` appears to contain credentials - avoid passing sensitive data in URLs", paramName),
 						nameValueNode,
 					))
 				}

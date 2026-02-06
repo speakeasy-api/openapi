@@ -1533,7 +1533,7 @@ components:
           type: array
 `,
 			expectedWarningCount:  1,
-			expectedWarningSubstr: "unknown property '$ref'",
+			expectedWarningSubstr: "unknown property `$ref`",
 		},
 		{
 			name: "MediaType with schema property (valid)",
@@ -1576,7 +1576,7 @@ paths:
           description: Success
 `,
 			expectedWarningCount:  1,
-			expectedWarningSubstr: "unknown property 'unknownField'",
+			expectedWarningSubstr: "unknown property `unknownField`",
 		},
 		{
 			name: "Schema property with unknown keyword",
@@ -1605,7 +1605,7 @@ paths:
           description: No content
 `,
 			expectedWarningCount:  1,
-			expectedWarningSubstr: "unknown property 'name'",
+			expectedWarningSubstr: "unknown property `name`",
 		},
 	}
 
@@ -1715,7 +1715,7 @@ components:
 	for _, err := range allErrors {
 		var vErr *validation.Error
 		if errors.As(err, &vErr) && vErr.Severity == validation.SeverityWarning {
-			if strings.Contains(err.Error(), "unknown property 'unknownField'") {
+			if strings.Contains(err.Error(), "unknown property `unknownField`") {
 				unknownPropWarnings = append(unknownPropWarnings, err)
 			}
 		}
@@ -1724,7 +1724,7 @@ components:
 	// Despite the User schema being referenced 3 times (in 3 different operations),
 	// we should only get 1 warning for the unknown property
 	assert.Len(t, unknownPropWarnings, 1, "should only have 1 warning for unknownField despite multiple references")
-	assert.Contains(t, unknownPropWarnings[0].Error(), "unknown property 'unknownField'", "warning should mention the unknown field")
+	assert.Contains(t, unknownPropWarnings[0].Error(), "unknown property `unknownField`", "warning should mention the unknown field")
 }
 
 func TestBuildIndex_CircularReferenceCounts_ValidCircular_Success(t *testing.T) {

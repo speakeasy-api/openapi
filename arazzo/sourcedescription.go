@@ -74,7 +74,7 @@ func (s *SourceDescription) Validate(ctx context.Context, opts ...validation.Opt
 	case SourceDescriptionTypeOpenAPI:
 	case SourceDescriptionTypeArazzo:
 	default:
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("sourceDescription.type must be one of [%s]", strings.Join([]string{SourceDescriptionTypeOpenAPI, SourceDescriptionTypeArazzo}, ", ")), core, core.Type))
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("sourceDescription.type must be one of [`%s`]", strings.Join([]string{SourceDescriptionTypeOpenAPI, SourceDescriptionTypeArazzo}, ", ")), core, core.Type))
 	}
 
 	s.Valid = len(errs) == 0 && core.GetValid()

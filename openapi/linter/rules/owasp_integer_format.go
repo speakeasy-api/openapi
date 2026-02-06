@@ -20,13 +20,13 @@ func (r *OwaspIntegerFormatRule) Category() string {
 	return CategorySecurity
 }
 func (r *OwaspIntegerFormatRule) Description() string {
-	return "Integer schemas must specify a format of int32 or int64 to define the expected size and range. Explicit integer formats prevent overflow vulnerabilities and ensure clients and servers agree on numeric boundaries."
+	return "Integer schemas must specify a `format` of `int32` or `int64` to define the expected size and range. Explicit integer formats prevent overflow vulnerabilities and ensure clients and servers agree on numeric boundaries."
 }
 func (r *OwaspIntegerFormatRule) Summary() string {
-	return "Integer schemas must specify int32 or int64 format."
+	return "Integer schemas must specify `int32` or `int64` format."
 }
 func (r *OwaspIntegerFormatRule) HowToFix() string {
-	return "Set integer schema format to int32 or int64 based on the expected range."
+	return "Set integer schema `format` to `int32` or `int64` based on the expected range."
 }
 func (r *OwaspIntegerFormatRule) Link() string {
 	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#owasp-integer-format"
@@ -74,7 +74,7 @@ func (r *OwaspIntegerFormatRule) Run(ctx context.Context, docInfo *linter.Docume
 				errs = append(errs, validation.NewValidationError(
 					config.GetSeverity(r.DefaultSeverity()),
 					RuleOwaspIntegerFormat,
-					errors.New("schema of type 'integer' must specify format as 'int32' or 'int64'"),
+					errors.New("schema of type `integer` must specify `format` as `int32` or `int64`"),
 					rootNode,
 				))
 			}

@@ -109,7 +109,7 @@ func TestServer_Validate_Error(t *testing.T) {
 			yml: `
 description: Server without URL
 `,
-			wantErrs: []string{"[2:1] error validation-required-field server.url is required"},
+			wantErrs: []string{"[2:1] error validation-required-field `server.url` is required"},
 		},
 		{
 			name: "empty URL",
@@ -117,7 +117,7 @@ description: Server without URL
 url: ""
 description: Server with empty URL
 `,
-			wantErrs: []string{"[2:6] error validation-required-field server.url is required"},
+			wantErrs: []string{"[2:6] error validation-required-field `server.url` is required"},
 		},
 		{
 			name: "variable without default value",
@@ -127,7 +127,7 @@ variables:
   environment:
     description: Environment name
 `,
-			wantErrs: []string{"[5:5] error validation-required-field serverVariable.default is required"},
+			wantErrs: []string{"[5:5] error validation-required-field `serverVariable.default` is required"},
 		},
 		{
 			name: "variable with empty default",
@@ -138,7 +138,7 @@ variables:
     default: ""
     description: Environment name
 `,
-			wantErrs: []string{"[5:14] error validation-required-field serverVariable.default is required"},
+			wantErrs: []string{"[5:14] error validation-required-field `serverVariable.default` is required"},
 		},
 		{
 			name: "variable with invalid enum value",
@@ -152,7 +152,7 @@ variables:
       - development
     description: Environment name
 `,
-			wantErrs: []string{"[5:14] error validation-allowed-values serverVariable.default must be one of [staging, development]"},
+			wantErrs: []string{"[5:14] error validation-allowed-values serverVariable.default must be one of [`staging, development`]"},
 		},
 		{
 			name: "multiple validation errors",
@@ -164,8 +164,8 @@ variables:
     description: Environment name
 `,
 			wantErrs: []string{
-				"[2:6] error validation-required-field server.url is required",
-				"[5:14] error validation-required-field serverVariable.default is required",
+				"[2:6] error validation-required-field `server.url` is required",
+				"[5:14] error validation-required-field `serverVariable.default` is required",
 			},
 		},
 		{
@@ -177,7 +177,7 @@ variables:
     default: api
 `,
 			wantErrs: []string{
-				"error validation-invalid-syntax server variable '{hostname}' is not defined. Use single curly braces for variable substitution",
+				"error validation-invalid-syntax server variable `{hostname}` is not defined. Use single curly braces for variable substitution",
 			},
 		},
 		{
@@ -191,8 +191,8 @@ variables:
     default: "8080"
 `,
 			wantErrs: []string{
-				"error validation-invalid-syntax server variable '{hostname}' is not defined. Use single curly braces for variable substitution",
-				"error validation-invalid-syntax server variable '{port}' is not defined. Use single curly braces for variable substitution",
+				"error validation-invalid-syntax server variable `{hostname}` is not defined. Use single curly braces for variable substitution",
+				"error validation-invalid-syntax server variable `{port}` is not defined. Use single curly braces for variable substitution",
 			},
 		},
 		{
@@ -204,7 +204,7 @@ variables:
     default: "8080"
 `,
 			wantErrs: []string{
-				"error validation-invalid-syntax server variable 'hostname' is not defined",
+				"error validation-invalid-syntax server variable `hostname` is not defined",
 			},
 		},
 	}
@@ -319,7 +319,7 @@ func TestServerVariable_Validate_Error(t *testing.T) {
 			yml: `
 description: Variable without default
 `,
-			wantErrs: []string{"[2:1] error validation-required-field serverVariable.default is required"},
+			wantErrs: []string{"[2:1] error validation-required-field `serverVariable.default` is required"},
 		},
 		{
 			name: "empty default",
@@ -327,7 +327,7 @@ description: Variable without default
 default: ""
 description: Variable with empty default
 `,
-			wantErrs: []string{"[2:10] error validation-required-field serverVariable.default is required"},
+			wantErrs: []string{"[2:10] error validation-required-field `serverVariable.default` is required"},
 		},
 		{
 			name: "default not in enum",
@@ -338,7 +338,7 @@ enum:
   - valid2
 description: Variable with invalid default
 `,
-			wantErrs: []string{"[2:10] error validation-allowed-values serverVariable.default must be one of [valid1, valid2]"},
+			wantErrs: []string{"[2:10] error validation-allowed-values serverVariable.default must be one of [`valid1, valid2`]"},
 		},
 	}
 
