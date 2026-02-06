@@ -1,6 +1,7 @@
 package linter_test
 
 import (
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -101,6 +102,173 @@ custom_rules:
 	require.NoError(t, err, "should load config with custom_rules")
 	require.NotNil(t, config.CustomRules, "custom_rules should survive UnmarshalYAML round-trip")
 	assert.Equal(t, []string{"./rules/*.ts", "./extra/*.ts"}, config.CustomRules.Paths, "custom_rules.paths should be preserved")
+}
+
+func TestLoadConfig_CategorySeverityAliases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		yaml             string
+		expectedSeverity validation.Severity
+	}{
+		{
+			name: "error severity",
+			yaml: `categories:
+  style:
+    severity: error`,
+			expectedSeverity: validation.SeverityError,
+		},
+		{
+			name: "warn alias for warning",
+			yaml: `categories:
+  style:
+    severity: warn`,
+			expectedSeverity: validation.SeverityWarning,
+		},
+		{
+			name: "warning severity",
+			yaml: `categories:
+  style:
+    severity: warning`,
+			expectedSeverity: validation.SeverityWarning,
+		},
+		{
+			name: "hint severity",
+			yaml: `categories:
+  style:
+    severity: hint`,
+			expectedSeverity: validation.SeverityHint,
+		},
+		{
+			name: "info alias for hint",
+			yaml: `categories:
+  style:
+    severity: info`,
+			expectedSeverity: validation.SeverityHint,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			config, err := linter.LoadConfig(strings.NewReader(tt.yaml))
+			require.NoError(t, err)
+			require.NotNil(t, config.Categories["style"].Severity, "severity should be set")
+			assert.Equal(t, tt.expectedSeverity, *config.Categories["style"].Severity, "severity should match expected")
+		})
+	}
+}
+
+func TestLoadConfig_CategoryEnabled(t *testing.T) {
+	t.Parallel()
+
+	configYAML := `categories:
+  security:
+    enabled: false`
+	config, err := linter.LoadConfig(strings.NewReader(configYAML))
+	require.NoError(t, err)
+	require.NotNil(t, config.Categories["security"].Enabled, "enabled should be set")
+	assert.False(t, *config.Categories["security"].Enabled, "security category should be disabled")
+}
+
+func TestLoadConfig_CategoryInvalidSeverity(t *testing.T) {
+	t.Parallel()
+
+	configYAML := `categories:
+  style:
+    severity: critical`
+	_, err := linter.LoadConfig(strings.NewReader(configYAML))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown severity")
+}
+
+func TestLoadConfig_RuleSeverityAliases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		yaml             string
+		expectedSeverity validation.Severity
+	}{
+		{
+			name: "warn alias",
+			yaml: `rules:
+  - id: test-rule
+    severity: warn`,
+			expectedSeverity: validation.SeverityWarning,
+		},
+		{
+			name: "info alias",
+			yaml: `rules:
+  - id: test-rule
+    severity: info`,
+			expectedSeverity: validation.SeverityHint,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			config, err := linter.LoadConfig(strings.NewReader(tt.yaml))
+			require.NoError(t, err)
+			require.Len(t, config.Rules, 1)
+			require.NotNil(t, config.Rules[0].Severity, "severity should be set")
+			assert.Equal(t, tt.expectedSeverity, *config.Rules[0].Severity, "severity should match expected")
+		})
+	}
+}
+
+func TestLoadConfig_RuleInvalidSeverity(t *testing.T) {
+	t.Parallel()
+
+	configYAML := `rules:
+  - id: test-rule
+    severity: critical`
+	_, err := linter.LoadConfig(strings.NewReader(configYAML))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown severity")
+}
+
+func TestLoadConfig_ExtendsInvalidType(t *testing.T) {
+	t.Parallel()
+
+	configYAML := `extends:
+  key: value`
+	_, err := linter.LoadConfig(strings.NewReader(configYAML))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "extends must be a string or list of strings")
+}
+
+func TestLoadConfig_ExtendsNull(t *testing.T) {
+	t.Parallel()
+
+	configYAML := `extends: null`
+	config, err := linter.LoadConfig(strings.NewReader(configYAML))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"all"}, config.Extends, "null extends should default to all")
+}
+
+func TestLoadConfigFromFile_Success(t *testing.T) {
+	t.Parallel()
+
+	tmpFile := t.TempDir() + "/lint.yaml"
+	err := os.WriteFile(tmpFile, []byte("extends: recommended\n"), 0644)
+	require.NoError(t, err)
+
+	config, err := linter.LoadConfigFromFile(tmpFile)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"recommended"}, config.Extends)
+}
+
+func TestLoadConfigFromFile_Error(t *testing.T) {
+	t.Parallel()
+
+	_, err := linter.LoadConfigFromFile("/nonexistent/path/lint.yaml")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to open config file")
 }
 
 func TestConfig_ValidateMissingRuleID(t *testing.T) {

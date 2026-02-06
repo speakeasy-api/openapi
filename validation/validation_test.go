@@ -622,6 +622,109 @@ func TestError_GetSeverity_Success(t *testing.T) {
 	}
 }
 
+// Test Error.Error() with DocumentLocation
+func TestError_Error_WithDocumentLocation(t *testing.T) {
+	t.Parallel()
+
+	err := &Error{
+		UnderlyingError:  errors.New("test error"),
+		Severity:         SeverityError,
+		Rule:             RuleValidationInvalidReference,
+		Node:             &yaml.Node{Line: 5, Column: 3},
+		DocumentLocation: "https://example.com/spec.yaml",
+	}
+
+	result := err.Error()
+	assert.Equal(t, "[5:3] error validation-invalid-reference test error (document: https://example.com/spec.yaml)", result)
+}
+
+// Test Error.GetNode() method
+func TestError_GetNode_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      *Error
+		expected *yaml.Node
+	}{
+		{
+			name: "returns node when set",
+			err: &Error{
+				Node: &yaml.Node{Line: 10, Column: 5},
+			},
+			expected: &yaml.Node{Line: 10, Column: 5},
+		},
+		{
+			name: "returns nil when node is nil",
+			err: &Error{
+				Node: nil,
+			},
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := tt.err.GetNode()
+			assert.Equal(t, tt.expected, result, "node should match expected")
+		})
+	}
+}
+
+// Test Error.GetDocumentLocation() method
+func TestError_GetDocumentLocation_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      *Error
+		expected string
+	}{
+		{
+			name: "returns document location when set",
+			err: &Error{
+				DocumentLocation: "https://example.com/spec.yaml",
+			},
+			expected: "https://example.com/spec.yaml",
+		},
+		{
+			name:     "returns empty string when not set",
+			err:      &Error{},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := tt.err.GetDocumentLocation()
+			assert.Equal(t, tt.expected, result, "document location should match expected")
+		})
+	}
+}
+
+// Test NewValidationErrorWithDocumentLocation function
+func TestNewValidationErrorWithDocumentLocation_Success(t *testing.T) {
+	t.Parallel()
+
+	underlyingErr := errors.New("remote error")
+	node := &yaml.Node{Line: 15, Column: 8}
+	docLocation := "https://example.com/components.yaml"
+
+	result := NewValidationErrorWithDocumentLocation(SeverityWarning, RuleValidationInvalidReference, underlyingErr, node, docLocation)
+
+	var validationErr *Error
+	require.ErrorAs(t, result, &validationErr, "should return *Error type")
+	assert.Equal(t, underlyingErr, validationErr.UnderlyingError, "underlying error should match")
+	assert.Equal(t, node, validationErr.Node, "node should match")
+	assert.Equal(t, SeverityWarning, validationErr.Severity, "severity should match")
+	assert.Equal(t, RuleValidationInvalidReference, validationErr.Rule, "rule should match")
+	assert.Equal(t, docLocation, validationErr.DocumentLocation, "document location should match")
+}
+
 // Test TypeMismatchError with ParentName
 func TestTypeMismatchError_WithParentName_Success(t *testing.T) {
 	t.Parallel()
