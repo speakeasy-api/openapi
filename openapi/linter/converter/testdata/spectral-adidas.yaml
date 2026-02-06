@@ -1,0 +1,169 @@
+# Real-world-style Spectral config modeled after Adidas API guidelines
+# Contains 30+ rules: overrides, custom rules with various functions
+
+extends:
+  - ["spectral:oas", "recommended"]
+
+rules:
+  # --- Built-in overrides (severity changes / disables) ---
+  operation-tags: error
+  operation-operationId: error
+  operation-operationId-valid-in-url: error
+  operation-description: warn
+  operation-singular-tag: warn
+  operation-success-response: error
+  operation-tag-defined: error
+  no-eval-in-markdown: error
+  no-script-tags-in-markdown: error
+  no-ref-siblings: warn
+  typed-enum: error
+  duplicated-entry-in-enum: error
+  no-ambiguous-paths: error
+  info-description: error
+  info-contact: error
+  info-license: warn
+  license-url: warn
+  contact-properties: warn
+  tag-description: warn
+  tags-alphabetical: warn
+  path-params: error
+  path-declarations-must-exist: error
+  path-keys-no-trailing-slash: error
+  path-not-include-query: error
+  oas3-api-servers: error
+  oas3-server-not-example.com: error
+  oas3-server-trailing-slash: error
+  openapi-tags: warn
+  oas3-parameter-description: warn
+  description-duplication: off
+
+  # --- Custom rules with various Spectral core functions ---
+
+  # Truthy: require operation summary
+  adidas-operation-summary:
+    description: "Every operation must have a summary for documentation"
+    message: "Operation {{property}} is missing a summary"
+    severity: error
+    given: "$.paths[*][*]"
+    then:
+      field: summary
+      function: truthy
+
+  # Pattern: API version must be semver
+  adidas-version-semver:
+    description: "API version must follow semantic versioning"
+    severity: error
+    given: "$.info.version"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+
+  # Casing: path segments must be kebab-case
+  adidas-paths-kebab-case:
+    description: "Path segments must use kebab-case"
+    severity: error
+    given: "$.paths[*]~"
+    then:
+      function: casing
+      functionOptions:
+        type: kebab-case
+
+  # Enumeration: servers must use approved URLs
+  adidas-approved-servers:
+    description: "API servers must use approved base URLs"
+    severity: error
+    given: "$.servers[*].url"
+    then:
+      function: enumeration
+      functionOptions:
+        values:
+          - "https://api.adidas.com"
+          - "https://api-staging.adidas.com"
+          - "https://api-sandbox.adidas.com"
+
+  # Length: description length constraints
+  adidas-description-length:
+    description: "Descriptions must be between 10 and 500 characters"
+    severity: warn
+    given: "$.paths[*][*]"
+    then:
+      field: description
+      function: length
+      functionOptions:
+        min: 10
+        max: 500
+
+  # XOR: examples must have exactly one of value or externalValue
+  adidas-example-value-or-external:
+    description: "Examples must have either value or externalValue, not both"
+    severity: error
+    given: "$.components.examples[*]"
+    then:
+      function: xor
+      functionOptions:
+        properties:
+          - value
+          - externalValue
+
+  # OR: operations must have description or summary
+  adidas-operation-docs:
+    description: "Operations must have at least a description or summary"
+    severity: warn
+    given: "$.paths[*][*]"
+    then:
+      function: or
+      functionOptions:
+        properties:
+          - description
+          - summary
+
+  # Multiple then checks
+  adidas-operation-complete:
+    description: "Operations must have both operationId and tags"
+    severity: error
+    given:
+      - "$.paths[*][*]"
+    then:
+      - field: operationId
+        function: truthy
+      - field: tags
+        function: truthy
+
+  # Formats: OAS3-only rule
+  adidas-oas3-request-body:
+    description: "POST/PUT/PATCH operations should have request bodies"
+    severity: warn
+    formats:
+      - oas3
+    given: "$.paths[*].post"
+    then:
+      field: requestBody
+      function: truthy
+
+  # resolved: false
+  adidas-no-circular-refs:
+    description: "No circular references allowed"
+    severity: error
+    resolved: false
+    given: "$"
+    then:
+      function: truthy
+
+  # Custom function (should generate TODO)
+  adidas-custom-naming:
+    description: "Adidas naming conventions validator"
+    severity: error
+    given: "$.paths[*][*]"
+    then:
+      function: adidasNamingConvention
+      functionOptions:
+        prefix: "adidas"
+
+  # Deep/unsupported JSONPath
+  adidas-extension-check:
+    description: "Check x-adidas-lifecycle extension"
+    severity: warn
+    given: "$.paths[*][*].x-adidas-lifecycle"
+    then:
+      function: truthy

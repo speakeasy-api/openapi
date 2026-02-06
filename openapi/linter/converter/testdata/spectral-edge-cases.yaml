@@ -1,0 +1,84 @@
+# Edge cases for parsing
+extends: "spectral:oas"
+
+rules:
+  # Numeric severity
+  operation-tags: 0
+  # Boolean true = use default (no override)
+  operation-operationId: true
+  # Boolean false = off
+  operation-description: false
+  # String singleton given and object singleton then
+  singleton-given-then:
+    description: "Test singleton forms"
+    severity: warn
+    given: "$.info"
+    then:
+      field: description
+      function: truthy
+  # Multiple then entries
+  multi-then:
+    description: "Multiple then checks"
+    severity: error
+    given:
+      - "$.paths[*][*]"
+    then:
+      - field: summary
+        function: truthy
+      - field: description
+        function: truthy
+  # Pattern with match/notMatch
+  pattern-rule:
+    description: "Version must be semver"
+    message: "{{property}} must match semver format"
+    severity: warn
+    given: "$.info.version"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[0-9]+\\.[0-9]+\\.[0-9]+"
+  # Enumeration function
+  enum-rule:
+    description: "API must use HTTPS"
+    severity: error
+    given: "$.servers[*].url"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^https://"
+  # Custom/unknown function
+  custom-function-rule:
+    description: "Uses a custom function"
+    severity: warn
+    given: "$.info"
+    then:
+      function: myCompanyValidator
+      functionOptions:
+        checkLicense: true
+  # Resolved false
+  unresolved-rule:
+    description: "Check unresolved refs"
+    severity: warn
+    resolved: false
+    given: "$"
+    then:
+      function: truthy
+  # formats field
+  oas3-only-rule:
+    description: "OAS3 only rule"
+    severity: warn
+    formats:
+      - oas3
+    given: "$.info"
+    then:
+      field: description
+      function: truthy
+  # enabled: false (Vacuum extension)
+  disabled-vacuum-rule:
+    description: "This is disabled via enabled field"
+    enabled: false
+    severity: warn
+    given: "$.info"
+    then:
+      field: description
+      function: truthy

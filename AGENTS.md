@@ -106,6 +106,66 @@ git commit -m "feat: implement prefixEncoding and itemEncoding for OpenAPI 3.2
 3. **Searchability**: Easier to search and filter commits
 4. **Tool Compatibility**: Works better with automated tools and scripts
 
+## Linter Rules
+
+This project uses `golangci-lint` with strict rules. Run `mise lint` to check. The most common violations are listed below. **When you encounter a new common lint pattern not documented here, add it to this section so future sessions avoid the same mistakes.**
+
+### perfsprint — Avoid `fmt.Sprintf` for Simple String Operations
+
+The `perfsprint` linter flags unnecessary `fmt.Sprintf` calls. Use string concatenation or `strconv` instead.
+
+#### ❌ Bad
+
+```go
+// Single %s — just use concatenation
+msg := fmt.Sprintf("prefix: %s", value)
+
+// Single %d — use strconv
+msg := fmt.Sprintf("%d", count)
+
+// Writing formatted string to a writer
+b.WriteString(fmt.Sprintf("hello %s world %d", name, n))
+```
+
+#### ✅ Good
+
+```go
+// String concatenation
+msg := "prefix: " + value
+
+// strconv for numbers
+msg := strconv.Itoa(count)
+
+// fmt.Fprintf writes directly to the writer
+fmt.Fprintf(b, "hello %s world %d", name, n)
+
+// For string-only format with multiple args, concatenation is fine
+b.WriteString(indent + "const x = " + varName + ";\n")
+```
+
+**Rule of thumb:** If `fmt.Sprintf` has a single `%s` or `%d` verb and nothing else complex, replace it with concatenation or `strconv`. If writing to an `io.Writer`/`strings.Builder`, use `fmt.Fprintf` directly instead of `WriteString(fmt.Sprintf(...))`.
+
+### staticcheck — Common Issues
+
+- **QF1012**: Use `fmt.Fprintf(w, ...)` instead of `w.WriteString(fmt.Sprintf(...))` — writes directly to the writer without an intermediate string allocation.
+- **QF1003**: Use tagged `switch` instead of `if-else` chains on the same variable.
+- **S1016**: Use type conversion `TargetType(value)` instead of struct literal when types have identical fields.
+
+### predeclared — Don't Shadow Built-in Identifiers
+
+Avoid using `min`, `max`, `new`, `len`, `cap`, `copy`, `delete`, `error`, `any` as variable names. Use descriptive alternatives like `minVal`, `maxVal`.
+
+### testifylint — Test Assertion Best Practices
+
+- Use `assert.Empty(t, val)` instead of `assert.Equal(t, "", val)`
+- Use `assert.True(t, val)` / `assert.False(t, val)` instead of `assert.Equal(t, true/false, val)`
+- Use `require.Error(t, err)` instead of `assert.Error(t, err)` for error checks
+- Use `assert.Len(t, slice, n)` instead of `assert.Equal(t, n, len(slice))`
+
+### gocritic — Code Style
+
+- Convert `if-else if` chains to `switch` statements when comparing the same variable.
+
 ## Testing
 
 Follow these testing conventions when writing Go tests in this project. Run newly added or modified test immediately after changes to make sure they work as expected before continuing with more work.

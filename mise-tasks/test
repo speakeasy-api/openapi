@@ -19,6 +19,8 @@ else
 
     echo "🧪 Running tests in separate modules..."
     (cd jsonschema/oas3/tests && GOWORK=off gotestsum --format testname -- -race ./...)
+    (cd openapi/linter/customrules && GOWORK=off gotestsum --format testname -- -race ./...)
+    (cd openapi/linter/converter/tests && GOWORK=off gotestsum --format testname -- -race ./...)
 fi
 
 echo "✅ All tests passed!"

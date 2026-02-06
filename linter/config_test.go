@@ -89,6 +89,20 @@ func TestLoadConfig_MatchRegex(t *testing.T) {
 	assert.Equal(t, regexp.MustCompile(".*title.*").String(), config.Rules[0].Match.String())
 }
 
+func TestLoadConfig_CustomRulesRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	configYAML := `extends: all
+custom_rules:
+  paths:
+    - "./rules/*.ts"
+    - "./extra/*.ts"`
+	config, err := linter.LoadConfig(strings.NewReader(configYAML))
+	require.NoError(t, err, "should load config with custom_rules")
+	require.NotNil(t, config.CustomRules, "custom_rules should survive UnmarshalYAML round-trip")
+	assert.Equal(t, []string{"./rules/*.ts", "./extra/*.ts"}, config.CustomRules.Paths, "custom_rules.paths should be preserved")
+}
+
 func TestConfig_ValidateMissingRuleID(t *testing.T) {
 	t.Parallel()
 

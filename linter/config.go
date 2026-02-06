@@ -48,6 +48,7 @@ func (c *Config) UnmarshalYAML(value *yaml.Node) error {
 		Rules        []RuleEntry               `yaml:"rules,omitempty"`
 		Categories   map[string]CategoryConfig `yaml:"categories,omitempty"`
 		OutputFormat OutputFormat              `yaml:"output_format,omitempty"`
+		CustomRules  *CustomRulesConfig        `yaml:"custom_rules,omitempty"`
 	}
 	if err := value.Decode(&raw); err != nil {
 		return err
@@ -78,6 +79,7 @@ func (c *Config) UnmarshalYAML(value *yaml.Node) error {
 	c.Rules = raw.Rules
 	c.Categories = raw.Categories
 	c.OutputFormat = raw.OutputFormat
+	c.CustomRules = raw.CustomRules
 	return nil
 }
 
