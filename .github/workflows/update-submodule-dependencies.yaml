@@ -7,6 +7,7 @@ on:
         paths-ignore:
             - "cmd/openapi/**"
             - "openapi/linter/customrules/**"
+            - "openapi/linter/converter/tests/**"
             - ".github/workflows/update-submodule-dependencies.yaml"
 
 permissions:
@@ -34,6 +35,15 @@ jobs:
                   go get github.com/speakeasy-api/openapi@main
                   go mod tidy
 
+            - name: Update openapi/linter/converter/tests go.mod
+              run: |
+                  cd openapi/linter/converter/tests
+
+                  # Update to latest main commit (both main module and customrules)
+                  go get github.com/speakeasy-api/openapi@main
+                  go get github.com/speakeasy-api/openapi/openapi/linter/customrules@main
+                  go mod tidy
+
             - name: Update cmd/openapi go.mod
               run: |
                   cd cmd/openapi
@@ -51,6 +61,11 @@ jobs:
                   # Check customrules module
                   if ! git diff --quiet openapi/linter/customrules/go.mod openapi/linter/customrules/go.sum 2>/dev/null; then
                     CHANGED_FILES="${CHANGED_FILES}customrules "
+                  fi
+
+                  # Check converter/tests module
+                  if ! git diff --quiet openapi/linter/converter/tests/go.mod openapi/linter/converter/tests/go.sum 2>/dev/null; then
+                    CHANGED_FILES="${CHANGED_FILES}converter-tests "
                   fi
 
                   # Check cmd/openapi module
