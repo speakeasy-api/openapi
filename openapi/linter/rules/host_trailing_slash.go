@@ -8,6 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/validation"
+	"gopkg.in/yaml.v3"
 )
 
 const RuleStyleOAS3HostTrailingSlash = "style-oas3-host-trailing-slash"
@@ -67,14 +68,35 @@ func (r *OAS3HostTrailingSlashRule) Run(ctx context.Context, docInfo *linter.Doc
 				errNode = server.GetRootNode()
 			}
 
-			errs = append(errs, validation.NewValidationError(
-				config.GetSeverity(r.DefaultSeverity()),
-				RuleStyleOAS3HostTrailingSlash,
-				fmt.Errorf("server url %q should not have a trailing slash", url),
-				errNode,
-			))
+			errs = append(errs, &validation.Error{
+				UnderlyingError: fmt.Errorf("server url %q should not have a trailing slash", url),
+				Node:            errNode,
+				Severity:        config.GetSeverity(r.DefaultSeverity()),
+				Rule:            RuleStyleOAS3HostTrailingSlash,
+				Fix:             &removeHostTrailingSlashFix{node: errNode},
+			})
 		}
 	}
 
 	return errs
+}
+
+// removeHostTrailingSlashFix removes the trailing slash from a server URL node.
+type removeHostTrailingSlashFix struct {
+	node *yaml.Node
+}
+
+func (f *removeHostTrailingSlashFix) Description() string {
+	return "Remove trailing slash from server URL"
+}
+func (f *removeHostTrailingSlashFix) Interactive() bool            { return false }
+func (f *removeHostTrailingSlashFix) Prompts() []validation.Prompt { return nil }
+func (f *removeHostTrailingSlashFix) SetInput([]string) error      { return nil }
+func (f *removeHostTrailingSlashFix) Apply(doc any) error          { return nil }
+
+func (f *removeHostTrailingSlashFix) ApplyNode(_ *yaml.Node) error {
+	if f.node != nil {
+		f.node.Value = strings.TrimRight(f.node.Value, "/")
+	}
+	return nil
 }

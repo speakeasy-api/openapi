@@ -1,6 +1,7 @@
 package format_test
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -11,6 +12,18 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
+
+// testFix is a minimal validation.Fix for testing formatter output.
+type testFix struct {
+	description string
+	interactive bool
+}
+
+func (f *testFix) Description() string          { return f.description }
+func (f *testFix) Interactive() bool            { return f.interactive }
+func (f *testFix) Prompts() []validation.Prompt { return nil }
+func (f *testFix) SetInput([]string) error      { return nil }
+func (f *testFix) Apply(any) error              { return nil }
 
 func TestTextFormatter_Format(t *testing.T) {
 	t.Parallel()
@@ -134,6 +147,123 @@ func TestJSONFormatter_Format(t *testing.T) {
 
 			for _, substr := range tt.contains {
 				assert.Contains(t, result, substr, "JSON should contain %q", substr)
+			}
+		})
+	}
+}
+
+func TestTextFormatter_FixableMarker(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		fix           validation.Fix
+		shouldHave    string
+		shouldNotHave string
+	}{
+		{
+			name:       "error with fix shows fixable marker",
+			fix:        &testFix{description: "auto fix", interactive: false},
+			shouldHave: "[fixable]",
+		},
+		{
+			name:          "error without fix has no fixable marker",
+			fix:           nil,
+			shouldNotHave: "[fixable]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			errs := []error{
+				&validation.Error{
+					UnderlyingError: errors.New("test issue"),
+					Node:            &yaml.Node{Line: 1, Column: 1},
+					Severity:        validation.SeverityWarning,
+					Rule:            "test-rule",
+					Fix:             tt.fix,
+				},
+			}
+
+			formatter := format.NewTextFormatter()
+			result, err := formatter.Format(errs)
+			require.NoError(t, err)
+
+			if tt.shouldHave != "" {
+				assert.Contains(t, result, tt.shouldHave, "text output should contain fixable marker")
+			}
+			if tt.shouldNotHave != "" {
+				assert.NotContains(t, result, tt.shouldNotHave, "text output should not contain fixable marker")
+			}
+		})
+	}
+}
+
+func TestJSONFormatter_FixMetadata(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		fix            validation.Fix
+		expectFix      bool
+		expectInteract bool
+	}{
+		{
+			name:           "non-interactive fix",
+			fix:            &testFix{description: "trim slash", interactive: false},
+			expectFix:      true,
+			expectInteract: false,
+		},
+		{
+			name:           "interactive fix",
+			fix:            &testFix{description: "add description", interactive: true},
+			expectFix:      true,
+			expectInteract: true,
+		},
+		{
+			name:      "no fix",
+			fix:       nil,
+			expectFix: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			errs := []error{
+				&validation.Error{
+					UnderlyingError: errors.New("test issue"),
+					Node:            &yaml.Node{Line: 1, Column: 1},
+					Severity:        validation.SeverityWarning,
+					Rule:            "test-rule",
+					Fix:             tt.fix,
+				},
+			}
+
+			formatter := format.NewJSONFormatter()
+			result, err := formatter.Format(errs)
+			require.NoError(t, err)
+
+			var output struct {
+				Results []struct {
+					Fix *struct {
+						Description string `json:"description"`
+						Interactive bool   `json:"interactive,omitempty"`
+					} `json:"fix,omitempty"`
+				} `json:"results"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(result), &output), "should be valid JSON")
+			require.Len(t, output.Results, 1, "should have one result")
+
+			if tt.expectFix {
+				require.NotNil(t, output.Results[0].Fix, "should have fix metadata")
+				assert.Equal(t, tt.fix.Description(), output.Results[0].Fix.Description, "should have correct description")
+				assert.Equal(t, tt.expectInteract, output.Results[0].Fix.Interactive, "should have correct interactive flag")
+			} else {
+				assert.Nil(t, output.Results[0].Fix, "should not have fix metadata")
 			}
 		})
 	}

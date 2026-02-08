@@ -6,6 +6,7 @@ import "github.com/spf13/cobra"
 func Apply(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(lintCmd)
+	rootCmd.AddCommand(listRulesCmd)
 	rootCmd.AddCommand(upgradeCmd)
 	rootCmd.AddCommand(inlineCmd)
 	rootCmd.AddCommand(cleanCmd)

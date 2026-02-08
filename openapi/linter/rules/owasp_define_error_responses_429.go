@@ -86,12 +86,13 @@ func (r *OwaspDefineErrorResponses429Rule) Run(ctx context.Context, docInfo *lin
 		if !has429 {
 			// Missing 429 response
 			if rootNode := responses.GetRootNode(); rootNode != nil {
-				errs = append(errs, validation.NewValidationError(
-					config.GetSeverity(r.DefaultSeverity()),
-					RuleOwaspDefineErrorResponses429,
-					fmt.Errorf("operation %s %s is missing 429 Too Many Requests response", method, path),
-					rootNode,
-				))
+				errs = append(errs, &validation.Error{
+					UnderlyingError: fmt.Errorf("operation %s %s is missing 429 Too Many Requests response", method, path),
+					Node:            rootNode,
+					Severity:        config.GetSeverity(r.DefaultSeverity()),
+					Rule:            RuleOwaspDefineErrorResponses429,
+					Fix:             &addErrorResponseFix{responsesNode: rootNode, statusCode: "429", description: "Too Many Requests"},
+				})
 			}
 			continue
 		}

@@ -7,6 +7,8 @@ import (
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/validation"
+	"github.com/speakeasy-api/openapi/yml"
+	"gopkg.in/yaml.v3"
 )
 
 const RuleOwaspNoAdditionalProperties = "owasp-no-additional-properties"
@@ -93,15 +95,44 @@ func (r *OwaspNoAdditionalPropertiesRule) Run(ctx context.Context, docInfo *lint
 
 		if isViolation {
 			if rootNode := refSchema.GetRootNode(); rootNode != nil {
-				errs = append(errs, validation.NewValidationError(
-					config.GetSeverity(r.DefaultSeverity()),
-					RuleOwaspNoAdditionalProperties,
-					errors.New("additionalProperties should not be set to true or define a schema - set to false or omit it"),
-					rootNode,
-				))
+				// Only provide auto-fix for the boolean true case
+				var fix validation.Fix
+				if additionalProps.IsBool() {
+					_, valueNode, found := yml.GetMapElementNodes(ctx, rootNode, "additionalProperties")
+					if found && valueNode != nil {
+						fix = &setAdditionalPropertiesFalseFix{node: valueNode}
+					}
+				}
+				errs = append(errs, &validation.Error{
+					UnderlyingError: errors.New("additionalProperties should not be set to true or define a schema - set to false or omit it"),
+					Node:            rootNode,
+					Severity:        config.GetSeverity(r.DefaultSeverity()),
+					Rule:            RuleOwaspNoAdditionalProperties,
+					Fix:             fix,
+				})
 			}
 		}
 	}
 
 	return errs
+}
+
+// setAdditionalPropertiesFalseFix changes additionalProperties: true to additionalProperties: false.
+type setAdditionalPropertiesFalseFix struct {
+	node *yaml.Node // the additionalProperties value node
+}
+
+func (f *setAdditionalPropertiesFalseFix) Description() string {
+	return "Set additionalProperties to false"
+}
+func (f *setAdditionalPropertiesFalseFix) Interactive() bool            { return false }
+func (f *setAdditionalPropertiesFalseFix) Prompts() []validation.Prompt { return nil }
+func (f *setAdditionalPropertiesFalseFix) SetInput([]string) error      { return nil }
+func (f *setAdditionalPropertiesFalseFix) Apply(doc any) error          { return nil }
+
+func (f *setAdditionalPropertiesFalseFix) ApplyNode(_ *yaml.Node) error {
+	if f.node != nil && f.node.Kind == yaml.ScalarNode && f.node.Value == "true" {
+		f.node.Value = "false"
+	}
+	return nil
 }

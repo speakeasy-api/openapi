@@ -9,6 +9,7 @@ import (
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
+	"gopkg.in/yaml.v3"
 )
 
 const RuleOwaspJWTBestPractices = "owasp-jwt-best-practices"
@@ -84,24 +85,60 @@ func (r *OwaspJWTBestPracticesRule) Run(ctx context.Context, docInfo *linter.Doc
 			if rootNode != nil {
 				_, descNode, found := yml.GetMapElementNodes(ctx, rootNode, "description")
 				if found && descNode != nil {
-					errs = append(errs, validation.NewValidationError(
-						config.GetSeverity(r.DefaultSeverity()),
-						RuleOwaspJWTBestPractices,
-						fmt.Errorf("security scheme `%s` must explicitly declare support for RFC8725 in the description", name),
-						descNode,
-					))
+					errs = append(errs, &validation.Error{
+						UnderlyingError: fmt.Errorf("security scheme `%s` must explicitly declare support for RFC8725 in the description", name),
+						Node:            descNode,
+						Severity:        config.GetSeverity(r.DefaultSeverity()),
+						Rule:            RuleOwaspJWTBestPractices,
+						Fix:             &appendRFC8725Fix{schemeNode: rootNode, descNode: descNode},
+					})
 				} else {
 					// No description field - report on the scheme itself
-					errs = append(errs, validation.NewValidationError(
-						config.GetSeverity(r.DefaultSeverity()),
-						RuleOwaspJWTBestPractices,
-						fmt.Errorf("security scheme `%s` must explicitly declare support for RFC8725 in the description", name),
-						rootNode,
-					))
+					errs = append(errs, &validation.Error{
+						UnderlyingError: fmt.Errorf("security scheme `%s` must explicitly declare support for RFC8725 in the description", name),
+						Node:            rootNode,
+						Severity:        config.GetSeverity(r.DefaultSeverity()),
+						Rule:            RuleOwaspJWTBestPractices,
+						Fix:             &appendRFC8725Fix{schemeNode: rootNode, descNode: nil},
+					})
 				}
 			}
 		}
 	}
 
 	return errs
+}
+
+const rfc8725Suffix = " This scheme follows RFC8725 best practices."
+
+// appendRFC8725Fix appends an RFC8725 mention to the security scheme description.
+type appendRFC8725Fix struct {
+	schemeNode *yaml.Node // the security scheme mapping node
+	descNode   *yaml.Node // the existing description value node (may be nil)
+}
+
+func (f *appendRFC8725Fix) Description() string {
+	return "Add RFC8725 mention to security scheme description"
+}
+func (f *appendRFC8725Fix) Interactive() bool            { return false }
+func (f *appendRFC8725Fix) Prompts() []validation.Prompt { return nil }
+func (f *appendRFC8725Fix) SetInput([]string) error      { return nil }
+func (f *appendRFC8725Fix) Apply(doc any) error          { return nil }
+
+func (f *appendRFC8725Fix) ApplyNode(_ *yaml.Node) error {
+	if f.schemeNode == nil {
+		return nil
+	}
+
+	if f.descNode != nil {
+		// Append to existing description
+		if !strings.Contains(f.descNode.Value, "RFC8725") {
+			f.descNode.Value += rfc8725Suffix
+		}
+	} else {
+		// No description field — add one
+		ctx := context.Background()
+		yml.CreateOrUpdateMapNodeElement(ctx, "description", nil, yml.CreateStringNode(strings.TrimSpace(rfc8725Suffix)), f.schemeNode)
+	}
+	return nil
 }

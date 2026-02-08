@@ -72,12 +72,14 @@ func (r *OperationDescriptionRule) Run(ctx context.Context, docInfo *linter.Docu
 				}
 			}
 
-			errs = append(errs, validation.NewValidationError(
-				config.GetSeverity(r.DefaultSeverity()),
-				RuleStyleOperationDescription,
-				fmt.Errorf("the %s is missing a description or summary", opIdentifier),
-				operation.GetRootNode(),
-			))
+			rootNode := operation.GetRootNode()
+			errs = append(errs, &validation.Error{
+				UnderlyingError: fmt.Errorf("the %s is missing a description or summary", opIdentifier),
+				Node:            rootNode,
+				Severity:        config.GetSeverity(r.DefaultSeverity()),
+				Rule:            RuleStyleOperationDescription,
+				Fix:             &addDescriptionFix{targetNode: rootNode, targetLabel: "operation " + opIdentifier},
+			})
 		}
 	}
 

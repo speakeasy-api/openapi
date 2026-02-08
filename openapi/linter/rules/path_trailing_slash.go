@@ -8,6 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/validation"
+	"gopkg.in/yaml.v3"
 )
 
 const RuleStylePathTrailingSlash = "style-path-trailing-slash"
@@ -51,14 +52,36 @@ func (r *PathTrailingSlashRule) Run(ctx context.Context, docInfo *linter.Documen
 	for pathKey := range paths.All() {
 		if strings.HasSuffix(pathKey, "/") && pathKey != "/" {
 			node := paths.GetCore().GetMapKeyNodeOrRoot(pathKey, paths.GetRootNode())
-			errs = append(errs, validation.NewValidationError(
-				config.GetSeverity(r.DefaultSeverity()),
-				RuleStylePathTrailingSlash,
-				fmt.Errorf("path `%s` must not end with a trailing slash", pathKey),
-				node,
-			))
+			errs = append(errs, &validation.Error{
+				UnderlyingError: fmt.Errorf("path `%s` must not end with a trailing slash", pathKey),
+				Node:            node,
+				Severity:        config.GetSeverity(r.DefaultSeverity()),
+				Rule:            RuleStylePathTrailingSlash,
+				Fix:             &removeTrailingSlashFix{node: node},
+			})
 		}
 	}
 
 	return errs
+}
+
+// removeTrailingSlashFix removes the trailing slash from a path key node.
+type removeTrailingSlashFix struct {
+	node *yaml.Node
+}
+
+func (f *removeTrailingSlashFix) Description() string {
+	return "Remove trailing slash from path"
+}
+
+func (f *removeTrailingSlashFix) Interactive() bool            { return false }
+func (f *removeTrailingSlashFix) Prompts() []validation.Prompt { return nil }
+func (f *removeTrailingSlashFix) SetInput([]string) error      { return nil }
+func (f *removeTrailingSlashFix) Apply(doc any) error          { return nil }
+
+func (f *removeTrailingSlashFix) ApplyNode(_ *yaml.Node) error {
+	if f.node != nil {
+		f.node.Value = strings.TrimRight(f.node.Value, "/")
+	}
+	return nil
 }

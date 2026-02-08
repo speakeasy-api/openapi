@@ -50,12 +50,14 @@ func (r *InfoContactRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[
 
 	contact := info.GetContact()
 	if contact == nil {
-		errs = append(errs, validation.NewValidationError(
-			config.GetSeverity(r.DefaultSeverity()),
-			RuleStyleInfoContact,
-			errors.New("info section is missing contact details"),
-			info.GetRootNode(),
-		))
+		infoRoot := info.GetRootNode()
+		errs = append(errs, &validation.Error{
+			UnderlyingError: errors.New("info section is missing contact details"),
+			Node:            infoRoot,
+			Severity:        config.GetSeverity(r.DefaultSeverity()),
+			Rule:            RuleStyleInfoContact,
+			Fix:             &addContactFix{infoNode: infoRoot},
+		})
 	}
 
 	return errs

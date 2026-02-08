@@ -48,12 +48,6 @@ type Error struct {
 	DocumentLocation string
 }
 
-// Fix represents a suggested fix for a error finding
-type Fix interface {
-	Apply(doc any) error
-	FixDescription() string
-}
-
 var _ error = (*Error)(nil)
 
 func (e Error) Error() string {

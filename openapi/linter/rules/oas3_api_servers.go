@@ -63,12 +63,13 @@ func (r *OAS3APIServersRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 	if len(doc.Servers) == 0 {
 		// Get the root node for error reporting
 		rootNode := doc.GetRootNode()
-		errs = append(errs, validation.NewValidationError(
-			config.GetSeverity(r.DefaultSeverity()),
-			RuleStyleOAS3APIServers,
-			errors.New("no servers defined for the specification"),
-			rootNode,
-		))
+		errs = append(errs, &validation.Error{
+			UnderlyingError: errors.New("no servers defined for the specification"),
+			Node:            rootNode,
+			Severity:        config.GetSeverity(r.DefaultSeverity()),
+			Rule:            RuleStyleOAS3APIServers,
+			Fix:             &addServerFix{doc: doc},
+		})
 		return errs
 	}
 

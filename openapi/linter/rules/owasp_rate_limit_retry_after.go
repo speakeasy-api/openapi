@@ -86,15 +86,17 @@ func (r *OwaspRateLimitRetryAfterRule) Run(ctx context.Context, docInfo *linter.
 
 		// Check if Retry-After header exists
 		headers := responseObj.GetHeaders()
+		responseRootNode := response429.GetRootNode()
 		if headers == nil {
 			// No headers at all
-			if rootNode := response429.GetRootNode(); rootNode != nil {
-				errs = append(errs, validation.NewValidationError(
-					config.GetSeverity(r.DefaultSeverity()),
-					RuleOwaspRateLimitRetryAfter,
-					fmt.Errorf("429 response for operation %s %s is missing Retry-After header", method, path),
-					rootNode,
-				))
+			if responseRootNode != nil {
+				errs = append(errs, &validation.Error{
+					UnderlyingError: fmt.Errorf("429 response for operation %s %s is missing Retry-After header", method, path),
+					Node:            responseRootNode,
+					Severity:        config.GetSeverity(r.DefaultSeverity()),
+					Rule:            RuleOwaspRateLimitRetryAfter,
+					Fix:             &addRetryAfterHeaderFix{responseNode: responseRootNode},
+				})
 			}
 			continue
 		}
@@ -107,13 +109,14 @@ func (r *OwaspRateLimitRetryAfterRule) Run(ctx context.Context, docInfo *linter.
 		}
 
 		if !hasRetryAfter || retryAfter == nil {
-			if rootNode := responseObj.GetRootNode(); rootNode != nil {
-				errs = append(errs, validation.NewValidationError(
-					config.GetSeverity(r.DefaultSeverity()),
-					RuleOwaspRateLimitRetryAfter,
-					fmt.Errorf("429 response for operation %s %s is missing Retry-After header", method, path),
-					rootNode,
-				))
+			if responseRootNode != nil {
+				errs = append(errs, &validation.Error{
+					UnderlyingError: fmt.Errorf("429 response for operation %s %s is missing Retry-After header", method, path),
+					Node:            responseRootNode,
+					Severity:        config.GetSeverity(r.DefaultSeverity()),
+					Rule:            RuleOwaspRateLimitRetryAfter,
+					Fix:             &addRetryAfterHeaderFix{responseNode: responseRootNode},
+				})
 			}
 		}
 	}

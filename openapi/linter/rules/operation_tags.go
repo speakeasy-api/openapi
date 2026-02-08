@@ -70,12 +70,14 @@ func (r *OperationTagsRule) Run(ctx context.Context, docInfo *linter.DocumentInf
 				}
 			}
 
-			errs = append(errs, validation.NewValidationError(
-				config.GetSeverity(r.DefaultSeverity()),
-				RuleStyleOperationTags,
-				fmt.Errorf("the %s is missing tags", opIdentifier),
-				operation.GetRootNode(),
-			))
+			rootNode := operation.GetRootNode()
+			errs = append(errs, &validation.Error{
+				UnderlyingError: fmt.Errorf("the %s is missing tags", opIdentifier),
+				Node:            rootNode,
+				Severity:        config.GetSeverity(r.DefaultSeverity()),
+				Rule:            RuleStyleOperationTags,
+				Fix:             &addOperationTagFix{operationNode: rootNode},
+			})
 		}
 	}
 

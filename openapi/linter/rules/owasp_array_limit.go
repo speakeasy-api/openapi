@@ -71,12 +71,13 @@ func (r *OwaspArrayLimitRule) Run(ctx context.Context, docInfo *linter.DocumentI
 		maxItems := schema.GetMaxItems()
 		if maxItems == nil {
 			if rootNode := refSchema.GetRootNode(); rootNode != nil {
-				errs = append(errs, validation.NewValidationError(
-					config.GetSeverity(r.DefaultSeverity()),
-					RuleOwaspArrayLimit,
-					errors.New("schema of type `array` must specify `maxItems`"),
-					rootNode,
-				))
+				errs = append(errs, &validation.Error{
+					UnderlyingError: errors.New("schema of type `array` must specify `maxItems`"),
+					Node:            rootNode,
+					Severity:        config.GetSeverity(r.DefaultSeverity()),
+					Rule:            RuleOwaspArrayLimit,
+					Fix:             &setNumericPropertyFix{schemaNode: rootNode, property: "maxItems", label: "Maximum number of array items"},
+				})
 			}
 		}
 	}

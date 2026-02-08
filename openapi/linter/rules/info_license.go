@@ -50,12 +50,14 @@ func (r *InfoLicenseRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[
 
 	license := info.GetLicense()
 	if license == nil {
-		errs = append(errs, validation.NewValidationError(
-			config.GetSeverity(r.DefaultSeverity()),
-			RuleStyleInfoLicense,
-			errors.New("info section should contain a license"),
-			info.GetRootNode(),
-		))
+		infoRoot := info.GetRootNode()
+		errs = append(errs, &validation.Error{
+			UnderlyingError: errors.New("info section should contain a license"),
+			Node:            infoRoot,
+			Severity:        config.GetSeverity(r.DefaultSeverity()),
+			Rule:            RuleStyleInfoLicense,
+			Fix:             &addLicenseFix{infoNode: infoRoot},
+		})
 	}
 
 	return errs

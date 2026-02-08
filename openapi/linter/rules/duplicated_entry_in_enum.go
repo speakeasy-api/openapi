@@ -57,19 +57,20 @@ func (r *DuplicatedEnumRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 		}
 
 		// Check for duplicates
+		coreSchema := schema.GetCore()
 		duplicateIndices := findDuplicateIndices(enumValues)
 		for _, indices := range duplicateIndices {
 			// Report on first duplicate occurrence (second index in the list)
 			if len(indices) > 1 {
 				displayValue := nodeToDisplayString(enumValues[indices[1]])
-				errs = append(errs, validation.NewSliceError(
-					config.GetSeverity(r.DefaultSeverity()),
-					RuleSemanticDuplicatedEnum,
-					fmt.Errorf("enum contains a duplicate: `%s`", displayValue),
-					schema.GetCore(),
-					schema.GetCore().Enum,
-					indices[1], // Report at second occurrence
-				))
+				errNode := coreSchema.Enum.GetSliceValueNodeOrRoot(indices[1], refSchema.GetRootNode())
+				errs = append(errs, &validation.Error{
+					UnderlyingError: fmt.Errorf("enum contains a duplicate: `%s`", displayValue),
+					Node:            errNode,
+					Severity:        config.GetSeverity(r.DefaultSeverity()),
+					Rule:            RuleSemanticDuplicatedEnum,
+					Fix:             &removeDuplicateEnumFix{enumNode: coreSchema.Enum.ValueNode, duplicateIndices: indices[1:]},
+				})
 			}
 		}
 	}
@@ -95,6 +96,32 @@ func findDuplicateIndices(enumValues []*yaml.Node) map[string][]int {
 	}
 
 	return duplicates
+}
+
+// removeDuplicateEnumFix removes duplicate entries from an enum sequence node.
+type removeDuplicateEnumFix struct {
+	enumNode         *yaml.Node // the sequence node containing enum values
+	duplicateIndices []int      // indices of duplicate entries to remove
+}
+
+func (f *removeDuplicateEnumFix) Description() string          { return "Remove duplicate enum entries" }
+func (f *removeDuplicateEnumFix) Interactive() bool            { return false }
+func (f *removeDuplicateEnumFix) Prompts() []validation.Prompt { return nil }
+func (f *removeDuplicateEnumFix) SetInput([]string) error      { return nil }
+func (f *removeDuplicateEnumFix) Apply(doc any) error          { return nil }
+
+func (f *removeDuplicateEnumFix) ApplyNode(_ *yaml.Node) error {
+	if f.enumNode == nil || len(f.duplicateIndices) == 0 {
+		return nil
+	}
+	// Remove from last index first to preserve earlier indices
+	for i := len(f.duplicateIndices) - 1; i >= 0; i-- {
+		idx := f.duplicateIndices[i]
+		if idx < len(f.enumNode.Content) {
+			f.enumNode.Content = append(f.enumNode.Content[:idx], f.enumNode.Content[idx+1:]...)
+		}
+	}
+	return nil
 }
 
 // nodeToString converts a yaml.Node to a string representation for comparison

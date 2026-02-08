@@ -60,12 +60,13 @@ func (r *OAS3HostNotExampleRule) Run(ctx context.Context, docInfo *linter.Docume
 			errNode = doc.GetRootNode()
 		}
 
-		errs = append(errs, validation.NewValidationError(
-			config.GetSeverity(r.DefaultSeverity()),
-			RuleStyleOAS3HostNotExample,
-			fmt.Errorf("server url %q must not point at example.com", server.GetURL()),
-			errNode,
-		))
+		errs = append(errs, &validation.Error{
+			UnderlyingError: fmt.Errorf("server url %q must not point at example.com", server.GetURL()),
+			Node:            errNode,
+			Severity:        config.GetSeverity(r.DefaultSeverity()),
+			Rule:            RuleStyleOAS3HostNotExample,
+			Fix:             &replaceServerURLFix{urlNode: errNode},
+		})
 	}
 
 	return errs

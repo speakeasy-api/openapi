@@ -96,12 +96,14 @@ func (r *OAS3ParameterDescriptionRule) Run(ctx context.Context, docInfo *linter.
 				msg = fmt.Sprintf("parameter `%s` is missing a description", paramName)
 			}
 
-			errs = append(errs, validation.NewValidationError(
-				config.GetSeverity(r.DefaultSeverity()),
-				RuleStyleOAS3ParameterDescription,
-				fmt.Errorf("%s", msg),
-				errNode,
-			))
+			paramRootNode := param.GetRootNode()
+			errs = append(errs, &validation.Error{
+				UnderlyingError: fmt.Errorf("%s", msg),
+				Node:            errNode,
+				Severity:        config.GetSeverity(r.DefaultSeverity()),
+				Rule:            RuleStyleOAS3ParameterDescription,
+				Fix:             &addDescriptionFix{targetNode: paramRootNode, targetLabel: "parameter '" + paramName + "'"},
+			})
 		}
 	}
 

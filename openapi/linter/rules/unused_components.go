@@ -213,7 +213,7 @@ func extractComponentPointer(ref references.Reference, docLocation string, docSe
 
 // checkUnusedComponents iterates through all component entries in the index
 // and flags those not in the referenced set using ToJSONPointer.
-func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[string]struct{}, config *linter.RuleConfig, severity validation.Severity) []error {
+func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[string]struct{}, config *linter.RuleConfig, severity validation.Severity) []error { //nolint:cyclop
 	var errs []error
 
 	// Check component schemas
@@ -228,7 +228,7 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 				continue
 			}
 			errNode := getComponentKeyNode(doc, node.Location)
-			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
+			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity, doc))
 		}
 	}
 
@@ -244,7 +244,7 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 				continue
 			}
 			errNode := getComponentKeyNode(doc, node.Location)
-			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
+			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity, doc))
 		}
 	}
 
@@ -260,7 +260,7 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 				continue
 			}
 			errNode := getComponentKeyNode(doc, node.Location)
-			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
+			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity, doc))
 		}
 	}
 
@@ -276,7 +276,7 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 				continue
 			}
 			errNode := getComponentKeyNode(doc, node.Location)
-			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
+			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity, doc))
 		}
 	}
 
@@ -292,7 +292,7 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 				continue
 			}
 			errNode := getComponentKeyNode(doc, node.Location)
-			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
+			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity, doc))
 		}
 	}
 
@@ -308,7 +308,7 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 				continue
 			}
 			errNode := getComponentKeyNode(doc, node.Location)
-			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
+			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity, doc))
 		}
 	}
 
@@ -324,7 +324,7 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 				continue
 			}
 			errNode := getComponentKeyNode(doc, node.Location)
-			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
+			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity, doc))
 		}
 	}
 
@@ -340,7 +340,7 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 				continue
 			}
 			errNode := getComponentKeyNode(doc, node.Location)
-			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
+			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity, doc))
 		}
 	}
 
@@ -356,7 +356,7 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 				continue
 			}
 			errNode := getComponentKeyNode(doc, node.Location)
-			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
+			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity, doc))
 		}
 	}
 
@@ -372,7 +372,7 @@ func checkUnusedComponents(doc *openapi.OpenAPI, idx *openapi.Index, refs map[st
 				continue
 			}
 			errNode := getComponentKeyNode(doc, node.Location)
-			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity))
+			errs = append(errs, createUnusedComponentError(pointer, errNode, config, severity, doc))
 		}
 	}
 
@@ -456,12 +456,62 @@ func hasUsageMarkingExtension(exts *extensions.Extensions) bool {
 }
 
 // createUnusedComponentError creates a validation error for an unused component.
-func createUnusedComponentError(pointer string, errNode *yaml.Node, config *linter.RuleConfig, severity validation.Severity) error {
+func createUnusedComponentError(pointer string, errNode *yaml.Node, config *linter.RuleConfig, severity validation.Severity, doc *openapi.OpenAPI) error {
 	componentRef := "#" + pointer
-	return validation.NewValidationError(
-		config.GetSeverity(severity),
-		RuleSemanticUnusedComponent,
-		fmt.Errorf("`%s` is potentially unused or has been orphaned", componentRef),
-		errNode,
-	)
+
+	// Build a fix to remove this unused component
+	var fix validation.Fix
+	parts := strings.Split(pointer, "/")
+	if len(parts) >= 4 {
+		componentType := parts[2]
+		componentName := parts[3]
+		if mapNode := getComponentTypeMapNode(doc, componentType); mapNode != nil {
+			fix = &removeUnusedComponentFix{
+				parentMapNode: mapNode,
+				componentName: componentName,
+				componentRef:  componentRef,
+			}
+		}
+	}
+
+	return &validation.Error{
+		UnderlyingError: fmt.Errorf("`%s` is potentially unused or has been orphaned", componentRef),
+		Node:            errNode,
+		Severity:        config.GetSeverity(severity),
+		Rule:            RuleSemanticUnusedComponent,
+		Fix:             fix,
+	}
+}
+
+// getComponentTypeMapNode returns the YAML mapping node for a given component type.
+func getComponentTypeMapNode(doc *openapi.OpenAPI, componentType string) *yaml.Node {
+	core := doc.GetCore()
+	if core == nil || !core.Components.Present || core.Components.Value == nil {
+		return nil
+	}
+	cc := core.Components.Value
+	switch componentType {
+	case "schemas":
+		return cc.Schemas.ValueNode
+	case "parameters":
+		return cc.Parameters.ValueNode
+	case "responses":
+		return cc.Responses.ValueNode
+	case "requestBodies":
+		return cc.RequestBodies.ValueNode
+	case "headers":
+		return cc.Headers.ValueNode
+	case "examples":
+		return cc.Examples.ValueNode
+	case "links":
+		return cc.Links.ValueNode
+	case "callbacks":
+		return cc.Callbacks.ValueNode
+	case "pathItems":
+		return cc.PathItems.ValueNode
+	case "securitySchemes":
+		return cc.SecuritySchemes.ValueNode
+	default:
+		return nil
+	}
 }

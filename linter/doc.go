@@ -54,6 +54,8 @@ func (g *DocGenerator[T]) GenerateRuleDoc(rule RuleRunner[T]) *RuleDoc {
 		doc.BadExample = documented.BadExample()
 		doc.Rationale = documented.Rationale()
 		doc.FixAvailable = documented.FixAvailable()
+	} else if fixable, ok := any(rule).(interface{ FixAvailable() bool }); ok {
+		doc.FixAvailable = fixable.FixAvailable()
 	}
 
 	// Check for configuration interface

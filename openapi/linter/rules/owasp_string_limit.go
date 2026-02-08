@@ -75,12 +75,13 @@ func (r *OwaspStringLimitRule) Run(ctx context.Context, docInfo *linter.Document
 		// If none of these are defined, report error
 		if maxLength == nil && constValue == nil && len(enumValues) == 0 {
 			if rootNode := refSchema.GetRootNode(); rootNode != nil {
-				errs = append(errs, validation.NewValidationError(
-					config.GetSeverity(r.DefaultSeverity()),
-					RuleOwaspStringLimit,
-					errors.New("schema of type 'string' must specify maxLength, const, or enum to prevent unbounded data"),
-					rootNode,
-				))
+				errs = append(errs, &validation.Error{
+					UnderlyingError: errors.New("schema of type 'string' must specify maxLength, const, or enum to prevent unbounded data"),
+					Node:            rootNode,
+					Severity:        config.GetSeverity(r.DefaultSeverity()),
+					Rule:            RuleOwaspStringLimit,
+					Fix:             &setNumericPropertyFix{schemaNode: rootNode, property: "maxLength", label: "Maximum string length"},
+				})
 			}
 		}
 	}

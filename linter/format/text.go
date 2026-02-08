@@ -33,7 +33,12 @@ func (f *TextFormatter) Format(results []error) (string, error) {
 				msg = fmt.Sprintf("%s (document: %s)", msg, vErr.DocumentLocation)
 			}
 
-			sb.WriteString(fmt.Sprintf("%d:%d\t%s\t%s\t%s\n", line, col, severity, rule, msg))
+			fixable := ""
+			if vErr.Fix != nil {
+				fixable = " [fixable]"
+			}
+
+			fmt.Fprintf(&sb, "%d:%d\t%s\t%s\t%s%s\n", line, col, severity, rule, msg, fixable)
 
 			switch severity {
 			case validation.SeverityError:

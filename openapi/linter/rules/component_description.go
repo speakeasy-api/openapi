@@ -76,12 +76,13 @@ func (r *ComponentDescriptionRule) Run(ctx context.Context, docInfo *linter.Docu
 					description := schema.GetDescription()
 					if description == "" {
 						node := componentsCore.Schemas.GetMapKeyNodeOrRoot(schemaKey, componentsRoot)
-						errs = append(errs, validation.NewValidationError(
-							config.GetSeverity(r.DefaultSeverity()),
-							RuleStyleComponentDescription,
-							fmt.Errorf("`schemas` component `%s` is missing a description", schemaKey),
-							node,
-						))
+						errs = append(errs, &validation.Error{
+							UnderlyingError: fmt.Errorf("`schemas` component `%s` is missing a description", schemaKey),
+							Node:            node,
+							Severity:        config.GetSeverity(r.DefaultSeverity()),
+							Rule:            RuleStyleComponentDescription,
+							Fix:             &addDescriptionFix{targetNode: jsonSchema.GetRootNode(), targetLabel: "schema '" + schemaKey + "'"},
+						})
 					}
 				}
 			}
@@ -99,12 +100,13 @@ func (r *ComponentDescriptionRule) Run(ctx context.Context, docInfo *linter.Docu
 					description := param.GetDescription()
 					if description == "" {
 						node := componentsCore.Parameters.GetMapKeyNodeOrRoot(paramKey, componentsRoot)
-						errs = append(errs, validation.NewValidationError(
-							config.GetSeverity(r.DefaultSeverity()),
-							RuleStyleComponentDescription,
-							fmt.Errorf("`parameters` component `%s` is missing a description", paramKey),
-							node,
-						))
+						errs = append(errs, &validation.Error{
+							UnderlyingError: fmt.Errorf("`parameters` component `%s` is missing a description", paramKey),
+							Node:            node,
+							Severity:        config.GetSeverity(r.DefaultSeverity()),
+							Rule:            RuleStyleComponentDescription,
+							Fix:             &addDescriptionFix{targetNode: param.GetRootNode(), targetLabel: "parameter '" + paramKey + "'"},
+						})
 					}
 				}
 			}
@@ -122,12 +124,13 @@ func (r *ComponentDescriptionRule) Run(ctx context.Context, docInfo *linter.Docu
 					description := rb.GetDescription()
 					if description == "" {
 						node := componentsCore.RequestBodies.GetMapKeyNodeOrRoot(rbKey, componentsRoot)
-						errs = append(errs, validation.NewValidationError(
-							config.GetSeverity(r.DefaultSeverity()),
-							RuleStyleComponentDescription,
-							fmt.Errorf("`requestBodies` component `%s` is missing a description", rbKey),
-							node,
-						))
+						errs = append(errs, &validation.Error{
+							UnderlyingError: fmt.Errorf("`requestBodies` component `%s` is missing a description", rbKey),
+							Node:            node,
+							Severity:        config.GetSeverity(r.DefaultSeverity()),
+							Rule:            RuleStyleComponentDescription,
+							Fix:             &addDescriptionFix{targetNode: rb.GetRootNode(), targetLabel: "requestBody '" + rbKey + "'"},
+						})
 					}
 				}
 			}
@@ -145,12 +148,13 @@ func (r *ComponentDescriptionRule) Run(ctx context.Context, docInfo *linter.Docu
 					description := resp.GetDescription()
 					if description == "" {
 						node := componentsCore.Responses.GetMapKeyNodeOrRoot(respKey, componentsRoot)
-						errs = append(errs, validation.NewValidationError(
-							config.GetSeverity(r.DefaultSeverity()),
-							RuleStyleComponentDescription,
-							fmt.Errorf("`responses` component `%s` is missing a description", respKey),
-							node,
-						))
+						errs = append(errs, &validation.Error{
+							UnderlyingError: fmt.Errorf("`responses` component `%s` is missing a description", respKey),
+							Node:            node,
+							Severity:        config.GetSeverity(r.DefaultSeverity()),
+							Rule:            RuleStyleComponentDescription,
+							Fix:             &addDescriptionFix{targetNode: resp.GetRootNode(), targetLabel: "response '" + respKey + "'"},
+						})
 					}
 				}
 			}
@@ -168,12 +172,13 @@ func (r *ComponentDescriptionRule) Run(ctx context.Context, docInfo *linter.Docu
 					description := ex.GetDescription()
 					if description == "" {
 						node := componentsCore.Examples.GetMapKeyNodeOrRoot(exKey, componentsRoot)
-						errs = append(errs, validation.NewValidationError(
-							config.GetSeverity(r.DefaultSeverity()),
-							RuleStyleComponentDescription,
-							fmt.Errorf("`examples` component `%s` is missing a description", exKey),
-							node,
-						))
+						errs = append(errs, &validation.Error{
+							UnderlyingError: fmt.Errorf("`examples` component `%s` is missing a description", exKey),
+							Node:            node,
+							Severity:        config.GetSeverity(r.DefaultSeverity()),
+							Rule:            RuleStyleComponentDescription,
+							Fix:             &addDescriptionFix{targetNode: ex.GetRootNode(), targetLabel: "example '" + exKey + "'"},
+						})
 					}
 				}
 			}
@@ -191,12 +196,13 @@ func (r *ComponentDescriptionRule) Run(ctx context.Context, docInfo *linter.Docu
 					description := header.GetDescription()
 					if description == "" {
 						node := componentsCore.Headers.GetMapKeyNodeOrRoot(headerKey, componentsRoot)
-						errs = append(errs, validation.NewValidationError(
-							config.GetSeverity(r.DefaultSeverity()),
-							RuleStyleComponentDescription,
-							fmt.Errorf("`headers` component `%s` is missing a description", headerKey),
-							node,
-						))
+						errs = append(errs, &validation.Error{
+							UnderlyingError: fmt.Errorf("`headers` component `%s` is missing a description", headerKey),
+							Node:            node,
+							Severity:        config.GetSeverity(r.DefaultSeverity()),
+							Rule:            RuleStyleComponentDescription,
+							Fix:             &addDescriptionFix{targetNode: header.GetRootNode(), targetLabel: "header '" + headerKey + "'"},
+						})
 					}
 				}
 			}
@@ -214,12 +220,13 @@ func (r *ComponentDescriptionRule) Run(ctx context.Context, docInfo *linter.Docu
 					description := link.GetDescription()
 					if description == "" {
 						node := componentsCore.Links.GetMapKeyNodeOrRoot(linkKey, componentsRoot)
-						errs = append(errs, validation.NewValidationError(
-							config.GetSeverity(r.DefaultSeverity()),
-							RuleStyleComponentDescription,
-							fmt.Errorf("`links` component `%s` is missing a description", linkKey),
-							node,
-						))
+						errs = append(errs, &validation.Error{
+							UnderlyingError: fmt.Errorf("`links` component `%s` is missing a description", linkKey),
+							Node:            node,
+							Severity:        config.GetSeverity(r.DefaultSeverity()),
+							Rule:            RuleStyleComponentDescription,
+							Fix:             &addDescriptionFix{targetNode: link.GetRootNode(), targetLabel: "link '" + linkKey + "'"},
+						})
 					}
 				}
 			}
@@ -237,12 +244,13 @@ func (r *ComponentDescriptionRule) Run(ctx context.Context, docInfo *linter.Docu
 					description := ss.GetDescription()
 					if description == "" {
 						node := componentsCore.SecuritySchemes.GetMapKeyNodeOrRoot(ssKey, componentsRoot)
-						errs = append(errs, validation.NewValidationError(
-							config.GetSeverity(r.DefaultSeverity()),
-							RuleStyleComponentDescription,
-							fmt.Errorf("`securitySchemes` component `%s` is missing a description", ssKey),
-							node,
-						))
+						errs = append(errs, &validation.Error{
+							UnderlyingError: fmt.Errorf("`securitySchemes` component `%s` is missing a description", ssKey),
+							Node:            node,
+							Severity:        config.GetSeverity(r.DefaultSeverity()),
+							Rule:            RuleStyleComponentDescription,
+							Fix:             &addDescriptionFix{targetNode: ss.GetRootNode(), targetLabel: "securityScheme '" + ssKey + "'"},
+						})
 					}
 				}
 			}
