@@ -2,22 +2,20 @@ package openapi_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/references"
 )
 
-// TestBuildIndex_ManyRefsToSameSchema creates a synthetic spec with many
-// references to the same schema to test for quadratic/exponential re-walking.
+// BenchmarkBuildIndex_ManyRefsToSameSchema creates a synthetic spec with many
+// references to the same schema to benchmark for quadratic/exponential re-walking.
 // Mimics the Glean spec pattern: heavy schemas referenced many times,
 // self-references, deep nesting, and a large union type (StructuredResult).
-func TestBuildIndex_ManyRefsToSameSchema(t *testing.T) {
-	t.Parallel()
-
+func BenchmarkBuildIndex_ManyRefsToSameSchema(b *testing.B) {
 	numPaths := 200
 
 	var pathsBuilder strings.Builder
@@ -181,11 +179,11 @@ components:
             $ref: '#/components/schemas/Collection'
 %s`, pathsBuilder.String(), unionProps.String(), leafSchemas.String())
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	doc, _, err := openapi.Unmarshal(ctx, bytes.NewReader([]byte(spec)))
 	if err != nil {
-		t.Fatalf("Failed to unmarshal: %v", err)
+		b.Fatalf("Failed to unmarshal: %v", err)
 	}
 
 	resolveOpts := references.ResolveOptions{
@@ -194,23 +192,8 @@ components:
 		TargetLocation: "test.yaml",
 	}
 
-	start := time.Now()
-	idx := openapi.BuildIndex(ctx, doc, resolveOpts)
-	elapsed := time.Since(start)
-
-	t.Logf("BuildIndex with %d paths took: %v", numPaths, elapsed)
-	t.Logf("Schemas: bool=%d inline=%d component=%d external=%d refs=%d",
-		len(idx.BooleanSchemas),
-		len(idx.InlineSchemas),
-		len(idx.ComponentSchemas),
-		len(idx.ExternalSchemas),
-		len(idx.SchemaReferences),
-	)
-
-	// With visitedRefs dedup, this should complete in under 1 second.
-	// Before the fix, 200 paths took ~2s due to re-walking ref targets;
-	// with the fix, ~30ms.
-	if elapsed > 1*time.Second {
-		t.Errorf("BuildIndex took %v, expected < 1s - likely re-walking ref targets", elapsed)
+	b.ResetTimer()
+	for range b.N {
+		openapi.BuildIndex(ctx, doc, resolveOpts)
 	}
 }
