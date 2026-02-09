@@ -169,6 +169,88 @@ components:
 	assert.Len(t, ops, 2, "User schema should be referenced by 2 operations")
 }
 
+func TestBuildIndex_NodeToOperations_SharedSchemaNestedRefs_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	// Two operations reference Parent, which has a nested $ref to Child.
+	// The first operation walks Parent fully (including Child).
+	// The second operation hits the visitedRefs shortcut for Parent.
+	// Child's nodes must still be associated with BOTH operations.
+	yml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /first:
+    get:
+      operationId: firstOp
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parent'
+  /second:
+    get:
+      operationId: secondOp
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parent'
+components:
+  schemas:
+    Parent:
+      type: object
+      properties:
+        child:
+          $ref: '#/components/schemas/Child'
+    Child:
+      type: object
+      properties:
+        name:
+          type: string
+`
+	doc := unmarshalOpenAPI(t, ctx, yml)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	}, openapi.WithNodeOperationMap())
+
+	require.NotNil(t, idx, "index should not be nil")
+	assert.False(t, idx.HasErrors(), "should have no errors")
+	assert.Len(t, idx.Operations, 2, "should have 2 operations")
+
+	// Find the Child component schema
+	var childNode *yaml.Node
+	for _, schema := range idx.ComponentSchemas {
+		jp := schema.Location.ToJSONPointer()
+		if strings.Contains(jp.String(), "Child") {
+			childNode = schema.Node.GetRootNode()
+			break
+		}
+	}
+	require.NotNil(t, childNode, "Child schema root node should exist")
+
+	// Child must be associated with both operations — not just the first.
+	// Before the fix, the visitedRefs shortcut only registered immediate
+	// leaf nodes of the resolved schema, missing nested refs like Child.
+	ops := idx.GetNodeOperations(childNode)
+	require.Len(t, ops, 2, "Child schema should be mapped to both operations via cached ref nodes")
+
+	opIDs := make([]string, len(ops))
+	for i, op := range ops {
+		opIDs[i] = *op.Node.OperationID
+	}
+	assert.ElementsMatch(t, []string{"firstOp", "secondOp"}, opIDs, "both operations should reference Child")
+}
+
 func TestBuildIndex_NodeToOperations_Webhooks_Success(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

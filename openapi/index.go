@@ -194,6 +194,8 @@ type Index struct {
 	referenceStack         []referenceStackEntry                      // Active reference resolution chain (by ref target)
 	polymorphicRefs        []*PolymorphicCircularRef                  // Pending polymorphic circulars
 	visitedRefs            map[string]bool                            // Tracks visited ref targets to avoid duplicates
+	refTargetNodes         map[string][]*yaml.Node                    // Cache of all nodes registered during a ref target's walk
+	activeRefCollectors    []string                                   // Stack of ref targets currently being collected
 	indexedReferences      map[any]bool                               // Tracks indexed reference objects to ensure each $ref appears once
 	reportedUnknownProps   map[marshaller.CoreModeler]map[string]bool // Tracks which unknown properties have been reported per core model
 	currentDocumentStack   []string                                   // Stack of document paths being walked (for determining external vs main)
@@ -312,6 +314,7 @@ func BuildIndex(ctx context.Context, doc *OpenAPI, resolveOpts references.Resolv
 	// Initialize the node-to-operation map if enabled
 	if options.BuildNodeOperationMap {
 		idx.NodeToOperations = make(map[*yaml.Node][]*IndexNode[*Operation])
+		idx.refTargetNodes = make(map[string][]*yaml.Node)
 	}
 
 	// Phase 1: Walk and index everything
@@ -666,6 +669,12 @@ func (i *Index) registerNodeWithOperation(node *yaml.Node, op *IndexNode[*Operat
 		}
 	}
 	i.NodeToOperations[node] = append(existing, op)
+
+	// Collect this node for all ref targets currently being walked so their
+	// caches include the complete set of nodes (including nested refs).
+	for _, target := range i.activeRefCollectors {
+		i.refTargetNodes[target] = append(i.refTargetNodes[target], node)
+	}
 }
 
 func buildIndex[T any](ctx context.Context, index *Index, obj *T) error {
@@ -900,6 +909,22 @@ func (i *Index) indexSchema(ctx context.Context, loc Locations, schema *oas3.JSO
 			}
 		}
 
+		// Skip re-walking ref targets we've already fully indexed.
+		// The circular check above handles refs currently on the stack (active walk),
+		// but we also need to avoid re-walking targets that were fully walked in a
+		// previous (completed) traversal. Without this, each of N references to the
+		// same schema triggers a full walk of that schema's tree, causing O(N × tree_size) work.
+		if i.visitedRefs[refTarget] {
+			// Replay all cached nodes for this ref target so the current
+			// operation gets a complete mapping (including nested schemas).
+			if i.buildNodeOperationMap && i.currentOperation != nil {
+				for _, node := range i.refTargetNodes[refTarget] {
+					i.registerNodeWithOperation(node, i.currentOperation)
+				}
+			}
+			return nil
+		}
+
 		// Get the document path for the resolved schema
 		info := schema.GetReferenceResolutionInfo()
 		var docPath string
@@ -930,6 +955,12 @@ func (i *Index) indexSchema(ctx context.Context, loc Locations, schema *oas3.JSO
 			}()
 		}
 
+		// Start collecting nodes for this ref target so the cache includes
+		// everything registered during the walk (including nested refs).
+		if i.buildNodeOperationMap {
+			i.activeRefCollectors = append(i.activeRefCollectors, refTarget)
+		}
+
 		// Get the resolved schema and recursively walk it
 		// Walk API doesn't walk resolved references automatically - we must walk them
 		resolved := schema.GetResolvedSchema()
@@ -938,12 +969,21 @@ func (i *Index) indexSchema(ctx context.Context, loc Locations, schema *oas3.JSO
 			refableResolved := oas3.ConcreteToReferenceable(resolved)
 			if err := buildIndex(ctx, i, refableResolved); err != nil {
 				i.referenceStack = i.referenceStack[:len(i.referenceStack)-1]
+				if i.buildNodeOperationMap {
+					i.activeRefCollectors = i.activeRefCollectors[:len(i.activeRefCollectors)-1]
+				}
 				return err
 			}
 		}
 
 		// Pop from reference stack
 		i.referenceStack = i.referenceStack[:len(i.referenceStack)-1]
+
+		// Stop collecting and mark as fully visited.
+		if i.buildNodeOperationMap {
+			i.activeRefCollectors = i.activeRefCollectors[:len(i.activeRefCollectors)-1]
+		}
+		i.visitedRefs[refTarget] = true
 
 		return nil
 	}

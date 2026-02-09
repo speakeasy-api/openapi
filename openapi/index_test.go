@@ -1929,9 +1929,10 @@ components:
         next:
           $ref: '#/components/schemas/PolyNode'
 `,
-			// 2 circular refs detected: one starting from PolyNode, one from PolyNodeObject
-			// Both are part of the same cycle but detected at different entry points
-			expectedValidCircular: 2,
+			// 1 circular ref detected for the PolyNode ↔ PolyNodeObject cycle.
+			// With visitedRefs optimization, each cycle is detected once from
+			// whichever entry point is walked first.
+			expectedValidCircular: 1,
 		},
 		{
 			name: "oneOf with inline schema",
