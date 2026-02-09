@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/speakeasy-api/openapi/linter/fix"
 	"github.com/speakeasy-api/openapi/validation"
@@ -214,6 +215,62 @@ func TestTerminalPrompter_Choice_OutOfRangeThenValid(t *testing.T) {
 	assert.Contains(t, output.String(), "Invalid choice", "should show invalid choice message")
 }
 
+func TestTerminalPrompter_FreeText_Default(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("\n")
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "add value",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptFreeText,
+				Message: "Enter value",
+				Default: "default-value",
+			},
+		},
+	}
+
+	responses, err := prompter.PromptFix(finding, f)
+	require.NoError(t, err, "PromptFix should not fail")
+	assert.Equal(t, []string{"default-value"}, responses, "should return default when input is empty")
+	assert.Contains(t, output.String(), "(default: default-value)", "should display default value")
+}
+
+func TestTerminalPrompter_FreeText_EmptyNoDefault(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("\n")
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "add value",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptFreeText,
+				Message: "Enter value",
+			},
+		},
+	}
+
+	_, err := prompter.PromptFix(finding, f)
+	require.Error(t, err, "should return error on empty input without default")
+	assert.ErrorIs(t, err, validation.ErrSkipFix, "should return ErrSkipFix")
+}
+
 func TestTerminalPrompter_Confirm_Yes(t *testing.T) {
 	t.Parallel()
 
@@ -236,4 +293,98 @@ func TestTerminalPrompter_Confirm_No(t *testing.T) {
 	result, err := prompter.Confirm("Apply fix?")
 	require.NoError(t, err, "Confirm should not fail")
 	assert.False(t, result, "should return false for 'n'")
+}
+
+func TestTerminalPrompter_UnknownPromptType(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("\n")
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "bad prompt type",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptType(99),
+				Message: "unknown",
+			},
+		},
+	}
+
+	_, err := prompter.PromptFix(finding, f)
+	require.Error(t, err, "should fail on unknown prompt type")
+	assert.Contains(t, err.Error(), "unknown prompt type", "error should mention unknown prompt type")
+}
+
+func TestTerminalPrompter_Choice_ReadError(t *testing.T) {
+	t.Parallel()
+
+	input := iotest.ErrReader(errors.New("read failed"))
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "pick",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptChoice,
+				Message: "Choose:",
+				Choices: []string{"a", "b"},
+			},
+		},
+	}
+
+	_, err := prompter.PromptFix(finding, f)
+	require.Error(t, err, "should fail on read error")
+	assert.Contains(t, err.Error(), "reading input", "error should mention reading input")
+}
+
+func TestTerminalPrompter_FreeText_ReadError(t *testing.T) {
+	t.Parallel()
+
+	input := iotest.ErrReader(errors.New("read failed"))
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "add value",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptFreeText,
+				Message: "Enter value",
+			},
+		},
+	}
+
+	_, err := prompter.PromptFix(finding, f)
+	require.Error(t, err, "should fail on read error")
+	assert.Contains(t, err.Error(), "reading input", "error should mention reading input")
+}
+
+func TestTerminalPrompter_Confirm_ReadError(t *testing.T) {
+	t.Parallel()
+
+	input := iotest.ErrReader(errors.New("read failed"))
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	_, err := prompter.Confirm("Apply fix?")
+	require.Error(t, err, "should fail on read error")
+	assert.Contains(t, err.Error(), "reading input", "error should mention reading input")
 }

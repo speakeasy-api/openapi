@@ -59,6 +59,16 @@ func (f *mockNodeFix) ApplyNode(rootNode *yaml.Node) error {
 	return nil
 }
 
+// mockInteractiveFixWithSetInputErr is an interactive fix that fails on SetInput.
+type mockInteractiveFixWithSetInputErr struct {
+	mockInteractiveFix
+	setInputErr error
+}
+
+func (f *mockInteractiveFixWithSetInputErr) SetInput(responses []string) error {
+	return f.setInputErr
+}
+
 // mockPrompter is a test prompter that returns predefined responses.
 type mockPrompter struct {
 	responses []string
@@ -319,6 +329,135 @@ func TestEngine_ModeInteractive_NonInteractiveFixAppliesWithoutPrompter(t *testi
 	require.NoError(t, err, "ProcessErrors should not fail")
 	assert.Len(t, result.Applied, 1, "should apply non-interactive fix even without prompter")
 	assert.True(t, f.applied, "fix should have been applied")
+}
+
+func TestEngine_SkipsNonValidationErrors(t *testing.T) {
+	t.Parallel()
+
+	f := &mockFix{description: "fix"}
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto}, nil, nil)
+	result, err := engine.ProcessErrors(t.Context(), &openapi.OpenAPI{}, []error{
+		errors.New("plain error, not a validation.Error"),
+		makeError("test-rule", 1, 1, "real issue", f),
+	})
+
+	require.NoError(t, err, "ProcessErrors should not fail")
+	assert.Len(t, result.Applied, 1, "should only apply fix for the validation error")
+	assert.True(t, f.applied, "fix for validation error should have been applied")
+}
+
+func TestEngine_ModeInteractive_PrompterError(t *testing.T) {
+	t.Parallel()
+
+	f := &mockInteractiveFix{
+		description: "needs input",
+		prompts:     []validation.Prompt{{Type: validation.PromptFreeText, Message: "enter value"}},
+	}
+	prompter := &mockPrompter{err: errors.New("terminal closed")}
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeInteractive}, prompter, nil)
+	result, err := engine.ProcessErrors(t.Context(), &openapi.OpenAPI{}, []error{
+		makeError("test-rule", 1, 1, "issue", f),
+	})
+
+	require.NoError(t, err, "ProcessErrors should not fail")
+	assert.Empty(t, result.Applied, "should not apply fix when prompter fails")
+	assert.Len(t, result.Failed, 1, "should record the fix as failed")
+	assert.False(t, f.applied, "fix should not have been applied")
+}
+
+func TestEngine_ModeInteractive_SetInputError(t *testing.T) {
+	t.Parallel()
+
+	f := &mockInteractiveFixWithSetInputErr{
+		mockInteractiveFix: mockInteractiveFix{
+			description: "needs input",
+			prompts:     []validation.Prompt{{Type: validation.PromptFreeText, Message: "enter value"}},
+		},
+		setInputErr: errors.New("invalid input"),
+	}
+	prompter := &mockPrompter{responses: []string{"bad value"}}
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeInteractive}, prompter, nil)
+	result, err := engine.ProcessErrors(t.Context(), &openapi.OpenAPI{}, []error{
+		makeError("test-rule", 1, 1, "issue", f),
+	})
+
+	require.NoError(t, err, "ProcessErrors should not fail")
+	assert.Empty(t, result.Applied, "should not apply fix when SetInput fails")
+	assert.Len(t, result.Failed, 1, "should record the fix as failed")
+}
+
+func TestEngine_NodeFix_UsesApplyNode(t *testing.T) {
+	t.Parallel()
+
+	f := &mockNodeFix{mockFix: mockFix{description: "node fix"}}
+	rootNode := &yaml.Node{Kind: yaml.MappingNode}
+	doc := &openapi.OpenAPI{}
+	doc.GetCore().SetRootNode(rootNode)
+
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto}, nil, nil)
+	result, err := engine.ProcessErrors(t.Context(), doc, []error{
+		makeError("test-rule", 1, 1, "issue", f),
+	})
+
+	require.NoError(t, err, "ProcessErrors should not fail")
+	assert.Len(t, result.Applied, 1, "should apply the fix")
+	assert.True(t, f.nodeApplied, "ApplyNode should be called when root node is present")
+	assert.False(t, f.applied, "Apply should not be called when ApplyNode succeeds")
+}
+
+func TestEngine_DryRun_ConflictDetection(t *testing.T) {
+	t.Parallel()
+
+	f1 := &mockFix{description: "first fix"}
+	f2 := &mockFix{description: "second fix"}
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto, DryRun: true}, nil, nil)
+	result, err := engine.ProcessErrors(t.Context(), &openapi.OpenAPI{}, []error{
+		makeError("same-rule", 5, 3, "issue 1", f1),
+		makeError("same-rule", 5, 3, "issue 2", f2),
+	})
+
+	require.NoError(t, err, "ProcessErrors should not fail")
+	assert.Len(t, result.Applied, 1, "dry-run should record first fix as would-apply")
+	assert.Len(t, result.Skipped, 1, "dry-run should skip second fix as conflict")
+	assert.False(t, f1.applied, "fix should NOT have been actually applied in dry-run")
+	assert.False(t, f2.applied, "fix should NOT have been actually applied in dry-run")
+}
+
+func TestApplyNodeFix_WithNodeFix(t *testing.T) {
+	t.Parallel()
+
+	f := &mockNodeFix{mockFix: mockFix{description: "node fix"}}
+	rootNode := &yaml.Node{Kind: yaml.MappingNode}
+	doc := &openapi.OpenAPI{}
+
+	err := fix.ApplyNodeFix(f, doc, rootNode)
+	require.NoError(t, err, "ApplyNodeFix should not fail")
+	assert.True(t, f.nodeApplied, "ApplyNode should be called")
+	assert.False(t, f.applied, "Apply should not be called")
+}
+
+func TestApplyNodeFix_NilRootNode(t *testing.T) {
+	t.Parallel()
+
+	f := &mockNodeFix{mockFix: mockFix{description: "node fix"}}
+	doc := &openapi.OpenAPI{}
+
+	err := fix.ApplyNodeFix(f, doc, nil)
+	require.NoError(t, err, "ApplyNodeFix should not fail")
+	assert.False(t, f.nodeApplied, "ApplyNode should not be called with nil root")
+	assert.True(t, f.applied, "Apply should be called as fallback")
+}
+
+func TestApplyNodeFix_RegularFix(t *testing.T) {
+	t.Parallel()
+
+	f := &mockFix{description: "regular fix"}
+	rootNode := &yaml.Node{Kind: yaml.MappingNode}
+	doc := &openapi.OpenAPI{}
+
+	err := fix.ApplyNodeFix(f, doc, rootNode)
+	require.NoError(t, err, "ApplyNodeFix should not fail")
+	assert.True(t, f.applied, "Apply should be called for non-NodeFix")
 }
 
 func TestEngine_SortsByLocation(t *testing.T) {
