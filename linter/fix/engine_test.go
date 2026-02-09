@@ -184,7 +184,25 @@ func TestEngine_DryRun(t *testing.T) {
 	assert.False(t, f.applied, "fix should NOT have been actually applied in dry-run")
 }
 
-func TestEngine_ConflictDetection(t *testing.T) {
+func TestEngine_ConflictDetection_SameRule(t *testing.T) {
+	t.Parallel()
+
+	f1 := &mockFix{description: "first fix"}
+	f2 := &mockFix{description: "second fix"}
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto}, nil, nil)
+	result, err := engine.ProcessErrors(t.Context(), &openapi.OpenAPI{}, []error{
+		makeError("same-rule", 5, 3, "issue 1", f1),
+		makeError("same-rule", 5, 3, "issue 2", f2),
+	})
+
+	require.NoError(t, err, "ProcessErrors should not fail")
+	assert.Len(t, result.Applied, 1, "should apply the first fix")
+	assert.Len(t, result.Skipped, 1, "should skip the second fix as conflict")
+	assert.True(t, f1.applied, "first fix should have been applied")
+	assert.False(t, f2.applied, "second fix should not have been applied")
+}
+
+func TestEngine_ConflictDetection_DifferentRules(t *testing.T) {
 	t.Parallel()
 
 	f1 := &mockFix{description: "first fix"}
@@ -196,10 +214,10 @@ func TestEngine_ConflictDetection(t *testing.T) {
 	})
 
 	require.NoError(t, err, "ProcessErrors should not fail")
-	assert.Len(t, result.Applied, 1, "should apply the first fix")
-	assert.Len(t, result.Skipped, 1, "should skip the second fix as conflict")
+	assert.Len(t, result.Applied, 2, "should apply both fixes from different rules at the same location")
+	assert.Empty(t, result.Skipped, "should not skip fixes from different rules")
 	assert.True(t, f1.applied, "first fix should have been applied")
-	assert.False(t, f2.applied, "second fix should not have been applied")
+	assert.True(t, f2.applied, "second fix should have been applied")
 }
 
 func TestEngine_FailedFix(t *testing.T) {

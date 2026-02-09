@@ -7,10 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"sync"
+
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/linter/fix"
 	"github.com/speakeasy-api/openapi/openapi"
 	openapiLinter "github.com/speakeasy-api/openapi/openapi/linter"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/spf13/cobra"
 
 	// Enable custom rules support
@@ -216,10 +219,12 @@ func lintOpenAPI(ctx context.Context, file string) error {
 }
 
 func applyFixes(ctx context.Context, fixOpts fix.Options, doc *openapi.OpenAPI, output *linter.Output, cleanFile string) error {
-	// Create prompter for interactive mode
-	var prompter *fix.TerminalPrompter
+	// Create prompter lazily for interactive mode — only initialized when
+	// an interactive fix is actually encountered, avoiding unnecessary setup
+	// when all fixes are non-interactive.
+	var prompter validation.Prompter
 	if fixOpts.Mode == fix.ModeInteractive {
-		prompter = fix.NewTerminalPrompter(os.Stdin, os.Stderr)
+		prompter = &lazyPrompter{}
 	}
 
 	engine := fix.NewEngine(fixOpts, prompter, nil)
@@ -291,6 +296,29 @@ func skipReasonString(reason fix.SkipReason) string {
 	default:
 		return "unknown"
 	}
+}
+
+// lazyPrompter defers TerminalPrompter creation until an interactive fix is
+// actually encountered, avoiding unnecessary setup when all fixes are non-interactive.
+type lazyPrompter struct {
+	once     sync.Once
+	prompter *fix.TerminalPrompter
+}
+
+func (l *lazyPrompter) init() {
+	l.once.Do(func() {
+		l.prompter = fix.NewTerminalPrompter(os.Stdin, os.Stderr)
+	})
+}
+
+func (l *lazyPrompter) PromptFix(finding *validation.Error, f validation.Fix) ([]string, error) {
+	l.init()
+	return l.prompter.PromptFix(finding, f)
+}
+
+func (l *lazyPrompter) Confirm(message string) (bool, error) {
+	l.init()
+	return l.prompter.Confirm(message)
 }
 
 func buildLintConfig() *linter.Config {

@@ -96,7 +96,7 @@ func (p *OpenAPIProcessor) WriteDocument(ctx context.Context, doc *openapi.OpenA
 		return fmt.Errorf("failed to write document: %w", err)
 	}
 
-	fmt.Printf("📄 Document written to: %s\n", cleanOutputFile)
+	fmt.Fprintf(os.Stderr, "📄 Document written to: %s\n", cleanOutputFile)
 
 	return nil
 }

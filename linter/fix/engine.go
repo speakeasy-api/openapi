@@ -86,10 +86,13 @@ func NewEngine(opts Options, prompter validation.Prompter, registry *FixRegistry
 	}
 }
 
-// conflictKey identifies a document location for conflict detection.
+// conflictKey identifies a document location and rule for conflict detection.
+// Including the rule allows independent fixes from different rules at the same
+// YAML node to be applied without incorrectly skipping them as conflicts.
 type conflictKey struct {
 	Line   int
 	Column int
+	Rule   string
 }
 
 // ProcessErrors takes lint output errors and applies fixes where available.
@@ -147,7 +150,7 @@ func (e *Engine) ProcessErrors(ctx context.Context, doc *openapi.OpenAPI, errs [
 		vErr := fe.vErr
 
 		// Check for conflicts at the same location
-		key := conflictKey{Line: vErr.GetLineNumber(), Column: vErr.GetColumnNumber()}
+		key := conflictKey{Line: vErr.GetLineNumber(), Column: vErr.GetColumnNumber(), Rule: vErr.Rule}
 		if key.Line >= 0 && modified[key] {
 			result.Skipped = append(result.Skipped, SkippedFix{
 				Error:  vErr,
