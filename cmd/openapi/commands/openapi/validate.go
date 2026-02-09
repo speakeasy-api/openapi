@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/spf13/cobra"
@@ -28,8 +31,12 @@ This command will parse and validate the provided OpenAPI document, checking for
 func runValidate(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	file := args[0]
+	start := time.Now()
 
-	if err := validateOpenAPI(ctx, file); err != nil {
+	err := validateOpenAPI(ctx, file)
+	reportElapsed(os.Stderr, "Validation", time.Since(start))
+
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -56,12 +63,20 @@ func validateOpenAPI(ctx context.Context, file string) error {
 	}
 
 	fmt.Printf("❌ OpenAPI document is invalid - %d errors:\n\n", len(validationErrors))
-
-	for i, validationErr := range validationErrors {
-		fmt.Printf("%d. %s\n", i+1, validationErr.Error())
-	}
+	fmt.Print(formatValidationErrors(validationErrors))
 
 	return errors.New("openAPI document validation failed")
+}
+
+func formatValidationErrors(validationErrors []error) string {
+	var sb strings.Builder
+	indexWidth := len(strconv.Itoa(len(validationErrors)))
+
+	for i, validationErr := range validationErrors {
+		fmt.Fprintf(&sb, "%*d. %s\n", indexWidth, i+1, validationErr.Error())
+	}
+
+	return sb.String()
 }
 
 // GetValidateCommand returns the validate command for external use

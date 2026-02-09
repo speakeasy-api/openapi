@@ -87,6 +87,40 @@ func TestTextFormatter_Format(t *testing.T) {
 	}
 }
 
+func TestTextFormatter_Format_ColumnAlignment(t *testing.T) {
+	t.Parallel()
+
+	formatter := format.NewTextFormatter()
+	result, err := formatter.Format([]error{
+		&validation.Error{
+			UnderlyingError: errors.New("first"),
+			Node:            &yaml.Node{Line: 1, Column: 1},
+			Severity:        validation.SeverityWarning,
+			Rule:            "short-rule",
+		},
+		&validation.Error{
+			UnderlyingError: errors.New("second"),
+			Node:            &yaml.Node{Line: 1200, Column: 20},
+			Severity:        validation.SeverityWarning,
+			Rule:            "longer-rule",
+		},
+	})
+	require.NoError(t, err)
+
+	lines := strings.Split(result, "\n")
+	require.GreaterOrEqual(t, len(lines), 2, "should have at least 2 output lines")
+
+	// location is right-aligned to width 7 ("1200:20"), severity left-aligned to width 7 ("warning"),
+	// rule left-aligned to width 11 ("longer-rule")
+	assert.Equal(t, "    1:1 warning short-rule  first", lines[0], "first line should be padded to align columns")
+	assert.Equal(t, "1200:20 warning longer-rule second", lines[1], "second line should fill location column exactly")
+
+	// Verify severity column starts at the same index in both lines
+	severityIdx0 := strings.Index(lines[0], "warning")
+	severityIdx1 := strings.Index(lines[1], "warning")
+	assert.Equal(t, severityIdx0, severityIdx1, "severity column should start at the same character index")
+}
+
 func TestJSONFormatter_Format(t *testing.T) {
 	t.Parallel()
 

@@ -392,9 +392,10 @@ ExternalNode:
 		circularErrors = append(circularErrors, result.Error())
 	}
 
+	// With visitedRefs optimization, each circular cycle is detected once
+	// (from whichever entry point is walked first), not from every entry point.
 	assert.ElementsMatch(t, []string{
 		"[7:7] error circular-reference-invalid non-terminating circular reference detected: /spec/openapi.yaml#/components/schemas/Node -> /spec/external.yaml#/ExternalNode -> /spec/openapi.yaml#/components/schemas/Node (document: /spec/external.yaml)",
-		"[24:11] error circular-reference-invalid non-terminating circular reference detected: /spec/external.yaml#/ExternalNode -> /spec/openapi.yaml#/components/schemas/Node -> /spec/external.yaml#/ExternalNode",
 	}, circularErrors)
 }
 

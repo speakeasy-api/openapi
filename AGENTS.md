@@ -60,7 +60,7 @@ mise test -count=1 ./...
 
 ## Git Commit Conventions
 
-**Always use single-line conventional commits.** Do not create multi-line commit messages.
+**Always use single-line conventional commits.** Do not create multi-line commit messages. Do not add `Co-Authored-By` trailers.
 
 ### Commit Message Format
 

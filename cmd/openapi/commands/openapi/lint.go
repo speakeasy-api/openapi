@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/linter/fix"
@@ -105,8 +106,12 @@ func validateLintFlags(_ *cobra.Command, _ []string) error {
 func runLint(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	file := args[0]
+	start := time.Now()
 
-	if err := lintOpenAPI(ctx, file); err != nil {
+	err := lintOpenAPI(ctx, file)
+	reportElapsed(os.Stderr, "Linting", time.Since(start))
+
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
