@@ -58,6 +58,14 @@ mise test -count=1 ./...
 - **Race Detection**: Automatically enables race detection to catch concurrency issues
 - **Submodule Awareness**: Checks for and warns about uninitialized test submodules
 
+## Pre-Commit CI Check
+
+**Always run `mise ci` before committing changes.** This runs the full CI pipeline locally (format, lint, test, build) and ensures your changes won't break CI.
+
+```bash
+mise ci
+```
+
 ## Git Commit Conventions
 
 **Always use single-line conventional commits.** Do not create multi-line commit messages. Do not add `Co-Authored-By` trailers.
