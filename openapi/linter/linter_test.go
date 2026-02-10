@@ -8,14 +8,19 @@ import (
 	"strings"
 	"testing"
 
+	"regexp"
+	"sync/atomic"
+
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
 	openapiLinter "github.com/speakeasy-api/openapi/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi/linter/rules"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/references"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 type mockVirtualFS struct {
@@ -453,6 +458,132 @@ paths:
 		"[1:7] error validation-invalid-schema schema.type value must be one of 'array', 'boolean', 'integer', 'null', 'number', 'object', 'string' (document: /spec/schema.yaml)",
 		"[1:7] error validation-type-mismatch schema.type expected `array`, got `string` (document: /spec/schema.yaml)",
 	}, documentErrors)
+}
+
+func TestLinter_FilterErrors(t *testing.T) {
+	t.Parallel()
+
+	disabled := true
+	config := &linter.Config{
+		Extends: []string{"all"},
+		Rules: []linter.RuleEntry{
+			{
+				ID:       rules.RuleSemanticPathParams,
+				Match:    regexp.MustCompile(".*userId.*"),
+				Disabled: &disabled,
+			},
+		},
+	}
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
+
+	errs := []error{
+		&validation.Error{
+			UnderlyingError: errors.New("userId is missing"),
+			Node:            &yaml.Node{Line: 1, Column: 1},
+			Severity:        validation.SeverityError,
+			Rule:            rules.RuleSemanticPathParams,
+		},
+		&validation.Error{
+			UnderlyingError: errors.New("orderId is missing"),
+			Node:            &yaml.Node{Line: 2, Column: 1},
+			Severity:        validation.SeverityError,
+			Rule:            rules.RuleSemanticPathParams,
+		},
+	}
+
+	filtered := lntr.FilterErrors(errs)
+	// The "userId" error matches the disable pattern, so it should be removed
+	// The "orderId" error does NOT match, so it passes through
+	require.Len(t, filtered, 1, "should filter out the matching error")
+	assert.Contains(t, filtered[0].Error(), "orderId", "should keep the non-matching error")
+}
+
+// testLoaderCalled tracks whether the test custom rule loader was invoked.
+// Protected by the global customRuleLoadersMu inside RegisterCustomRuleLoader.
+var testLoaderCalled int32
+
+func init() {
+	// Register a single test loader that branches on a sentinel path.
+	// This avoids race conditions from registering loaders inside parallel tests.
+	openapiLinter.RegisterCustomRuleLoader(func(config *linter.CustomRulesConfig) ([]linter.RuleRunner[*openapi.OpenAPI], error) {
+		for _, p := range config.Paths {
+			if p == "__test_error_path__" {
+				return nil, errors.New("failed to compile rules")
+			}
+		}
+		atomic.AddInt32(&testLoaderCalled, 1)
+		return nil, nil
+	})
+}
+
+func TestNewLinter_CustomRuleLoader(t *testing.T) {
+	t.Parallel()
+
+	before := atomic.LoadInt32(&testLoaderCalled)
+
+	config := &linter.Config{
+		CustomRules: &linter.CustomRulesConfig{
+			Paths: []string{"./rules/*.ts"},
+		},
+	}
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err, "NewLinter should not fail")
+	assert.NotNil(t, lntr, "linter should be created")
+
+	after := atomic.LoadInt32(&testLoaderCalled)
+	assert.Greater(t, after, before, "custom rule loader should have been called")
+}
+
+func TestNewLinter_CustomRuleLoaderError(t *testing.T) {
+	t.Parallel()
+
+	config := &linter.Config{
+		CustomRules: &linter.CustomRulesConfig{
+			Paths: []string{"__test_error_path__"},
+		},
+	}
+	_, err := openapiLinter.NewLinter(config)
+	require.Error(t, err, "NewLinter should fail when custom rule loader fails")
+	assert.Contains(t, err.Error(), "loading custom rules", "error should mention loading custom rules")
+}
+
+func TestLinter_Lint_WithResolveOptions(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yamlInput := `
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        '200':
+          description: ok
+`
+
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(yamlInput))
+	require.NoError(t, err)
+
+	config := &linter.Config{
+		Extends: []string{},
+	}
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
+
+	docInfo := linter.NewDocumentInfo(doc, "/spec/openapi.yaml")
+	output, err := lntr.Lint(ctx, docInfo, nil, &linter.LintOptions{
+		ResolveOptions: &references.ResolveOptions{
+			DisableExternalRefs: true,
+			SkipValidation:      true,
+		},
+	})
+	require.NoError(t, err, "Lint should not fail with resolve options")
+	assert.NotNil(t, output, "should return output")
 }
 
 func TestNewLinter_WithoutDefaultRules(t *testing.T) {
