@@ -572,3 +572,79 @@ func (f *removeUnusedComponentFix) ApplyNode(_ *yaml.Node) error {
 	yml.DeleteMapNodeElement(ctx, f.componentName, f.parentMapNode)
 	return nil
 }
+
+// addPathParameterFix adds a missing path parameter definition to an operation.
+type addPathParameterFix struct {
+	operationNode *yaml.Node // the operation mapping node
+	paramName     string     // e.g. "userId"
+	schemaType    string     // "integer" or "string"
+	schemaFormat  string     // e.g. "uuid" or ""
+}
+
+func (f *addPathParameterFix) Description() string {
+	desc := "Add missing path parameter '" + f.paramName + "'"
+	if f.schemaFormat != "" {
+		desc += " (type: " + f.schemaType + ", format: " + f.schemaFormat + ")"
+	} else {
+		desc += " (type: " + f.schemaType + ")"
+	}
+	return desc
+}
+func (f *addPathParameterFix) Interactive() bool            { return false }
+func (f *addPathParameterFix) Prompts() []validation.Prompt { return nil }
+func (f *addPathParameterFix) SetInput([]string) error      { return nil }
+func (f *addPathParameterFix) Apply(doc any) error          { return nil }
+
+func (f *addPathParameterFix) ApplyNode(_ *yaml.Node) error {
+	if f.operationNode == nil || f.operationNode.Kind != yaml.MappingNode {
+		return nil
+	}
+
+	ctx := context.Background()
+
+	// Get or create parameters sequence
+	_, paramsNode, found := yml.GetMapElementNodes(ctx, f.operationNode, "parameters")
+	if !found || paramsNode == nil || paramsNode.Kind != yaml.SequenceNode {
+		paramsNode = &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+		yml.CreateOrUpdateMapNodeElement(ctx, "parameters", nil, paramsNode, f.operationNode)
+	}
+
+	// Idempotency: check if parameter already exists
+	for _, elem := range paramsNode.Content {
+		if elem.Kind != yaml.MappingNode {
+			continue
+		}
+		_, nameNode, nameFound := yml.GetMapElementNodes(ctx, elem, "name")
+		_, inNode, inFound := yml.GetMapElementNodes(ctx, elem, "in")
+		if nameFound && inFound && nameNode.Value == f.paramName && inNode.Value == "path" {
+			return nil // already exists
+		}
+	}
+
+	// Build schema node
+	schemaContent := []*yaml.Node{
+		yml.CreateStringNode("type"),
+		yml.CreateStringNode(f.schemaType),
+	}
+	if f.schemaFormat != "" {
+		schemaContent = append(schemaContent,
+			yml.CreateStringNode("format"),
+			yml.CreateStringNode(f.schemaFormat))
+	}
+	schemaNode := yml.CreateMapNode(ctx, schemaContent)
+
+	// Build parameter node
+	paramNode := yml.CreateMapNode(ctx, []*yaml.Node{
+		yml.CreateStringNode("name"),
+		yml.CreateStringNode(f.paramName),
+		yml.CreateStringNode("in"),
+		yml.CreateStringNode("path"),
+		yml.CreateStringNode("required"),
+		yml.CreateBoolNode(true),
+		yml.CreateStringNode("schema"),
+		schemaNode,
+	})
+
+	paramsNode.Content = append(paramsNode.Content, paramNode)
+	return nil
+}

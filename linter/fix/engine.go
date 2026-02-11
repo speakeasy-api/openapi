@@ -45,8 +45,10 @@ const (
 
 // AppliedFix records a successfully applied fix.
 type AppliedFix struct {
-	Error *validation.Error
-	Fix   validation.Fix
+	Error  *validation.Error
+	Fix    validation.Fix
+	Before string // populated from ChangeDescriber if implemented
+	After  string // populated from ChangeDescriber if implemented
 }
 
 // SkippedFix records a fix that was skipped.
@@ -97,6 +99,17 @@ type conflictKey struct {
 
 // ProcessErrors takes lint output errors and applies fixes where available.
 // The doc is modified in-place by successful fixes.
+//
+// Pipeline ordering:
+//  1. Fixable errors are collected from both Error.Fix fields and the FixRegistry.
+//  2. Errors are sorted by document location (line, column ascending) so fixes
+//     are applied in first-in-document-order. This ensures deterministic results.
+//  3. Conflict detection: the key is {line, column, rule}. If two errors from
+//     the same rule share a location, only the first (by sort order) is applied.
+//     Different rules CAN independently fix the same location.
+//  4. Interactive fixes are skipped in ModeAuto or when no prompter is available.
+//  5. In dry-run mode, fixes are recorded without modifying the document but
+//     conflict detection still operates.
 func (e *Engine) ProcessErrors(ctx context.Context, doc *openapi.OpenAPI, errs []error) (*Result, error) {
 	if e.opts.Mode == ModeNone {
 		return &Result{}, nil
@@ -172,7 +185,7 @@ func (e *Engine) ProcessErrors(ctx context.Context, doc *openapi.OpenAPI, errs [
 
 		// Dry-run: record what would happen without applying
 		if e.opts.DryRun {
-			result.Applied = append(result.Applied, AppliedFix{Error: vErr, Fix: fix})
+			result.Applied = append(result.Applied, makeAppliedFix(vErr, fix))
 			if key.Line >= 0 {
 				modified[key] = true
 			}
@@ -230,10 +243,18 @@ func (e *Engine) ProcessErrors(ctx context.Context, doc *openapi.OpenAPI, errs [
 			modified[key] = true
 		}
 
-		result.Applied = append(result.Applied, AppliedFix{Error: vErr, Fix: fix})
+		result.Applied = append(result.Applied, makeAppliedFix(vErr, fix))
 	}
 
 	return result, nil
+}
+
+func makeAppliedFix(vErr *validation.Error, fix validation.Fix) AppliedFix {
+	af := AppliedFix{Error: vErr, Fix: fix}
+	if cd, ok := fix.(validation.ChangeDescriber); ok {
+		af.Before, af.After = cd.DescribeChange()
+	}
+	return af
 }
 
 // ApplyNodeFix is a helper that applies a NodeFix if the fix implements the interface,

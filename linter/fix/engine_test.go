@@ -460,6 +460,71 @@ func TestApplyNodeFix_RegularFix(t *testing.T) {
 	assert.True(t, f.applied, "Apply should be called for non-NodeFix")
 }
 
+// mockChangeDescriberFix is a fix that implements ChangeDescriber.
+type mockChangeDescriberFix struct {
+	mockFix
+	before string
+	after  string
+}
+
+func (f *mockChangeDescriberFix) DescribeChange() (string, string) {
+	return f.before, f.after
+}
+
+func TestEngine_ChangeDescriber_PopulatesBeforeAfter(t *testing.T) {
+	t.Parallel()
+
+	f := &mockChangeDescriberFix{
+		mockFix: mockFix{description: "trim slash"},
+		before:  "/users/",
+		after:   "/users",
+	}
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto}, nil, nil)
+	result, err := engine.ProcessErrors(t.Context(), &openapi.OpenAPI{}, []error{
+		makeError("test-rule", 1, 1, "trailing slash", f),
+	})
+
+	require.NoError(t, err, "ProcessErrors should not fail")
+	require.Len(t, result.Applied, 1, "should apply the fix")
+	assert.Equal(t, "/users/", result.Applied[0].Before, "should populate Before from ChangeDescriber")
+	assert.Equal(t, "/users", result.Applied[0].After, "should populate After from ChangeDescriber")
+}
+
+func TestEngine_ChangeDescriber_DryRun(t *testing.T) {
+	t.Parallel()
+
+	f := &mockChangeDescriberFix{
+		mockFix: mockFix{description: "upgrade https"},
+		before:  "http://api.example.com",
+		after:   "https://api.example.com",
+	}
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto, DryRun: true}, nil, nil)
+	result, err := engine.ProcessErrors(t.Context(), &openapi.OpenAPI{}, []error{
+		makeError("test-rule", 1, 1, "use https", f),
+	})
+
+	require.NoError(t, err, "ProcessErrors should not fail")
+	require.Len(t, result.Applied, 1, "should record the fix as would-apply")
+	assert.Equal(t, "http://api.example.com", result.Applied[0].Before, "dry-run should populate Before")
+	assert.Equal(t, "https://api.example.com", result.Applied[0].After, "dry-run should populate After")
+	assert.False(t, f.applied, "fix should NOT have been actually applied in dry-run")
+}
+
+func TestEngine_NoChangeDescriber_EmptyBeforeAfter(t *testing.T) {
+	t.Parallel()
+
+	f := &mockFix{description: "simple fix"}
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto}, nil, nil)
+	result, err := engine.ProcessErrors(t.Context(), &openapi.OpenAPI{}, []error{
+		makeError("test-rule", 1, 1, "issue", f),
+	})
+
+	require.NoError(t, err, "ProcessErrors should not fail")
+	require.Len(t, result.Applied, 1, "should apply the fix")
+	assert.Empty(t, result.Applied[0].Before, "Before should be empty without ChangeDescriber")
+	assert.Empty(t, result.Applied[0].After, "After should be empty without ChangeDescriber")
+}
+
 func TestEngine_SortsByLocation(t *testing.T) {
 	t.Parallel()
 

@@ -227,7 +227,7 @@ func applyFixes(ctx context.Context, fixOpts fix.Options, doc *openapi.OpenAPI, 
 		prompter = &lazyPrompter{}
 	}
 
-	engine := fix.NewEngine(fixOpts, prompter, nil)
+	engine := fix.NewEngine(fixOpts, prompter, fix.NewFixRegistry())
 	result, err := engine.ProcessErrors(ctx, doc, output.Results)
 	if err != nil {
 		return fmt.Errorf("fix processing failed: %w", err)
@@ -263,6 +263,9 @@ func reportFixResults(result *fix.Result, dryRun bool) {
 			fmt.Fprintf(os.Stderr, "  [%d:%d] %s - %s\n",
 				af.Error.GetLineNumber(), af.Error.GetColumnNumber(),
 				af.Error.Rule, af.Fix.Description())
+			if af.Before != "" || af.After != "" {
+				fmt.Fprintf(os.Stderr, "    %s -> %s\n", af.Before, af.After)
+			}
 		}
 	}
 

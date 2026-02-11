@@ -437,6 +437,83 @@ components:
 	assert.Empty(t, errs2, "fix should resolve the array limit violation")
 }
 
+func TestFixIntegration_MissingPathParam(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	doc := parseOpenAPIDoc(t, `
+openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths:
+  /users/{userId}:
+    get:
+      operationId: getUser
+      responses:
+        "200":
+          description: OK
+`)
+
+	rule := &PathParamsRule{}
+	docInfo := buildDocInfo(t, doc)
+	errs := rule.Run(ctx, docInfo, &linter.RuleConfig{})
+	require.Len(t, errs, 1, "should detect missing userId param")
+
+	// Extract and apply fix
+	nodeFix := extractNodeFix(t, errs)
+	var valErr0 *validation.Error
+	require.ErrorAs(t, errs[0], &valErr0)
+	assert.False(t, valErr0.Fix.Interactive(), "should be non-interactive")
+	require.NoError(t, nodeFix.ApplyNode(nil))
+
+	// Re-parse and verify violation is resolved
+	doc2 := remarshalAndParse(t, doc)
+	docInfo2 := buildDocInfo(t, doc2)
+	errs2 := rule.Run(ctx, docInfo2, &linter.RuleConfig{})
+	assert.Empty(t, errs2, "fix should resolve the missing path param violation")
+}
+
+func TestFixIntegration_MissingPathParam_TypeInference(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	doc := parseOpenAPIDoc(t, `
+openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths:
+  /users/{userId}/sessions/{sessionUuid}:
+    get:
+      operationId: getSession
+      responses:
+        "200":
+          description: OK
+`)
+
+	rule := &PathParamsRule{}
+	docInfo := buildDocInfo(t, doc)
+	errs := rule.Run(ctx, docInfo, &linter.RuleConfig{})
+	require.Len(t, errs, 2, "should detect both missing params")
+
+	// Apply all fixes
+	for _, err := range errs {
+		var valErr *validation.Error
+		require.ErrorAs(t, err, &valErr)
+		require.NotNil(t, valErr.Fix, "should have a fix")
+		nodeFix, ok := valErr.Fix.(validation.NodeFix)
+		require.True(t, ok)
+		require.NoError(t, nodeFix.ApplyNode(nil))
+	}
+
+	// Re-parse and verify
+	doc2 := remarshalAndParse(t, doc)
+	docInfo2 := buildDocInfo(t, doc2)
+	errs2 := rule.Run(ctx, docInfo2, &linter.RuleConfig{})
+	assert.Empty(t, errs2, "fixes should resolve all missing path param violations")
+}
+
 // ============================================================
 // Fix engine integration test
 // ============================================================

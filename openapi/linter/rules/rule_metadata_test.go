@@ -104,7 +104,7 @@ func TestAllRules_FixAvailable(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, 32, fixableCount, "expected 32 rules to implement FixAvailable")
+	assert.Equal(t, 33, fixableCount, "expected 33 rules to implement FixAvailable")
 }
 
 func TestAllRules_MetadataPopulated(t *testing.T) {

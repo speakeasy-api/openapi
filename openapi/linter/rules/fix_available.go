@@ -35,3 +35,4 @@ func (r *OwaspArrayLimitRule) FixAvailable() bool                      { return 
 func (r *OwaspIntegerLimitRule) FixAvailable() bool                    { return true }
 func (r *OwaspAdditionalPropertiesConstrainedRule) FixAvailable() bool { return true }
 func (r *UnusedComponentRule) FixAvailable() bool                      { return true }
+func (r *PathParamsRule) FixAvailable() bool                           { return true }

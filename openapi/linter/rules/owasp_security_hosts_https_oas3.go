@@ -97,6 +97,13 @@ func (f *upgradeToHTTPSFix) Prompts() []validation.Prompt { return nil }
 func (f *upgradeToHTTPSFix) SetInput([]string) error      { return nil }
 func (f *upgradeToHTTPSFix) Apply(doc any) error          { return nil }
 
+func (f *upgradeToHTTPSFix) DescribeChange() (string, string) {
+	if f.node == nil || !strings.HasPrefix(f.node.Value, "http://") {
+		return "", ""
+	}
+	return f.node.Value, "https://" + strings.TrimPrefix(f.node.Value, "http://")
+}
+
 func (f *upgradeToHTTPSFix) ApplyNode(_ *yaml.Node) error {
 	if f.node != nil && strings.HasPrefix(f.node.Value, "http://") {
 		f.node.Value = "https://" + strings.TrimPrefix(f.node.Value, "http://")

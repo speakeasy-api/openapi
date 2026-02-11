@@ -61,6 +61,23 @@ func TestRemoveHostTrailingSlashFix(t *testing.T) {
 		f := &removeHostTrailingSlashFix{node: nil}
 		require.NoError(t, f.ApplyNode(nil))
 	})
+
+	t.Run("describe change", func(t *testing.T) {
+		t.Parallel()
+		node := yml.CreateStringNode("https://api.example.com/")
+		f := &removeHostTrailingSlashFix{node: node}
+		before, after := f.DescribeChange()
+		assert.Equal(t, "https://api.example.com/", before, "before should be original value")
+		assert.Equal(t, "https://api.example.com", after, "after should have slash removed")
+	})
+
+	t.Run("describe change nil node", func(t *testing.T) {
+		t.Parallel()
+		f := &removeHostTrailingSlashFix{node: nil}
+		before, after := f.DescribeChange()
+		assert.Empty(t, before, "before should be empty for nil node")
+		assert.Empty(t, after, "after should be empty for nil node")
+	})
 }
 
 func TestRemoveTrailingSlashFix(t *testing.T) {
@@ -87,6 +104,23 @@ func TestRemoveTrailingSlashFix(t *testing.T) {
 		t.Parallel()
 		f := &removeTrailingSlashFix{node: nil}
 		require.NoError(t, f.ApplyNode(nil))
+	})
+
+	t.Run("describe change", func(t *testing.T) {
+		t.Parallel()
+		node := yml.CreateStringNode("/pets/")
+		f := &removeTrailingSlashFix{node: node}
+		before, after := f.DescribeChange()
+		assert.Equal(t, "/pets/", before, "before should be original value")
+		assert.Equal(t, "/pets", after, "after should have slash removed")
+	})
+
+	t.Run("describe change nil node", func(t *testing.T) {
+		t.Parallel()
+		f := &removeTrailingSlashFix{node: nil}
+		before, after := f.DescribeChange()
+		assert.Empty(t, before, "before should be empty for nil node")
+		assert.Empty(t, after, "after should be empty for nil node")
 	})
 }
 
@@ -349,6 +383,32 @@ func TestUpgradeToHTTPSFix(t *testing.T) {
 		f := &upgradeToHTTPSFix{node: nil}
 		require.NoError(t, f.ApplyNode(nil))
 	})
+
+	t.Run("describe change", func(t *testing.T) {
+		t.Parallel()
+		node := yml.CreateStringNode("http://api.example.com")
+		f := &upgradeToHTTPSFix{node: node}
+		before, after := f.DescribeChange()
+		assert.Equal(t, "http://api.example.com", before, "before should be original value")
+		assert.Equal(t, "https://api.example.com", after, "after should be upgraded to HTTPS")
+	})
+
+	t.Run("describe change nil node", func(t *testing.T) {
+		t.Parallel()
+		f := &upgradeToHTTPSFix{node: nil}
+		before, after := f.DescribeChange()
+		assert.Empty(t, before, "before should be empty for nil node")
+		assert.Empty(t, after, "after should be empty for nil node")
+	})
+
+	t.Run("describe change already https", func(t *testing.T) {
+		t.Parallel()
+		node := yml.CreateStringNode("https://api.example.com")
+		f := &upgradeToHTTPSFix{node: node}
+		before, after := f.DescribeChange()
+		assert.Empty(t, before, "before should be empty when already HTTPS")
+		assert.Empty(t, after, "after should be empty when already HTTPS")
+	})
 }
 
 func TestRemoveNullableFix(t *testing.T) {
@@ -560,4 +620,183 @@ func TestSetAdditionalPropertiesFalseFix(t *testing.T) {
 		f := &setAdditionalPropertiesFalseFix{node: nil}
 		require.NoError(t, f.ApplyNode(nil))
 	})
+}
+
+func TestAddPathParameterFix(t *testing.T) {
+	t.Parallel()
+
+	t.Run("metadata", func(t *testing.T) {
+		t.Parallel()
+		f := &addPathParameterFix{paramName: "userId", schemaType: "integer"}
+		assert.Equal(t, "Add missing path parameter 'userId' (type: integer)", f.Description())
+		assert.False(t, f.Interactive())
+		assert.Nil(t, f.Prompts())
+		require.NoError(t, f.SetInput(nil))
+		require.NoError(t, f.Apply(nil))
+	})
+
+	t.Run("metadata with format", func(t *testing.T) {
+		t.Parallel()
+		f := &addPathParameterFix{paramName: "requestUuid", schemaType: "string", schemaFormat: "uuid"}
+		assert.Equal(t, "Add missing path parameter 'requestUuid' (type: string, format: uuid)", f.Description())
+	})
+
+	t.Run("adds param to existing parameters sequence", func(t *testing.T) {
+		t.Parallel()
+		ctx := t.Context()
+
+		// Create an operation node with existing parameters
+		paramsSeq := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+		opNode := yml.CreateMapNode(ctx, []*yaml.Node{
+			yml.CreateStringNode("parameters"),
+			paramsSeq,
+		})
+
+		f := &addPathParameterFix{
+			operationNode: opNode,
+			paramName:     "userId",
+			schemaType:    "integer",
+		}
+		require.NoError(t, f.ApplyNode(nil))
+
+		// Verify parameter was added
+		_, updatedParams, found := yml.GetMapElementNodes(ctx, opNode, "parameters")
+		require.True(t, found, "parameters should exist")
+		require.Equal(t, yaml.SequenceNode, updatedParams.Kind)
+		assert.Len(t, updatedParams.Content, 1, "should have one parameter")
+
+		// Verify parameter content
+		param := updatedParams.Content[0]
+		_, nameNode, _ := yml.GetMapElementNodes(ctx, param, "name")
+		_, inNode, _ := yml.GetMapElementNodes(ctx, param, "in")
+		_, reqNode, _ := yml.GetMapElementNodes(ctx, param, "required")
+		assert.Equal(t, "userId", nameNode.Value)
+		assert.Equal(t, "path", inNode.Value)
+		assert.Equal(t, "true", reqNode.Value)
+
+		_, schemaNode, _ := yml.GetMapElementNodes(ctx, param, "schema")
+		require.NotNil(t, schemaNode)
+		_, typeNode, _ := yml.GetMapElementNodes(ctx, schemaNode, "type")
+		assert.Equal(t, "integer", typeNode.Value)
+	})
+
+	t.Run("creates parameters sequence when missing", func(t *testing.T) {
+		t.Parallel()
+		ctx := t.Context()
+
+		// Create an operation node without parameters
+		opNode := yml.CreateMapNode(ctx, []*yaml.Node{
+			yml.CreateStringNode("summary"),
+			yml.CreateStringNode("Get user"),
+		})
+
+		f := &addPathParameterFix{
+			operationNode: opNode,
+			paramName:     "userId",
+			schemaType:    "string",
+		}
+		require.NoError(t, f.ApplyNode(nil))
+
+		// Verify parameters was created
+		_, updatedParams, found := yml.GetMapElementNodes(ctx, opNode, "parameters")
+		require.True(t, found, "parameters should be created")
+		require.Equal(t, yaml.SequenceNode, updatedParams.Kind)
+		assert.Len(t, updatedParams.Content, 1, "should have one parameter")
+	})
+
+	t.Run("includes format when specified", func(t *testing.T) {
+		t.Parallel()
+		ctx := t.Context()
+
+		opNode := yml.CreateMapNode(ctx, nil)
+
+		f := &addPathParameterFix{
+			operationNode: opNode,
+			paramName:     "requestUuid",
+			schemaType:    "string",
+			schemaFormat:  "uuid",
+		}
+		require.NoError(t, f.ApplyNode(nil))
+
+		_, paramsNode, _ := yml.GetMapElementNodes(ctx, opNode, "parameters")
+		param := paramsNode.Content[0]
+		_, schemaNode, _ := yml.GetMapElementNodes(ctx, param, "schema")
+		_, formatNode, found := yml.GetMapElementNodes(ctx, schemaNode, "format")
+		require.True(t, found, "format should be present")
+		assert.Equal(t, "uuid", formatNode.Value)
+	})
+
+	t.Run("idempotent - does not add duplicate", func(t *testing.T) {
+		t.Parallel()
+		ctx := t.Context()
+
+		// Pre-populate with existing path param
+		existingParam := yml.CreateMapNode(ctx, []*yaml.Node{
+			yml.CreateStringNode("name"),
+			yml.CreateStringNode("userId"),
+			yml.CreateStringNode("in"),
+			yml.CreateStringNode("path"),
+		})
+		paramsSeq := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: []*yaml.Node{existingParam}}
+		opNode := yml.CreateMapNode(ctx, []*yaml.Node{
+			yml.CreateStringNode("parameters"),
+			paramsSeq,
+		})
+
+		f := &addPathParameterFix{
+			operationNode: opNode,
+			paramName:     "userId",
+			schemaType:    "integer",
+		}
+		require.NoError(t, f.ApplyNode(nil))
+
+		_, updatedParams, _ := yml.GetMapElementNodes(ctx, opNode, "parameters")
+		assert.Len(t, updatedParams.Content, 1, "should still have one parameter (no duplicate)")
+	})
+
+	t.Run("nil operation node is no-op", func(t *testing.T) {
+		t.Parallel()
+		f := &addPathParameterFix{operationNode: nil, paramName: "userId", schemaType: "string"}
+		require.NoError(t, f.ApplyNode(nil))
+	})
+
+	t.Run("non-mapping operation node is no-op", func(t *testing.T) {
+		t.Parallel()
+		f := &addPathParameterFix{
+			operationNode: &yaml.Node{Kind: yaml.SequenceNode},
+			paramName:     "userId",
+			schemaType:    "string",
+		}
+		require.NoError(t, f.ApplyNode(nil))
+	})
+}
+
+func TestInferPathParamType(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		paramName      string
+		expectedType   string
+		expectedFormat string
+	}{
+		{name: "userId inferred as integer", paramName: "userId", expectedType: "integer", expectedFormat: ""},
+		{name: "postId inferred as integer", paramName: "postId", expectedType: "integer", expectedFormat: ""},
+		{name: "orgid inferred as integer", paramName: "orgid", expectedType: "integer", expectedFormat: ""},
+		{name: "requestUuid inferred as string uuid", paramName: "requestUuid", expectedType: "string", expectedFormat: "uuid"},
+		{name: "sessionGuid inferred as string uuid", paramName: "sessionGuid", expectedType: "string", expectedFormat: "uuid"},
+		{name: "UUID uppercase inferred as string uuid", paramName: "UUID", expectedType: "string", expectedFormat: "uuid"},
+		{name: "name inferred as string", paramName: "name", expectedType: "string", expectedFormat: ""},
+		{name: "slug inferred as string", paramName: "slug", expectedType: "string", expectedFormat: ""},
+		{name: "version inferred as string", paramName: "version", expectedType: "string", expectedFormat: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			schemaType, format := inferPathParamType(tt.paramName)
+			assert.Equal(t, tt.expectedType, schemaType, "schema type should match")
+			assert.Equal(t, tt.expectedFormat, format, "format should match")
+		})
+	}
 }

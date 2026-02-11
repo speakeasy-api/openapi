@@ -94,6 +94,13 @@ func (f *removeHostTrailingSlashFix) Prompts() []validation.Prompt { return nil 
 func (f *removeHostTrailingSlashFix) SetInput([]string) error      { return nil }
 func (f *removeHostTrailingSlashFix) Apply(doc any) error          { return nil }
 
+func (f *removeHostTrailingSlashFix) DescribeChange() (string, string) {
+	if f.node == nil {
+		return "", ""
+	}
+	return f.node.Value, strings.TrimRight(f.node.Value, "/")
+}
+
 func (f *removeHostTrailingSlashFix) ApplyNode(_ *yaml.Node) error {
 	if f.node != nil {
 		f.node.Value = strings.TrimRight(f.node.Value, "/")

@@ -79,6 +79,13 @@ func (f *removeTrailingSlashFix) Prompts() []validation.Prompt { return nil }
 func (f *removeTrailingSlashFix) SetInput([]string) error      { return nil }
 func (f *removeTrailingSlashFix) Apply(doc any) error          { return nil }
 
+func (f *removeTrailingSlashFix) DescribeChange() (string, string) {
+	if f.node == nil {
+		return "", ""
+	}
+	return f.node.Value, strings.TrimRight(f.node.Value, "/")
+}
+
 func (f *removeTrailingSlashFix) ApplyNode(_ *yaml.Node) error {
 	if f.node != nil {
 		f.node.Value = strings.TrimRight(f.node.Value, "/")

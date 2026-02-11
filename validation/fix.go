@@ -54,6 +54,13 @@ type Fix interface {
 	Apply(doc any) error
 }
 
+// ChangeDescriber is an optional interface that fixes can implement to provide
+// human-readable before/after descriptions of what the fix changes. This enables
+// richer dry-run and reporting output.
+type ChangeDescriber interface {
+	DescribeChange() (before, after string)
+}
+
 // NodeFix is an optional interface for fixes that operate directly on yaml.Node
 // trees rather than the high-level document model. This is useful for simple
 // textual changes (renaming a key, changing a value) where going through the
