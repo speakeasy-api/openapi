@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/speakeasy-api/jsonpath/pkg/overlay"
+	"github.com/speakeasy-api/openapi/overlay"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
