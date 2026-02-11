@@ -6,6 +6,8 @@
 // These are defined in runtime.go's setupGlobals()
 var registerRule = globalThis.registerRule;
 var createValidationError = globalThis.createValidationError;
+var createFix = globalThis.createFix;
+var createValidationErrorWithFix = globalThis.createValidationErrorWithFix;
 
 // Base Rule class - users can extend this or implement RuleRunner directly
 export class Rule {
@@ -20,4 +22,4 @@ export class Rule {
 }
 
 // Export the globals so user rules can import them
-export { registerRule, createValidationError };
+export { registerRule, createValidationError, createFix, createValidationErrorWithFix };

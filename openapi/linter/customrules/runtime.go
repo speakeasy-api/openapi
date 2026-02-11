@@ -16,13 +16,14 @@ import (
 type Runtime struct {
 	vm     *goja.Runtime
 	logger Logger
+	config *Config
 
 	// registeredRules holds rules registered via registerRule()
 	registeredRules []goja.Value
 }
 
 // NewRuntime creates a new JavaScript runtime configured for custom rules.
-func NewRuntime(logger Logger) (*Runtime, error) {
+func NewRuntime(logger Logger, config *Config) (*Runtime, error) {
 	vm := goja.New()
 
 	// Use uncapitalized field/method mapper for JS-style naming
@@ -32,6 +33,7 @@ func NewRuntime(logger Logger) (*Runtime, error) {
 	rt := &Runtime{
 		vm:     vm,
 		logger: logger,
+		config: config,
 	}
 
 	// Set up console object
@@ -102,6 +104,16 @@ func (rt *Runtime) setupGlobals() error {
 		return err
 	}
 
+	// createFix(options) - creates a fix object for attaching to validation errors
+	if err := rt.vm.Set("createFix", rt.createFix); err != nil {
+		return err
+	}
+
+	// createValidationErrorWithFix(severity, ruleId, message, node, fix) - creates a validation error with a fix
+	if err := rt.vm.Set("createValidationErrorWithFix", rt.createValidationErrorWithFix); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -136,6 +148,55 @@ func (rt *Runtime) createValidationError(call goja.FunctionCall) goja.Value {
 	)
 
 	return rt.vm.ToValue(err)
+}
+
+// createFix is the JS-callable function for creating a fix object.
+func (rt *Runtime) createFix(call goja.FunctionCall) goja.Value {
+	if len(call.Arguments) < 1 {
+		panic(rt.vm.ToValue("createFix requires an options argument"))
+	}
+
+	fix, err := newJSFix(rt, rt.config, call.Arguments[0])
+	if err != nil {
+		panic(rt.vm.ToValue(err.Error()))
+	}
+
+	return rt.vm.ToValue(fix)
+}
+
+// createValidationErrorWithFix is the JS-callable function for creating validation errors with fixes.
+func (rt *Runtime) createValidationErrorWithFix(call goja.FunctionCall) goja.Value {
+	if len(call.Arguments) < 5 {
+		panic(rt.vm.ToValue("createValidationErrorWithFix requires 5 arguments: severity, ruleId, message, node, fix"))
+	}
+
+	severityStr := call.Arguments[0].String()
+	ruleID := call.Arguments[1].String()
+	message := call.Arguments[2].String()
+	nodeVal := call.Arguments[3].Export()
+	fixVal := call.Arguments[4].Export()
+
+	severity := parseSeverity(severityStr)
+
+	var node *yaml.Node
+	if nodeVal != nil {
+		if n, ok := nodeVal.(*yaml.Node); ok {
+			node = n
+		}
+	}
+
+	vErr := &validation.Error{
+		UnderlyingError: errors.New(message),
+		Node:            node,
+		Severity:        severity,
+		Rule:            ruleID,
+	}
+
+	if fix, ok := fixVal.(validation.Fix); ok {
+		vErr.Fix = fix
+	}
+
+	return rt.vm.ToValue(vErr)
 }
 
 // parseSeverity converts a string to validation.Severity.

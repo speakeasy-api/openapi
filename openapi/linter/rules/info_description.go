@@ -3,6 +3,7 @@ package rules
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -50,13 +51,51 @@ func (r *InfoDescriptionRule) Run(ctx context.Context, docInfo *linter.DocumentI
 
 	description := info.GetDescription()
 	if description == "" {
-		errs = append(errs, validation.NewValidationError(
-			config.GetSeverity(r.DefaultSeverity()),
-			RuleStyleInfoDescription,
-			errors.New("info section is missing a description"),
-			info.GetRootNode(),
-		))
+		errs = append(errs, &validation.Error{
+			UnderlyingError: errors.New("info section is missing a description"),
+			Node:            info.GetRootNode(),
+			Severity:        config.GetSeverity(r.DefaultSeverity()),
+			Rule:            RuleStyleInfoDescription,
+			Fix:             &addInfoDescriptionFix{},
+		})
 	}
 
 	return errs
+}
+
+// addInfoDescriptionFix prompts the user for a description and sets it on the info object.
+type addInfoDescriptionFix struct {
+	description string
+}
+
+func (f *addInfoDescriptionFix) Description() string { return "Add a description to the info section" }
+func (f *addInfoDescriptionFix) Interactive() bool   { return true }
+func (f *addInfoDescriptionFix) Prompts() []validation.Prompt {
+	return []validation.Prompt{
+		{
+			Type:    validation.PromptFreeText,
+			Message: "Enter an API description",
+		},
+	}
+}
+
+func (f *addInfoDescriptionFix) SetInput(responses []string) error {
+	if len(responses) != 1 {
+		return fmt.Errorf("expected 1 response, got %d", len(responses))
+	}
+	f.description = responses[0]
+	return nil
+}
+
+func (f *addInfoDescriptionFix) Apply(doc any) error {
+	oasDoc, ok := doc.(*openapi.OpenAPI)
+	if !ok {
+		return fmt.Errorf("expected *openapi.OpenAPI, got %T", doc)
+	}
+	info := oasDoc.GetInfo()
+	if info == nil {
+		return errors.New("document has no info section")
+	}
+	info.Description = &f.description
+	return nil
 }

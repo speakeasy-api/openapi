@@ -67,31 +67,36 @@ func (r *ContactPropertiesRule) Run(ctx context.Context, docInfo *linter.Documen
 	url := contact.GetURL()
 	email := contact.GetEmail()
 
+	contactRoot := contact.GetRootNode()
+
 	if name == "" {
-		errs = append(errs, validation.NewValidationError(
-			config.GetSeverity(r.DefaultSeverity()),
-			RuleStyleContactProperties,
-			errors.New("`contact` section must contain a `name`"),
-			contact.GetRootNode(),
-		))
+		errs = append(errs, &validation.Error{
+			UnderlyingError: errors.New("`contact` section must contain a `name`"),
+			Node:            contactRoot,
+			Severity:        config.GetSeverity(r.DefaultSeverity()),
+			Rule:            RuleStyleContactProperties,
+			Fix:             &addContactPropertyFix{contactNode: contactRoot, property: "name"},
+		})
 	}
 
 	if url == "" {
-		errs = append(errs, validation.NewValidationError(
-			config.GetSeverity(r.DefaultSeverity()),
-			RuleStyleContactProperties,
-			errors.New("`contact` section must contain a `url`"),
-			contact.GetRootNode(),
-		))
+		errs = append(errs, &validation.Error{
+			UnderlyingError: errors.New("`contact` section must contain a `url`"),
+			Node:            contactRoot,
+			Severity:        config.GetSeverity(r.DefaultSeverity()),
+			Rule:            RuleStyleContactProperties,
+			Fix:             &addContactPropertyFix{contactNode: contactRoot, property: "url"},
+		})
 	}
 
 	if email == "" {
-		errs = append(errs, validation.NewValidationError(
-			config.GetSeverity(r.DefaultSeverity()),
-			RuleStyleContactProperties,
-			errors.New("`contact` section must contain an `email`"),
-			contact.GetRootNode(),
-		))
+		errs = append(errs, &validation.Error{
+			UnderlyingError: errors.New("`contact` section must contain an `email`"),
+			Node:            contactRoot,
+			Severity:        config.GetSeverity(r.DefaultSeverity()),
+			Rule:            RuleStyleContactProperties,
+			Fix:             &addContactPropertyFix{contactNode: contactRoot, property: "email"},
+		})
 	}
 
 	return errs

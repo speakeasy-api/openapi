@@ -9,6 +9,7 @@ import (
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
+	"gopkg.in/yaml.v3"
 )
 
 const RuleOwaspSecurityHostsHttpsOAS3 = "owasp-security-hosts-https-oas3"
@@ -70,16 +71,42 @@ func (r *OwaspSecurityHostsHttpsOAS3Rule) Run(ctx context.Context, docInfo *lint
 			if rootNode := server.GetRootNode(); rootNode != nil {
 				_, urlValueNode, found := yml.GetMapElementNodes(ctx, rootNode, "url")
 				if found && urlValueNode != nil {
-					errs = append(errs, validation.NewValidationError(
-						config.GetSeverity(r.DefaultSeverity()),
-						RuleOwaspSecurityHostsHttpsOAS3,
-						fmt.Errorf("server URL `%s` must use HTTPS protocol for security", url),
-						urlValueNode,
-					))
+					errs = append(errs, &validation.Error{
+						UnderlyingError: fmt.Errorf("server URL `%s` must use HTTPS protocol for security", url),
+						Node:            urlValueNode,
+						Severity:        config.GetSeverity(r.DefaultSeverity()),
+						Rule:            RuleOwaspSecurityHostsHttpsOAS3,
+						Fix:             &upgradeToHTTPSFix{node: urlValueNode},
+					})
 				}
 			}
 		}
 	}
 
 	return errs
+}
+
+// upgradeToHTTPSFix replaces http:// with https:// in a server URL node.
+type upgradeToHTTPSFix struct {
+	node *yaml.Node
+}
+
+func (f *upgradeToHTTPSFix) Description() string          { return "Upgrade server URL to HTTPS" }
+func (f *upgradeToHTTPSFix) Interactive() bool            { return false }
+func (f *upgradeToHTTPSFix) Prompts() []validation.Prompt { return nil }
+func (f *upgradeToHTTPSFix) SetInput([]string) error      { return nil }
+func (f *upgradeToHTTPSFix) Apply(doc any) error          { return nil }
+
+func (f *upgradeToHTTPSFix) DescribeChange() (string, string) {
+	if f.node == nil || !strings.HasPrefix(f.node.Value, "http://") {
+		return "", ""
+	}
+	return f.node.Value, "https://" + strings.TrimPrefix(f.node.Value, "http://")
+}
+
+func (f *upgradeToHTTPSFix) ApplyNode(_ *yaml.Node) error {
+	if f.node != nil && strings.HasPrefix(f.node.Value, "http://") {
+		f.node.Value = "https://" + strings.TrimPrefix(f.node.Value, "http://")
+	}
+	return nil
 }

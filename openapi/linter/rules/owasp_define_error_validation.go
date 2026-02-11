@@ -88,12 +88,13 @@ func (r *OwaspDefineErrorValidationRule) Run(ctx context.Context, docInfo *linte
 		if has400 == nil && has422 == nil && has4XX == nil {
 			// Missing all validation error responses
 			if rootNode := responses.GetRootNode(); rootNode != nil {
-				errs = append(errs, validation.NewValidationError(
-					config.GetSeverity(r.DefaultSeverity()),
-					RuleOwaspDefineErrorValidation,
-					fmt.Errorf("operation %s %s is missing validation error response (should have 400, 422, or 4XX)", method, path),
-					rootNode,
-				))
+				errs = append(errs, &validation.Error{
+					UnderlyingError: fmt.Errorf("operation %s %s is missing validation error response (should have 400, 422, or 4XX)", method, path),
+					Node:            rootNode,
+					Severity:        config.GetSeverity(r.DefaultSeverity()),
+					Rule:            RuleOwaspDefineErrorValidation,
+					Fix:             &addErrorResponseFix{responsesNode: rootNode, statusCode: "400", description: "Bad Request"},
+				})
 			}
 		}
 	}

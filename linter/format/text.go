@@ -44,11 +44,16 @@ func (f *TextFormatter) Format(results []error) (string, error) {
 				msg += " (document: " + vErr.DocumentLocation + ")"
 			}
 
+			fixable := ""
+			if vErr.Fix != nil {
+				fixable = " [fixable]"
+			}
+
 			rows = append(rows, textRow{
 				location: location,
 				severity: severity,
 				rule:     rule,
-				message:  msg,
+				message:  msg + fixable,
 			})
 
 			if len(location) > maxLocationWidth {

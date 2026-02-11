@@ -84,12 +84,13 @@ func (r *OwaspIntegerLimitRule) Run(ctx context.Context, docInfo *linter.Documen
 
 		if !hasMin || !hasMax {
 			if rootNode := refSchema.GetRootNode(); rootNode != nil {
-				errs = append(errs, validation.NewValidationError(
-					config.GetSeverity(r.DefaultSeverity()),
-					RuleOwaspIntegerLimit,
-					errors.New("schema of type `integer` must specify `minimum` and `maximum` (or `exclusiveMinimum` and `exclusiveMaximum`)"),
-					rootNode,
-				))
+				errs = append(errs, &validation.Error{
+					UnderlyingError: errors.New("schema of type `integer` must specify `minimum` and `maximum` (or `exclusiveMinimum` and `exclusiveMaximum`)"),
+					Node:            rootNode,
+					Severity:        config.GetSeverity(r.DefaultSeverity()),
+					Rule:            RuleOwaspIntegerLimit,
+					Fix:             &setIntegerLimitsFix{schemaNode: rootNode},
+				})
 			}
 		}
 	}

@@ -14,6 +14,11 @@ type howToFixer interface {
 	HowToFix() string
 }
 
+// fixAvailabler is the interface satisfied by rules that advertise auto-fix support.
+type fixAvailabler interface {
+	FixAvailable() bool
+}
+
 // allRules returns every built-in rule instance.
 func allRules() []linter.RuleRunner[*openapi.OpenAPI] {
 	return []linter.RuleRunner[*openapi.OpenAPI]{
@@ -80,6 +85,26 @@ func allRules() []linter.RuleRunner[*openapi.OpenAPI] {
 		&rules.OAS3ExampleMissingRule{},
 		&rules.OASSchemaCheckRule{},
 	}
+}
+
+func TestAllRules_FixAvailable(t *testing.T) {
+	t.Parallel()
+
+	fixableCount := 0
+
+	for _, rule := range allRules() {
+		if fa, ok := rule.(fixAvailabler); ok {
+			fixableCount++
+
+			t.Run(rule.ID(), func(t *testing.T) {
+				t.Parallel()
+
+				assert.True(t, fa.FixAvailable(), "rule %s should report fix available", rule.ID())
+			})
+		}
+	}
+
+	assert.Equal(t, 33, fixableCount, "expected 33 rules to implement FixAvailable")
 }
 
 func TestAllRules_MetadataPopulated(t *testing.T) {

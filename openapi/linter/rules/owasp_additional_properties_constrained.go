@@ -95,12 +95,13 @@ func (r *OwaspAdditionalPropertiesConstrainedRule) Run(ctx context.Context, docI
 			maxProps := schema.GetMaxProperties()
 			if maxProps == nil {
 				if rootNode := refSchema.GetRootNode(); rootNode != nil {
-					errs = append(errs, validation.NewValidationError(
-						config.GetSeverity(r.DefaultSeverity()),
-						RuleOwaspAdditionalPropertiesConstrained,
-						errors.New("schema should define maxProperties when additionalProperties is set to true or a schema"),
-						rootNode,
-					))
+					errs = append(errs, &validation.Error{
+						UnderlyingError: errors.New("schema should define maxProperties when additionalProperties is set to true or a schema"),
+						Node:            rootNode,
+						Severity:        config.GetSeverity(r.DefaultSeverity()),
+						Rule:            RuleOwaspAdditionalPropertiesConstrained,
+						Fix:             &setNumericPropertyFix{schemaNode: rootNode, property: "maxProperties", label: "Maximum number of properties"},
+					})
 				}
 			}
 		}

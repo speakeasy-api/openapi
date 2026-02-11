@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -91,12 +92,19 @@ func (r *PathParamsRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*
 			// 1. All template params must be in effectiveParams
 			for _, tmplParam := range templateParams {
 				if _, ok := effectiveParams[tmplParam]; !ok {
-					errs = append(errs, validation.NewValidationError(
-						config.GetSeverity(r.DefaultSeverity()),
-						RuleSemanticPathParams,
-						fmt.Errorf("path parameter `{%s}` is not defined in operation parameters", tmplParam),
-						op.GetRootNode(),
-					))
+					schemaType, schemaFormat := inferPathParamType(tmplParam)
+					errs = append(errs, &validation.Error{
+						Severity:        config.GetSeverity(r.DefaultSeverity()),
+						Rule:            RuleSemanticPathParams,
+						UnderlyingError: fmt.Errorf("path parameter `{%s}` is not defined in operation parameters", tmplParam),
+						Node:            op.GetRootNode(),
+						Fix: &addPathParameterFix{
+							operationNode: op.GetRootNode(),
+							paramName:     tmplParam,
+							schemaType:    schemaType,
+							schemaFormat:  schemaFormat,
+						},
+					})
 				}
 			}
 
@@ -183,4 +191,17 @@ func mergeParameters(base, override map[string]bool) map[string]bool {
 		result[k] = v
 	}
 	return result
+}
+
+// inferPathParamType guesses the schema type for a path parameter based on naming conventions.
+func inferPathParamType(name string) (schemaType, format string) {
+	lower := strings.ToLower(name)
+	switch {
+	case strings.Contains(lower, "uuid") || strings.Contains(lower, "guid"):
+		return "string", "uuid"
+	case strings.HasSuffix(lower, "id"):
+		return "integer", ""
+	default:
+		return "string", ""
+	}
 }

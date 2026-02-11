@@ -71,12 +71,13 @@ func (r *OwaspIntegerFormatRule) Run(ctx context.Context, docInfo *linter.Docume
 		format := schema.GetFormat()
 		if format != "int32" && format != "int64" {
 			if rootNode := refSchema.GetRootNode(); rootNode != nil {
-				errs = append(errs, validation.NewValidationError(
-					config.GetSeverity(r.DefaultSeverity()),
-					RuleOwaspIntegerFormat,
-					errors.New("schema of type `integer` must specify `format` as `int32` or `int64`"),
-					rootNode,
-				))
+				errs = append(errs, &validation.Error{
+					UnderlyingError: errors.New("schema of type `integer` must specify `format` as `int32` or `int64`"),
+					Node:            rootNode,
+					Severity:        config.GetSeverity(r.DefaultSeverity()),
+					Rule:            RuleOwaspIntegerFormat,
+					Fix:             &setIntegerFormatFix{schemaNode: rootNode},
+				})
 			}
 		}
 	}

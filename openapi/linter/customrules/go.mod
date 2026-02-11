@@ -2,6 +2,8 @@ module github.com/speakeasy-api/openapi/openapi/linter/customrules
 
 go 1.24.3
 
+replace github.com/speakeasy-api/openapi => ../../../
+
 require (
 	github.com/dop251/goja v0.0.0-20260106131823-651366fbe6e3
 	github.com/evanw/esbuild v0.27.2

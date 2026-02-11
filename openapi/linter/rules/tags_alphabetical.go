@@ -3,11 +3,14 @@ package rules
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/validation"
+	"github.com/speakeasy-api/openapi/yml"
+	"gopkg.in/yaml.v3"
 )
 
 const RuleStyleTagsAlphabetical = "style-tags-alphabetical"
@@ -79,16 +82,52 @@ func (r *TagsAlphabeticalRule) Run(ctx context.Context, docInfo *linter.Document
 				tagsNode = doc.GetRootNode()
 			}
 
-			errs = append(errs, validation.NewValidationError(
-				config.GetSeverity(r.DefaultSeverity()),
-				RuleStyleTagsAlphabetical,
-				fmt.Errorf("tag `%s` must be placed before `%s` (alphabetical)", nextName, currentName),
-				tagsNode,
-			))
+			errs = append(errs, &validation.Error{
+				UnderlyingError: fmt.Errorf("tag `%s` must be placed before `%s` (alphabetical)", nextName, currentName),
+				Node:            tagsNode,
+				Severity:        config.GetSeverity(r.DefaultSeverity()),
+				Rule:            RuleStyleTagsAlphabetical,
+				Fix:             &sortTagsFix{tagsNode: tagsNode},
+			})
 			// Report only the first violation for deterministic behavior
 			break
 		}
 	}
 
 	return errs
+}
+
+// sortTagsFix sorts the tags sequence node alphabetically by tag name.
+type sortTagsFix struct {
+	tagsNode *yaml.Node
+}
+
+func (f *sortTagsFix) Description() string          { return "Sort tags alphabetically" }
+func (f *sortTagsFix) Interactive() bool            { return false }
+func (f *sortTagsFix) Prompts() []validation.Prompt { return nil }
+func (f *sortTagsFix) SetInput([]string) error      { return nil }
+func (f *sortTagsFix) Apply(doc any) error          { return nil }
+
+func (f *sortTagsFix) ApplyNode(_ *yaml.Node) error {
+	if f.tagsNode == nil || f.tagsNode.Kind != yaml.SequenceNode || len(f.tagsNode.Content) < 2 {
+		return nil
+	}
+	sort.SliceStable(f.tagsNode.Content, func(i, j int) bool {
+		nameI := getTagName(f.tagsNode.Content[i])
+		nameJ := getTagName(f.tagsNode.Content[j])
+		return strings.ToLower(nameI) < strings.ToLower(nameJ)
+	})
+	return nil
+}
+
+// getTagName extracts the "name" field value from a tag mapping node.
+func getTagName(node *yaml.Node) string {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return ""
+	}
+	_, valueNode, found := yml.GetMapElementNodes(context.Background(), node, "name")
+	if !found || valueNode == nil {
+		return ""
+	}
+	return valueNode.Value
 }

@@ -67,12 +67,14 @@ func (r *TagDescriptionRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 		name := tag.GetName()
 
 		if description == "" {
-			errs = append(errs, validation.NewValidationError(
-				config.GetSeverity(r.DefaultSeverity()),
-				RuleStyleTagDescription,
-				fmt.Errorf("tag `%s` must have a description", name),
-				tag.GetRootNode(),
-			))
+			rootNode := tag.GetRootNode()
+			errs = append(errs, &validation.Error{
+				UnderlyingError: fmt.Errorf("tag `%s` must have a description", name),
+				Node:            rootNode,
+				Severity:        config.GetSeverity(r.DefaultSeverity()),
+				Rule:            RuleStyleTagDescription,
+				Fix:             &addDescriptionFix{targetNode: rootNode, targetLabel: "tag '" + name + "'"},
+			})
 		}
 	}
 

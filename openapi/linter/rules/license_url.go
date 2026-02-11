@@ -55,12 +55,14 @@ func (r *LicenseURLRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*
 
 	url := license.GetURL()
 	if url == "" {
-		errs = append(errs, validation.NewValidationError(
-			config.GetSeverity(r.DefaultSeverity()),
-			RuleStyleLicenseURL,
-			errors.New("license should contain a URL"),
-			license.GetRootNode(),
-		))
+		licenseRoot := license.GetRootNode()
+		errs = append(errs, &validation.Error{
+			UnderlyingError: errors.New("license should contain a URL"),
+			Node:            licenseRoot,
+			Severity:        config.GetSeverity(r.DefaultSeverity()),
+			Rule:            RuleStyleLicenseURL,
+			Fix:             &addLicenseURLFix{licenseNode: licenseRoot},
+		})
 	}
 
 	return errs

@@ -405,3 +405,9 @@ func (o *Output) FormatJSON() string {
 	s, _ := f.Format(o.Results)
 	return s
 }
+
+func (o *Output) FormatSummary() string {
+	f := format.NewSummaryFormatter()
+	s, _ := f.Format(o.Results)
+	return s
+}

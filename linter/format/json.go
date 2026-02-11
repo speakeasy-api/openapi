@@ -37,6 +37,7 @@ type jsonLocation struct {
 
 type jsonFix struct {
 	Description string `json:"description"`
+	Interactive bool   `json:"interactive,omitempty"`
 }
 
 type jsonSummary struct {
@@ -76,7 +77,8 @@ func (f *JSONFormatter) Format(results []error) (string, error) {
 
 			if vErr.Fix != nil {
 				result.Fix = &jsonFix{
-					Description: vErr.Fix.FixDescription(),
+					Description: vErr.Fix.Description(),
+					Interactive: vErr.Fix.Interactive(),
 				}
 			}
 

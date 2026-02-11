@@ -267,7 +267,7 @@ func (l *Loader) loadRules(transpiled []*TranspiledRule, config *Config) ([]base
 	for _, tr := range transpiled {
 		// Create a new runtime for each rule file
 		// (goja runtimes are not thread-safe)
-		rt, err := NewRuntime(config.GetLogger())
+		rt, err := NewRuntime(config.GetLogger(), config)
 		if err != nil {
 			return nil, fmt.Errorf("creating runtime for %q: %w", tr.SourceFile, err)
 		}

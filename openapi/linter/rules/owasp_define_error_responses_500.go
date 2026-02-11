@@ -86,12 +86,13 @@ func (r *OwaspDefineErrorResponses500Rule) Run(ctx context.Context, docInfo *lin
 		if !has500 {
 			// Missing 500 response
 			if rootNode := responses.GetRootNode(); rootNode != nil {
-				errs = append(errs, validation.NewValidationError(
-					config.GetSeverity(r.DefaultSeverity()),
-					RuleOwaspDefineErrorResponses500,
-					fmt.Errorf("operation %s %s is missing 500 Internal Server Error response", method, path),
-					rootNode,
-				))
+				errs = append(errs, &validation.Error{
+					UnderlyingError: fmt.Errorf("operation %s %s is missing 500 Internal Server Error response", method, path),
+					Node:            rootNode,
+					Severity:        config.GetSeverity(r.DefaultSeverity()),
+					Rule:            RuleOwaspDefineErrorResponses500,
+					Fix:             &addErrorResponseFix{responsesNode: rootNode, statusCode: "500", description: "Internal Server Error"},
+				})
 			}
 			continue
 		}

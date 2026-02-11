@@ -71,17 +71,44 @@ func (r *OperationTagDefinedRule) Run(ctx context.Context, docInfo *linter.Docum
 		opTags := operation.GetTags()
 		for i, tagName := range opTags {
 			if tagName != "" && !globalTags[tagName] {
-				errs = append(errs, validation.NewSliceError(
-					config.GetSeverity(r.DefaultSeverity()),
-					RuleStyleOperationTagDefined,
-					fmt.Errorf("tag `%s` for %s operation is not defined as a global tag", tagName, opIdentifier),
-					operation.GetCore(),
-					operation.GetCore().Tags,
-					i,
-				))
+				errNode := operation.GetCore().Tags.GetSliceValueNodeOrRoot(i, operation.GetRootNode())
+				errs = append(errs, &validation.Error{
+					UnderlyingError: fmt.Errorf("tag `%s` for %s operation is not defined as a global tag", tagName, opIdentifier),
+					Node:            errNode,
+					Severity:        config.GetSeverity(r.DefaultSeverity()),
+					Rule:            RuleStyleOperationTagDefined,
+					Fix:             &addGlobalTagFix{tagName: tagName},
+				})
 			}
 		}
 	}
 
 	return errs
+}
+
+// addGlobalTagFix adds a missing tag to the document's global tags array.
+type addGlobalTagFix struct {
+	tagName string
+}
+
+func (f *addGlobalTagFix) Description() string {
+	return "Add tag `" + f.tagName + "` to global tags"
+}
+func (f *addGlobalTagFix) Interactive() bool            { return false }
+func (f *addGlobalTagFix) Prompts() []validation.Prompt { return nil }
+func (f *addGlobalTagFix) SetInput([]string) error      { return nil }
+
+func (f *addGlobalTagFix) Apply(doc any) error {
+	oasDoc, ok := doc.(*openapi.OpenAPI)
+	if !ok {
+		return fmt.Errorf("expected *openapi.OpenAPI, got %T", doc)
+	}
+	// Idempotency: check if tag already exists
+	for _, tag := range oasDoc.Tags {
+		if tag != nil && tag.Name == f.tagName {
+			return nil
+		}
+	}
+	oasDoc.Tags = append(oasDoc.Tags, &openapi.Tag{Name: f.tagName})
+	return nil
 }
