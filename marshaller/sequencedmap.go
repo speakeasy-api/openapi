@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
 	"golang.org/x/sync/errgroup"
@@ -262,7 +263,7 @@ func syncSequencedMapChanges(ctx context.Context, target interfaces.SequencedMap
 
 	for k, v := range mg.AllUntyped() {
 		hasEntries = true
-		keyStr := fmt.Sprintf("%v", k) // TODO this might not work with non string keys
+		keyStr := utils.AnyToString(k)
 
 		// Try to convert the key type if needed (similar to populateSequencedMap)
 		targetKey := k
@@ -309,7 +310,7 @@ func syncSequencedMapChanges(ctx context.Context, target interfaces.SequencedMap
 	keysToDelete := []any{}
 
 	for k := range target.KeysAny() {
-		key := fmt.Sprintf("%v", k) // TODO this might not work with non string keys
+		key := utils.AnyToString(k)
 
 		if !slices.Contains(remainingKeys, key) {
 			keysToDelete = append(keysToDelete, k)
@@ -318,7 +319,7 @@ func syncSequencedMapChanges(ctx context.Context, target interfaces.SequencedMap
 
 	for _, key := range keysToDelete {
 		target.DeleteAny(key)
-		valueNode = yml.DeleteMapNodeElement(ctx, fmt.Sprintf("%v", key), valueNode)
+		valueNode = yml.DeleteMapNodeElement(ctx, utils.AnyToString(key), valueNode)
 	}
 
 	// If no entries were processed but we have an embedded map, ensure we create an empty mapping node

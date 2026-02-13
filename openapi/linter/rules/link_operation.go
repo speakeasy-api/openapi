@@ -64,23 +64,8 @@ func (r *LinkOperationRule) Run(ctx context.Context, docInfo *linter.DocumentInf
 		}
 	}
 
-	// Build a map of operation locations (document + JSON pointer) for operationRef validation
-	// TODO: Implement operationRef validation once we have better tracking of document locations
-	// For now, we only validate operationId
-	operationLocations := make(map[string]bool)
-	for _, opNode := range docInfo.Index.Operations {
-		if opNode.Node != nil {
-			// Convert location to JSON pointer
-			jsonPtr := opNode.Location.ToJSONPointer()
-			operationLocations[string(jsonPtr)] = true
-		}
-	}
-
 	// Check all links (inline, component, and external)
-	allLinks := make([]*openapi.IndexNode[*openapi.ReferencedLink], 0)
-	allLinks = append(allLinks, docInfo.Index.InlineLinks...)
-	allLinks = append(allLinks, docInfo.Index.ComponentLinks...)
-	allLinks = append(allLinks, docInfo.Index.ExternalLinks...)
+	allLinks := docInfo.Index.GetAllLinks()
 
 	for _, linkNode := range allLinks {
 		if linkNode.Node == nil || linkNode.Node.Object == nil {
@@ -116,7 +101,6 @@ func (r *LinkOperationRule) Run(ctx context.Context, docInfo *linter.DocumentInf
 		// Full operationRef resolution validation requires tracking which document each operation belongs to
 		// and resolving relative URIs correctly. This will be implemented in a future enhancement.
 		_ = operationRef
-		_ = operationLocations
 	}
 
 	return errs

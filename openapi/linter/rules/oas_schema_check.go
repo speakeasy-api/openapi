@@ -14,13 +14,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const RuleOasSchemaCheck = "oas-schema-check"
+
 var _ linter.Rule = (*OASSchemaCheckRule)(nil)
 
 // OASSchemaCheckRule validates that schemas contain appropriate constraints for their types
 type OASSchemaCheckRule struct{}
 
 func (r *OASSchemaCheckRule) ID() string {
-	return "oas-schema-check"
+	return RuleOasSchemaCheck
 }
 
 func (r *OASSchemaCheckRule) Category() string {
@@ -40,7 +42,7 @@ func (r *OASSchemaCheckRule) HowToFix() string {
 }
 
 func (r *OASSchemaCheckRule) Link() string {
-	return "https://quobix.com/vacuum/rules/schemas/oas-schema-check/"
+	return "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md#oas-schema-check"
 }
 
 func (r *OASSchemaCheckRule) DefaultSeverity() validation.Severity {
@@ -680,7 +682,7 @@ func (r *OASSchemaCheckRule) validateConst(_ context.Context, schema *oas3.Schem
 		for i, t := range schemaTypes {
 			typeStrs[i] = "`" + string(t) + "`"
 		}
-		typeList := fmt.Sprintf("[%s]", strings.Join(typeStrs, ", "))
+		typeList := "[" + strings.Join(typeStrs, ", ") + "]"
 		if rootNode := refSchema.GetRootNode(); rootNode != nil {
 			errs = append(errs, validation.NewValidationError(
 				config.GetSeverity(r.DefaultSeverity()),

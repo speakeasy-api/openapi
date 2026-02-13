@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
@@ -753,11 +754,7 @@ func (m *Map[K, V]) MarshalYAML() (interface{}, error) {
 
 // compareKeys provides a generic comparison function for keys
 func compareKeys[K any](a, b K) int {
-	// Convert to strings for comparison
-	aStr := fmt.Sprintf("%v", a)
-	bStr := fmt.Sprintf("%v", b)
-
-	return strings.Compare(aStr, bStr)
+	return strings.Compare(utils.AnyToString(a), utils.AnyToString(b))
 }
 
 // IsEqual compares two Map instances for equality.

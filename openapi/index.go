@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
@@ -172,6 +173,26 @@ type Index struct {
 	// nil when the feature is disabled.
 	NodeToOperations map[*yaml.Node][]*IndexNode[*Operation]
 
+	// Cached merged slices (lazily computed via sync.Once for concurrent rule access)
+	allSchemasOnce       sync.Once
+	allSchemas           []*IndexNode[*oas3.JSONSchemaReferenceable]
+	allPathItemsOnce     sync.Once
+	allPathItems         []*IndexNode[*ReferencedPathItem]
+	allParametersOnce    sync.Once
+	allParameters        []*IndexNode[*ReferencedParameter]
+	allResponsesOnce     sync.Once
+	allResponses         []*IndexNode[*ReferencedResponse]
+	allRequestBodiesOnce sync.Once
+	allRequestBodies     []*IndexNode[*ReferencedRequestBody]
+	allHeadersOnce       sync.Once
+	allHeaders           []*IndexNode[*ReferencedHeader]
+	allExamplesOnce      sync.Once
+	allExamples          []*IndexNode[*ReferencedExample]
+	allLinksOnce         sync.Once
+	allLinks             []*IndexNode[*ReferencedLink]
+	allCallbacksOnce     sync.Once
+	allCallbacks         []*IndexNode[*ReferencedCallback]
+
 	validationErrs []error
 	resolutionErrs []error
 	circularErrs   []error
@@ -327,21 +348,24 @@ func BuildIndex(ctx context.Context, doc *OpenAPI, resolveOpts references.Resolv
 }
 
 // GetAllSchemas returns all schemas in the index (boolean, inline, component, external, and references).
+// The result is cached after the first call for efficient concurrent access from multiple rules.
 func (i *Index) GetAllSchemas() []*IndexNode[*oas3.JSONSchemaReferenceable] {
 	if i == nil {
 		return nil
 	}
 
-	allSchemas := make([]*IndexNode[*oas3.JSONSchemaReferenceable], 0, len(i.BooleanSchemas)+
-		len(i.InlineSchemas)+
-		len(i.ComponentSchemas)+
-		len(i.ExternalSchemas),
-	)
-	allSchemas = append(allSchemas, i.BooleanSchemas...)
-	allSchemas = append(allSchemas, i.InlineSchemas...)
-	allSchemas = append(allSchemas, i.ComponentSchemas...)
-	allSchemas = append(allSchemas, i.ExternalSchemas...)
-	return allSchemas
+	i.allSchemasOnce.Do(func() {
+		i.allSchemas = make([]*IndexNode[*oas3.JSONSchemaReferenceable], 0, len(i.BooleanSchemas)+
+			len(i.InlineSchemas)+
+			len(i.ComponentSchemas)+
+			len(i.ExternalSchemas),
+		)
+		i.allSchemas = append(i.allSchemas, i.BooleanSchemas...)
+		i.allSchemas = append(i.allSchemas, i.InlineSchemas...)
+		i.allSchemas = append(i.allSchemas, i.ComponentSchemas...)
+		i.allSchemas = append(i.allSchemas, i.ExternalSchemas...)
+	})
+	return i.allSchemas
 }
 
 // GetAllPathItems returns all path items in the index (inline, component, and external).
@@ -350,14 +374,16 @@ func (i *Index) GetAllPathItems() []*IndexNode[*ReferencedPathItem] {
 		return nil
 	}
 
-	allPathItems := make([]*IndexNode[*ReferencedPathItem], 0, len(i.InlinePathItems)+
-		len(i.ComponentPathItems)+
-		len(i.ExternalPathItems),
-	)
-	allPathItems = append(allPathItems, i.InlinePathItems...)
-	allPathItems = append(allPathItems, i.ComponentPathItems...)
-	allPathItems = append(allPathItems, i.ExternalPathItems...)
-	return allPathItems
+	i.allPathItemsOnce.Do(func() {
+		i.allPathItems = make([]*IndexNode[*ReferencedPathItem], 0, len(i.InlinePathItems)+
+			len(i.ComponentPathItems)+
+			len(i.ExternalPathItems),
+		)
+		i.allPathItems = append(i.allPathItems, i.InlinePathItems...)
+		i.allPathItems = append(i.allPathItems, i.ComponentPathItems...)
+		i.allPathItems = append(i.allPathItems, i.ExternalPathItems...)
+	})
+	return i.allPathItems
 }
 
 // GetAllParameters returns all parameters in the index (inline, component, and external).
@@ -366,14 +392,16 @@ func (i *Index) GetAllParameters() []*IndexNode[*ReferencedParameter] {
 		return nil
 	}
 
-	allParameters := make([]*IndexNode[*ReferencedParameter], 0, len(i.InlineParameters)+
-		len(i.ComponentParameters)+
-		len(i.ExternalParameters),
-	)
-	allParameters = append(allParameters, i.InlineParameters...)
-	allParameters = append(allParameters, i.ComponentParameters...)
-	allParameters = append(allParameters, i.ExternalParameters...)
-	return allParameters
+	i.allParametersOnce.Do(func() {
+		i.allParameters = make([]*IndexNode[*ReferencedParameter], 0, len(i.InlineParameters)+
+			len(i.ComponentParameters)+
+			len(i.ExternalParameters),
+		)
+		i.allParameters = append(i.allParameters, i.InlineParameters...)
+		i.allParameters = append(i.allParameters, i.ComponentParameters...)
+		i.allParameters = append(i.allParameters, i.ExternalParameters...)
+	})
+	return i.allParameters
 }
 
 // GetAllResponses returns all responses in the index (inline, component, and external).
@@ -382,14 +410,16 @@ func (i *Index) GetAllResponses() []*IndexNode[*ReferencedResponse] {
 		return nil
 	}
 
-	allResponses := make([]*IndexNode[*ReferencedResponse], 0, len(i.InlineResponses)+
-		len(i.ComponentResponses)+
-		len(i.ExternalResponses),
-	)
-	allResponses = append(allResponses, i.InlineResponses...)
-	allResponses = append(allResponses, i.ComponentResponses...)
-	allResponses = append(allResponses, i.ExternalResponses...)
-	return allResponses
+	i.allResponsesOnce.Do(func() {
+		i.allResponses = make([]*IndexNode[*ReferencedResponse], 0, len(i.InlineResponses)+
+			len(i.ComponentResponses)+
+			len(i.ExternalResponses),
+		)
+		i.allResponses = append(i.allResponses, i.InlineResponses...)
+		i.allResponses = append(i.allResponses, i.ComponentResponses...)
+		i.allResponses = append(i.allResponses, i.ExternalResponses...)
+	})
+	return i.allResponses
 }
 
 // GetAllRequestBodies returns all request bodies in the index (inline, component, and external).
@@ -398,14 +428,16 @@ func (i *Index) GetAllRequestBodies() []*IndexNode[*ReferencedRequestBody] {
 		return nil
 	}
 
-	allRequestBodies := make([]*IndexNode[*ReferencedRequestBody], 0, len(i.InlineRequestBodies)+
-		len(i.ComponentRequestBodies)+
-		len(i.ExternalRequestBodies),
-	)
-	allRequestBodies = append(allRequestBodies, i.InlineRequestBodies...)
-	allRequestBodies = append(allRequestBodies, i.ComponentRequestBodies...)
-	allRequestBodies = append(allRequestBodies, i.ExternalRequestBodies...)
-	return allRequestBodies
+	i.allRequestBodiesOnce.Do(func() {
+		i.allRequestBodies = make([]*IndexNode[*ReferencedRequestBody], 0, len(i.InlineRequestBodies)+
+			len(i.ComponentRequestBodies)+
+			len(i.ExternalRequestBodies),
+		)
+		i.allRequestBodies = append(i.allRequestBodies, i.InlineRequestBodies...)
+		i.allRequestBodies = append(i.allRequestBodies, i.ComponentRequestBodies...)
+		i.allRequestBodies = append(i.allRequestBodies, i.ExternalRequestBodies...)
+	})
+	return i.allRequestBodies
 }
 
 // GetAllHeaders returns all headers in the index (inline, component, and external).
@@ -414,14 +446,16 @@ func (i *Index) GetAllHeaders() []*IndexNode[*ReferencedHeader] {
 		return nil
 	}
 
-	allHeaders := make([]*IndexNode[*ReferencedHeader], 0, len(i.InlineHeaders)+
-		len(i.ComponentHeaders)+
-		len(i.ExternalHeaders),
-	)
-	allHeaders = append(allHeaders, i.InlineHeaders...)
-	allHeaders = append(allHeaders, i.ComponentHeaders...)
-	allHeaders = append(allHeaders, i.ExternalHeaders...)
-	return allHeaders
+	i.allHeadersOnce.Do(func() {
+		i.allHeaders = make([]*IndexNode[*ReferencedHeader], 0, len(i.InlineHeaders)+
+			len(i.ComponentHeaders)+
+			len(i.ExternalHeaders),
+		)
+		i.allHeaders = append(i.allHeaders, i.InlineHeaders...)
+		i.allHeaders = append(i.allHeaders, i.ComponentHeaders...)
+		i.allHeaders = append(i.allHeaders, i.ExternalHeaders...)
+	})
+	return i.allHeaders
 }
 
 // GetAllExamples returns all examples in the index (inline, component, and external).
@@ -430,14 +464,16 @@ func (i *Index) GetAllExamples() []*IndexNode[*ReferencedExample] {
 		return nil
 	}
 
-	allExamples := make([]*IndexNode[*ReferencedExample], 0, len(i.InlineExamples)+
-		len(i.ComponentExamples)+
-		len(i.ExternalExamples),
-	)
-	allExamples = append(allExamples, i.InlineExamples...)
-	allExamples = append(allExamples, i.ComponentExamples...)
-	allExamples = append(allExamples, i.ExternalExamples...)
-	return allExamples
+	i.allExamplesOnce.Do(func() {
+		i.allExamples = make([]*IndexNode[*ReferencedExample], 0, len(i.InlineExamples)+
+			len(i.ComponentExamples)+
+			len(i.ExternalExamples),
+		)
+		i.allExamples = append(i.allExamples, i.InlineExamples...)
+		i.allExamples = append(i.allExamples, i.ComponentExamples...)
+		i.allExamples = append(i.allExamples, i.ExternalExamples...)
+	})
+	return i.allExamples
 }
 
 // GetAllLinks returns all links in the index (inline, component, and external).
@@ -446,14 +482,16 @@ func (i *Index) GetAllLinks() []*IndexNode[*ReferencedLink] {
 		return nil
 	}
 
-	allLinks := make([]*IndexNode[*ReferencedLink], 0, len(i.InlineLinks)+
-		len(i.ComponentLinks)+
-		len(i.ExternalLinks),
-	)
-	allLinks = append(allLinks, i.InlineLinks...)
-	allLinks = append(allLinks, i.ComponentLinks...)
-	allLinks = append(allLinks, i.ExternalLinks...)
-	return allLinks
+	i.allLinksOnce.Do(func() {
+		i.allLinks = make([]*IndexNode[*ReferencedLink], 0, len(i.InlineLinks)+
+			len(i.ComponentLinks)+
+			len(i.ExternalLinks),
+		)
+		i.allLinks = append(i.allLinks, i.InlineLinks...)
+		i.allLinks = append(i.allLinks, i.ComponentLinks...)
+		i.allLinks = append(i.allLinks, i.ExternalLinks...)
+	})
+	return i.allLinks
 }
 
 // GetAllCallbacks returns all callbacks in the index (inline, component, and external).
@@ -462,14 +500,16 @@ func (i *Index) GetAllCallbacks() []*IndexNode[*ReferencedCallback] {
 		return nil
 	}
 
-	allCallbacks := make([]*IndexNode[*ReferencedCallback], 0, len(i.InlineCallbacks)+
-		len(i.ComponentCallbacks)+
-		len(i.ExternalCallbacks),
-	)
-	allCallbacks = append(allCallbacks, i.InlineCallbacks...)
-	allCallbacks = append(allCallbacks, i.ComponentCallbacks...)
-	allCallbacks = append(allCallbacks, i.ExternalCallbacks...)
-	return allCallbacks
+	i.allCallbacksOnce.Do(func() {
+		i.allCallbacks = make([]*IndexNode[*ReferencedCallback], 0, len(i.InlineCallbacks)+
+			len(i.ComponentCallbacks)+
+			len(i.ExternalCallbacks),
+		)
+		i.allCallbacks = append(i.allCallbacks, i.InlineCallbacks...)
+		i.allCallbacks = append(i.allCallbacks, i.ComponentCallbacks...)
+		i.allCallbacks = append(i.allCallbacks, i.ExternalCallbacks...)
+	})
+	return i.allCallbacks
 }
 
 // ReferenceNode represents any node that can be a reference in an OpenAPI document.

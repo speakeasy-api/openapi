@@ -12,14 +12,15 @@ type Options struct {
 
 func WithContextObject[T any](obj *T) Option {
 	return func(o *Options) {
+		if o.ContextObjects == nil {
+			o.ContextObjects = make(map[reflect.Type]any)
+		}
 		o.ContextObjects[reflect.TypeOf((*T)(nil)).Elem()] = obj
 	}
 }
 
 func NewOptions(opts ...Option) *Options {
-	o := &Options{
-		ContextObjects: make(map[reflect.Type]any),
-	}
+	o := &Options{}
 	for _, opt := range opts {
 		opt(o)
 	}

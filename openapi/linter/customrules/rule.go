@@ -8,6 +8,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/go-sourcemap/sourcemap"
+	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/validation"
@@ -126,7 +127,7 @@ func (r *CustomRule) callStringArrayMethod(method string) ([]string, error) {
 	if arr, ok := exported.([]interface{}); ok {
 		strings := make([]string, len(arr))
 		for i, v := range arr {
-			strings[i] = fmt.Sprintf("%v", v)
+			strings[i] = utils.AnyToString(v)
 		}
 		return strings, nil
 	}

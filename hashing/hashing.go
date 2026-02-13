@@ -16,7 +16,19 @@ func Hash(v any) string {
 	hasher := fnv.New64a()
 	hashableStr := toHashableString(v)
 	_, _ = hasher.Write([]byte(hashableStr))
-	return fmt.Sprintf("%016x", hasher.Sum64())
+	return formatHash(hasher.Sum64())
+}
+
+// formatHash converts a uint64 hash to a zero-padded 16-character hex string
+// without the allocation overhead of fmt.Sprintf.
+func formatHash(h uint64) string {
+	const hexDigits = "0123456789abcdef"
+	var buf [16]byte
+	for i := 15; i >= 0; i-- {
+		buf[i] = hexDigits[h&0xf]
+		h >>= 4
+	}
+	return string(buf[:])
 }
 
 type model interface {
@@ -88,6 +100,14 @@ func toHashableString(v any) string {
 			builder.WriteString(v)
 		case int:
 			builder.WriteString(strconv.Itoa(v))
+		case int64:
+			builder.WriteString(strconv.FormatInt(v, 10))
+		case float64:
+			builder.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
+		case bool:
+			builder.WriteString(strconv.FormatBool(v))
+		case uint64:
+			builder.WriteString(strconv.FormatUint(v, 10))
 		case *yaml.Node:
 			builder.WriteString(yamlNodeToHashableString(v))
 		default:
@@ -160,7 +180,8 @@ func yamlNodeToHashableString(node *yaml.Node) string {
 	var builder strings.Builder
 
 	// Include semantic fields only
-	builder.WriteString(fmt.Sprintf("Kind%d", node.Kind))
+	builder.WriteString("Kind")
+	builder.WriteString(strconv.Itoa(int(node.Kind)))
 	if node.Tag != "" {
 		builder.WriteString("Tag" + node.Tag)
 	}

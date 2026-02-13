@@ -2,6 +2,7 @@ package rules
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -74,7 +75,7 @@ func (r *TypedEnumRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*o
 				errs = append(errs, validation.NewSliceError(
 					config.GetSeverity(r.DefaultSeverity()),
 					RuleSemanticTypedEnum,
-					fmt.Errorf("%s", errorMsg),
+					errors.New(errorMsg),
 					schema.GetCore(),
 					schema.GetCore().Enum,
 					i,

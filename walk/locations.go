@@ -29,22 +29,27 @@ type Locations[T any] []LocationContext[T]
 // ToJSONPointer converts the locations to a JSON pointer.
 func (l Locations[T]) ToJSONPointer() jsonpointer.JSONPointer {
 	var sb strings.Builder
+	sb.Grow(len(l) * 20) // pre-allocate for typical pointer segments
 	sb.WriteString("/")
 
+	needsSep := false
 	for _, location := range l {
 		if location.ParentField != "" {
-			if !strings.HasSuffix(sb.String(), "/") {
+			if needsSep {
 				sb.WriteString("/")
 			}
 			sb.WriteString(jsonpointer.EscapeString(location.ParentField))
+			needsSep = true
 		}
 
 		if location.ParentKey != nil {
 			sb.WriteString("/")
 			sb.WriteString(jsonpointer.EscapeString(*location.ParentKey))
+			needsSep = true
 		} else if location.ParentIndex != nil {
 			sb.WriteString("/")
 			sb.WriteString(strconv.Itoa(*location.ParentIndex))
+			needsSep = true
 		}
 	}
 

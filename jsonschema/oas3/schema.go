@@ -4,7 +4,6 @@ package oas3
 import (
 	_ "embed"
 	"fmt"
-	"reflect"
 
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3/core"
@@ -727,8 +726,8 @@ func (s *Schema) IsEqual(other *Schema) bool {
 		return false
 	}
 
-	// Compare reference using reflect.DeepEqual
-	if !reflect.DeepEqual(s.Ref, other.Ref) {
+	// Compare reference
+	if !equalPtrs(s.Ref, other.Ref) {
 		return false
 	}
 
@@ -823,74 +822,74 @@ func (s *Schema) IsEqual(other *Schema) bool {
 		return false
 	}
 
-	// Compare pointer fields using reflect.DeepEqual
-	if !reflect.DeepEqual(s.MinContains, other.MinContains) {
+	// Compare pointer fields
+	if !equalPtrs(s.MinContains, other.MinContains) {
 		return false
 	}
-	if !reflect.DeepEqual(s.MaxContains, other.MaxContains) {
+	if !equalPtrs(s.MaxContains, other.MaxContains) {
 		return false
 	}
-	if !reflect.DeepEqual(s.Anchor, other.Anchor) {
+	if !equalPtrs(s.Anchor, other.Anchor) {
 		return false
 	}
-	if !reflect.DeepEqual(s.ID, other.ID) {
+	if !equalPtrs(s.ID, other.ID) {
 		return false
 	}
-	if !reflect.DeepEqual(s.Title, other.Title) {
+	if !equalPtrs(s.Title, other.Title) {
 		return false
 	}
-	if !reflect.DeepEqual(s.MultipleOf, other.MultipleOf) {
+	if !equalPtrs(s.MultipleOf, other.MultipleOf) {
 		return false
 	}
-	if !reflect.DeepEqual(s.Maximum, other.Maximum) {
+	if !equalPtrs(s.Maximum, other.Maximum) {
 		return false
 	}
-	if !reflect.DeepEqual(s.Minimum, other.Minimum) {
+	if !equalPtrs(s.Minimum, other.Minimum) {
 		return false
 	}
-	if !reflect.DeepEqual(s.MaxLength, other.MaxLength) {
+	if !equalPtrs(s.MaxLength, other.MaxLength) {
 		return false
 	}
-	if !reflect.DeepEqual(s.MinLength, other.MinLength) {
+	if !equalPtrs(s.MinLength, other.MinLength) {
 		return false
 	}
-	if !reflect.DeepEqual(s.Pattern, other.Pattern) {
+	if !equalPtrs(s.Pattern, other.Pattern) {
 		return false
 	}
-	if !reflect.DeepEqual(s.Format, other.Format) {
+	if !equalPtrs(s.Format, other.Format) {
 		return false
 	}
-	if !reflect.DeepEqual(s.MaxItems, other.MaxItems) {
+	if !equalPtrs(s.MaxItems, other.MaxItems) {
 		return false
 	}
-	if !reflect.DeepEqual(s.MinItems, other.MinItems) {
+	if !equalPtrs(s.MinItems, other.MinItems) {
 		return false
 	}
-	if !reflect.DeepEqual(s.UniqueItems, other.UniqueItems) {
+	if !equalPtrs(s.UniqueItems, other.UniqueItems) {
 		return false
 	}
-	if !reflect.DeepEqual(s.MaxProperties, other.MaxProperties) {
+	if !equalPtrs(s.MaxProperties, other.MaxProperties) {
 		return false
 	}
-	if !reflect.DeepEqual(s.MinProperties, other.MinProperties) {
+	if !equalPtrs(s.MinProperties, other.MinProperties) {
 		return false
 	}
-	if !reflect.DeepEqual(s.Description, other.Description) {
+	if !equalPtrs(s.Description, other.Description) {
 		return false
 	}
-	if !reflect.DeepEqual(s.Nullable, other.Nullable) {
+	if !equalPtrs(s.Nullable, other.Nullable) {
 		return false
 	}
-	if !reflect.DeepEqual(s.ReadOnly, other.ReadOnly) {
+	if !equalPtrs(s.ReadOnly, other.ReadOnly) {
 		return false
 	}
-	if !reflect.DeepEqual(s.WriteOnly, other.WriteOnly) {
+	if !equalPtrs(s.WriteOnly, other.WriteOnly) {
 		return false
 	}
-	if !reflect.DeepEqual(s.Deprecated, other.Deprecated) {
+	if !equalPtrs(s.Deprecated, other.Deprecated) {
 		return false
 	}
-	if !reflect.DeepEqual(s.Schema, other.Schema) {
+	if !equalPtrs(s.Schema, other.Schema) {
 		return false
 	}
 
@@ -1194,7 +1193,18 @@ func equalSequencedMaps(a, b *sequencedmap.Map[string, *JSONSchema[Referenceable
 	return a.IsEqualFunc(b, equalJSONSchemas)
 }
 
-func equalSlices[T any](a, b []T) bool {
+// equalPtrs compares two pointers for value equality without reflect.DeepEqual overhead.
+func equalPtrs[T comparable](a, b *T) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+func equalSlices[T comparable](a, b []T) bool {
 	// Treat nil and empty slices as equal
 	if len(a) == 0 && len(b) == 0 {
 		return true
@@ -1203,7 +1213,7 @@ func equalSlices[T any](a, b []T) bool {
 		return false
 	}
 	for i := range a {
-		if !reflect.DeepEqual(a[i], b[i]) {
+		if a[i] != b[i] {
 			return false
 		}
 	}

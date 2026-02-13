@@ -23,7 +23,7 @@ jobs:
       - name: Setup Go with caching
         uses: actions/setup-go@v6
         with:
-          go-version-file: "go.mod"
+          go-version-file: "go.work"
           cache: true
 
       - name: Check code formatting
@@ -57,7 +57,7 @@ jobs:
       - name: Setup Go with caching
         uses: actions/setup-go@v6
         with:
-          go-version-file: "go.mod"
+          go-version-file: "go.work"
           cache: true
 
       # Verify Docker is available for testcontainers (Ubuntu only)
@@ -111,7 +111,7 @@ jobs:
       - name: Setup Go with caching
         uses: actions/setup-go@v6
         with:
-          go-version-file: "go.mod"
+          go-version-file: "go.work"
           cache: true
 
       # Verify Docker is available for testcontainers
@@ -229,7 +229,7 @@ jobs:
       - name: Setup Go with caching
         uses: actions/setup-go@v6
         with:
-          go-version-file: "go.mod"
+          go-version-file: "go.work"
           cache: true
 
       - name: Build project
@@ -250,7 +250,7 @@ jobs:
       - name: Setup Go with caching
         uses: actions/setup-go@v6
         with:
-          go-version-file: "go.mod"
+          go-version-file: "go.work"
           cache: true
 
       - name: Build project
@@ -272,7 +272,7 @@ jobs:
       - name: Setup Go with caching
         uses: actions/setup-go@v6
         with:
-          go-version-file: "go.mod"
+          go-version-file: "go.work"
           cache: true
 
       - name: Run CLI integration tests
