@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -11,51 +12,66 @@ import (
 	"github.com/speakeasy-api/openapi/openapi"
 )
 
+// StdinIndicator is the conventional Unix indicator to read from stdin.
+const StdinIndicator = "-"
+
+// IsStdin returns true if the given path indicates stdin should be used.
+func IsStdin(path string) bool {
+	return path == StdinIndicator
+}
+
 // OpenAPIProcessor handles common OpenAPI document processing operations
 type OpenAPIProcessor struct {
 	InputFile     string
 	OutputFile    string
+	ReadFromStdin bool
 	WriteToStdout bool
 }
 
-// NewOpenAPIProcessor creates a new processor with the given input and output files
+// NewOpenAPIProcessor creates a new processor with the given input and output files.
+// Pass "-" as inputFile to read from stdin.
 func NewOpenAPIProcessor(inputFile, outputFile string, writeInPlace bool) (*OpenAPIProcessor, error) {
-	var finalOutputFile string
+	readFromStdin := IsStdin(inputFile)
 
 	if writeInPlace {
+		if readFromStdin {
+			return nil, errors.New("cannot use --write flag when reading from stdin")
+		}
 		if outputFile != "" {
 			return nil, errors.New("cannot specify output file when using --write flag")
 		}
-		finalOutputFile = inputFile
-	} else {
-		finalOutputFile = outputFile
+		outputFile = inputFile
 	}
 
 	return &OpenAPIProcessor{
 		InputFile:     inputFile,
-		OutputFile:    finalOutputFile,
-		WriteToStdout: finalOutputFile == "",
+		OutputFile:    outputFile,
+		ReadFromStdin: readFromStdin,
+		WriteToStdout: outputFile == "",
 	}, nil
 }
 
-// LoadDocument loads and parses an OpenAPI document from the input file
+// LoadDocument loads and parses an OpenAPI document from the input file or stdin.
 func (p *OpenAPIProcessor) LoadDocument(ctx context.Context) (*openapi.OpenAPI, []error, error) {
-	cleanInputFile := filepath.Clean(p.InputFile)
+	var reader io.ReadCloser
 
-	// Only print status messages if not writing to stdout (to keep stdout clean for piping)
-	if !p.WriteToStdout {
-		fmt.Printf("Processing OpenAPI document: %s\n", cleanInputFile)
-	}
+	if p.ReadFromStdin {
+		fmt.Fprintf(os.Stderr, "Processing OpenAPI document from stdin\n")
+		reader = io.NopCloser(os.Stdin)
+	} else {
+		cleanInputFile := filepath.Clean(p.InputFile)
+		fmt.Fprintf(os.Stderr, "Processing OpenAPI document: %s\n", cleanInputFile)
 
-	// Read the input file
-	f, err := os.Open(cleanInputFile)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open input file: %w", err)
+		f, err := os.Open(cleanInputFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to open input file: %w", err)
+		}
+		reader = f
 	}
-	defer f.Close()
+	defer reader.Close()
 
 	// Parse the OpenAPI document
-	doc, validationErrors, err := openapi.Unmarshal(ctx, f)
+	doc, validationErrors, err := openapi.Unmarshal(ctx, reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal OpenAPI document: %w", err)
 	}
@@ -66,14 +82,14 @@ func (p *OpenAPIProcessor) LoadDocument(ctx context.Context) (*openapi.OpenAPI, 
 	return doc, validationErrors, nil
 }
 
-// ReportValidationErrors reports validation errors if not writing to stdout
+// ReportValidationErrors reports validation errors to stderr.
 func (p *OpenAPIProcessor) ReportValidationErrors(validationErrors []error) {
-	if len(validationErrors) > 0 && !p.WriteToStdout {
-		fmt.Printf("⚠️  Found %d validation errors in original document:\n", len(validationErrors))
+	if len(validationErrors) > 0 {
+		fmt.Fprintf(os.Stderr, "⚠️  Found %d validation errors in original document:\n", len(validationErrors))
 		for i, validationErr := range validationErrors {
-			fmt.Printf("  %d. %s\n", i+1, validationErr.Error())
+			fmt.Fprintf(os.Stderr, "  %d. %s\n", i+1, validationErr.Error())
 		}
-		fmt.Println()
+		fmt.Fprintln(os.Stderr)
 	}
 }
 
@@ -101,23 +117,17 @@ func (p *OpenAPIProcessor) WriteDocument(ctx context.Context, doc *openapi.OpenA
 	return nil
 }
 
-// PrintSuccess prints a success message if not writing to stdout
+// PrintSuccess prints a success message to stderr.
 func (p *OpenAPIProcessor) PrintSuccess(message string) {
-	if !p.WriteToStdout {
-		fmt.Printf("✅ %s\n", message)
-	}
+	fmt.Fprintf(os.Stderr, "✅ %s\n", message)
 }
 
-// PrintInfo prints an info message if not writing to stdout
+// PrintInfo prints an info message to stderr.
 func (p *OpenAPIProcessor) PrintInfo(message string) {
-	if !p.WriteToStdout {
-		fmt.Printf("📋 %s\n", message)
-	}
+	fmt.Fprintf(os.Stderr, "📋 %s\n", message)
 }
 
-// PrintWarning prints a warning message if not writing to stdout
+// PrintWarning prints a warning message to stderr.
 func (p *OpenAPIProcessor) PrintWarning(message string) {
-	if !p.WriteToStdout {
-		fmt.Printf("⚠️  Warning: %s\n", message)
-	}
+	fmt.Fprintf(os.Stderr, "⚠️  Warning: %s\n", message)
 }

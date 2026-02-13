@@ -126,12 +126,12 @@ func runJoinCommand(cmd *cobra.Command, args []string) error {
 		}
 
 		// Report validation errors for this document
-		if len(docValidationErrors) > 0 && !processor.WriteToStdout {
-			fmt.Printf("⚠️  Found %d validation errors in %s:\n", len(docValidationErrors), docFile)
+		if len(docValidationErrors) > 0 {
+			fmt.Fprintf(os.Stderr, "⚠️  Found %d validation errors in %s:\n", len(docValidationErrors), docFile)
 			for i, validationErr := range docValidationErrors {
-				fmt.Printf("  %d. %s\n", i+1, validationErr.Error())
+				fmt.Fprintf(os.Stderr, "  %d. %s\n", i+1, validationErr.Error())
 			}
-			fmt.Println()
+			fmt.Fprintln(os.Stderr)
 		}
 
 		documents = append(documents, doc)

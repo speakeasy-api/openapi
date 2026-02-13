@@ -16,6 +16,9 @@ var sanitizeCmd = &cobra.Command{
 	Long: `Sanitize an OpenAPI specification by removing unwanted elements such as vendor extensions,
 unused components, and unknown properties.
 
+Use '-' as the input file to read from stdin:
+  cat spec.yaml | openapi spec sanitize -
+
 This command provides comprehensive cleanup of OpenAPI documents to prepare them for
 distribution, standardization, or sharing. By default, it performs aggressive cleanup
 by removing all extensions and unused components.

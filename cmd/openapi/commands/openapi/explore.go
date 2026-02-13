@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -18,6 +19,9 @@ var exploreCmd = &cobra.Command{
 	Use:   "explore <file>",
 	Short: "Interactively explore an OpenAPI specification",
 	Long: `Launch an interactive terminal UI to browse and explore OpenAPI operations.
+
+Use '-' as the file argument to read from stdin:
+  cat spec.yaml | openapi spec explore -
 
 This command provides a user-friendly interface for navigating through API
 endpoints, viewing operation details, parameters, request/response information,
@@ -81,17 +85,23 @@ func runExplore(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// loadOpenAPIDocument loads an OpenAPI document from a file
+// loadOpenAPIDocument loads an OpenAPI document from a file or stdin (using "-").
 func loadOpenAPIDocument(ctx context.Context, file string) (*openapi.OpenAPI, error) {
-	cleanFile := filepath.Clean(file)
+	var reader io.ReadCloser
 
-	f, err := os.Open(cleanFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
+	if IsStdin(file) {
+		reader = io.NopCloser(os.Stdin)
+	} else {
+		cleanFile := filepath.Clean(file)
+		f, err := os.Open(cleanFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open file: %w", err)
+		}
+		reader = f
 	}
-	defer f.Close()
+	defer reader.Close()
 
-	doc, validationErrors, err := openapi.Unmarshal(ctx, f)
+	doc, validationErrors, err := openapi.Unmarshal(ctx, reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal OpenAPI document: %w", err)
 	}

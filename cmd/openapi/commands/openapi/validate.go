@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -23,7 +24,10 @@ This command will parse and validate the provided OpenAPI document, checking for
 - Structural validity according to the OpenAPI Specification
 - Required fields and proper data types
 - Reference resolution and consistency
-- Schema validation rules`,
+- Schema validation rules
+
+Use '-' as the file argument to read from stdin:
+  cat spec.yaml | openapi spec validate -`,
 	Args: cobra.ExactArgs(1),
 	Run:  runValidate,
 }
@@ -43,27 +47,35 @@ func runValidate(cmd *cobra.Command, args []string) {
 }
 
 func validateOpenAPI(ctx context.Context, file string) error {
-	cleanFile := filepath.Clean(file)
-	fmt.Printf("Validating OpenAPI document: %s\n", cleanFile)
+	var reader io.ReadCloser
 
-	f, err := os.Open(cleanFile)
-	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+	if IsStdin(file) {
+		fmt.Fprintf(os.Stderr, "Validating OpenAPI document from stdin\n")
+		reader = io.NopCloser(os.Stdin)
+	} else {
+		cleanFile := filepath.Clean(file)
+		fmt.Fprintf(os.Stderr, "Validating OpenAPI document: %s\n", cleanFile)
+
+		f, err := os.Open(cleanFile)
+		if err != nil {
+			return fmt.Errorf("failed to open file: %w", err)
+		}
+		reader = f
 	}
-	defer f.Close()
+	defer reader.Close()
 
-	_, validationErrors, err := openapi.Unmarshal(ctx, f)
+	_, validationErrors, err := openapi.Unmarshal(ctx, reader)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal file: %w", err)
 	}
 
 	if len(validationErrors) == 0 {
-		fmt.Printf("✅ OpenAPI document is valid - 0 errors\n")
+		fmt.Fprintf(os.Stderr, "✅ OpenAPI document is valid - 0 errors\n")
 		return nil
 	}
 
-	fmt.Printf("❌ OpenAPI document is invalid - %d errors:\n\n", len(validationErrors))
-	fmt.Print(formatValidationErrors(validationErrors))
+	fmt.Fprintf(os.Stderr, "❌ OpenAPI document is invalid - %d errors:\n\n", len(validationErrors))
+	fmt.Fprint(os.Stderr, formatValidationErrors(validationErrors))
 
 	return errors.New("openAPI document validation failed")
 }

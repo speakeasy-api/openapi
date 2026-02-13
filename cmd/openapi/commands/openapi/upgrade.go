@@ -15,6 +15,9 @@ var upgradeCmd = &cobra.Command{
 	Short: "Upgrade an OpenAPI specification to the latest supported version",
 	Long: `Upgrade an OpenAPI specification document to the latest supported version (3.2.0).
 
+Use '-' as the input file to read from stdin:
+  cat spec.yaml | openapi spec upgrade -
+
 By default, upgrades all versions including patch-level upgrades:
 - 3.0.x → 3.2.0
 - 3.1.x → 3.2.0

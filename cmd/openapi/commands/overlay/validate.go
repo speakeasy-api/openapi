@@ -2,6 +2,7 @@ package overlay
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/speakeasy-api/openapi/overlay/loader"
 	"github.com/spf13/cobra"
@@ -46,5 +47,5 @@ func RunValidateOverlay(cmd *cobra.Command, args []string) {
 		Dief("Overlay file %q failed validation:\n%v", overlayFile, err)
 	}
 
-	fmt.Printf("Overlay file %q is valid.\n", overlayFile)
+	fmt.Fprintf(os.Stderr, "Overlay file %q is valid.\n", overlayFile)
 }

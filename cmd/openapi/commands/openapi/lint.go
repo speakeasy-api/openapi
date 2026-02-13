@@ -3,6 +3,7 @@ package openapi
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -30,6 +31,11 @@ This command runs both spec validation and additional lint rules including:
 - Operation ID requirements
 - Consistent naming conventions
 - Security best practices (OWASP)
+
+Use '-' as the file argument to read from stdin:
+  cat spec.yaml | openapi spec lint -
+
+Note: --fix and --fix-interactive are not supported when reading from stdin.
 
 CONFIGURATION:
 
@@ -96,12 +102,15 @@ func init() {
 	lintCmd.Flags().BoolVar(&lintDryRun, "dry-run", false, "Show what fixes would be applied without changing the file (requires --fix or --fix-interactive)")
 }
 
-func validateLintFlags(_ *cobra.Command, _ []string) error {
+func validateLintFlags(_ *cobra.Command, args []string) error {
 	if lintFix && lintFixInteractive {
 		return fmt.Errorf("--fix and --fix-interactive are mutually exclusive")
 	}
 	if lintDryRun && !lintFix && !lintFixInteractive {
 		return fmt.Errorf("--dry-run requires --fix or --fix-interactive")
+	}
+	if len(args) > 0 && IsStdin(args[0]) && (lintFix || lintFixInteractive) {
+		return fmt.Errorf("--fix and --fix-interactive are not supported when reading from stdin")
 	}
 	return nil
 }
@@ -121,23 +130,37 @@ func runLint(cmd *cobra.Command, args []string) {
 }
 
 func lintOpenAPI(ctx context.Context, file string) error {
-	cleanFile := filepath.Clean(file)
+	fromStdin := IsStdin(file)
 
-	// Get absolute path for document location
-	absPath, err := filepath.Abs(cleanFile)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path: %w", err)
-	}
+	var reader io.ReadCloser
+	var absPath string
 
-	// Load the OpenAPI document
-	f, err := os.Open(cleanFile)
-	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+	if fromStdin {
+		fmt.Fprintf(os.Stderr, "Linting OpenAPI document from stdin\n")
+		reader = io.NopCloser(os.Stdin)
+		absPath = "stdin"
+	} else {
+		cleanFile := filepath.Clean(file)
+
+		// Get absolute path for document location
+		var err error
+		absPath, err = filepath.Abs(cleanFile)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path: %w", err)
+		}
+
+		fmt.Fprintf(os.Stderr, "Linting OpenAPI document: %s\n", cleanFile)
+
+		f, err := os.Open(cleanFile)
+		if err != nil {
+			return fmt.Errorf("failed to open file: %w", err)
+		}
+		reader = f
 	}
-	defer f.Close()
+	defer reader.Close()
 
 	// Unmarshal with validation to get validation errors
-	doc, validationErrors, err := openapi.Unmarshal(ctx, f)
+	doc, validationErrors, err := openapi.Unmarshal(ctx, reader)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal file: %w", err)
 	}
@@ -160,7 +183,7 @@ func lintOpenAPI(ctx context.Context, file string) error {
 		return fmt.Errorf("linting failed: %w", err)
 	}
 
-	// Determine fix mode
+	// Determine fix mode (already validated that fix is not used with stdin)
 	fixOpts := fix.Options{Mode: fix.ModeNone, DryRun: lintDryRun}
 	switch {
 	case lintFixInteractive:
@@ -170,6 +193,7 @@ func lintOpenAPI(ctx context.Context, file string) error {
 	}
 
 	if fixOpts.Mode != fix.ModeNone {
+		cleanFile := filepath.Clean(file)
 		if err := applyFixes(ctx, fixOpts, doc, output, cleanFile); err != nil {
 			return err
 		}
@@ -196,12 +220,16 @@ func lintOpenAPI(ctx context.Context, file string) error {
 		}
 	}
 
-	// Format and print output
+	// Format and print output to stdout (this is the data output)
+	displayFile := file
+	if fromStdin {
+		displayFile = "stdin"
+	}
 	switch lintOutputFormat {
 	case "json":
 		fmt.Println(output.FormatJSON())
 	default:
-		fmt.Printf("%s\n", cleanFile)
+		fmt.Printf("%s\n", displayFile)
 		fmt.Println(output.FormatText())
 	}
 

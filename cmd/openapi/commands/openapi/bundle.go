@@ -20,6 +20,9 @@ var bundleCmd = &cobra.Command{
 	Long: `Bundle transforms an OpenAPI document by bringing all external references into the components section,
 creating a self-contained document that maintains the reference structure but doesn't depend on external files.
 
+Use '-' as the input file to read from stdin:
+  cat spec.yaml | openapi spec bundle -
+
 This operation is useful when you want to:
 • Create portable documents that combine multiple OpenAPI files
 • Maintain reference structure for tooling that supports references
@@ -88,10 +91,14 @@ func runBundleCommand(cmd *cobra.Command, args []string) error {
 	processor.ReportValidationErrors(validationErrors)
 
 	// Configure bundle options
+	targetLocation := inputFile
+	if processor.ReadFromStdin {
+		targetLocation = ""
+	}
 	opts := openapi.BundleOptions{
 		ResolveOptions: openapi.ResolveOptions{
 			RootDocument:   doc,
-			TargetLocation: inputFile,
+			TargetLocation: targetLocation,
 		},
 		NamingStrategy: namingStrategy,
 	}

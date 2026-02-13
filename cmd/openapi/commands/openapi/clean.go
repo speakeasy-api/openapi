@@ -15,6 +15,9 @@ var cleanCmd = &cobra.Command{
 	Short: "Remove unused components and unused top-level tags from an OpenAPI specification",
 	Long: `Remove unused components and unused top-level tags from an OpenAPI specification to create a cleaner, more focused document.
 
+Use '-' as the input file to read from stdin:
+  cat spec.yaml | openapi spec clean -
+
 This command uses reachability-based analysis to keep only what is actually used by the API surface:
 - Seeds reachability exclusively from API surface areas: entries under /paths and the top-level security section
 - Expands through $ref links across component sections until a fixed point is reached

@@ -19,6 +19,9 @@ var inlineCmd = &cobra.Command{
 This command transforms an OpenAPI document by replacing all $ref references with their actual content,
 eliminating the need for external definitions or component references.
 
+Use '-' as the input file to read from stdin:
+  cat spec.yaml | openapi spec inline -
+
 Benefits of inlining:
 - Create standalone OpenAPI documents for easy distribution
 - Improve compatibility with tools that work better with fully expanded specifications
@@ -82,10 +85,14 @@ func inlineOpenAPI(ctx context.Context, processor *OpenAPIProcessor) error {
 	processor.ReportValidationErrors(validationErrors)
 
 	// Prepare inline options (always remove unused components)
+	targetLocation := ""
+	if !processor.ReadFromStdin {
+		targetLocation = filepath.Clean(processor.InputFile)
+	}
 	opts := openapi.InlineOptions{
 		ResolveOptions: openapi.ResolveOptions{
 			RootDocument:   doc,
-			TargetLocation: filepath.Clean(processor.InputFile),
+			TargetLocation: targetLocation,
 		},
 		RemoveUnusedComponents: true,
 	}

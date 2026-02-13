@@ -102,8 +102,8 @@ func localizeOpenAPI(ctx context.Context, inputFile, targetDirectory string) err
 	cleanInputFile := filepath.Clean(inputFile)
 	cleanTargetDir := filepath.Clean(targetDirectory)
 
-	fmt.Printf("Localizing OpenAPI document: %s\n", cleanInputFile)
-	fmt.Printf("Target directory: %s\n", cleanTargetDir)
+	fmt.Fprintf(os.Stderr, "Localizing OpenAPI document: %s\n", cleanInputFile)
+	fmt.Fprintf(os.Stderr, "Target directory: %s\n", cleanTargetDir)
 
 	// Read the input file
 	f, err := os.Open(cleanInputFile)
@@ -123,11 +123,11 @@ func localizeOpenAPI(ctx context.Context, inputFile, targetDirectory string) err
 
 	// Report validation errors if any
 	if len(validationErrors) > 0 {
-		fmt.Printf("⚠️  Found %d validation errors in original document:\n", len(validationErrors))
+		fmt.Fprintf(os.Stderr, "⚠️  Found %d validation errors in original document:\n", len(validationErrors))
 		for i, validationErr := range validationErrors {
-			fmt.Printf("  %d. %s\n", i+1, validationErr.Error())
+			fmt.Fprintf(os.Stderr, "  %d. %s\n", i+1, validationErr.Error())
 		}
-		fmt.Println()
+		fmt.Fprintln(os.Stderr)
 	}
 
 	// Determine naming strategy
@@ -173,8 +173,8 @@ func localizeOpenAPI(ctx context.Context, inputFile, targetDirectory string) err
 		return fmt.Errorf("failed to write localized document: %w", err)
 	}
 
-	fmt.Printf("📄 Localized document written to: %s\n", cleanOutputFile)
-	fmt.Printf("✅ Localization completed successfully - original document unchanged\n")
+	fmt.Fprintf(os.Stderr, "📄 Localized document written to: %s\n", cleanOutputFile)
+	fmt.Fprintf(os.Stderr, "✅ Localization completed successfully - original document unchanged\n")
 
 	return nil
 }
