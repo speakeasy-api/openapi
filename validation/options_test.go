@@ -54,8 +54,7 @@ func TestNewOptions_Success(t *testing.T) {
 			opts: nil,
 			validate: func(t *testing.T, options *Options) {
 				t.Helper()
-				assert.NotNil(t, options.ContextObjects)
-				assert.Empty(t, options.ContextObjects)
+				assert.Nil(t, options.ContextObjects, "map is lazy-initialized on first write")
 			},
 		},
 		{

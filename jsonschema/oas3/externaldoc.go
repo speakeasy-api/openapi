@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"reflect"
 
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
@@ -61,8 +60,8 @@ func (e *ExternalDocumentation) IsEqual(other *ExternalDocumentation) bool {
 		return false
 	}
 
-	// Compare Description using reflect.DeepEqual
-	if !reflect.DeepEqual(e.Description, other.Description) {
+	// Compare Description
+	if !equalPtrs(e.Description, other.Description) {
 		return false
 	}
 

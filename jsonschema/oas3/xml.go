@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"reflect"
 
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
@@ -90,20 +89,20 @@ func (x *XML) IsEqual(other *XML) bool {
 		return false
 	}
 
-	// Compare all pointer fields using reflect.DeepEqual
-	if !reflect.DeepEqual(x.Name, other.Name) {
+	// Compare all pointer fields
+	if !equalPtrs(x.Name, other.Name) {
 		return false
 	}
-	if !reflect.DeepEqual(x.Namespace, other.Namespace) {
+	if !equalPtrs(x.Namespace, other.Namespace) {
 		return false
 	}
-	if !reflect.DeepEqual(x.Prefix, other.Prefix) {
+	if !equalPtrs(x.Prefix, other.Prefix) {
 		return false
 	}
-	if !reflect.DeepEqual(x.Attribute, other.Attribute) {
+	if !equalPtrs(x.Attribute, other.Attribute) {
 		return false
 	}
-	if !reflect.DeepEqual(x.Wrapped, other.Wrapped) {
+	if !equalPtrs(x.Wrapped, other.Wrapped) {
 		return false
 	}
 

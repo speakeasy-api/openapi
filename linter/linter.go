@@ -13,8 +13,10 @@ import (
 
 // Linter is the main linting engine
 type Linter[T any] struct {
-	config   *Config
-	registry *Registry[T]
+	config    *Config
+	registry  *Registry[T]
+	overrides map[string]ruleOverride
+	filters   []matchFilter
 }
 
 type ruleOverride struct {
@@ -32,10 +34,13 @@ type matchFilter struct {
 
 // NewLinter creates a new linter with the given configuration
 func NewLinter[T any](config *Config, registry *Registry[T]) *Linter[T] {
-	return &Linter[T]{
+	l := &Linter[T]{
 		config:   config,
 		registry: registry,
 	}
+	l.overrides = l.buildOverrides()
+	l.filters = l.buildMatchFilters()
+	return l
 }
 
 // Registry returns the rule registry for documentation generation
@@ -71,13 +76,13 @@ func (l *Linter[T]) runRules(ctx context.Context, docInfo *DocumentInfo[T], opts
 	// Determine enabled rules
 	enabledRules := l.getEnabledRules()
 
-	// Run rules in parallel for better performance
-	var (
-		mu   sync.Mutex
-		errs []error
-		wg   sync.WaitGroup
-	)
+	type ruleJob struct {
+		runner RuleRunner[T]
+		config RuleConfig
+	}
 
+	// Pre-filter rules and build job list
+	var jobs []ruleJob
 	for _, rule := range enabledRules {
 		ruleConfig := l.getRuleConfig(rule.ID())
 
@@ -119,20 +124,32 @@ func (l *Linter[T]) runRules(ctx context.Context, docInfo *DocumentInfo[T], opts
 			ruleConfig.ResolveOptions = &resolveOpts
 		}
 
-		// Run rule in parallel
+		jobs = append(jobs, ruleJob{runner: rule, config: ruleConfig})
+	}
+
+	// Each goroutine writes to its own slot — no mutex needed
+	results := make([][]error, len(jobs))
+	var wg sync.WaitGroup
+
+	for i, job := range jobs {
 		wg.Add(1)
-		go func(r RuleRunner[T], cfg RuleConfig) {
+		go func(idx int, r RuleRunner[T], cfg RuleConfig) {
 			defer wg.Done()
-
-			ruleErrs := r.Run(ctx, docInfo, &cfg)
-
-			mu.Lock()
-			errs = append(errs, ruleErrs...)
-			mu.Unlock()
-		}(rule, ruleConfig)
+			results[idx] = r.Run(ctx, docInfo, &cfg)
+		}(i, job.runner, job.config)
 	}
 
 	wg.Wait()
+
+	// Merge results lock-free
+	var totalLen int
+	for _, r := range results {
+		totalLen += len(r)
+	}
+	errs := make([]error, 0, totalLen)
+	for _, r := range results {
+		errs = append(errs, r...)
+	}
 	return errs
 }
 
@@ -166,7 +183,7 @@ func (l *Linter[T]) getEnabledRules() []RuleRunner[T] {
 	}
 
 	// Apply rule config from list entries without match
-	for id, override := range l.ruleOverrides() {
+	for id, override := range l.overrides {
 		if override.disabled != nil {
 			ruleStatus[id] = !*override.disabled
 			continue
@@ -207,7 +224,7 @@ func (l *Linter[T]) getRuleConfig(ruleID string) RuleConfig {
 	}
 
 	// Apply rule config from list entries without match
-	if override, ok := l.ruleOverrides()[ruleID]; ok {
+	if override, ok := l.overrides[ruleID]; ok {
 		if override.severity != nil {
 			config.Severity = override.severity
 		}
@@ -235,8 +252,6 @@ func (l *Linter[T]) applySeverityOverrides(errs []error) []error {
 
 // FilterErrors applies rule-level overrides and match filters to any errors.
 func (l *Linter[T]) FilterErrors(errs []error) []error {
-	filters := l.buildMatchFilters()
-
 	var filtered []error
 	for _, err := range errs {
 		var vErr *validation.Error
@@ -245,7 +260,7 @@ func (l *Linter[T]) FilterErrors(errs []error) []error {
 			continue
 		}
 
-		updatedErr, include := applyMatchFilters(vErr, filters)
+		updatedErr, include := applyMatchFilters(vErr, l.filters)
 		if include {
 			filtered = append(filtered, updatedErr)
 		}
@@ -261,7 +276,7 @@ func (l *Linter[T]) formatOutput(errs []error) *Output {
 	}
 }
 
-func (l *Linter[T]) ruleOverrides() map[string]ruleOverride {
+func (l *Linter[T]) buildOverrides() map[string]ruleOverride {
 	overrides := make(map[string]ruleOverride)
 	for _, entry := range l.config.Rules {
 		if entry.Match != nil {

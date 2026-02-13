@@ -2,7 +2,7 @@ package rules
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -91,14 +91,14 @@ func (r *OAS3ParameterDescriptionRule) Run(ctx context.Context, docInfo *linter.
 
 			var msg string
 			if method != "" && path != "" {
-				msg = fmt.Sprintf("parameter `%s` in `%s %s` is missing a description", paramName, method, path)
+				msg = "parameter `" + paramName + "` in `" + method + " " + path + "` is missing a description"
 			} else {
-				msg = fmt.Sprintf("parameter `%s` is missing a description", paramName)
+				msg = "parameter `" + paramName + "` is missing a description"
 			}
 
 			paramRootNode := param.GetRootNode()
 			errs = append(errs, &validation.Error{
-				UnderlyingError: fmt.Errorf("%s", msg),
+				UnderlyingError: errors.New(msg),
 				Node:            errNode,
 				Severity:        config.GetSeverity(r.DefaultSeverity()),
 				Rule:            RuleStyleOAS3ParameterDescription,
