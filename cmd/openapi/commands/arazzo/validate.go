@@ -15,6 +15,18 @@ import (
 // stdinIndicator is the conventional Unix indicator to read from stdin.
 const stdinIndicator = "-"
 
+func isStdin(path string) bool {
+	return path == stdinIndicator
+}
+
+func stdinIsPiped() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) == 0
+}
+
 var validateCmd = &cobra.Command{
 	Use:   "validate <file>",
 	Short: "Validate an Arazzo workflow document",
@@ -27,15 +39,30 @@ This command will parse and validate the provided Arazzo document, checking for:
 - Runtime expression validation
 - Source description references
 
-Use '-' as the file argument to read from stdin:
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat workflow.yaml | openapi arazzo validate
   cat workflow.yaml | openapi arazzo validate -`,
-	Args: cobra.ExactArgs(1),
-	Run:  runValidate,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			if stdinIsPiped() {
+				return nil
+			}
+			return fmt.Errorf("requires at least 1 arg(s), or pipe data to stdin")
+		}
+		if len(args) > 1 {
+			return fmt.Errorf("accepts at most 1 arg(s), received %d", len(args))
+		}
+		return nil
+	},
+	Run: runValidate,
 }
 
 func runValidate(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	file := args[0]
+	file := stdinIndicator
+	if len(args) > 0 {
+		file = args[0]
+	}
 
 	if err := validateArazzo(ctx, file); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -46,7 +73,7 @@ func runValidate(cmd *cobra.Command, args []string) {
 func validateArazzo(ctx context.Context, file string) error {
 	var reader io.ReadCloser
 
-	if file == stdinIndicator {
+	if isStdin(file) {
 		fmt.Fprintf(os.Stderr, "Validating Arazzo document from stdin\n")
 		reader = io.NopCloser(os.Stdin)
 	} else {

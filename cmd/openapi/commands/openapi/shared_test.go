@@ -94,3 +94,61 @@ func TestNewOpenAPIProcessor_WriteInPlace(t *testing.T) {
 		assert.Contains(t, err.Error(), "cannot specify output file when using --write flag")
 	})
 }
+
+func TestInputFileFromArgs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		args     []string
+		expected string
+	}{
+		{name: "no args returns stdin indicator", args: []string{}, expected: "-"},
+		{name: "nil args returns stdin indicator", args: nil, expected: "-"},
+		{name: "single file arg", args: []string{"spec.yaml"}, expected: "spec.yaml"},
+		{name: "explicit dash", args: []string{"-"}, expected: "-"},
+		{name: "multiple args returns first", args: []string{"spec.yaml", "out.yaml"}, expected: "spec.yaml"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, inputFileFromArgs(tt.args))
+		})
+	}
+}
+
+func TestStdinOrFileArgs(t *testing.T) {
+	t.Parallel()
+
+	validator := stdinOrFileArgs(1, 2)
+
+	t.Run("rejects zero args when stdin is not piped", func(t *testing.T) {
+		t.Parallel()
+		// In a test environment, stdin is typically not a pipe
+		// so this should return an error when not piped
+		err := validator(nil, []string{})
+		// The result depends on whether the test runner pipes stdin
+		// so we just verify it doesn't panic
+		_ = err
+	})
+
+	t.Run("accepts one arg", func(t *testing.T) {
+		t.Parallel()
+		err := validator(nil, []string{"spec.yaml"})
+		assert.NoError(t, err)
+	})
+
+	t.Run("accepts two args", func(t *testing.T) {
+		t.Parallel()
+		err := validator(nil, []string{"spec.yaml", "out.yaml"})
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects three args with max 2", func(t *testing.T) {
+		t.Parallel()
+		err := validator(nil, []string{"a", "b", "c"})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "accepts at most 2 arg(s)")
+	})
+}

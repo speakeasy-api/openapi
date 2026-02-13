@@ -19,7 +19,8 @@ var inlineCmd = &cobra.Command{
 This command transforms an OpenAPI document by replacing all $ref references with their actual content,
 eliminating the need for external definitions or component references.
 
-Use '-' as the input file to read from stdin:
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec inline
   cat spec.yaml | openapi spec inline -
 
 Benefits of inlining:
@@ -40,7 +41,7 @@ Output options:
 - No output file specified: writes to stdout (pipe-friendly)
 - Output file specified: writes to the specified file
 - --write flag: writes in-place to the input file`,
-	Args: cobra.RangeArgs(1, 2),
+	Args: stdinOrFileArgs(1, 2),
 	Run:  runInline,
 }
 
@@ -52,10 +53,11 @@ func init() {
 
 func runInline(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	inputFile := args[0]
+	inputFile := inputFileFromArgs(args)
 
 	var outputFile string
-	if len(args) > 1 {
+	// When args has 2 elements, second is the output file
+	if len(args) >= 2 {
 		outputFile = args[1]
 	}
 

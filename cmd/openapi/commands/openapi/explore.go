@@ -20,7 +20,8 @@ var exploreCmd = &cobra.Command{
 	Short: "Interactively explore an OpenAPI specification",
 	Long: `Launch an interactive terminal UI to browse and explore OpenAPI operations.
 
-Use '-' as the file argument to read from stdin:
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec explore
   cat spec.yaml | openapi spec explore -
 
 This command provides a user-friendly interface for navigating through API
@@ -40,13 +41,13 @@ Navigation:
 
 The explore command helps you understand API structure and operation details
 without needing to manually parse the OpenAPI specification file.`,
-	Args: cobra.ExactArgs(1),
+	Args: stdinOrFileArgs(1, 1),
 	RunE: runExplore,
 }
 
 func runExplore(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	inputFile := args[0]
+	inputFile := inputFileFromArgs(args)
 
 	// Load the OpenAPI document
 	doc, err := loadOpenAPIDocument(ctx, inputFile)

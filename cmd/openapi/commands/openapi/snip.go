@@ -27,7 +27,8 @@ var snipCmd = &cobra.Command{
 	Short: "Remove operations from an OpenAPI specification",
 	Long: `Remove selected operations from an OpenAPI specification and clean up unused components.
 
-Use '-' as the input file to read from stdin (CLI mode only):
+Stdin is supported in CLI mode — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec snip --operationId deleteUser
   cat spec.yaml | openapi spec snip --operationId deleteUser -
 
 This command can operate in two modes:
@@ -72,7 +73,7 @@ Examples:
 
   # CLI mode - write to stdout for piping
   openapi spec snip --operation /internal/debug:GET ./spec.yaml > ./public-spec.yaml`,
-	Args: cobra.RangeArgs(1, 2),
+	Args: stdinOrFileArgs(1, 2),
 	RunE: runSnip,
 }
 
@@ -87,10 +88,10 @@ func init() {
 
 func runSnip(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	inputFile := args[0]
+	inputFile := inputFileFromArgs(args)
 
 	var outputFile string
-	if len(args) > 1 {
+	if len(args) >= 2 {
 		outputFile = args[1]
 	}
 

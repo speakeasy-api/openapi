@@ -29,7 +29,8 @@ var optimizeCmd = &cobra.Command{
 	Short: "Optimize an OpenAPI specification by deduplicating inline schemas",
 	Long: `Optimize an OpenAPI specification by finding duplicate inline schemas and extracting them to reusable components.
 
-Use '-' as the input file to read from stdin:
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec optimize --non-interactive
   cat spec.yaml | openapi spec optimize - --non-interactive
 
 This command analyzes an OpenAPI document to identify inline JSON schemas that appear multiple times
@@ -82,7 +83,7 @@ Examples:
 
   # Optimize in-place
   openapi spec optimize api.yaml --write`,
-	Args: cobra.RangeArgs(1, 2),
+	Args: stdinOrFileArgs(1, 2),
 	Run:  runOptimize,
 }
 
@@ -98,10 +99,10 @@ func init() {
 
 func runOptimize(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	inputFile := args[0]
+	inputFile := inputFileFromArgs(args)
 
 	var outputFile string
-	if len(args) > 1 {
+	if len(args) >= 2 {
 		outputFile = args[1]
 	}
 

@@ -20,7 +20,8 @@ var bundleCmd = &cobra.Command{
 	Long: `Bundle transforms an OpenAPI document by bringing all external references into the components section,
 creating a self-contained document that maintains the reference structure but doesn't depend on external files.
 
-Use '-' as the input file to read from stdin:
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec bundle
   cat spec.yaml | openapi spec bundle -
 
 This operation is useful when you want to:
@@ -45,7 +46,7 @@ Examples:
 
   # Bundle with filepath naming (default)
   openapi spec bundle --naming filepath ./spec.yaml ./bundled.yaml`,
-	Args: cobra.RangeArgs(1, 2),
+	Args: stdinOrFileArgs(1, 2),
 	RunE: runBundleCommand,
 }
 
@@ -58,9 +59,9 @@ func runBundleCommand(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
 	// Parse arguments
-	inputFile := args[0]
+	inputFile := inputFileFromArgs(args)
 	var outputFile string
-	if len(args) > 1 {
+	if len(args) >= 2 {
 		outputFile = args[1]
 	}
 

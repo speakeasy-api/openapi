@@ -15,7 +15,8 @@ var upgradeCmd = &cobra.Command{
 	Short: "Upgrade an OpenAPI specification to the latest supported version",
 	Long: `Upgrade an OpenAPI specification document to the latest supported version (3.2.0).
 
-Use '-' as the input file to read from stdin:
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec upgrade
   cat spec.yaml | openapi spec upgrade -
 
 By default, upgrades all versions including patch-level upgrades:
@@ -38,7 +39,7 @@ Output options:
 - No output file specified: writes to stdout (pipe-friendly)
 - Output file specified: writes to the specified file
 - --write flag: writes in-place to the input file`,
-	Args: cobra.RangeArgs(1, 2),
+	Args: stdinOrFileArgs(1, 2),
 	Run:  runUpgrade,
 }
 
@@ -54,10 +55,10 @@ func init() {
 
 func runUpgrade(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	inputFile := args[0]
+	inputFile := inputFileFromArgs(args)
 
 	var outputFile string
-	if len(args) > 1 {
+	if len(args) >= 2 {
 		outputFile = args[1]
 	}
 

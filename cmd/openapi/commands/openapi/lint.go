@@ -32,7 +32,8 @@ This command runs both spec validation and additional lint rules including:
 - Consistent naming conventions
 - Security best practices (OWASP)
 
-Use '-' as the file argument to read from stdin:
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec lint
   cat spec.yaml | openapi spec lint -
 
 Note: --fix and --fix-interactive are not supported when reading from stdin.
@@ -75,7 +76,7 @@ Use --dry-run with either flag to preview what would be changed without modifyin
 
 See the full documentation at:
 https://github.com/speakeasy-api/openapi/blob/main/cmd/openapi/commands/openapi/README.md#lint`,
-	Args:    cobra.ExactArgs(1),
+	Args:    stdinOrFileArgs(1, 1),
 	PreRunE: validateLintFlags,
 	Run:     runLint,
 }
@@ -109,7 +110,8 @@ func validateLintFlags(_ *cobra.Command, args []string) error {
 	if lintDryRun && !lintFix && !lintFixInteractive {
 		return fmt.Errorf("--dry-run requires --fix or --fix-interactive")
 	}
-	if len(args) > 0 && IsStdin(args[0]) && (lintFix || lintFixInteractive) {
+	file := inputFileFromArgs(args)
+	if IsStdin(file) && (lintFix || lintFixInteractive) {
 		return fmt.Errorf("--fix and --fix-interactive are not supported when reading from stdin")
 	}
 	return nil
@@ -117,7 +119,7 @@ func validateLintFlags(_ *cobra.Command, args []string) error {
 
 func runLint(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	file := args[0]
+	file := inputFileFromArgs(args)
 	start := time.Now()
 
 	err := lintOpenAPI(ctx, file)

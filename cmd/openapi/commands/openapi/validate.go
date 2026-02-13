@@ -26,15 +26,16 @@ This command will parse and validate the provided OpenAPI document, checking for
 - Reference resolution and consistency
 - Schema validation rules
 
-Use '-' as the file argument to read from stdin:
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec validate
   cat spec.yaml | openapi spec validate -`,
-	Args: cobra.ExactArgs(1),
+	Args: stdinOrFileArgs(1, 1),
 	Run:  runValidate,
 }
 
 func runValidate(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	file := args[0]
+	file := inputFileFromArgs(args)
 	start := time.Now()
 
 	err := validateOpenAPI(ctx, file)
