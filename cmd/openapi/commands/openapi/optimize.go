@@ -101,6 +101,13 @@ func runOptimize(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	inputFile := inputFileFromArgs(args)
 
+	// Interactive mode reads user input from stdin, which conflicts with
+	// document data already being piped via stdin.
+	if IsStdin(inputFile) && !optimizeNonInteractive {
+		fmt.Fprintf(os.Stderr, "Error: interactive mode is not supported when reading from stdin; use --non-interactive\n")
+		os.Exit(1)
+	}
+
 	var outputFile string
 	if len(args) >= 2 {
 		outputFile = args[1]

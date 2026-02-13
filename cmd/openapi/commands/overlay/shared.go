@@ -1,16 +1,9 @@
 package overlay
 
-import (
-	"fmt"
-	"os"
-)
+import "github.com/speakeasy-api/openapi/cmd/openapi/commands/cmdutil"
 
-func Dief(f string, args ...any) {
-	fmt.Fprintf(os.Stderr, f+"\n", args...)
-	os.Exit(1)
-}
+// Dief delegates to cmdutil.Dief.
+var Dief = cmdutil.Dief
 
-func Die(err error) {
-	fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-	os.Exit(1)
-}
+// Die delegates to cmdutil.Die.
+var Die = cmdutil.Die

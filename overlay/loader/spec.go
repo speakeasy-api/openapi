@@ -3,6 +3,7 @@ package loader
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -68,6 +69,16 @@ func LoadExtendsSpecification(o *overlay.Overlay) (*yaml.Node, error) {
 	}
 
 	return LoadSpecification(path)
+}
+
+// LoadSpecificationFromReader parses a YAML or JSON specification from the given reader.
+func LoadSpecificationFromReader(r io.Reader) (*yaml.Node, error) {
+	var ys yaml.Node
+	if err := yaml.NewDecoder(r).Decode(&ys); err != nil {
+		return nil, fmt.Errorf("failed to parse specification from reader: %w", err)
+	}
+
+	return &ys, nil
 }
 
 // LoadSpecification will load and parse a YAML or JSON file from the given path.

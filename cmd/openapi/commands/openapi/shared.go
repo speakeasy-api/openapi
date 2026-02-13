@@ -8,56 +8,23 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/speakeasy-api/openapi/cmd/openapi/commands/cmdutil"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/spf13/cobra"
 )
 
-// StdinIndicator is the conventional Unix indicator to read from stdin.
-const StdinIndicator = "-"
-
-// IsStdin returns true if the given path indicates stdin should be used.
+// IsStdin delegates to cmdutil.IsStdin.
 func IsStdin(path string) bool {
-	return path == StdinIndicator
+	return cmdutil.IsStdin(path)
 }
 
-// StdinIsPiped returns true when stdin is connected to a pipe (not a terminal),
-// meaning data is being piped in from another command or a file redirect.
-func StdinIsPiped() bool {
-	fi, err := os.Stdin.Stat()
-	if err != nil {
-		return false
-	}
-	return (fi.Mode() & os.ModeCharDevice) == 0
-}
-
-// inputFileFromArgs returns the input file from args, or "-" if stdin should
-// be used. It extracts the first positional arg or detects piped stdin.
 func inputFileFromArgs(args []string) string {
-	if len(args) > 0 {
-		return args[0]
-	}
-	return StdinIndicator
+	return cmdutil.InputFileFromArgs(args)
 }
 
-// stdinOrFileArgs returns a cobra arg validator that accepts minArgs..maxArgs
-// when a file is given, but also allows zero args when stdin is piped.
 func stdinOrFileArgs(minArgs, maxArgs int) cobra.PositionalArgs {
-	return func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			if StdinIsPiped() {
-				return nil
-			}
-			return fmt.Errorf("requires at least %d arg(s), or pipe data to stdin", minArgs)
-		}
-		if len(args) < minArgs {
-			return fmt.Errorf("requires at least %d arg(s), only received %d", minArgs, len(args))
-		}
-		if maxArgs >= 0 && len(args) > maxArgs {
-			return fmt.Errorf("accepts at most %d arg(s), received %d", maxArgs, len(args))
-		}
-		return nil
-	}
+	return cmdutil.StdinOrFileArgs(minArgs, maxArgs)
 }
 
 // OpenAPIProcessor handles common OpenAPI document processing operations
@@ -71,7 +38,7 @@ type OpenAPIProcessor struct {
 // NewOpenAPIProcessor creates a new processor with the given input and output files.
 // Pass "-" as inputFile to read from stdin.
 func NewOpenAPIProcessor(inputFile, outputFile string, writeInPlace bool) (*OpenAPIProcessor, error) {
-	readFromStdin := IsStdin(inputFile)
+	readFromStdin := cmdutil.IsStdin(inputFile)
 
 	if writeInPlace {
 		if readFromStdin {

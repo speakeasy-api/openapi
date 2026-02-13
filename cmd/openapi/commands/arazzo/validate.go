@@ -9,23 +9,9 @@ import (
 	"path/filepath"
 
 	"github.com/speakeasy-api/openapi/arazzo"
+	"github.com/speakeasy-api/openapi/cmd/openapi/commands/cmdutil"
 	"github.com/spf13/cobra"
 )
-
-// stdinIndicator is the conventional Unix indicator to read from stdin.
-const stdinIndicator = "-"
-
-func isStdin(path string) bool {
-	return path == stdinIndicator
-}
-
-func stdinIsPiped() bool {
-	fi, err := os.Stdin.Stat()
-	if err != nil {
-		return false
-	}
-	return (fi.Mode() & os.ModeCharDevice) == 0
-}
 
 var validateCmd = &cobra.Command{
 	Use:   "validate <file>",
@@ -42,27 +28,13 @@ This command will parse and validate the provided Arazzo document, checking for:
 Stdin is supported — either pipe data directly or use '-' explicitly:
   cat workflow.yaml | openapi arazzo validate
   cat workflow.yaml | openapi arazzo validate -`,
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			if stdinIsPiped() {
-				return nil
-			}
-			return fmt.Errorf("requires at least 1 arg(s), or pipe data to stdin")
-		}
-		if len(args) > 1 {
-			return fmt.Errorf("accepts at most 1 arg(s), received %d", len(args))
-		}
-		return nil
-	},
-	Run: runValidate,
+	Args: cmdutil.StdinOrFileArgs(1, 1),
+	Run:  runValidate,
 }
 
 func runValidate(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	file := stdinIndicator
-	if len(args) > 0 {
-		file = args[0]
-	}
+	file := cmdutil.InputFileFromArgs(args)
 
 	if err := validateArazzo(ctx, file); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -73,7 +45,7 @@ func runValidate(cmd *cobra.Command, args []string) {
 func validateArazzo(ctx context.Context, file string) error {
 	var reader io.ReadCloser
 
-	if isStdin(file) {
+	if cmdutil.IsStdin(file) {
 		fmt.Fprintf(os.Stderr, "Validating Arazzo document from stdin\n")
 		reader = io.NopCloser(os.Stdin)
 	} else {
