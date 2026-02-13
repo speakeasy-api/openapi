@@ -108,10 +108,7 @@ func runOptimize(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	var outputFile string
-	if len(args) >= 2 {
-		outputFile = args[1]
-	}
+	outputFile := outputFileFromArgs(args)
 
 	processor, err := NewOpenAPIProcessor(inputFile, outputFile, optimizeWriteInPlace)
 	if err != nil {

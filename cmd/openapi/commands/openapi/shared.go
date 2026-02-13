@@ -23,6 +23,10 @@ func inputFileFromArgs(args []string) string {
 	return cmdutil.InputFileFromArgs(args)
 }
 
+func outputFileFromArgs(args []string) string {
+	return cmdutil.ArgAt(args, 1, "")
+}
+
 func stdinOrFileArgs(minArgs, maxArgs int) cobra.PositionalArgs {
 	return cmdutil.StdinOrFileArgs(minArgs, maxArgs)
 }
@@ -33,6 +37,32 @@ type OpenAPIProcessor struct {
 	OutputFile    string
 	ReadFromStdin bool
 	WriteToStdout bool
+
+	// Optional overrides for testing — when nil, os.Stdin/os.Stdout/os.Stderr are used.
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+func (p *OpenAPIProcessor) stdin() io.Reader {
+	if p.Stdin != nil {
+		return p.Stdin
+	}
+	return os.Stdin
+}
+
+func (p *OpenAPIProcessor) stdout() io.Writer {
+	if p.Stdout != nil {
+		return p.Stdout
+	}
+	return os.Stdout
+}
+
+func (p *OpenAPIProcessor) stderr() io.Writer {
+	if p.Stderr != nil {
+		return p.Stderr
+	}
+	return os.Stderr
 }
 
 // NewOpenAPIProcessor creates a new processor with the given input and output files.
@@ -63,11 +93,11 @@ func (p *OpenAPIProcessor) LoadDocument(ctx context.Context) (*openapi.OpenAPI, 
 	var reader io.ReadCloser
 
 	if p.ReadFromStdin {
-		fmt.Fprintf(os.Stderr, "Processing OpenAPI document from stdin\n")
-		reader = io.NopCloser(os.Stdin)
+		fmt.Fprintf(p.stderr(), "Processing OpenAPI document from stdin\n")
+		reader = io.NopCloser(p.stdin())
 	} else {
 		cleanInputFile := filepath.Clean(p.InputFile)
-		fmt.Fprintf(os.Stderr, "Processing OpenAPI document: %s\n", cleanInputFile)
+		fmt.Fprintf(p.stderr(), "Processing OpenAPI document: %s\n", cleanInputFile)
 
 		f, err := os.Open(cleanInputFile)
 		if err != nil {
@@ -92,11 +122,11 @@ func (p *OpenAPIProcessor) LoadDocument(ctx context.Context) (*openapi.OpenAPI, 
 // ReportValidationErrors reports validation errors to stderr.
 func (p *OpenAPIProcessor) ReportValidationErrors(validationErrors []error) {
 	if len(validationErrors) > 0 {
-		fmt.Fprintf(os.Stderr, "⚠️  Found %d validation errors in original document:\n", len(validationErrors))
+		fmt.Fprintf(p.stderr(), "⚠️  Found %d validation errors in original document:\n", len(validationErrors))
 		for i, validationErr := range validationErrors {
-			fmt.Fprintf(os.Stderr, "  %d. %s\n", i+1, validationErr.Error())
+			fmt.Fprintf(p.stderr(), "  %d. %s\n", i+1, validationErr.Error())
 		}
-		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(p.stderr())
 	}
 }
 
@@ -104,7 +134,7 @@ func (p *OpenAPIProcessor) ReportValidationErrors(validationErrors []error) {
 func (p *OpenAPIProcessor) WriteDocument(ctx context.Context, doc *openapi.OpenAPI) error {
 	if p.WriteToStdout {
 		// Write to stdout (pipe-friendly)
-		return marshaller.Marshal(ctx, doc, os.Stdout)
+		return marshaller.Marshal(ctx, doc, p.stdout())
 	}
 
 	// Write to file
@@ -119,22 +149,22 @@ func (p *OpenAPIProcessor) WriteDocument(ctx context.Context, doc *openapi.OpenA
 		return fmt.Errorf("failed to write document: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "📄 Document written to: %s\n", cleanOutputFile)
+	fmt.Fprintf(p.stderr(), "📄 Document written to: %s\n", cleanOutputFile)
 
 	return nil
 }
 
 // PrintSuccess prints a success message to stderr.
 func (p *OpenAPIProcessor) PrintSuccess(message string) {
-	fmt.Fprintf(os.Stderr, "✅ %s\n", message)
+	fmt.Fprintf(p.stderr(), "✅ %s\n", message)
 }
 
 // PrintInfo prints an info message to stderr.
 func (p *OpenAPIProcessor) PrintInfo(message string) {
-	fmt.Fprintf(os.Stderr, "📋 %s\n", message)
+	fmt.Fprintf(p.stderr(), "📋 %s\n", message)
 }
 
 // PrintWarning prints a warning message to stderr.
 func (p *OpenAPIProcessor) PrintWarning(message string) {
-	fmt.Fprintf(os.Stderr, "⚠️  Warning: %s\n", message)
+	fmt.Fprintf(p.stderr(), "⚠️  Warning: %s\n", message)
 }

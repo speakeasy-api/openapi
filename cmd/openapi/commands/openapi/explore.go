@@ -49,6 +49,10 @@ func runExplore(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	inputFile := inputFileFromArgs(args)
 
+	if IsStdin(inputFile) {
+		fmt.Fprintf(os.Stderr, "Note: reading document from stdin; interactive TUI requires /dev/tty for keyboard input.\n")
+	}
+
 	// Load the OpenAPI document
 	doc, err := loadOpenAPIDocument(ctx, inputFile)
 	if err != nil {

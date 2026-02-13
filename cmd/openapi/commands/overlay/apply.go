@@ -64,8 +64,8 @@ func RunApply(cmd *cobra.Command, args []string) {
 	var specFile string
 	if applySchemaFlag != "" {
 		specFile = applySchemaFlag
-	} else if len(args) > 1 {
-		specFile = args[1]
+	} else {
+		specFile = cmdutil.ArgAt(args, 1, "")
 	}
 
 	// Load spec from stdin or file

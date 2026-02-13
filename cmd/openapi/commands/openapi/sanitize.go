@@ -113,10 +113,7 @@ func runSanitize(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	inputFile := inputFileFromArgs(args)
 
-	var outputFile string
-	if len(args) >= 2 {
-		outputFile = args[1]
-	}
+	outputFile := outputFileFromArgs(args)
 
 	processor, err := NewOpenAPIProcessor(inputFile, outputFile, sanitizeWriteInPlace)
 	if err != nil {

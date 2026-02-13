@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/speakeasy-api/openapi/cmd/openapi/commands/cmdutil"
+	"github.com/speakeasy-api/openapi/overlay"
 	"github.com/speakeasy-api/openapi/overlay/loader"
 	"github.com/spf13/cobra"
 )
@@ -46,25 +47,21 @@ func RunValidateOverlay(cmd *cobra.Command, args []string) {
 	}
 
 	source := overlayFile
+	var o *overlay.Overlay
+	var err error
+
 	if source == "" || cmdutil.IsStdin(source) {
-		// Read from stdin
 		source = "stdin"
 		fmt.Fprintf(os.Stderr, "Validating overlay from stdin\n")
-		o, err := loader.LoadOverlayFromReader(os.Stdin)
-		if err != nil {
-			Die(err)
-		}
-		if err := o.Validate(); err != nil {
-			Dief("Overlay %q failed validation:\n%v", source, err)
-		}
+		o, err = loader.LoadOverlayFromReader(os.Stdin)
 	} else {
-		o, err := loader.LoadOverlay(overlayFile)
-		if err != nil {
-			Die(err)
-		}
-		if err := o.Validate(); err != nil {
-			Dief("Overlay %q failed validation:\n%v", source, err)
-		}
+		o, err = loader.LoadOverlay(overlayFile)
+	}
+	if err != nil {
+		Die(err)
+	}
+	if err := o.Validate(); err != nil {
+		Dief("Overlay %q failed validation:\n%v", source, err)
 	}
 
 	fmt.Fprintf(os.Stderr, "Overlay %q is valid.\n", source)

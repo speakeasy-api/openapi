@@ -20,9 +20,9 @@ func AnyToString(v any) string {
 	case int32:
 		return strconv.FormatInt(int64(v), 10)
 	case float64:
-		return strconv.FormatFloat(v, 'f', -1, 64)
+		return strconv.FormatFloat(v, 'G', -1, 64)
 	case float32:
-		return strconv.FormatFloat(float64(v), 'f', -1, 32)
+		return strconv.FormatFloat(float64(v), 'G', -1, 32)
 	case bool:
 		return strconv.FormatBool(v)
 	case uint64:

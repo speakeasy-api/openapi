@@ -33,28 +33,15 @@ func TestLoadDocumentFromStdin(t *testing.T) {
 	t.Run("loads valid document from stdin", func(t *testing.T) {
 		t.Parallel()
 
-		// Create a processor configured for stdin
 		processor := &OpenAPIProcessor{
 			InputFile:     "-",
 			ReadFromStdin: true,
 			WriteToStdout: true,
+			Stdin:         strings.NewReader(testOpenAPIDoc),
+			Stderr:        &bytes.Buffer{},
 		}
 
-		// Replace os.Stdin with our test data
-		oldStdin := os.Stdin
-		r, w, err := os.Pipe()
-		require.NoError(t, err)
-		os.Stdin = r
-
-		// Write test data and close writer
-		go func() {
-			_, _ = w.Write([]byte(testOpenAPIDoc))
-			w.Close()
-		}()
-
-		// Load the document
 		doc, validationErrors, err := processor.LoadDocument(context.Background())
-		os.Stdin = oldStdin
 
 		require.NoError(t, err)
 		require.NotNil(t, doc)
@@ -66,17 +53,13 @@ func TestLoadDocumentFromStdin(t *testing.T) {
 	t.Run("loads document from file", func(t *testing.T) {
 		t.Parallel()
 
-		// Write a temp file
-		tmpFile, err := os.CreateTemp(t.TempDir(), "spec-*.yaml")
-		require.NoError(t, err)
-		_, err = tmpFile.Write([]byte(testOpenAPIDoc))
-		require.NoError(t, err)
-		tmpFile.Close()
+		tmpFile := writeTestFile(t, testOpenAPIDoc)
 
 		processor := &OpenAPIProcessor{
-			InputFile:     tmpFile.Name(),
+			InputFile:     tmpFile,
 			ReadFromStdin: false,
 			WriteToStdout: true,
+			Stderr:        &bytes.Buffer{},
 		}
 
 		doc, validationErrors, err := processor.LoadDocument(context.Background())
@@ -90,29 +73,20 @@ func TestLoadDocumentFromStdin(t *testing.T) {
 func TestWriteDocumentToStdout(t *testing.T) {
 	t.Parallel()
 
-	// Parse a document to write
 	doc, _, err := openapi.Unmarshal(context.Background(), strings.NewReader(testOpenAPIDoc))
 	require.NoError(t, err)
 
+	var stdout bytes.Buffer
 	processor := &OpenAPIProcessor{
 		WriteToStdout: true,
+		Stdout:        &stdout,
+		Stderr:        &bytes.Buffer{},
 	}
 
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	os.Stdout = w
-
 	writeErr := processor.WriteDocument(context.Background(), doc)
-	w.Close()
-
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
-	os.Stdout = oldStdout
 
 	require.NoError(t, writeErr)
-	output := buf.String()
+	output := stdout.String()
 	assert.Contains(t, output, "openapi:")
 	assert.Contains(t, output, "Test API")
 }
@@ -123,48 +97,26 @@ func TestStdinPipeline(t *testing.T) {
 	t.Run("stdin to stdout pipeline", func(t *testing.T) {
 		t.Parallel()
 
-		// Simulate: cat spec.yaml | openapi spec inline -
+		var stderr bytes.Buffer
 		processor := &OpenAPIProcessor{
 			InputFile:     "-",
 			ReadFromStdin: true,
 			WriteToStdout: true,
+			Stdin:         strings.NewReader(testOpenAPIDoc),
+			Stderr:        &stderr,
 		}
 
-		// Replace stdin
-		oldStdin := os.Stdin
-		r, w, err := os.Pipe()
-		require.NoError(t, err)
-		os.Stdin = r
-
-		go func() {
-			_, _ = w.Write([]byte(testOpenAPIDoc))
-			w.Close()
-		}()
-
-		// Load
 		doc, _, loadErr := processor.LoadDocument(context.Background())
-		os.Stdin = oldStdin
-
 		require.NoError(t, loadErr)
 		require.NotNil(t, doc)
 
-		// Capture stdout for write
-		oldStdout := os.Stdout
-		rOut, wOut, err := os.Pipe()
-		require.NoError(t, err)
-		os.Stdout = wOut
+		var stdout bytes.Buffer
+		processor.Stdout = &stdout
 
 		writeErr := processor.WriteDocument(context.Background(), doc)
-		wOut.Close()
-
-		var buf bytes.Buffer
-		_, _ = buf.ReadFrom(rOut)
-		os.Stdout = oldStdout
-
 		require.NoError(t, writeErr)
 
-		// The output should be a valid OpenAPI document
-		output := buf.String()
+		output := stdout.String()
 		assert.Contains(t, output, "openapi:")
 		assert.Contains(t, output, "Test API")
 		assert.Contains(t, output, "/users")
@@ -179,60 +131,47 @@ func TestStdinPipeline(t *testing.T) {
 			OutputFile:    outFile,
 			ReadFromStdin: true,
 			WriteToStdout: false,
+			Stdin:         strings.NewReader(testOpenAPIDoc),
+			Stderr:        &bytes.Buffer{},
 		}
 
-		// Replace stdin
-		oldStdin := os.Stdin
-		r, w, err := os.Pipe()
-		require.NoError(t, err)
-		os.Stdin = r
-
-		go func() {
-			_, _ = w.Write([]byte(testOpenAPIDoc))
-			w.Close()
-		}()
-
 		doc, _, loadErr := processor.LoadDocument(context.Background())
-		os.Stdin = oldStdin
-
 		require.NoError(t, loadErr)
 		require.NotNil(t, doc)
 
 		writeErr := processor.WriteDocument(context.Background(), doc)
 		require.NoError(t, writeErr)
 
-		// Read the output file
-		content, err := os.ReadFile(outFile)
+		contentBytes, err := os.ReadFile(outFile)
 		require.NoError(t, err)
-		assert.Contains(t, string(content), "openapi:")
-		assert.Contains(t, string(content), "Test API")
+		content := string(contentBytes)
+		assert.Contains(t, content, "openapi:")
+		assert.Contains(t, content, "Test API")
 	})
 }
 
 func TestStatusMessagesGoToStderr(t *testing.T) {
 	t.Parallel()
 
-	// Capture stderr
-	oldStderr := os.Stderr
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	os.Stderr = w
-
+	var stderr bytes.Buffer
 	processor := &OpenAPIProcessor{
 		WriteToStdout: true,
+		Stderr:        &stderr,
 	}
 
 	processor.PrintSuccess("test success")
 	processor.PrintInfo("test info")
 	processor.PrintWarning("test warning")
 
-	w.Close()
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
-	os.Stderr = oldStderr
-
-	output := buf.String()
+	output := stderr.String()
 	assert.Contains(t, output, "test success")
 	assert.Contains(t, output, "test info")
 	assert.Contains(t, output, "test warning")
+}
+
+func writeTestFile(t *testing.T, content string) string {
+	t.Helper()
+	path := t.TempDir() + "/spec.yaml"
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+	return path
 }

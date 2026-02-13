@@ -221,10 +221,7 @@ func runUpgrade(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	inputFile := cmdutil.InputFileFromArgs(args)
 
-	var outputFile string
-	if len(args) > 1 {
-		outputFile = args[1]
-	}
+	outputFile := cmdutil.ArgAt(args, 1, "")
 
 	processor, err := NewSwaggerProcessor(inputFile, outputFile, writeInPlace)
 	if err != nil {

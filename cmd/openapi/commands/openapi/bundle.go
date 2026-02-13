@@ -60,10 +60,7 @@ func runBundleCommand(cmd *cobra.Command, args []string) error {
 
 	// Parse arguments
 	inputFile := inputFileFromArgs(args)
-	var outputFile string
-	if len(args) >= 2 {
-		outputFile = args[1]
-	}
+	outputFile := outputFileFromArgs(args)
 
 	// Validate naming strategy
 	var namingStrategy openapi.BundleNamingStrategy

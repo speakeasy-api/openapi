@@ -55,11 +55,7 @@ func runInline(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	inputFile := inputFileFromArgs(args)
 
-	var outputFile string
-	// When args has 2 elements, second is the output file
-	if len(args) >= 2 {
-		outputFile = args[1]
-	}
+	outputFile := outputFileFromArgs(args)
 
 	processor, err := NewOpenAPIProcessor(inputFile, outputFile, inlineWriteInPlace)
 	if err != nil {

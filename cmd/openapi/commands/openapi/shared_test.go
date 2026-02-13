@@ -118,19 +118,41 @@ func TestInputFileFromArgs(t *testing.T) {
 	}
 }
 
+func TestOutputFileFromArgs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		args     []string
+		expected string
+	}{
+		{name: "no args returns empty", args: []string{}, expected: ""},
+		{name: "one arg returns empty", args: []string{"input.yaml"}, expected: ""},
+		{name: "two args returns second", args: []string{"input.yaml", "output.yaml"}, expected: "output.yaml"},
+		{name: "three args returns second", args: []string{"a", "b", "c"}, expected: "b"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, outputFileFromArgs(tt.args))
+		})
+	}
+}
+
 func TestStdinOrFileArgs(t *testing.T) {
 	t.Parallel()
 
 	validator := stdinOrFileArgs(1, 2)
 
-	t.Run("rejects zero args when stdin is not piped", func(t *testing.T) {
+	t.Run("zero args returns error or nil depending on stdin", func(t *testing.T) {
 		t.Parallel()
-		// In a test environment, stdin is typically not a pipe
-		// so this should return an error when not piped
 		err := validator(nil, []string{})
-		// The result depends on whether the test runner pipes stdin
-		// so we just verify it doesn't panic
-		_ = err
+		// When stdin is not piped (typical in tests), this should error.
+		// When stdin IS piped (e.g. CI), this returns nil. Both are valid.
+		if err != nil {
+			assert.Contains(t, err.Error(), "pipe data to stdin")
+		}
 	})
 
 	t.Run("accepts one arg", func(t *testing.T) {

@@ -90,10 +90,7 @@ func runSnip(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	inputFile := inputFileFromArgs(args)
 
-	var outputFile string
-	if len(args) >= 2 {
-		outputFile = args[1]
-	}
+	outputFile := outputFileFromArgs(args)
 
 	// Check which flag sets were specified
 	hasRemoveFlags := len(snipOperationIDs) > 0 || len(snipOperations) > 0

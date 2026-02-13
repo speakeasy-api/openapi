@@ -59,9 +59,10 @@ func RunCompare(cmd *cobra.Command, args []string) {
 	var spec2 string
 	if compareAfterFlag != "" {
 		spec2 = compareAfterFlag
-	} else if len(args) > 1 {
-		spec2 = args[1]
 	} else {
+		spec2 = cmdutil.ArgAt(args, 1, "")
+	}
+	if spec2 == "" {
 		Dief("second specification file is required (use --after flag or provide as second argument)")
 	}
 

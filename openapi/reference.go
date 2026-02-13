@@ -183,9 +183,9 @@ type Reference[T any, V interfaces.Validator[T], C marshaller.CoreModeler] struc
 	// If this was an inline object instead of a reference this will contain that object.
 	Object *T
 
-	// Mutex to protect concurrent access to cache fields (pointer to allow struct copying)
+	// Mutex to protect concurrent access to cache fields (pointers to allow struct copying)
 	cacheMutex               *sync.RWMutex
-	initMutex                sync.Once
+	initMutex                *sync.Once
 	referenceResolutionCache *references.ResolveResult[Reference[T, V, C]]
 	validationErrsCache      []error
 	circularErrorFound       bool
@@ -686,8 +686,12 @@ func unmarshaler[T any, V interfaces.Validator[T], C marshaller.CoreModeler](_ *
 }
 
 // ensureMutex initializes the mutex if it's nil (lazy initialization).
-// Uses sync.Once to guarantee thread-safe single initialization.
+// Uses sync.Once (pointer) to guarantee thread-safe single initialization
+// while keeping Reference safe to copy before first use.
 func (r *Reference[T, V, C]) ensureMutex() {
+	if r.initMutex == nil {
+		r.initMutex = &sync.Once{}
+	}
 	r.initMutex.Do(func() {
 		r.cacheMutex = &sync.RWMutex{}
 	})
