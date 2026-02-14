@@ -7,6 +7,7 @@ import (
 	"github.com/speakeasy-api/openapi/overlay/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestCompare(t *testing.T) {
@@ -37,4 +38,45 @@ func TestCompare(t *testing.T) {
 	require.NoError(t, err)
 	NodeMatchesFile(t, node, "testdata/openapi-overlayed.yaml")
 
+}
+
+func TestCompare_ArrayAppendMultiple(t *testing.T) {
+	t.Parallel()
+
+	original := `items:
+  - name: a
+  - name: b
+`
+	target := `items:
+  - name: a
+  - name: b
+  - name: c
+  - name: d
+`
+	var origNode yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte(original), &origNode))
+	var targetNode yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte(target), &targetNode))
+
+	o, err := overlay.Compare("test", &origNode, targetNode)
+	require.NoError(t, err)
+
+	// Emits a single append update for the new tail elements
+	require.Len(t, o.Actions, 1)
+	assert.Equal(t, `$["items"]`, o.Actions[0].Target)
+	assert.False(t, o.Actions[0].Remove)
+	require.Len(t, o.Actions[0].Update.Content, 2)
+
+	// Round-trip: applying the overlay should produce the target
+	err = o.ApplyTo(&origNode)
+	require.NoError(t, err)
+
+	var expected yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte(target), &expected))
+
+	actualYAML, err := yaml.Marshal(&origNode)
+	require.NoError(t, err)
+	expectedYAML, err := yaml.Marshal(&expected)
+	require.NoError(t, err)
+	assert.Equal(t, string(expectedYAML), string(actualYAML))
 }
