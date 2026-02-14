@@ -7,6 +7,7 @@ import (
 	"github.com/speakeasy-api/openapi/overlay/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestCompare(t *testing.T) {
@@ -37,4 +38,52 @@ func TestCompare(t *testing.T) {
 	require.NoError(t, err)
 	NodeMatchesFile(t, node, "testdata/openapi-overlayed.yaml")
 
+}
+
+func TestCompare_ArrayAppendMultiple(t *testing.T) {
+	t.Parallel()
+
+	original := `items:
+  - name: a
+  - name: b
+`
+	target := `items:
+  - name: a
+  - name: b
+  - name: c
+  - name: d
+`
+	var origNode yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte(original), &origNode))
+	var targetNode yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte(target), &targetNode))
+
+	o, err := overlay.Compare("test", &origNode, targetNode)
+	require.NoError(t, err)
+
+	// Should produce a single update action (no remove), appending the new elements
+	require.Len(t, o.Actions, 1)
+	assert.Equal(t, `$["items"]`, o.Actions[0].Target)
+	assert.False(t, o.Actions[0].Remove)
+	assert.Equal(t, yaml.SequenceNode, o.Actions[0].Update.Kind)
+	require.Len(t, o.Actions[0].Update.Content, 2)
+	assert.Equal(t, "name: c\n", nodeToString(t, o.Actions[0].Update.Content[0]))
+	assert.Equal(t, "name: d\n", nodeToString(t, o.Actions[0].Update.Content[1]))
+
+	// Round-trip: applying the overlay should produce the target
+	err = o.ApplyTo(&origNode)
+	require.NoError(t, err)
+	var roundTripped yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte(target), &roundTripped))
+
+	origStr := nodeToString(t, &origNode)
+	targetStr := nodeToString(t, &roundTripped)
+	assert.Equal(t, targetStr, origStr)
+}
+
+func nodeToString(t *testing.T, node *yaml.Node) string {
+	t.Helper()
+	out, err := yaml.Marshal(node)
+	require.NoError(t, err)
+	return string(out)
 }
