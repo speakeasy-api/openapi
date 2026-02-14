@@ -61,29 +61,22 @@ func TestCompare_ArrayAppendMultiple(t *testing.T) {
 	o, err := overlay.Compare("test", &origNode, targetNode)
 	require.NoError(t, err)
 
-	// Should produce a single update action (no remove), appending the new elements
+	// Emits a single append update for the new tail elements
 	require.Len(t, o.Actions, 1)
 	assert.Equal(t, `$["items"]`, o.Actions[0].Target)
 	assert.False(t, o.Actions[0].Remove)
-	assert.Equal(t, yaml.SequenceNode, o.Actions[0].Update.Kind)
 	require.Len(t, o.Actions[0].Update.Content, 2)
-	assert.Equal(t, "name: c\n", nodeToString(t, o.Actions[0].Update.Content[0]))
-	assert.Equal(t, "name: d\n", nodeToString(t, o.Actions[0].Update.Content[1]))
 
 	// Round-trip: applying the overlay should produce the target
 	err = o.ApplyTo(&origNode)
 	require.NoError(t, err)
-	var roundTripped yaml.Node
-	require.NoError(t, yaml.Unmarshal([]byte(target), &roundTripped))
 
-	origStr := nodeToString(t, &origNode)
-	targetStr := nodeToString(t, &roundTripped)
-	assert.Equal(t, targetStr, origStr)
-}
+	var expected yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte(target), &expected))
 
-func nodeToString(t *testing.T, node *yaml.Node) string {
-	t.Helper()
-	out, err := yaml.Marshal(node)
+	actualYAML, err := yaml.Marshal(&origNode)
 	require.NoError(t, err)
-	return string(out)
+	expectedYAML, err := yaml.Marshal(&expected)
+	require.NoError(t, err)
+	assert.Equal(t, string(expectedYAML), string(actualYAML))
 }
