@@ -685,14 +685,24 @@ func unmarshaler[T any, V interfaces.Validator[T], C marshaller.CoreModeler](_ *
 	}
 }
 
+// referenceInitGlobalMutex serializes initialization of per-Reference mutexes
+// to avoid data races on r.initMutex when ensureMutex is called concurrently.
+var referenceInitGlobalMutex sync.Mutex
+
 // ensureMutex initializes the mutex if it's nil (lazy initialization).
 // Uses sync.Once (pointer) to guarantee thread-safe single initialization
 // while keeping Reference safe to copy before first use.
 func (r *Reference[T, V, C]) ensureMutex() {
+	// Guard lazy initialization of r.initMutex with a global mutex to avoid
+	// concurrent read/write races on the pointer field.
+	referenceInitGlobalMutex.Lock()
 	if r.initMutex == nil {
 		r.initMutex = &sync.Once{}
 	}
-	r.initMutex.Do(func() {
+	initOnce := r.initMutex
+	referenceInitGlobalMutex.Unlock()
+
+	initOnce.Do(func() {
 		r.cacheMutex = &sync.RWMutex{}
 	})
 }

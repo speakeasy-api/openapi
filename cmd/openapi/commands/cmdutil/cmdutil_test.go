@@ -68,6 +68,8 @@ func TestArgAt(t *testing.T) {
 		{name: "returns default for empty args", args: []string{}, index: 0, defaultVal: "default", expected: "default"},
 		{name: "returns default for nil args", args: nil, index: 0, defaultVal: "default", expected: "default"},
 		{name: "returns empty default", args: []string{}, index: 0, defaultVal: "", expected: ""},
+		{name: "returns default for negative index", args: []string{"a", "b"}, index: -1, defaultVal: "default", expected: "default"},
+		{name: "returns default for large negative index", args: []string{"a"}, index: -100, defaultVal: "fallback", expected: "fallback"},
 	}
 
 	for _, tt := range tests {
@@ -100,5 +102,28 @@ func TestStdinOrFileArgs(t *testing.T) {
 		err := validator(nil, []string{"a", "b", "c"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "accepts at most 2 arg(s)")
+	})
+
+	t.Run("unbounded max accepts many args", func(t *testing.T) {
+		t.Parallel()
+		unbounded := StdinOrFileArgs(1, -1)
+		err := unbounded(nil, []string{"a", "b", "c", "d", "e"})
+		assert.NoError(t, err, "negative maxArgs should allow unlimited args")
+	})
+
+	t.Run("zero minArgs accepts any arg count", func(t *testing.T) {
+		t.Parallel()
+		noMin := StdinOrFileArgs(0, 2)
+		err := noMin(nil, []string{})
+		assert.NoError(t, err, "zero minArgs should accept empty args")
+	})
+
+	t.Run("error message includes min arg count", func(t *testing.T) {
+		t.Parallel()
+		min3 := StdinOrFileArgs(3, 5)
+		err := min3(nil, []string{"a", "b"})
+		if err != nil {
+			assert.Contains(t, err.Error(), "requires at least 3 arg(s)")
+		}
 	})
 }

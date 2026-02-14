@@ -1,6 +1,8 @@
 package openapi
 
 import (
+	"bytes"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -138,6 +140,49 @@ func TestOutputFileFromArgs(t *testing.T) {
 			assert.Equal(t, tt.expected, outputFileFromArgs(tt.args))
 		})
 	}
+}
+
+func TestOpenAPIProcessor_IOAccessors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("stdin falls back to os.Stdin when nil", func(t *testing.T) {
+		t.Parallel()
+		p := &OpenAPIProcessor{}
+		assert.Equal(t, os.Stdin, p.stdin(), "nil Stdin should fall back to os.Stdin")
+	})
+
+	t.Run("stdout falls back to os.Stdout when nil", func(t *testing.T) {
+		t.Parallel()
+		p := &OpenAPIProcessor{}
+		assert.Equal(t, os.Stdout, p.stdout(), "nil Stdout should fall back to os.Stdout")
+	})
+
+	t.Run("stderr falls back to os.Stderr when nil", func(t *testing.T) {
+		t.Parallel()
+		p := &OpenAPIProcessor{}
+		assert.Equal(t, os.Stderr, p.stderr(), "nil Stderr should fall back to os.Stderr")
+	})
+
+	t.Run("stdin uses override when set", func(t *testing.T) {
+		t.Parallel()
+		custom := &bytes.Buffer{}
+		p := &OpenAPIProcessor{Stdin: custom}
+		assert.Equal(t, custom, p.stdin(), "should use custom Stdin")
+	})
+
+	t.Run("stdout uses override when set", func(t *testing.T) {
+		t.Parallel()
+		custom := &bytes.Buffer{}
+		p := &OpenAPIProcessor{Stdout: custom}
+		assert.Equal(t, custom, p.stdout(), "should use custom Stdout")
+	})
+
+	t.Run("stderr uses override when set", func(t *testing.T) {
+		t.Parallel()
+		custom := &bytes.Buffer{}
+		p := &OpenAPIProcessor{Stderr: custom}
+		assert.Equal(t, custom, p.stderr(), "should use custom Stderr")
+	})
 }
 
 func TestStdinOrFileArgs(t *testing.T) {

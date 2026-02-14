@@ -26,8 +26,8 @@ func StdinIsPiped() bool {
 	return (fi.Mode() & os.ModeCharDevice) == 0
 }
 
-// InputFileFromArgs returns the input file from args, or "-" if stdin should
-// be used. It extracts the first positional arg or detects piped stdin.
+// InputFileFromArgs returns the first positional arg as the input file path,
+// or the stdin indicator "-" when no args are provided.
 func InputFileFromArgs(args []string) string {
 	if len(args) > 0 {
 		return args[0]
@@ -54,7 +54,7 @@ func StdinOrFileArgs(minArgs, maxArgs int) cobra.PositionalArgs {
 
 // ArgAt returns args[index] if it exists, or defaultVal otherwise.
 func ArgAt(args []string, index int, defaultVal string) string {
-	if index < len(args) {
+	if index >= 0 && index < len(args) {
 		return args[index]
 	}
 	return defaultVal
