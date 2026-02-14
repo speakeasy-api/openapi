@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -18,6 +19,10 @@ var exploreCmd = &cobra.Command{
 	Use:   "explore <file>",
 	Short: "Interactively explore an OpenAPI specification",
 	Long: `Launch an interactive terminal UI to browse and explore OpenAPI operations.
+
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec explore
+  cat spec.yaml | openapi spec explore -
 
 This command provides a user-friendly interface for navigating through API
 endpoints, viewing operation details, parameters, request/response information,
@@ -36,13 +41,17 @@ Navigation:
 
 The explore command helps you understand API structure and operation details
 without needing to manually parse the OpenAPI specification file.`,
-	Args: cobra.ExactArgs(1),
+	Args: stdinOrFileArgs(1, 1),
 	RunE: runExplore,
 }
 
 func runExplore(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	inputFile := args[0]
+	inputFile := inputFileFromArgs(args)
+
+	if IsStdin(inputFile) {
+		fmt.Fprintf(os.Stderr, "Note: reading document from stdin; interactive TUI requires /dev/tty for keyboard input.\n")
+	}
 
 	// Load the OpenAPI document
 	doc, err := loadOpenAPIDocument(ctx, inputFile)
@@ -81,17 +90,23 @@ func runExplore(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// loadOpenAPIDocument loads an OpenAPI document from a file
+// loadOpenAPIDocument loads an OpenAPI document from a file or stdin (using "-").
 func loadOpenAPIDocument(ctx context.Context, file string) (*openapi.OpenAPI, error) {
-	cleanFile := filepath.Clean(file)
+	var reader io.ReadCloser
 
-	f, err := os.Open(cleanFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
+	if IsStdin(file) {
+		reader = io.NopCloser(os.Stdin)
+	} else {
+		cleanFile := filepath.Clean(file)
+		f, err := os.Open(cleanFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open file: %w", err)
+		}
+		reader = f
 	}
-	defer f.Close()
+	defer reader.Close()
 
-	doc, validationErrors, err := openapi.Unmarshal(ctx, f)
+	doc, validationErrors, err := openapi.Unmarshal(ctx, reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal OpenAPI document: %w", err)
 	}

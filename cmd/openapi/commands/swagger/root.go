@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
+	"github.com/speakeasy-api/openapi/cmd/openapi/commands/cmdutil"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
 	sw "github.com/speakeasy-api/openapi/swagger"
@@ -22,8 +24,12 @@ This command will parse and validate the provided Swagger document, checking for
 - Structural validity according to the Swagger 2.0 Specification
 - Required fields and proper data types
 - Reference resolution and consistency
-- Schema validation rules`,
-	Args: cobra.ExactArgs(1),
+- Schema validation rules
+
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat swagger.yaml | openapi swagger validate
+  cat swagger.yaml | openapi swagger validate -`,
+	Args: cmdutil.StdinOrFileArgs(1, 1),
 	Run:  runValidate,
 }
 
@@ -39,11 +45,15 @@ The upgrade process includes:
 - Migrating securityDefinitions to components.securitySchemes
 - Rewriting $ref targets to OAS3 component locations
 
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat swagger.yaml | openapi swagger upgrade
+  cat swagger.yaml | openapi swagger upgrade -
+
 Output options:
 - No output file specified: writes to stdout (pipe-friendly)
 - Output file specified: writes to the specified file
 - --write flag: writes in-place to the input file`,
-	Args: cobra.RangeArgs(1, 2),
+	Args: cmdutil.StdinOrFileArgs(1, 2),
 	Run:  runUpgrade,
 }
 
@@ -61,7 +71,7 @@ func Apply(rootCmd *cobra.Command) {
 
 func runValidate(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	file := args[0]
+	file := cmdutil.InputFileFromArgs(args)
 
 	if err := validateSwagger(ctx, file); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -70,29 +80,37 @@ func runValidate(cmd *cobra.Command, args []string) {
 }
 
 func validateSwagger(ctx context.Context, file string) error {
-	cleanFile := filepath.Clean(file)
-	fmt.Printf("Validating Swagger document: %s\n", cleanFile)
+	var reader io.ReadCloser
 
-	f, err := os.Open(cleanFile)
-	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+	if cmdutil.IsStdin(file) {
+		fmt.Fprintf(os.Stderr, "Validating Swagger document from stdin\n")
+		reader = io.NopCloser(os.Stdin)
+	} else {
+		cleanFile := filepath.Clean(file)
+		fmt.Fprintf(os.Stderr, "Validating Swagger document: %s\n", cleanFile)
+
+		f, err := os.Open(cleanFile)
+		if err != nil {
+			return fmt.Errorf("failed to open file: %w", err)
+		}
+		reader = f
 	}
-	defer f.Close()
+	defer reader.Close()
 
-	_, validationErrors, err := sw.Unmarshal(ctx, f)
+	_, validationErrors, err := sw.Unmarshal(ctx, reader)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal file: %w", err)
 	}
 
 	if len(validationErrors) == 0 {
-		fmt.Printf("✅ Swagger document is valid - 0 errors\n")
+		fmt.Fprintf(os.Stderr, "✅ Swagger document is valid - 0 errors\n")
 		return nil
 	}
 
-	fmt.Printf("❌ Swagger document is invalid - %d errors:\n\n", len(validationErrors))
+	fmt.Fprintf(os.Stderr, "❌ Swagger document is invalid - %d errors:\n\n", len(validationErrors))
 
 	for i, validationErr := range validationErrors {
-		fmt.Printf("%d. %s\n", i+1, validationErr.Error())
+		fmt.Fprintf(os.Stderr, "%d. %s\n", i+1, validationErr.Error())
 	}
 
 	return errors.New("swagger document validation failed")
@@ -102,45 +120,53 @@ func validateSwagger(ctx context.Context, file string) error {
 type SwaggerProcessor struct {
 	InputFile     string
 	OutputFile    string
+	ReadFromStdin bool
 	WriteToStdout bool
 }
 
-// NewSwaggerProcessor creates a new processor with the given input and output files
+// NewSwaggerProcessor creates a new processor with the given input and output files.
+// Pass "-" as inputFile to read from stdin.
 func NewSwaggerProcessor(inputFile, outputFile string, writeInPlace bool) (*SwaggerProcessor, error) {
-	var finalOutputFile string
+	readFromStdin := cmdutil.IsStdin(inputFile)
 
 	if writeInPlace {
+		if readFromStdin {
+			return nil, errors.New("cannot use --write flag when reading from stdin")
+		}
 		if outputFile != "" {
 			return nil, errors.New("cannot specify output file when using --write flag")
 		}
-		finalOutputFile = inputFile
-	} else {
-		finalOutputFile = outputFile
+		outputFile = inputFile
 	}
 
 	return &SwaggerProcessor{
 		InputFile:     inputFile,
-		OutputFile:    finalOutputFile,
-		WriteToStdout: finalOutputFile == "",
+		OutputFile:    outputFile,
+		ReadFromStdin: readFromStdin,
+		WriteToStdout: outputFile == "",
 	}, nil
 }
 
-// LoadDocument loads and parses a Swagger 2.0 document from the input file
+// LoadDocument loads and parses a Swagger 2.0 document from the input file or stdin.
 func (p *SwaggerProcessor) LoadDocument(ctx context.Context) (*sw.Swagger, []error, error) {
-	cleanInputFile := filepath.Clean(p.InputFile)
+	var reader io.ReadCloser
 
-	// Only print status messages if not writing to stdout (keep stdout clean for piping)
-	if !p.WriteToStdout {
-		fmt.Printf("Processing Swagger document: %s\n", cleanInputFile)
+	if p.ReadFromStdin {
+		fmt.Fprintf(os.Stderr, "Processing Swagger document from stdin\n")
+		reader = io.NopCloser(os.Stdin)
+	} else {
+		cleanInputFile := filepath.Clean(p.InputFile)
+		fmt.Fprintf(os.Stderr, "Processing Swagger document: %s\n", cleanInputFile)
+
+		f, err := os.Open(cleanInputFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to open input file: %w", err)
+		}
+		reader = f
 	}
+	defer reader.Close()
 
-	f, err := os.Open(cleanInputFile)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open input file: %w", err)
-	}
-	defer f.Close()
-
-	doc, validationErrors, err := sw.Unmarshal(ctx, f)
+	doc, validationErrors, err := sw.Unmarshal(ctx, reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal Swagger document: %w", err)
 	}
@@ -151,14 +177,14 @@ func (p *SwaggerProcessor) LoadDocument(ctx context.Context) (*sw.Swagger, []err
 	return doc, validationErrors, nil
 }
 
-// ReportValidationErrors reports validation errors if not writing to stdout
+// ReportValidationErrors reports validation errors to stderr.
 func (p *SwaggerProcessor) ReportValidationErrors(validationErrors []error) {
-	if len(validationErrors) > 0 && !p.WriteToStdout {
-		fmt.Printf("⚠️  Found %d validation errors in original document:\n", len(validationErrors))
+	if len(validationErrors) > 0 {
+		fmt.Fprintf(os.Stderr, "⚠️  Found %d validation errors in original document:\n", len(validationErrors))
 		for i, validationErr := range validationErrors {
-			fmt.Printf("  %d. %s\n", i+1, validationErr.Error())
+			fmt.Fprintf(os.Stderr, "  %d. %s\n", i+1, validationErr.Error())
 		}
-		fmt.Println()
+		fmt.Fprintln(os.Stderr)
 	}
 }
 
@@ -181,40 +207,21 @@ func (p *SwaggerProcessor) WriteOpenAPIDocument(ctx context.Context, doc *openap
 		return fmt.Errorf("failed to write document: %w", err)
 	}
 
-	fmt.Printf("📄 Document written to: %s\n", cleanOutputFile)
+	fmt.Fprintf(os.Stderr, "📄 Document written to: %s\n", cleanOutputFile)
 
 	return nil
 }
 
-// PrintSuccess prints a success message if not writing to stdout
+// PrintSuccess prints a success message to stderr.
 func (p *SwaggerProcessor) PrintSuccess(message string) {
-	if !p.WriteToStdout {
-		fmt.Printf("✅ %s\n", message)
-	}
-}
-
-// PrintInfo prints an info message if not writing to stdout
-func (p *SwaggerProcessor) PrintInfo(message string) {
-	if !p.WriteToStdout {
-		fmt.Printf("📋 %s\n", message)
-	}
-}
-
-// PrintWarning prints a warning message if not writing to stdout
-func (p *SwaggerProcessor) PrintWarning(message string) {
-	if !p.WriteToStdout {
-		fmt.Printf("⚠️  Warning: %s\n", message)
-	}
+	fmt.Fprintf(os.Stderr, "✅ %s\n", message)
 }
 
 func runUpgrade(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	inputFile := args[0]
+	inputFile := cmdutil.InputFileFromArgs(args)
 
-	var outputFile string
-	if len(args) > 1 {
-		outputFile = args[1]
-	}
+	outputFile := cmdutil.ArgAt(args, 1, "")
 
 	processor, err := NewSwaggerProcessor(inputFile, outputFile, writeInPlace)
 	if err != nil {

@@ -66,8 +66,13 @@ func compareValidationErrors(a, b *Error) int {
 		}
 		return 1
 	}
-	aMsg := a.UnderlyingError.Error()
-	bMsg := b.UnderlyingError.Error()
+	var aMsg, bMsg string
+	if a.UnderlyingError != nil {
+		aMsg = a.UnderlyingError.Error()
+	}
+	if b.UnderlyingError != nil {
+		bMsg = b.UnderlyingError.Error()
+	}
 	if aMsg != bMsg {
 		if aMsg < bMsg {
 			return -1

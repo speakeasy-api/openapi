@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/speakeasy-api/openapi/overlay"
+	"github.com/speakeasy-api/openapi/cmd/openapi/commands/cmdutil"
+	overlayPkg "github.com/speakeasy-api/openapi/overlay"
 	"github.com/speakeasy-api/openapi/overlay/loader"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -27,11 +29,15 @@ var compareCmd = &cobra.Command{
   openapi overlay compare --before spec1.yaml --after spec2.yaml
 
   # Compare specs with output to file
-  openapi overlay compare --before spec1.yaml --after spec2.yaml --out overlay.yaml`,
+  openapi overlay compare --before spec1.yaml --after spec2.yaml --out overlay.yaml
+
+  # Pipe the "before" spec via stdin
+  cat spec1.yaml | openapi overlay compare - spec2.yaml
+  cat spec1.yaml | openapi overlay compare --after spec2.yaml`,
 }
 
 func init() {
-	compareCmd.Flags().StringVar(&compareBeforeFlag, "before", "", "Path to the first (before) specification file")
+	compareCmd.Flags().StringVar(&compareBeforeFlag, "before", "", "Path to the first (before) specification file (use '-' for stdin)")
 	compareCmd.Flags().StringVar(&compareAfterFlag, "after", "", "Path to the second (after) specification file")
 	compareCmd.Flags().StringVarP(&compareOutFlag, "out", "o", "", "Output file path (defaults to stdout)")
 }
@@ -43,6 +49,8 @@ func RunCompare(cmd *cobra.Command, args []string) {
 		spec1 = compareBeforeFlag
 	} else if len(args) > 0 {
 		spec1 = args[0]
+	} else if cmdutil.StdinIsPiped() {
+		spec1 = cmdutil.StdinIndicator
 	} else {
 		Dief("first specification file is required (use --before flag or provide as first argument)")
 	}
@@ -51,15 +59,30 @@ func RunCompare(cmd *cobra.Command, args []string) {
 	var spec2 string
 	if compareAfterFlag != "" {
 		spec2 = compareAfterFlag
-	} else if len(args) > 1 {
-		spec2 = args[1]
 	} else {
+		spec2 = cmdutil.ArgAt(args, 1, "")
+	}
+	if spec2 == "" {
 		Dief("second specification file is required (use --after flag or provide as second argument)")
 	}
 
-	y1, err := loader.LoadSpecification(spec1)
-	if err != nil {
-		Dief("Failed to load %q: %v", spec1, err)
+	// Load first spec (may come from stdin)
+	var y1 *yaml.Node
+	spec1Source := spec1
+	if cmdutil.IsStdin(spec1) {
+		fmt.Fprintf(os.Stderr, "Reading before spec from stdin\n")
+		spec1Source = "stdin"
+		var err error
+		y1, err = loader.LoadSpecificationFromReader(os.Stdin)
+		if err != nil {
+			Dief("Failed to load spec from stdin: %v", err)
+		}
+	} else {
+		var err error
+		y1, err = loader.LoadSpecification(spec1)
+		if err != nil {
+			Dief("Failed to load %q: %v", spec1, err)
+		}
 	}
 
 	y2, err := loader.LoadSpecification(spec2)
@@ -67,11 +90,11 @@ func RunCompare(cmd *cobra.Command, args []string) {
 		Dief("Failed to load %q: %v", spec2, err)
 	}
 
-	title := fmt.Sprintf("Overlay %s => %s", spec1, spec2)
+	title := fmt.Sprintf("Overlay %s => %s", spec1Source, spec2)
 
-	o, err := overlay.Compare(title, y1, *y2)
+	o, err := overlayPkg.Compare(title, y1, *y2)
 	if err != nil {
-		Dief("Failed to compare spec files %q and %q: %v", spec1, spec2, err)
+		Dief("Failed to compare specs %q and %q: %v", spec1Source, spec2, err)
 	}
 
 	// Write to output file if specified, otherwise stdout

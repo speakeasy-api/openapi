@@ -440,6 +440,63 @@ func TestSortValidationErrors_EdgeCases_Success(t *testing.T) {
 		assert.NotErrorAs(t, errors[6], &notValidation, "index 6 should be regular error")
 	})
 
+	t.Run("validation errors with nil underlying errors", func(t *testing.T) {
+		t.Parallel()
+
+		errs := []error{
+			&Error{
+				UnderlyingError: nil,
+				Node:            &yaml.Node{Line: 5, Column: 10},
+			},
+			&Error{
+				UnderlyingError: errors.New("has message"),
+				Node:            &yaml.Node{Line: 5, Column: 10},
+			},
+			&Error{
+				UnderlyingError: nil,
+				Node:            &yaml.Node{Line: 5, Column: 10},
+			},
+		}
+
+		assert.NotPanics(t, func() {
+			SortValidationErrors(errs)
+		}, "sorting with nil UnderlyingError should not panic")
+
+		// Error with message should sort after nil-message errors (empty string < "has message")
+		var err0, err1, err2 *Error
+		require.ErrorAs(t, errs[0], &err0)
+		require.ErrorAs(t, errs[1], &err1)
+		require.ErrorAs(t, errs[2], &err2)
+		assert.NoError(t, err0.UnderlyingError, "nil error should sort first")
+		assert.NoError(t, err1.UnderlyingError, "nil error should sort first")
+		assert.Error(t, err2.UnderlyingError, "non-nil error should sort last")
+	})
+
+	t.Run("one nil and one non-nil underlying error", func(t *testing.T) {
+		t.Parallel()
+
+		errs := []error{
+			&Error{
+				UnderlyingError: errors.New("error B"),
+				Node:            &yaml.Node{Line: 1, Column: 1},
+			},
+			&Error{
+				UnderlyingError: nil,
+				Node:            &yaml.Node{Line: 1, Column: 1},
+			},
+		}
+
+		assert.NotPanics(t, func() {
+			SortValidationErrors(errs)
+		}, "sorting with one nil UnderlyingError should not panic")
+
+		var err0, err1 *Error
+		require.ErrorAs(t, errs[0], &err0)
+		require.ErrorAs(t, errs[1], &err1)
+		require.NoError(t, err0.UnderlyingError, "nil underlying error sorts before non-nil")
+		require.Error(t, err1.UnderlyingError)
+	})
+
 	t.Run("validation errors first then regular errors forces bIsValidationErr", func(t *testing.T) {
 		t.Parallel()
 

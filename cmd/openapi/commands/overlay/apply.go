@@ -1,8 +1,10 @@
 package overlay
 
 import (
+	"fmt"
 	"os"
 
+	"github.com/speakeasy-api/openapi/cmd/openapi/commands/cmdutil"
 	"github.com/speakeasy-api/openapi/overlay/loader"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -29,12 +31,16 @@ var applyCmd = &cobra.Command{
   openapi overlay apply --overlay overlay.yaml --schema spec.yaml --out modified-spec.yaml
 
   # Apply overlay when overlay has extends key set
-  openapi overlay apply overlay.yaml`,
+  openapi overlay apply overlay.yaml
+
+  # Pipe spec via stdin and provide overlay as file
+  cat spec.yaml | openapi overlay apply overlay.yaml -
+  cat spec.yaml | openapi overlay apply --overlay overlay.yaml --schema -`,
 }
 
 func init() {
 	applyCmd.Flags().StringVar(&applyOverlayFlag, "overlay", "", "Path to the overlay file")
-	applyCmd.Flags().StringVar(&applySchemaFlag, "schema", "", "Path to the OpenAPI specification file")
+	applyCmd.Flags().StringVar(&applySchemaFlag, "schema", "", "Path to the OpenAPI specification file (use '-' for stdin)")
 	applyCmd.Flags().StringVarP(&applyOutFlag, "out", "o", "", "Output file path (defaults to stdout)")
 }
 
@@ -58,18 +64,30 @@ func RunApply(cmd *cobra.Command, args []string) {
 	var specFile string
 	if applySchemaFlag != "" {
 		specFile = applySchemaFlag
-	} else if len(args) > 1 {
-		specFile = args[1]
+	} else {
+		specFile = cmdutil.ArgAt(args, 1, "")
 	}
 
-	ys, specFile, err := loader.LoadEitherSpecification(specFile, o)
-	if err != nil {
-		Die(err)
+	// Load spec from stdin or file
+	var ys *yaml.Node
+	specSource := specFile
+	if cmdutil.IsStdin(specFile) || (specFile == "" && cmdutil.StdinIsPiped()) {
+		fmt.Fprintf(os.Stderr, "Reading specification from stdin\n")
+		specSource = "stdin"
+		ys, err = loader.LoadSpecificationFromReader(os.Stdin)
+		if err != nil {
+			Die(err)
+		}
+	} else {
+		ys, specSource, err = loader.LoadEitherSpecification(specFile, o)
+		if err != nil {
+			Die(err)
+		}
 	}
 
 	err = o.ApplyTo(ys)
 	if err != nil {
-		Dief("Failed to apply overlay to spec file %q: %v", specFile, err)
+		Dief("Failed to apply overlay to spec %q: %v", specSource, err)
 	}
 
 	// Write to output file if specified, otherwise stdout
@@ -85,6 +103,6 @@ func RunApply(cmd *cobra.Command, args []string) {
 
 	err = yaml.NewEncoder(out).Encode(ys)
 	if err != nil {
-		Dief("Failed to encode spec file %q: %v", specFile, err)
+		Dief("Failed to encode spec %q: %v", specSource, err)
 	}
 }

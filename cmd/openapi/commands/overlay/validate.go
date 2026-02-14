@@ -2,7 +2,10 @@ package overlay
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/speakeasy-api/openapi/cmd/openapi/commands/cmdutil"
+	"github.com/speakeasy-api/openapi/overlay"
 	"github.com/speakeasy-api/openapi/overlay/loader"
 	"github.com/spf13/cobra"
 )
@@ -12,13 +15,22 @@ var validateOverlayFlag string
 var validateCmd = &cobra.Command{
 	Use:   "validate <overlay>",
 	Short: "Given an overlay, it will state whether it appears to be valid or describe the problems found",
-	Args:  cobra.RangeArgs(0, 1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		// Accept: --overlay flag, positional arg, or piped stdin
+		if validateOverlayFlag != "" || len(args) > 0 || cmdutil.StdinIsPiped() {
+			return nil
+		}
+		return fmt.Errorf("overlay file is required (use --overlay flag, provide as argument, or pipe to stdin)")
+	},
 	Run:   RunValidateOverlay,
 	Example: `  # Validate overlay using positional argument
   openapi overlay validate overlay.yaml
 
   # Validate overlay using flag
-  openapi overlay validate --overlay overlay.yaml`,
+  openapi overlay validate --overlay overlay.yaml
+
+  # Validate overlay from stdin
+  cat overlay.yaml | openapi overlay validate`,
 }
 
 func init() {
@@ -32,19 +44,25 @@ func RunValidateOverlay(cmd *cobra.Command, args []string) {
 		overlayFile = validateOverlayFlag
 	} else if len(args) > 0 {
 		overlayFile = args[0]
-	} else {
-		Dief("overlay file is required (use --overlay flag or provide as first argument)")
 	}
 
-	o, err := loader.LoadOverlay(overlayFile)
+	source := overlayFile
+	var o *overlay.Overlay
+	var err error
+
+	if source == "" || cmdutil.IsStdin(source) {
+		source = "stdin"
+		fmt.Fprintf(os.Stderr, "Validating overlay from stdin\n")
+		o, err = loader.LoadOverlayFromReader(os.Stdin)
+	} else {
+		o, err = loader.LoadOverlay(overlayFile)
+	}
 	if err != nil {
 		Die(err)
 	}
-
-	err = o.Validate()
-	if err != nil {
-		Dief("Overlay file %q failed validation:\n%v", overlayFile, err)
+	if err := o.Validate(); err != nil {
+		Dief("Overlay %q failed validation:\n%v", source, err)
 	}
 
-	fmt.Printf("Overlay file %q is valid.\n", overlayFile)
+	fmt.Fprintf(os.Stderr, "Overlay %q is valid.\n", source)
 }

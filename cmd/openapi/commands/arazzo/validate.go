@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/speakeasy-api/openapi/arazzo"
+	"github.com/speakeasy-api/openapi/cmd/openapi/commands/cmdutil"
 	"github.com/spf13/cobra"
 )
 
@@ -21,14 +23,18 @@ This command will parse and validate the provided Arazzo document, checking for:
 - Required fields and proper data types
 - Workflow step dependencies and consistency
 - Runtime expression validation
-- Source description references`,
-	Args: cobra.ExactArgs(1),
+- Source description references
+
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat workflow.yaml | openapi arazzo validate
+  cat workflow.yaml | openapi arazzo validate -`,
+	Args: cmdutil.StdinOrFileArgs(1, 1),
 	Run:  runValidate,
 }
 
 func runValidate(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	file := args[0]
+	file := cmdutil.InputFileFromArgs(args)
 
 	if err := validateArazzo(ctx, file); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -37,29 +43,37 @@ func runValidate(cmd *cobra.Command, args []string) {
 }
 
 func validateArazzo(ctx context.Context, file string) error {
-	cleanFile := filepath.Clean(file)
-	fmt.Printf("Validating Arazzo document: %s\n", cleanFile)
+	var reader io.ReadCloser
 
-	f, err := os.Open(cleanFile)
-	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+	if cmdutil.IsStdin(file) {
+		fmt.Fprintf(os.Stderr, "Validating Arazzo document from stdin\n")
+		reader = io.NopCloser(os.Stdin)
+	} else {
+		cleanFile := filepath.Clean(file)
+		fmt.Fprintf(os.Stderr, "Validating Arazzo document: %s\n", cleanFile)
+
+		f, err := os.Open(cleanFile)
+		if err != nil {
+			return fmt.Errorf("failed to open file: %w", err)
+		}
+		reader = f
 	}
-	defer f.Close()
+	defer reader.Close()
 
-	_, validationErrors, err := arazzo.Unmarshal(ctx, f)
+	_, validationErrors, err := arazzo.Unmarshal(ctx, reader)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal file: %w", err)
 	}
 
 	if len(validationErrors) == 0 {
-		fmt.Printf("✅ Arazzo document is valid - 0 errors\n")
+		fmt.Fprintf(os.Stderr, "✅ Arazzo document is valid - 0 errors\n")
 		return nil
 	}
 
-	fmt.Printf("❌ Arazzo document is invalid - %d errors:\n\n", len(validationErrors))
+	fmt.Fprintf(os.Stderr, "❌ Arazzo document is invalid - %d errors:\n\n", len(validationErrors))
 
 	for i, validationErr := range validationErrors {
-		fmt.Printf("%d. %s\n", i+1, validationErr.Error())
+		fmt.Fprintf(os.Stderr, "%d. %s\n", i+1, validationErr.Error())
 	}
 
 	return errors.New("arazzo document validation failed")

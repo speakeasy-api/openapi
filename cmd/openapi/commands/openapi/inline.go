@@ -19,6 +19,10 @@ var inlineCmd = &cobra.Command{
 This command transforms an OpenAPI document by replacing all $ref references with their actual content,
 eliminating the need for external definitions or component references.
 
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec inline
+  cat spec.yaml | openapi spec inline -
+
 Benefits of inlining:
 - Create standalone OpenAPI documents for easy distribution
 - Improve compatibility with tools that work better with fully expanded specifications
@@ -37,7 +41,7 @@ Output options:
 - No output file specified: writes to stdout (pipe-friendly)
 - Output file specified: writes to the specified file
 - --write flag: writes in-place to the input file`,
-	Args: cobra.RangeArgs(1, 2),
+	Args: stdinOrFileArgs(1, 2),
 	Run:  runInline,
 }
 
@@ -49,12 +53,9 @@ func init() {
 
 func runInline(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	inputFile := args[0]
+	inputFile := inputFileFromArgs(args)
 
-	var outputFile string
-	if len(args) > 1 {
-		outputFile = args[1]
-	}
+	outputFile := outputFileFromArgs(args)
 
 	processor, err := NewOpenAPIProcessor(inputFile, outputFile, inlineWriteInPlace)
 	if err != nil {
@@ -82,10 +83,14 @@ func inlineOpenAPI(ctx context.Context, processor *OpenAPIProcessor) error {
 	processor.ReportValidationErrors(validationErrors)
 
 	// Prepare inline options (always remove unused components)
+	targetLocation := ""
+	if !processor.ReadFromStdin {
+		targetLocation = filepath.Clean(processor.InputFile)
+	}
 	opts := openapi.InlineOptions{
 		ResolveOptions: openapi.ResolveOptions{
 			RootDocument:   doc,
-			TargetLocation: filepath.Clean(processor.InputFile),
+			TargetLocation: targetLocation,
 		},
 		RemoveUnusedComponents: true,
 	}

@@ -16,6 +16,10 @@ var sanitizeCmd = &cobra.Command{
 	Long: `Sanitize an OpenAPI specification by removing unwanted elements such as vendor extensions,
 unused components, and unknown properties.
 
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec sanitize
+  cat spec.yaml | openapi spec sanitize -
+
 This command provides comprehensive cleanup of OpenAPI documents to prepare them for
 distribution, standardization, or sharing. By default, it performs aggressive cleanup
 by removing all extensions and unused components.
@@ -91,7 +95,7 @@ Examples:
 
   # Combine config and output options
   openapi spec sanitize --config sanitize-config.yaml -w ./api.yaml`,
-	Args: cobra.RangeArgs(1, 2),
+	Args: stdinOrFileArgs(1, 2),
 	Run:  runSanitize,
 }
 
@@ -107,12 +111,9 @@ func init() {
 
 func runSanitize(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	inputFile := args[0]
+	inputFile := inputFileFromArgs(args)
 
-	var outputFile string
-	if len(args) > 1 {
-		outputFile = args[1]
-	}
+	outputFile := outputFileFromArgs(args)
 
 	processor, err := NewOpenAPIProcessor(inputFile, outputFile, sanitizeWriteInPlace)
 	if err != nil {

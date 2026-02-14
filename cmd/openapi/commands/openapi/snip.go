@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -25,6 +26,10 @@ var snipCmd = &cobra.Command{
 	Use:   "snip <input-file> [output-file]",
 	Short: "Remove operations from an OpenAPI specification",
 	Long: `Remove selected operations from an OpenAPI specification and clean up unused components.
+
+Stdin is supported in CLI mode — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec snip --operationId deleteUser
+  cat spec.yaml | openapi spec snip --operationId deleteUser -
 
 This command can operate in two modes:
 
@@ -68,7 +73,7 @@ Examples:
 
   # CLI mode - write to stdout for piping
   openapi spec snip --operation /internal/debug:GET ./spec.yaml > ./public-spec.yaml`,
-	Args: cobra.RangeArgs(1, 2),
+	Args: stdinOrFileArgs(1, 2),
 	RunE: runSnip,
 }
 
@@ -83,12 +88,9 @@ func init() {
 
 func runSnip(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	inputFile := args[0]
+	inputFile := inputFileFromArgs(args)
 
-	var outputFile string
-	if len(args) > 1 {
-		outputFile = args[1]
-	}
+	outputFile := outputFileFromArgs(args)
 
 	// Check which flag sets were specified
 	hasRemoveFlags := len(snipOperationIDs) > 0 || len(snipOperations) > 0
@@ -99,8 +101,11 @@ func runSnip(cmd *cobra.Command, args []string) error {
 		return errors.New("--write flag requires specifying operations via --operationId/--operation or --keepOperationId/--keepOperation")
 	}
 
-	// Interactive mode when no flags provided
+	// Interactive mode when no flags provided (not supported with stdin)
 	if !hasRemoveFlags && !hasKeepFlags {
+		if IsStdin(inputFile) {
+			return errors.New("interactive mode is not supported when reading from stdin; use --operationId or --operation flags")
+		}
 		return runSnipInteractive(ctx, inputFile, outputFile)
 	}
 
@@ -304,14 +309,14 @@ func runSnipInteractive(ctx context.Context, inputFile, outputFile string) error
 	actionKey := tuiModel.GetActionKey()
 	if actionKey == "" {
 		// User cancelled (pressed q or Esc)
-		fmt.Println("Snip cancelled - no changes made")
+		fmt.Fprintln(os.Stderr, "Snip cancelled - no changes made")
 		return nil
 	}
 
 	// Get selected operations
 	selectedOps := tuiModel.GetSelectedOperations()
 	if len(selectedOps) == 0 {
-		fmt.Println("No operations selected - no changes made")
+		fmt.Fprintln(os.Stderr, "No operations selected - no changes made")
 		return nil
 	}
 
@@ -330,7 +335,7 @@ func runSnipInteractive(ctx context.Context, inputFile, outputFile string) error
 		return fmt.Errorf("failed to snip operations: %w", err)
 	}
 
-	fmt.Printf("✅ Successfully removed %d operation(s) and cleaned unused components\n", removed)
+	fmt.Fprintf(os.Stderr, "✅ Successfully removed %d operation(s) and cleaned unused components\n", removed)
 
 	// Determine default output path (prefer outputFile if specified, otherwise inputFile)
 	defaultPath := outputFile
@@ -346,7 +351,7 @@ func runSnipInteractive(ctx context.Context, inputFile, outputFile string) error
 
 	if finalOutputFile == "" {
 		// User cancelled
-		fmt.Println("Cancelled - no changes saved")
+		fmt.Fprintln(os.Stderr, "Cancelled - no changes saved")
 		return nil
 	}
 

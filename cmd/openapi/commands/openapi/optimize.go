@@ -29,6 +29,10 @@ var optimizeCmd = &cobra.Command{
 	Short: "Optimize an OpenAPI specification by deduplicating inline schemas",
 	Long: `Optimize an OpenAPI specification by finding duplicate inline schemas and extracting them to reusable components.
 
+Stdin is supported — either pipe data directly or use '-' explicitly:
+  cat spec.yaml | openapi spec optimize --non-interactive
+  cat spec.yaml | openapi spec optimize - --non-interactive
+
 This command analyzes an OpenAPI document to identify inline JSON schemas that appear multiple times
 with identical content and replaces them with references to newly created or existing components.
 
@@ -79,7 +83,7 @@ Examples:
 
   # Optimize in-place
   openapi spec optimize api.yaml --write`,
-	Args: cobra.RangeArgs(1, 2),
+	Args: stdinOrFileArgs(1, 2),
 	Run:  runOptimize,
 }
 
@@ -95,12 +99,16 @@ func init() {
 
 func runOptimize(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	inputFile := args[0]
+	inputFile := inputFileFromArgs(args)
 
-	var outputFile string
-	if len(args) > 1 {
-		outputFile = args[1]
+	// Interactive mode reads user input from stdin, which conflicts with
+	// document data already being piped via stdin.
+	if IsStdin(inputFile) && !optimizeNonInteractive {
+		fmt.Fprintf(os.Stderr, "Error: interactive mode is not supported when reading from stdin; use --non-interactive\n")
+		os.Exit(1)
 	}
+
+	outputFile := outputFileFromArgs(args)
 
 	processor, err := NewOpenAPIProcessor(inputFile, outputFile, optimizeWriteInPlace)
 	if err != nil {
@@ -213,14 +221,14 @@ func createInteractiveCallback(ctx context.Context, processor *OpenAPIProcessor)
 	reader := bufio.NewReader(os.Stdin)
 
 	return func(suggestedName, hash string, locations []string, schema *oas3.JSONSchema[oas3.Referenceable]) string {
-		// Display schema information
-		fmt.Print("\n" + strings.Repeat("=", 80) + "\n")
-		fmt.Printf("Found duplicate schema at %d locations:\n", len(locations))
+		// Display schema information to stderr (interactive prompts)
+		fmt.Fprint(os.Stderr, "\n"+strings.Repeat("=", 80)+"\n")
+		fmt.Fprintf(os.Stderr, "Found duplicate schema at %d locations:\n", len(locations))
 		for i, location := range locations {
-			fmt.Printf("  %d. %s\n", i+1, location)
+			fmt.Fprintf(os.Stderr, "  %d. %s\n", i+1, location)
 		}
-		fmt.Printf("\nSchema content:\n")
-		fmt.Print(strings.Repeat("-", 40) + "\n")
+		fmt.Fprintf(os.Stderr, "\nSchema content:\n")
+		fmt.Fprint(os.Stderr, strings.Repeat("-", 40)+"\n")
 
 		// Convert schema to YAML for display using marshaller
 		if schema != nil && !schema.IsReference() && schema.GetLeft() != nil {
@@ -228,15 +236,15 @@ func createInteractiveCallback(ctx context.Context, processor *OpenAPIProcessor)
 			err := marshaller.Marshal(ctx, schema.GetLeft(), &schemaBuilder)
 			if err == nil {
 				// Display the schema in a beautiful code block
-				fmt.Println(boxedCode(schemaBuilder.String()))
+				fmt.Fprintln(os.Stderr, boxedCode(schemaBuilder.String()))
 			} else {
-				fmt.Printf("  (Unable to display schema: %v)\n", err)
+				fmt.Fprintf(os.Stderr, "  (Unable to display schema: %v)\n", err)
 			}
 		}
 
-		fmt.Print(strings.Repeat("-", 40) + "\n")
-		fmt.Printf("Suggested name: %s\n", suggestedName)
-		fmt.Printf("Enter custom name (or press Enter to use suggested): ")
+		fmt.Fprint(os.Stderr, strings.Repeat("-", 40)+"\n")
+		fmt.Fprintf(os.Stderr, "Suggested name: %s\n", suggestedName)
+		fmt.Fprintf(os.Stderr, "Enter custom name (or press Enter to use suggested): ")
 
 		// Read user input
 		input, err := reader.ReadString('\n')

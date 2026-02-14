@@ -4,58 +4,111 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
+	"github.com/speakeasy-api/openapi/cmd/openapi/commands/cmdutil"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
+	"github.com/spf13/cobra"
 )
+
+// IsStdin delegates to cmdutil.IsStdin.
+func IsStdin(path string) bool {
+	return cmdutil.IsStdin(path)
+}
+
+func inputFileFromArgs(args []string) string {
+	return cmdutil.InputFileFromArgs(args)
+}
+
+func outputFileFromArgs(args []string) string {
+	return cmdutil.ArgAt(args, 1, "")
+}
+
+func stdinOrFileArgs(minArgs, maxArgs int) cobra.PositionalArgs {
+	return cmdutil.StdinOrFileArgs(minArgs, maxArgs)
+}
 
 // OpenAPIProcessor handles common OpenAPI document processing operations
 type OpenAPIProcessor struct {
 	InputFile     string
 	OutputFile    string
+	ReadFromStdin bool
 	WriteToStdout bool
+
+	// Optional overrides for testing — when nil, os.Stdin/os.Stdout/os.Stderr are used.
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
 }
 
-// NewOpenAPIProcessor creates a new processor with the given input and output files
+func (p *OpenAPIProcessor) stdin() io.Reader {
+	if p.Stdin != nil {
+		return p.Stdin
+	}
+	return os.Stdin
+}
+
+func (p *OpenAPIProcessor) stdout() io.Writer {
+	if p.Stdout != nil {
+		return p.Stdout
+	}
+	return os.Stdout
+}
+
+func (p *OpenAPIProcessor) stderr() io.Writer {
+	if p.Stderr != nil {
+		return p.Stderr
+	}
+	return os.Stderr
+}
+
+// NewOpenAPIProcessor creates a new processor with the given input and output files.
+// Pass "-" as inputFile to read from stdin.
 func NewOpenAPIProcessor(inputFile, outputFile string, writeInPlace bool) (*OpenAPIProcessor, error) {
-	var finalOutputFile string
+	readFromStdin := cmdutil.IsStdin(inputFile)
 
 	if writeInPlace {
+		if readFromStdin {
+			return nil, errors.New("cannot use --write flag when reading from stdin")
+		}
 		if outputFile != "" {
 			return nil, errors.New("cannot specify output file when using --write flag")
 		}
-		finalOutputFile = inputFile
-	} else {
-		finalOutputFile = outputFile
+		outputFile = inputFile
 	}
 
 	return &OpenAPIProcessor{
 		InputFile:     inputFile,
-		OutputFile:    finalOutputFile,
-		WriteToStdout: finalOutputFile == "",
+		OutputFile:    outputFile,
+		ReadFromStdin: readFromStdin,
+		WriteToStdout: outputFile == "",
 	}, nil
 }
 
-// LoadDocument loads and parses an OpenAPI document from the input file
+// LoadDocument loads and parses an OpenAPI document from the input file or stdin.
 func (p *OpenAPIProcessor) LoadDocument(ctx context.Context) (*openapi.OpenAPI, []error, error) {
-	cleanInputFile := filepath.Clean(p.InputFile)
+	var reader io.ReadCloser
 
-	// Only print status messages if not writing to stdout (to keep stdout clean for piping)
-	if !p.WriteToStdout {
-		fmt.Printf("Processing OpenAPI document: %s\n", cleanInputFile)
-	}
+	if p.ReadFromStdin {
+		fmt.Fprintf(p.stderr(), "Processing OpenAPI document from stdin\n")
+		reader = io.NopCloser(p.stdin())
+	} else {
+		cleanInputFile := filepath.Clean(p.InputFile)
+		fmt.Fprintf(p.stderr(), "Processing OpenAPI document: %s\n", cleanInputFile)
 
-	// Read the input file
-	f, err := os.Open(cleanInputFile)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open input file: %w", err)
+		f, err := os.Open(cleanInputFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to open input file: %w", err)
+		}
+		reader = f
 	}
-	defer f.Close()
+	defer reader.Close()
 
 	// Parse the OpenAPI document
-	doc, validationErrors, err := openapi.Unmarshal(ctx, f)
+	doc, validationErrors, err := openapi.Unmarshal(ctx, reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal OpenAPI document: %w", err)
 	}
@@ -66,14 +119,14 @@ func (p *OpenAPIProcessor) LoadDocument(ctx context.Context) (*openapi.OpenAPI, 
 	return doc, validationErrors, nil
 }
 
-// ReportValidationErrors reports validation errors if not writing to stdout
+// ReportValidationErrors reports validation errors to stderr.
 func (p *OpenAPIProcessor) ReportValidationErrors(validationErrors []error) {
-	if len(validationErrors) > 0 && !p.WriteToStdout {
-		fmt.Printf("⚠️  Found %d validation errors in original document:\n", len(validationErrors))
+	if len(validationErrors) > 0 {
+		fmt.Fprintf(p.stderr(), "⚠️  Found %d validation errors in original document:\n", len(validationErrors))
 		for i, validationErr := range validationErrors {
-			fmt.Printf("  %d. %s\n", i+1, validationErr.Error())
+			fmt.Fprintf(p.stderr(), "  %d. %s\n", i+1, validationErr.Error())
 		}
-		fmt.Println()
+		fmt.Fprintln(p.stderr())
 	}
 }
 
@@ -81,7 +134,7 @@ func (p *OpenAPIProcessor) ReportValidationErrors(validationErrors []error) {
 func (p *OpenAPIProcessor) WriteDocument(ctx context.Context, doc *openapi.OpenAPI) error {
 	if p.WriteToStdout {
 		// Write to stdout (pipe-friendly)
-		return marshaller.Marshal(ctx, doc, os.Stdout)
+		return marshaller.Marshal(ctx, doc, p.stdout())
 	}
 
 	// Write to file
@@ -96,28 +149,22 @@ func (p *OpenAPIProcessor) WriteDocument(ctx context.Context, doc *openapi.OpenA
 		return fmt.Errorf("failed to write document: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "📄 Document written to: %s\n", cleanOutputFile)
+	fmt.Fprintf(p.stderr(), "📄 Document written to: %s\n", cleanOutputFile)
 
 	return nil
 }
 
-// PrintSuccess prints a success message if not writing to stdout
+// PrintSuccess prints a success message to stderr.
 func (p *OpenAPIProcessor) PrintSuccess(message string) {
-	if !p.WriteToStdout {
-		fmt.Printf("✅ %s\n", message)
-	}
+	fmt.Fprintf(p.stderr(), "✅ %s\n", message)
 }
 
-// PrintInfo prints an info message if not writing to stdout
+// PrintInfo prints an info message to stderr.
 func (p *OpenAPIProcessor) PrintInfo(message string) {
-	if !p.WriteToStdout {
-		fmt.Printf("📋 %s\n", message)
-	}
+	fmt.Fprintf(p.stderr(), "📋 %s\n", message)
 }
 
-// PrintWarning prints a warning message if not writing to stdout
+// PrintWarning prints a warning message to stderr.
 func (p *OpenAPIProcessor) PrintWarning(message string) {
-	if !p.WriteToStdout {
-		fmt.Printf("⚠️  Warning: %s\n", message)
-	}
+	fmt.Fprintf(p.stderr(), "⚠️  Warning: %s\n", message)
 }
