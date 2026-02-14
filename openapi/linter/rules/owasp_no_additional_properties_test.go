@@ -219,5 +219,5 @@ func TestOwaspNoAdditionalPropertiesRule_RuleMetadata(t *testing.T) {
 	assert.NotEmpty(t, rule.Description())
 	assert.NotEmpty(t, rule.Link())
 	assert.Equal(t, validation.SeverityError, rule.DefaultSeverity())
-	assert.Equal(t, []string{"3.0", "3.1"}, rule.Versions())
+	assert.Nil(t, rule.Versions())
 }

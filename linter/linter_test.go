@@ -177,6 +177,89 @@ func TestLinter_RuleSelection(t *testing.T) {
 	})
 }
 
+func TestLinter_VersionFiltering(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		ruleVersions  []string
+		docVersion    string
+		expectResults bool
+	}{
+		{
+			name:          "exact 3.1 matches 3.1.0 via prefix",
+			ruleVersions:  []string{"3.1"},
+			docVersion:    "3.1.0",
+			expectResults: true,
+		},
+		{
+			name:          "exact 3.1 does not match 3.2.0",
+			ruleVersions:  []string{"3.1"},
+			docVersion:    "3.2.0",
+			expectResults: false,
+		},
+		{
+			name:          "exact 3.0 matches 3.0.3",
+			ruleVersions:  []string{"3.0"},
+			docVersion:    "3.0.3",
+			expectResults: true,
+		},
+		{
+			name:          "nil versions matches any version",
+			ruleVersions:  nil,
+			docVersion:    "3.2.0",
+			expectResults: true,
+		},
+		{
+			name:          "empty versions matches any version",
+			ruleVersions:  []string{},
+			docVersion:    "3.2.0",
+			expectResults: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+
+			registry := linter.NewRegistry[*MockDoc]()
+			registry.Register(&mockRule{
+				id:              "version-test-rule",
+				category:        "test",
+				defaultSeverity: validation.SeverityError,
+				versions:        tt.ruleVersions,
+				runFunc: func(_ context.Context, _ *linter.DocumentInfo[*MockDoc], _ *linter.RuleConfig) []error {
+					return []error{validation.NewValidationError(validation.SeverityError, "version-test-rule", errors.New("test error"), nil)}
+				},
+			})
+
+			config := &linter.Config{
+				Extends: []string{"all"},
+			}
+
+			lntr := linter.NewLinter(config, registry)
+			docInfo := &linter.DocumentInfo[*MockDoc]{
+				Document: &MockDoc{ID: "test"},
+			}
+
+			version := tt.docVersion
+			opts := &linter.LintOptions{
+				VersionFilter: &version,
+			}
+
+			output, err := lntr.Lint(ctx, docInfo, nil, opts)
+			require.NoError(t, err)
+
+			if tt.expectResults {
+				assert.NotEmpty(t, output.Results, "rule should have run for version %s", tt.docVersion)
+			} else {
+				assert.Empty(t, output.Results, "rule should not have run for version %s", tt.docVersion)
+			}
+		})
+	}
+}
+
 func TestLinter_SeverityOverrides(t *testing.T) {
 	t.Parallel()
 

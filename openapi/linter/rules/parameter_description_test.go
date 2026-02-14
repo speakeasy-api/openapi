@@ -177,5 +177,5 @@ func TestOAS3ParameterDescriptionRule_RuleMetadata(t *testing.T) {
 	assert.NotEmpty(t, rule.Description())
 	assert.NotEmpty(t, rule.Link())
 	assert.Equal(t, validation.SeverityWarning, rule.DefaultSeverity())
-	assert.NotNil(t, rule.Versions())
+	assert.Nil(t, rule.Versions())
 }

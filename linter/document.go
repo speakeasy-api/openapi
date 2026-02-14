@@ -41,8 +41,8 @@ type LintOptions struct {
 	// If nil, default options will be used
 	ResolveOptions *references.ResolveOptions
 
-	// VersionFilter is the document version (e.g., "3.0", "3.1")
-	// If set, only rules that apply to this version will be run
-	// Rules with nil/empty Versions() apply to all versions
+	// VersionFilter is the document version (e.g., "3.0.0", "3.1", "3.2.0")
+	// If set, only rules that apply to this version will be run.
+	// Rules with nil/empty Versions() apply to all versions.
 	VersionFilter *string
 }

@@ -35,7 +35,7 @@ func (r *OwaspStringRestrictedRule) DefaultSeverity() validation.Severity {
 	return validation.SeverityError
 }
 func (r *OwaspStringRestrictedRule) Versions() []string {
-	return []string{"3.0", "3.1"}
+	return nil
 }
 
 func (r *OwaspStringRestrictedRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {

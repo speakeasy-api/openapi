@@ -35,7 +35,7 @@ func (r *OwaspRateLimitRetryAfterRule) DefaultSeverity() validation.Severity {
 	return validation.SeverityError
 }
 func (r *OwaspRateLimitRetryAfterRule) Versions() []string {
-	return []string{"3.0", "3.1"} // OAS3 only
+	return nil
 }
 
 func (r *OwaspRateLimitRetryAfterRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
@@ -77,6 +77,13 @@ func (r *OwaspRateLimitRetryAfterRule) Run(ctx context.Context, docInfo *linter.
 		response429, exists := responses.Get("429")
 		if !exists || response429 == nil {
 			continue
+		}
+
+		// Resolve $ref if needed
+		if response429.IsReference() && config.ResolveOptions != nil {
+			if _, err := response429.Resolve(ctx, *config.ResolveOptions); err != nil {
+				continue
+			}
 		}
 
 		responseObj := response429.GetObject()

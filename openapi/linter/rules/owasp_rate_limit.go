@@ -45,7 +45,7 @@ func (r *OwaspRateLimitRule) DefaultSeverity() validation.Severity {
 	return validation.SeverityError
 }
 func (r *OwaspRateLimitRule) Versions() []string {
-	return []string{"3.0", "3.1"} // OAS3 only
+	return nil
 }
 
 func (r *OwaspRateLimitRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
@@ -88,6 +88,13 @@ func (r *OwaspRateLimitRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 			// Only check 2XX and 4XX responses
 			if !strings.HasPrefix(statusCode, "2") && !strings.HasPrefix(statusCode, "4") {
 				continue
+			}
+
+			// Resolve $ref if needed
+			if response.IsReference() && config.ResolveOptions != nil {
+				if _, err := response.Resolve(ctx, *config.ResolveOptions); err != nil {
+					continue
+				}
 			}
 
 			responseObj := response.GetObject()

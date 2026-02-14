@@ -305,6 +305,88 @@ paths:
 	}
 }
 
+func TestOwaspRateLimitRule_RefResponses(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		yaml          string
+		expectedCount int
+	}{
+		{
+			name: "ref response without rate limit headers is flagged",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  responses:
+    Success:
+      description: Success
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+`,
+			expectedCount: 1,
+		},
+		{
+			name: "ref response with rate limit headers is valid",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  responses:
+    Success:
+      description: Success
+      headers:
+        RateLimit:
+          schema:
+            type: string
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+`,
+			expectedCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+
+			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
+			require.NoError(t, err)
+
+			resolveOpts := references.ResolveOptions{
+				RootDocument:   doc,
+				TargetDocument: doc,
+				TargetLocation: "test.yaml",
+			}
+
+			rule := &rules.OwaspRateLimitRule{}
+			config := &linter.RuleConfig{
+				ResolveOptions: &resolveOpts,
+			}
+
+			idx := openapi.BuildIndex(ctx, doc, resolveOpts)
+			docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
+
+			errs := rule.Run(ctx, docInfo, config)
+			assert.Len(t, errs, tt.expectedCount)
+		})
+	}
+}
+
 func TestOwaspRateLimitRule_RuleMetadata(t *testing.T) {
 	t.Parallel()
 
@@ -315,5 +397,5 @@ func TestOwaspRateLimitRule_RuleMetadata(t *testing.T) {
 	assert.NotEmpty(t, rule.Description())
 	assert.NotEmpty(t, rule.Link())
 	assert.Equal(t, validation.SeverityError, rule.DefaultSeverity())
-	assert.Equal(t, []string{"3.0", "3.1"}, rule.Versions())
+	assert.Nil(t, rule.Versions())
 }

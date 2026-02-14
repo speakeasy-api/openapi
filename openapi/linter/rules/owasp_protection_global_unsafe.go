@@ -87,8 +87,10 @@ func (r *OwaspProtectionGlobalUnsafeRule) Run(ctx context.Context, docInfo *lint
 			continue
 		}
 
-		// Check if operation has explicit security field (even if empty array)
-		// security: [] means explicitly public and is allowed
+		// Check if operation has explicit security field (even if empty array).
+		// NOTE: This rule treats security: [] as intentional opt-out (public endpoint).
+		// Some linters (vacuum, spectral) treat security: [] on write operations as a
+		// violation, requiring explicit non-empty security on all unsafe operations.
 		rootNode := op.GetRootNode()
 		hasExplicitSecurity := false
 		if rootNode != nil {

@@ -38,7 +38,7 @@ func (r *OwaspJWTBestPracticesRule) DefaultSeverity() validation.Severity {
 	return validation.SeverityError
 }
 func (r *OwaspJWTBestPracticesRule) Versions() []string {
-	return []string{"3.0", "3.1"} // OAS3 only
+	return nil
 }
 
 func (r *OwaspJWTBestPracticesRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
