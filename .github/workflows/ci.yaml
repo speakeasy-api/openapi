@@ -15,16 +15,16 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install mise
-        uses: jdx/mise-action@v3
-        with:
-          experimental: true
-
       - name: Setup Go with caching
         uses: actions/setup-go@v6
         with:
           go-version-file: "go.work"
           cache: true
+
+      - name: Install mise
+        uses: jdx/mise-action@v3
+        with:
+          experimental: true
 
       - name: Check code formatting
         run: mise run fmt-check
@@ -51,14 +51,14 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install mise
-        uses: jdx/mise-action@v3
-
       - name: Setup Go with caching
         uses: actions/setup-go@v6
         with:
           go-version-file: "go.work"
           cache: true
+
+      - name: Install mise
+        uses: jdx/mise-action@v3
 
       # Verify Docker is available for testcontainers (Ubuntu only)
       - name: Verify Docker availability
@@ -105,14 +105,14 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install mise
-        uses: jdx/mise-action@v3
-
       - name: Setup Go with caching
         uses: actions/setup-go@v6
         with:
           go-version-file: "go.work"
           cache: true
+
+      - name: Install mise
+        uses: jdx/mise-action@v3
 
       # Verify Docker is available for testcontainers
       - name: Verify Docker availability
@@ -223,14 +223,14 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install mise
-        uses: jdx/mise-action@v3
-
       - name: Setup Go with caching
         uses: actions/setup-go@v6
         with:
           go-version-file: "go.work"
           cache: true
+
+      - name: Install mise
+        uses: jdx/mise-action@v3
 
       - name: Build project
         run: mise run build
@@ -244,14 +244,14 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install mise
-        uses: jdx/mise-action@v3
-
       - name: Setup Go with caching
         uses: actions/setup-go@v6
         with:
           go-version-file: "go.work"
           cache: true
+
+      - name: Install mise
+        uses: jdx/mise-action@v3
 
       - name: Build project
         run: go build -v ./...
@@ -266,14 +266,14 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install mise
-        uses: jdx/mise-action@v3
-
       - name: Setup Go with caching
         uses: actions/setup-go@v6
         with:
           go-version-file: "go.work"
           cache: true
+
+      - name: Install mise
+        uses: jdx/mise-action@v3
 
       - name: Run CLI integration tests
         run: mise run test-cli
