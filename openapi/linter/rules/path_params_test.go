@@ -904,7 +904,7 @@ paths:
 		assert.Contains(t, errs[0].Error(), "postId", "error should mention postId")
 	})
 
-	t.Run("resolution error reported when external reference fails", func(t *testing.T) {
+	t.Run("unresolved external reference reports missing path param", func(t *testing.T) {
 		t.Parallel()
 		ctx := t.Context()
 
@@ -937,21 +937,12 @@ paths:
 
 		errs := rule.Run(ctx, docInfo, config)
 
-		// Should have errors for both resolution failure and missing param
-		require.NotEmpty(t, errs, "should have errors when resolution fails")
-
-		// Check that we have a resolution error
-		var foundResolutionError bool
-		for _, err := range errs {
-			if strings.Contains(err.Error(), "failed to resolve parameter reference") {
-				foundResolutionError = true
-				break
-			}
-		}
-		assert.True(t, foundResolutionError, "should report resolution error")
+		// Unresolved ref returns nil from GetResolvedObject, so userId is still missing
+		require.NotEmpty(t, errs, "should have errors when reference is unresolved")
+		assert.Contains(t, errs[0].Error(), "userId", "should report missing userId param")
 	})
 
-	t.Run("resolution error for invalid yaml content", func(t *testing.T) {
+	t.Run("unresolved external reference with invalid yaml reports missing path param", func(t *testing.T) {
 		t.Parallel()
 		ctx := t.Context()
 
@@ -991,16 +982,8 @@ paths:
 
 		errs := rule.Run(ctx, docInfo, config)
 
-		// Should have a resolution error for invalid YAML
+		// Unresolved ref returns nil from GetResolvedObject, so userId is still missing
 		require.NotEmpty(t, errs, "should have errors when YAML is invalid")
-
-		var foundResolutionError bool
-		for _, err := range errs {
-			if strings.Contains(err.Error(), "failed to resolve parameter reference") {
-				foundResolutionError = true
-				break
-			}
-		}
-		assert.True(t, foundResolutionError, "should report resolution error for invalid YAML")
+		assert.Contains(t, errs[0].Error(), "userId", "should report missing userId param")
 	})
 }

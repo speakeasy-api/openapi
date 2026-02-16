@@ -36,7 +36,7 @@ func (r *OwaspProtectionGlobalUnsafeStrictRule) DefaultSeverity() validation.Sev
 	return validation.SeverityHint
 }
 func (r *OwaspProtectionGlobalUnsafeStrictRule) Versions() []string {
-	return []string{"3.0", "3.1"} // OAS3 only
+	return nil
 }
 
 func (r *OwaspProtectionGlobalUnsafeStrictRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {

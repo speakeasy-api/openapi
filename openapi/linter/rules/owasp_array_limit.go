@@ -35,7 +35,7 @@ func (r *OwaspArrayLimitRule) DefaultSeverity() validation.Severity {
 	return validation.SeverityError
 }
 func (r *OwaspArrayLimitRule) Versions() []string {
-	return []string{"3.0", "3.1"} // OAS3 only
+	return nil
 }
 
 func (r *OwaspArrayLimitRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {

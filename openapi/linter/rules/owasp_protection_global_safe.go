@@ -43,7 +43,7 @@ func (r *OwaspProtectionGlobalSafeRule) DefaultSeverity() validation.Severity {
 	return validation.SeverityHint
 }
 func (r *OwaspProtectionGlobalSafeRule) Versions() []string {
-	return []string{"3.0", "3.1"} // OAS3 only
+	return nil
 }
 
 func (r *OwaspProtectionGlobalSafeRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {

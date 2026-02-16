@@ -38,7 +38,7 @@ func (r *OwaspSecurityHostsHttpsOAS3Rule) DefaultSeverity() validation.Severity 
 	return validation.SeverityError
 }
 func (r *OwaspSecurityHostsHttpsOAS3Rule) Versions() []string {
-	return []string{"3.0", "3.1"} // Only applies to OpenAPI 3.x
+	return nil
 }
 
 func (r *OwaspSecurityHostsHttpsOAS3Rule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {

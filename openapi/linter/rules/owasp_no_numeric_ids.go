@@ -36,7 +36,7 @@ func (r *OwaspNoNumericIDsRule) DefaultSeverity() validation.Severity {
 	return validation.SeverityError
 }
 func (r *OwaspNoNumericIDsRule) Versions() []string {
-	return []string{"3.0", "3.1"} // OAS3 only
+	return nil
 }
 
 // isIDParameter checks if a parameter name is an ID field

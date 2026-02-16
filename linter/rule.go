@@ -26,7 +26,8 @@ type Rule interface {
 	// DefaultSeverity returns the default severity level for this rule
 	DefaultSeverity() validation.Severity
 
-	// Versions returns the spec versions this rule applies to (nil = all versions)
+	// Versions returns the spec versions this rule applies to (nil or empty slice = all versions).
+	// Supports exact versions ("3.1") and prefix matching ("3.0" matches "3.0.x").
 	Versions() []string
 }
 

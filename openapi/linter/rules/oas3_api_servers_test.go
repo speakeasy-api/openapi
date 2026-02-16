@@ -316,5 +316,5 @@ func TestOAS3APIServersRule_RuleMetadata(t *testing.T) {
 	assert.NotEmpty(t, rule.Description())
 	assert.NotEmpty(t, rule.Link())
 	assert.Equal(t, validation.SeverityWarning, rule.DefaultSeverity())
-	assert.Equal(t, []string{"3.0.0", "3.0.1", "3.0.2", "3.0.3", "3.1.0", "3.1.1", "3.2.0"}, rule.Versions())
+	assert.Nil(t, rule.Versions())
 }

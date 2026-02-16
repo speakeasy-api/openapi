@@ -44,7 +44,7 @@ func (r *OAS3HostTrailingSlashRule) Link() string {
 }
 
 func (r *OAS3HostTrailingSlashRule) Versions() []string {
-	return []string{"3.0.0", "3.0.1", "3.0.2", "3.0.3", "3.1.0", "3.1.1", "3.2.0"}
+	return nil
 }
 
 func (r *OAS3HostTrailingSlashRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {

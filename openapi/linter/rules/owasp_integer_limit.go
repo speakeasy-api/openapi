@@ -35,7 +35,7 @@ func (r *OwaspIntegerLimitRule) DefaultSeverity() validation.Severity {
 	return validation.SeverityError
 }
 func (r *OwaspIntegerLimitRule) Versions() []string {
-	return []string{"3.0", "3.1"}
+	return nil
 }
 
 func (r *OwaspIntegerLimitRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
