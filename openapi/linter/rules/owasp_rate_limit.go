@@ -90,14 +90,7 @@ func (r *OwaspRateLimitRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 				continue
 			}
 
-			// Resolve $ref if needed
-			if response.IsReference() && config.ResolveOptions != nil {
-				if _, err := response.Resolve(ctx, *config.ResolveOptions); err != nil {
-					continue
-				}
-			}
-
-			responseObj := response.GetObject()
+			responseObj := response.GetResolvedObject()
 			if responseObj == nil {
 				continue
 			}

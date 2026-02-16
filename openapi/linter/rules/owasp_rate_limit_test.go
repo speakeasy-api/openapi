@@ -367,18 +367,14 @@ paths:
 			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
 			require.NoError(t, err)
 
-			resolveOpts := references.ResolveOptions{
+			rule := &rules.OwaspRateLimitRule{}
+			config := &linter.RuleConfig{}
+
+			idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
 				RootDocument:   doc,
 				TargetDocument: doc,
 				TargetLocation: "test.yaml",
-			}
-
-			rule := &rules.OwaspRateLimitRule{}
-			config := &linter.RuleConfig{
-				ResolveOptions: &resolveOpts,
-			}
-
-			idx := openapi.BuildIndex(ctx, doc, resolveOpts)
+			})
 			docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
 
 			errs := rule.Run(ctx, docInfo, config)

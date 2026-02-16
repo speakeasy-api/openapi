@@ -79,14 +79,7 @@ func (r *OwaspRateLimitRetryAfterRule) Run(ctx context.Context, docInfo *linter.
 			continue
 		}
 
-		// Resolve $ref if needed
-		if response429.IsReference() && config.ResolveOptions != nil {
-			if _, err := response429.Resolve(ctx, *config.ResolveOptions); err != nil {
-				continue
-			}
-		}
-
-		responseObj := response429.GetObject()
+		responseObj := response429.GetResolvedObject()
 		if responseObj == nil {
 			continue
 		}

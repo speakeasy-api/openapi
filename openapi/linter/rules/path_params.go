@@ -45,20 +45,6 @@ func (r *PathParamsRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*
 
 	var errs []error
 
-	doc := docInfo.Document
-
-	// Build resolve options from config
-	resolveOpts := openapi.ResolveOptions{
-		RootDocument:   doc,
-		TargetDocument: doc,
-		TargetLocation: docInfo.Location,
-	}
-	if config.ResolveOptions != nil {
-		resolveOpts.VirtualFS = config.ResolveOptions.VirtualFS
-		resolveOpts.HTTPClient = config.ResolveOptions.HTTPClient
-		resolveOpts.DisableExternalRefs = config.ResolveOptions.DisableExternalRefs
-	}
-
 	// Use the pre-computed InlinePathItems index (path items from /paths)
 	// These are the only ones with path templates in their location parent key
 	for _, pathItemNode := range docInfo.Index.InlinePathItems {
@@ -78,14 +64,12 @@ func (r *PathParamsRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*
 		templateParams := extractParamsFromPath(path)
 
 		// Get PathItem parameters (in: path)
-		pathItemParams, pathItemErrs := getPathParameters(ctx, pathItem.Parameters, resolveOpts, config)
-		errs = append(errs, pathItemErrs...)
+		pathItemParams := getPathParameters(pathItem.Parameters)
 
 		// Iterate operations
 		for _, op := range pathItem.All() {
 			// Merge parameters
-			opParams, opErrs := getPathParameters(ctx, op.Parameters, resolveOpts, config)
-			errs = append(errs, opErrs...)
+			opParams := getPathParameters(op.Parameters)
 			effectiveParams := mergeParameters(pathItemParams, opParams)
 
 			// Validate
@@ -143,34 +127,15 @@ func extractParamsFromPath(path string) []string {
 	return params
 }
 
-func getPathParameters(ctx context.Context, params []*openapi.ReferencedParameter, resolveOpts openapi.ResolveOptions, _ *linter.RuleConfig) (map[string]bool, []error) {
+func getPathParameters(params []*openapi.ReferencedParameter) map[string]bool {
 	result := make(map[string]bool)
-	var resolutionErrs []error
 
 	for _, refParam := range params {
 		if refParam == nil {
 			continue
 		}
 
-		// Resolve reference if needed
-		if refParam.IsReference() && !refParam.IsResolved() {
-			validErrs, err := refParam.Resolve(ctx, resolveOpts)
-			if err != nil {
-				// Resolution failed - report as validation error
-				resolutionErrs = append(resolutionErrs, validation.NewValidationError(
-					validation.SeverityError,
-					RuleSemanticPathParams,
-					fmt.Errorf("failed to resolve parameter reference `%s`: %w", refParam.GetReference(), err),
-					refParam.GetRootNode(),
-				))
-				continue
-			}
-			// Append any validation errors from resolution
-			resolutionErrs = append(resolutionErrs, validErrs...)
-		}
-
-		// GetObject() returns the resolved object for references, or inline object
-		param := refParam.GetObject()
+		param := refParam.GetResolvedObject()
 		if param == nil {
 			continue
 		}
@@ -179,7 +144,7 @@ func getPathParameters(ctx context.Context, params []*openapi.ReferencedParamete
 			result[param.Name] = true
 		}
 	}
-	return result, resolutionErrs
+	return result
 }
 
 func mergeParameters(base, override map[string]bool) map[string]bool {
