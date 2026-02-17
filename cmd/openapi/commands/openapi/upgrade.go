@@ -29,6 +29,12 @@ With --minor-only, only performs cross-minor version upgrades:
 - 3.1.x → 3.2.0 (cross-minor upgrade)
 - 3.2.x → no change (same minor version, skip patch upgrades)
 
+With --version, upgrades to a specific OpenAPI version instead of the latest:
+- openapi spec upgrade --version 3.1.0 spec.yaml
+  (upgrades a 3.0.x spec to 3.1.0)
+
+Note: --version and --minor-only are mutually exclusive.
+
 The upgrade process includes:
 - Updating the OpenAPI version field
 - Converting nullable properties to proper JSON Schema format
@@ -44,18 +50,25 @@ Output options:
 }
 
 var (
-	minorOnly    bool
-	writeInPlace bool
+	minorOnly     bool
+	writeInPlace  bool
+	targetVersion string
 )
 
 func init() {
 	upgradeCmd.Flags().BoolVar(&minorOnly, "minor-only", false, "only upgrade across minor versions, skip patch-level upgrades within same minor")
 	upgradeCmd.Flags().BoolVarP(&writeInPlace, "write", "w", false, "write result in-place to input file")
+	upgradeCmd.Flags().StringVarP(&targetVersion, "version", "V", "", "target OpenAPI version to upgrade to (default latest)")
 }
 
 func runUpgrade(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	inputFile := inputFileFromArgs(args)
+
+	if targetVersion != "" && minorOnly {
+		fmt.Fprintf(os.Stderr, "Error: --version and --minor-only are mutually exclusive\n")
+		os.Exit(1)
+	}
 
 	outputFile := outputFileFromArgs(args)
 
@@ -65,13 +78,27 @@ func runUpgrade(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	if err := upgradeOpenAPI(ctx, processor, !minorOnly); err != nil {
+	var opts []openapi.Option[openapi.UpgradeOptions]
+	if targetVersion != "" {
+		opts = append(opts, openapi.WithUpgradeTargetVersion(targetVersion))
+		// Enable same-minor upgrades so patch-level targets work as expected.
+		// Without this, --version 3.1.2 on a 3.1.0 doc would be silently
+		// skipped because they share the same minor version.
+		opts = append(opts, openapi.WithUpgradeSameMinorVersion())
+	} else if !minorOnly {
+		// By default, upgrade all versions including patch upgrades (e.g., 3.2.0 → 3.2.1)
+		opts = append(opts, openapi.WithUpgradeSameMinorVersion())
+	}
+	// When minorOnly is true, only cross-minor upgrades are performed
+	// Patch upgrades within the same minor version (e.g., 3.2.0 → 3.2.1) are skipped
+
+	if err := upgradeOpenAPI(ctx, processor, opts...); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func upgradeOpenAPI(ctx context.Context, processor *OpenAPIProcessor, upgradeSameMinorVersion bool) error {
+func upgradeOpenAPI(ctx context.Context, processor *OpenAPIProcessor, opts ...openapi.Option[openapi.UpgradeOptions]) error {
 	// Load the OpenAPI document
 	doc, validationErrors, err := processor.LoadDocument(ctx)
 	if err != nil {
@@ -83,15 +110,6 @@ func upgradeOpenAPI(ctx context.Context, processor *OpenAPIProcessor, upgradeSam
 
 	// Report validation errors but continue with upgrade
 	processor.ReportValidationErrors(validationErrors)
-
-	// Prepare upgrade options
-	var opts []openapi.Option[openapi.UpgradeOptions]
-	if upgradeSameMinorVersion {
-		// By default, upgrade all versions including patch upgrades (e.g., 3.2.0 → 3.2.1)
-		opts = append(opts, openapi.WithUpgradeSameMinorVersion())
-	}
-	// When minorOnly is true, only cross-minor upgrades are performed
-	// Patch upgrades within the same minor version (e.g., 3.2.0 → 3.2.1) are skipped
 
 	// Perform the upgrade
 	originalVersion := doc.OpenAPI
