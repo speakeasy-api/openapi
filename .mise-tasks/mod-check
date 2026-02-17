@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "🔍 Checking if go.mod and go.sum are tidy..."
+
+FAILED=0
+
+while IFS= read -r gomod_file; do
+    dir=$(dirname "$gomod_file")
+    display="${dir#./}"
+    [ "$display" = "." ] && display="root"
+    echo "  Checking $display..."
+
+    # Backup go.mod and go.sum
+    cp "$gomod_file" "$gomod_file.bak"
+    [ -f "$dir/go.sum" ] && cp "$dir/go.sum" "$dir/go.sum.bak" || true
+
+    # Run go mod tidy
+    (cd "$dir" && go mod tidy)
+
+    # Check if files changed
+    if ! cmp -s "$gomod_file" "$gomod_file.bak" || \
+       { [ -f "$dir/go.sum.bak" ] && ! cmp -s "$dir/go.sum" "$dir/go.sum.bak"; } || \
+       { [ -f "$dir/go.sum" ] && ! [ -f "$dir/go.sum.bak" ]; }; then
+        echo "  ❌ $display needs tidying!"
+        FAILED=1
+    fi
+
+    # Restore original files
+    mv "$gomod_file.bak" "$gomod_file"
+    if [ -f "$dir/go.sum.bak" ]; then
+        mv "$dir/go.sum.bak" "$dir/go.sum"
+    elif [ -f "$dir/go.sum" ]; then
+        # go.sum was created by tidy but didn't exist before — remove it
+        rm -f "$dir/go.sum"
+    fi
+done < <(find . -name "go.mod" -not -path "*/vendor/*" | sort)
+
+if [ "$FAILED" -eq 1 ]; then
+    echo ""
+    echo "❌ go.mod or go.sum is not tidy!"
+    echo "Please run 'mise run mod-tidy' to fix module dependencies."
+    exit 1
+fi
+
+echo "✅ go.mod and go.sum are tidy!"

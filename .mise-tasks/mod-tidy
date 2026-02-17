@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "📦 Tidying Go modules..."
+
+while IFS= read -r gomod_file; do
+    dir=$(dirname "$gomod_file")
+    display="${dir#./}"
+    [ "$display" = "." ] && display="root"
+    echo "  → $display"
+    (cd "$dir" && go mod tidy)
+done < <(find . -name "go.mod" -not -path "*/vendor/*" | sort)
+
+echo "✅ All Go modules tidied!"

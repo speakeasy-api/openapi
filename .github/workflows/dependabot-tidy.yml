@@ -1,0 +1,46 @@
+name: Dependabot Go Mod Tidy
+
+on:
+  pull_request_target:
+    branches: [main]
+
+jobs:
+  tidy:
+    name: Go Mod Tidy
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
+
+      - name: Setup Go with caching
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.work
+          cache: true
+
+      - name: Install mise
+        uses: jdx/mise-action@v3
+        with:
+          experimental: true
+
+      - name: Run go mod tidy for all modules
+        run: mise run mod-tidy
+
+      - name: Commit changes if any
+        run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: go mod tidy"
+            git push
+          fi
