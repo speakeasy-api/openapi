@@ -64,7 +64,7 @@ func RunApply(cmd *cobra.Command, args []string) {
 	for _, f := range overlayFiles {
 		o, err := loader.LoadOverlay(f)
 		if err != nil {
-			Dief("load overlay %q: %s", f, err.Error())
+			Dief("Failed to load overlay %q: %s", f, err.Error())
 		}
 		overlays = append(overlays, o)
 	}
