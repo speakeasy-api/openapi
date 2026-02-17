@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-echo "📦 Tidying Go modules..."
-go mod tidy
-echo "✅ Go modules tidied!"
