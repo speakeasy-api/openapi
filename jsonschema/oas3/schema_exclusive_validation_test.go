@@ -248,7 +248,7 @@ exclusiveMaximum: false
 type: number
 exclusiveMinimum: "invalid"
 `,
-			wantErrs: []string{"[2:1] error validation-type-mismatch schema.exclusiveMinimum expected `number`, got `string`", "[3:19] error validation-type-mismatch schema.exclusiveMinimum failed to validate either bool [schema.exclusiveMinimum line 3: cannot unmarshal !!str `invalid` into bool] or float64 [schema.exclusiveMinimum line 3: cannot unmarshal !!str `invalid` into float64]"},
+			wantErrs: []string{"[2:1] error validation-type-mismatch schema.exclusiveMinimum expected `number`, got `string`", "[3:19] error validation-type-mismatch schema.exclusiveMinimum failed to validate either bool [schema.exclusiveMinimum line 3: cannot construct !!str `invalid` into bool] or float64 [schema.exclusiveMinimum line 3: cannot construct !!str `invalid` into float64]"},
 		},
 		{
 			name: "invalid string type for exclusiveMaximum",
@@ -256,7 +256,7 @@ exclusiveMinimum: "invalid"
 type: number
 exclusiveMaximum: "invalid"
 `,
-			wantErrs: []string{"[2:1] error validation-type-mismatch schema.exclusiveMaximum expected `number`, got `string`", "[3:19] error validation-type-mismatch schema.exclusiveMaximum failed to validate either bool [schema.exclusiveMaximum line 3: cannot unmarshal !!str `invalid` into bool] or float64 [schema.exclusiveMaximum line 3: cannot unmarshal !!str `invalid` into float64]"},
+			wantErrs: []string{"[2:1] error validation-type-mismatch schema.exclusiveMaximum expected `number`, got `string`", "[3:19] error validation-type-mismatch schema.exclusiveMaximum failed to validate either bool [schema.exclusiveMaximum line 3: cannot construct !!str `invalid` into bool] or float64 [schema.exclusiveMaximum line 3: cannot construct !!str `invalid` into float64]"},
 		},
 		{
 			name: "invalid array type for exclusiveMinimum",

@@ -8,7 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/validation"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 const RuleStyleOAS3HostTrailingSlash = "style-oas3-host-trailing-slash"

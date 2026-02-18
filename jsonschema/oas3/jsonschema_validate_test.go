@@ -227,7 +227,7 @@ func TestJSONSchema_Validate_Error(t *testing.T) {
 			name: "schema fails direct validation",
 			yml: `
 "test"`,
-			wantErrs: []string{"[2:1] error validation-type-mismatch failed to validate either Schema [expected `object`, got `te...`] or bool [line 2: cannot unmarshal !!str `test` into bool]"},
+			wantErrs: []string{"[2:1] error validation-type-mismatch failed to validate either Schema [expected `object`, got `te...`] or bool [line 2: cannot construct !!str `test` into bool]"},
 		},
 		{
 			name: "child schema fails validation",

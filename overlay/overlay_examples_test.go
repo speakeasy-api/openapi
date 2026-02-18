@@ -7,7 +7,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/overlay"
 	"github.com/speakeasy-api/openapi/overlay/loader"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Example_applying demonstrates how to apply an overlay to an OpenAPI document.

@@ -3,7 +3,7 @@ package marshaller
 import (
 	"reflect"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // NodeCollector provides utilities for collecting yaml.Node pointers from core models.

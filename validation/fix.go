@@ -1,6 +1,6 @@
 package validation
 
-import "gopkg.in/yaml.v3"
+import "go.yaml.in/yaml/v4"
 
 // PromptType describes what kind of user input a fix needs.
 type PromptType int

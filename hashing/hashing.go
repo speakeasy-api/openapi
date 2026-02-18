@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func Hash(v any) string {

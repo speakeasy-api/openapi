@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/speakeasy-api/openapi/yml"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Marshallable represents a high-level model that can be marshaled

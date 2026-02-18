@@ -2,13 +2,21 @@ package marshaller_test
 
 import (
 	"testing"
+	"unsafe"
 
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
+	yamlv3 "gopkg.in/yaml.v3"
 )
+
+// queryV4 runs a jsonpath query using a v4 node by casting to v3 and back.
+func queryV4(path *jsonpath.JSONPath, node *yaml.Node) []*yaml.Node {
+	v3result := path.Query((*yamlv3.Node)(unsafe.Pointer(node)))
+	return *(*[]*yaml.Node)(unsafe.Pointer(&v3result))
+}
 
 func TestCoreModel_GetJSONPath_Success(t *testing.T) {
 	t.Parallel()
@@ -178,7 +186,7 @@ func findNodeByJSONPath(t *testing.T, rootNode *yaml.Node, jsonPath string) *yam
 	require.NoError(t, err, "JSONPath should be valid: %s", jsonPath)
 
 	// Query the YAML node directly
-	result := path.Query(rootNode)
+	result := queryV4(path, rootNode)
 	require.NotEmpty(t, result, "JSONPath query should return results: %s", jsonPath)
 
 	// The result should be a slice of *yaml.Node, so return the first one
@@ -196,7 +204,7 @@ func verifyJSONPathWorks(t *testing.T, rootNode *yaml.Node, jsonPath string, exp
 	path, err := jsonpath.NewPath(jsonPath)
 	require.NoError(t, err, "generated JSONPath should be valid: %s", jsonPath)
 
-	result := path.Query(rootNode)
+	result := queryV4(path, rootNode)
 	require.NotEmpty(t, result, "JSONPath query should return results: %s", jsonPath)
 
 	// Special case for root node: the query might return the document node

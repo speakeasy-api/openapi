@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/speakeasy-api/openapi/errors"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 const (

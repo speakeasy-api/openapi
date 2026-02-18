@@ -6,7 +6,7 @@ import (
 
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath/config"
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath/token"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // ApplyTo will take an overlay and apply its changes to the given YAML

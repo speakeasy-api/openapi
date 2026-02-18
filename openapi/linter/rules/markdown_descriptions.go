@@ -1,7 +1,7 @@
 package rules
 
 import (
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // GetFieldValueNode gets the YAML value node for a specific field from any object with a GetCore() method.

@@ -10,7 +10,7 @@ import (
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestArazzo_ArrayOrdering_ReorderWorkflows_Success(t *testing.T) {

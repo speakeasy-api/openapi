@@ -12,8 +12,8 @@ import (
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
+	"go.yaml.in/yaml/v4"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v3"
 )
 
 // Pre-computed reflection types for performance (reusing from populator.go where possible)
@@ -545,8 +545,12 @@ func decodeNode(_ context.Context, parentName string, node *yaml.Node, out any) 
 	// Check if this is a type mismatch error
 	if yamlTypeErr := asTypeMismatchError(err); yamlTypeErr != nil {
 		// Convert type mismatch to validation error
-		validationErr := validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, strings.Join(yamlTypeErr.Errors, ", ")), resolvedNode)
-		return []error{validationErr}, nil //nolint:nilerr
+		errStrings := make([]string, len(yamlTypeErr.Errors))
+		for i, e := range yamlTypeErr.Errors {
+			errStrings[i] = e.Error()
+		}
+		validationErr := validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, strings.Join(errStrings, ", ")), resolvedNode)
+		return []error{validationErr}, nil
 	}
 
 	// For all other errors (syntax, etc.), return as standard error
@@ -749,9 +753,9 @@ func validateNodeKind(resolvedNode *yaml.Node, expectedKind yaml.Kind, parentNam
 	return nil
 }
 
-// asTypeMismatchError returns the underlying yaml.TypeError if the error is a type mismatch error
-func asTypeMismatchError(err error) *yaml.TypeError {
-	var yamlTypeErr *yaml.TypeError
+// asTypeMismatchError returns the underlying yaml.LoadErrors if the error is a type mismatch error
+func asTypeMismatchError(err error) *yaml.LoadErrors {
+	var yamlTypeErr *yaml.LoadErrors
 	if errors.As(err, &yamlTypeErr) {
 		return yamlTypeErr
 	}

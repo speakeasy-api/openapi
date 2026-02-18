@@ -265,10 +265,10 @@ func Example_validating() {
 	//   [56:7] error validation-type-mismatch schema.examples expected `array`, got `object`
 	//   [59:15] error validation-type-mismatch schema.properties.name expected one of [`boolean`, `object`], got `string`
 	//   [59:15] error validation-type-mismatch schema.properties.name expected one of [`boolean`, `object`], got `string`
-	//   [59:15] error validation-type-mismatch schema.properties.name failed to validate either Schema [schema.properties.name expected `object`, got `str...`] or bool [schema.properties.name line 59: cannot unmarshal !!str `string` into bool]
+	//   [59:15] error validation-type-mismatch schema.properties.name failed to validate either Schema [schema.properties.name expected `object`, got `str...`] or bool [schema.properties.name line 59: cannot construct !!str `string` into bool]
 	//   [60:18] error validation-type-mismatch schema.properties.example expected one of [`boolean`, `object`], got `string`
 	//   [60:18] error validation-type-mismatch schema.properties.example expected one of [`boolean`, `object`], got `string`
-	//   [60:18] error validation-type-mismatch schema.properties.example failed to validate either Schema [schema.properties.example expected `object`, got `John Do...`] or bool [schema.properties.example line 60: cannot unmarshal !!str `John Doe` into bool]
+	//   [60:18] error validation-type-mismatch schema.properties.example failed to validate either Schema [schema.properties.example expected `object`, got `John Do...`] or bool [schema.properties.example line 60: cannot construct !!str `John Doe` into bool]
 	//   [63:9] error validation-type-mismatch schema.examples expected `sequence`, got `object`
 	//
 	// Fixing validation errors...
