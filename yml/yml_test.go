@@ -843,3 +843,304 @@ func TestNodeTagToString_Success(t *testing.T) {
 		})
 	}
 }
+
+func TestIsMergeKey_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		node     *yaml.Node
+		expected bool
+	}{
+		{
+			name:     "nil node",
+			node:     nil,
+			expected: false,
+		},
+		{
+			name: "merge key node",
+			node: &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Tag:   "!!merge",
+				Value: "<<",
+			},
+			expected: true,
+		},
+		{
+			name: "regular string key with << value",
+			node: &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Tag:   "!!str",
+				Value: "<<",
+			},
+			expected: false,
+		},
+		{
+			name: "regular key node",
+			node: &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Tag:   "!!str",
+				Value: "name",
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, yml.IsMergeKey(tt.node))
+		})
+	}
+}
+
+func TestResolveMergeKeys_Success(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no merge keys returns original content", func(t *testing.T) {
+		t.Parallel()
+
+		content := []*yaml.Node{
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "key1"},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "val1"},
+		}
+
+		result := yml.ResolveMergeKeys(content)
+		assert.Equal(t, content, result)
+	})
+
+	t.Run("empty content returns original", func(t *testing.T) {
+		t.Parallel()
+
+		var content []*yaml.Node
+		result := yml.ResolveMergeKeys(content)
+		assert.Empty(t, result)
+	})
+
+	t.Run("merge key expands aliased mapping", func(t *testing.T) {
+		t.Parallel()
+
+		aliasTarget := &yaml.Node{
+			Kind: yaml.MappingNode,
+			Tag:  "!!map",
+			Content: []*yaml.Node{
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "merged_key"},
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "merged_val"},
+			},
+		}
+
+		content := []*yaml.Node{
+			{Kind: yaml.ScalarNode, Tag: "!!merge", Value: "<<"},
+			{Kind: yaml.AliasNode, Alias: aliasTarget},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "explicit_key"},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "explicit_val"},
+		}
+
+		result := yml.ResolveMergeKeys(content)
+		require.Len(t, result, 4)
+		assert.Equal(t, "merged_key", result[0].Value)
+		assert.Equal(t, "merged_val", result[1].Value)
+		assert.Equal(t, "explicit_key", result[2].Value)
+		assert.Equal(t, "explicit_val", result[3].Value)
+	})
+
+	t.Run("explicit keys override merged keys", func(t *testing.T) {
+		t.Parallel()
+
+		aliasTarget := &yaml.Node{
+			Kind: yaml.MappingNode,
+			Tag:  "!!map",
+			Content: []*yaml.Node{
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "name"},
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "from_merge"},
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "id"},
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "from_merge"},
+			},
+		}
+
+		content := []*yaml.Node{
+			{Kind: yaml.ScalarNode, Tag: "!!merge", Value: "<<"},
+			{Kind: yaml.AliasNode, Alias: aliasTarget},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "name"},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "explicit"},
+		}
+
+		result := yml.ResolveMergeKeys(content)
+		// Only "id" should come from merge; "name" is explicit and overrides
+		require.Len(t, result, 4)
+		assert.Equal(t, "id", result[0].Value)
+		assert.Equal(t, "from_merge", result[1].Value)
+		assert.Equal(t, "name", result[2].Value)
+		assert.Equal(t, "explicit", result[3].Value)
+	})
+
+	t.Run("merge key with sequence of mappings", func(t *testing.T) {
+		t.Parallel()
+
+		alias1 := &yaml.Node{
+			Kind: yaml.MappingNode,
+			Content: []*yaml.Node{
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "a"},
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "1"},
+			},
+		}
+		alias2 := &yaml.Node{
+			Kind: yaml.MappingNode,
+			Content: []*yaml.Node{
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "b"},
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "2"},
+			},
+		}
+
+		content := []*yaml.Node{
+			{Kind: yaml.ScalarNode, Tag: "!!merge", Value: "<<"},
+			{
+				Kind: yaml.SequenceNode,
+				Content: []*yaml.Node{
+					{Kind: yaml.AliasNode, Alias: alias1},
+					{Kind: yaml.AliasNode, Alias: alias2},
+				},
+			},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "c"},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "3"},
+		}
+
+		result := yml.ResolveMergeKeys(content)
+		require.Len(t, result, 6)
+		assert.Equal(t, "a", result[0].Value)
+		assert.Equal(t, "b", result[2].Value)
+		assert.Equal(t, "c", result[4].Value)
+	})
+
+	t.Run("nested merge chain is recursively flattened", func(t *testing.T) {
+		t.Parallel()
+
+		// base1 has {a: 1}
+		base1 := &yaml.Node{
+			Kind: yaml.MappingNode,
+			Content: []*yaml.Node{
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "a"},
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "1"},
+			},
+		}
+
+		// base2 merges base1 and adds {b: 2}  =>  <<: *base1, b: 2
+		base2 := &yaml.Node{
+			Kind: yaml.MappingNode,
+			Content: []*yaml.Node{
+				{Kind: yaml.ScalarNode, Tag: "!!merge", Value: "<<"},
+				{Kind: yaml.AliasNode, Alias: base1},
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "b"},
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "2"},
+			},
+		}
+
+		// extended merges base2 and adds {c: 3}
+		content := []*yaml.Node{
+			{Kind: yaml.ScalarNode, Tag: "!!merge", Value: "<<"},
+			{Kind: yaml.AliasNode, Alias: base2},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "c"},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "3"},
+		}
+
+		result := yml.ResolveMergeKeys(content)
+		// Should have a, b (from recursive merge), and c (explicit)
+		require.Len(t, result, 6, "should have 3 key-value pairs after recursive merge")
+		assert.Equal(t, "a", result[0].Value)
+		assert.Equal(t, "1", result[1].Value)
+		assert.Equal(t, "b", result[2].Value)
+		assert.Equal(t, "2", result[3].Value)
+		assert.Equal(t, "c", result[4].Value)
+		assert.Equal(t, "3", result[5].Value)
+	})
+
+	t.Run("quoted literal << key is not treated as merge", func(t *testing.T) {
+		t.Parallel()
+
+		// A quoted '<<' key has tag !!str, not !!merge — it should remain as-is
+		content := []*yaml.Node{
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "<<"},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "literal_value"},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "other"},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "val"},
+		}
+
+		result := yml.ResolveMergeKeys(content)
+		require.Len(t, result, 4)
+		assert.Equal(t, "<<", result[0].Value)
+		assert.Equal(t, "literal_value", result[1].Value)
+	})
+
+	t.Run("sequence merge precedence first mapping wins", func(t *testing.T) {
+		t.Parallel()
+
+		// Both aliases define key "x" — first one in sequence should win
+		alias1 := &yaml.Node{
+			Kind: yaml.MappingNode,
+			Content: []*yaml.Node{
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "x"},
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "from_first"},
+			},
+		}
+		alias2 := &yaml.Node{
+			Kind: yaml.MappingNode,
+			Content: []*yaml.Node{
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "x"},
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "from_second"},
+			},
+		}
+
+		content := []*yaml.Node{
+			{Kind: yaml.ScalarNode, Tag: "!!merge", Value: "<<"},
+			{
+				Kind: yaml.SequenceNode,
+				Content: []*yaml.Node{
+					{Kind: yaml.AliasNode, Alias: alias1},
+					{Kind: yaml.AliasNode, Alias: alias2},
+				},
+			},
+		}
+
+		result := yml.ResolveMergeKeys(content)
+		require.Len(t, result, 2)
+		assert.Equal(t, "x", result[0].Value)
+		assert.Equal(t, "from_first", result[1].Value, "first mapping in sequence should take precedence")
+	})
+
+	t.Run("circular alias does not cause infinite loop", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a node that references itself via merge key
+		circular := &yaml.Node{
+			Kind: yaml.MappingNode,
+			Content: []*yaml.Node{
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "a"},
+				{Kind: yaml.ScalarNode, Tag: "!!str", Value: "1"},
+			},
+		}
+		// Add a merge key that points back to itself
+		circular.Content = append(circular.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!merge", Value: "<<"},
+			&yaml.Node{Kind: yaml.AliasNode, Alias: circular},
+		)
+
+		content := []*yaml.Node{
+			{Kind: yaml.ScalarNode, Tag: "!!merge", Value: "<<"},
+			{Kind: yaml.AliasNode, Alias: circular},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "b"},
+			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "2"},
+		}
+
+		// Should not hang — cycle guard should stop recursion
+		result := yml.ResolveMergeKeys(content)
+		require.NotEmpty(t, result)
+
+		// "a" from circular merge, "b" explicit
+		keys := make([]string, 0)
+		for i := 0; i < len(result); i += 2 {
+			keys = append(keys, result[i].Value)
+		}
+		assert.Contains(t, keys, "a")
+		assert.Contains(t, keys, "b")
+	})
+}

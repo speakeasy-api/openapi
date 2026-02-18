@@ -36,6 +36,9 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 
 	target.Init()
 
+	// Resolve YAML merge keys (<<) before processing
+	content := yml.ResolveMergeKeys(resolvedNode.Content)
+
 	// Pre-scan for duplicate keys to detect them before concurrent processing
 	type keyInfo struct {
 		firstLine int
@@ -45,8 +48,8 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 	indicesToSkip := make(map[int]bool)
 	var duplicateKeyErrs []error
 
-	for i := 0; i < len(resolvedNode.Content); i += 2 {
-		keyNode := resolvedNode.Content[i]
+	for i := 0; i < len(content); i += 2 {
+		keyNode := content[i]
 		resolvedKeyNode := yml.ResolveAlias(keyNode)
 		if resolvedKeyNode == nil {
 			continue
@@ -75,7 +78,7 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 
 	g, ctx := errgroup.WithContext(ctx)
 
-	numJobs := len(resolvedNode.Content) / 2
+	numJobs := len(content) / 2
 	jobsValidationErrs := make([][]error, numJobs)
 
 	type keyPair struct {
@@ -85,15 +88,15 @@ func unmarshalSequencedMap(ctx context.Context, parentName string, node *yaml.No
 
 	valuesToSet := make([]keyPair, numJobs)
 
-	for i := 0; i < len(resolvedNode.Content); i += 2 {
+	for i := 0; i < len(content); i += 2 {
 		g.Go(func() error {
 			// Skip duplicate keys (all but the last occurrence)
 			if indicesToSkip[i/2] {
 				return nil
 			}
 
-			keyNode := resolvedNode.Content[i]
-			valueNode := resolvedNode.Content[i+1]
+			keyNode := content[i]
+			valueNode := content[i+1]
 
 			// Resolve alias for key node to handle alias keys like *keyAlias :
 			resolvedKeyNode := yml.ResolveAlias(keyNode)

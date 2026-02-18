@@ -194,6 +194,129 @@ func ResolveAlias(node *yaml.Node) *yaml.Node {
 	}
 }
 
+// IsMergeKey returns true if the given node is a YAML merge key (<<).
+func IsMergeKey(node *yaml.Node) bool {
+	return node != nil && node.Kind == yaml.ScalarNode && node.Tag == "!!merge" && node.Value == "<<"
+}
+
+// ResolveMergeKeys processes a mapping node's content and expands any YAML merge keys (<<).
+// Explicit keys in the mapping take precedence over merged keys (per the YAML merge key spec).
+// Merged mappings are recursively flattened so nested merge chains are fully expanded.
+// Returns new content with merge keys expanded, or the original content if no merge keys are present.
+func ResolveMergeKeys(content []*yaml.Node) []*yaml.Node {
+	return resolveMergeKeys(content, nil)
+}
+
+// resolveKeyValue returns the effective key string for a node, resolving aliases.
+func resolveKeyValue(node *yaml.Node) string {
+	resolved := ResolveAlias(node)
+	if resolved == nil {
+		return node.Value
+	}
+	return resolved.Value
+}
+
+func resolveMergeKeys(content []*yaml.Node, seen map[*yaml.Node]bool) []*yaml.Node {
+	if len(content) < 2 {
+		return content
+	}
+
+	hasMergeKey := false
+	for i := 0; i < len(content); i += 2 {
+		if IsMergeKey(content[i]) {
+			hasMergeKey = true
+			break
+		}
+	}
+	if !hasMergeKey {
+		return content
+	}
+
+	// Collect explicit (non-merge) keys, resolving aliases for correct identity
+	explicitKeys := make(map[string]bool)
+	for i := 0; i < len(content); i += 2 {
+		if !IsMergeKey(content[i]) {
+			explicitKeys[resolveKeyValue(content[i])] = true
+		}
+	}
+
+	// Build result: start with merged content, then explicit content
+	// (explicit keys override merged ones)
+	var mergedContent []*yaml.Node
+	seenMerged := make(map[string]bool)
+
+	for i := 0; i < len(content); i += 2 {
+		if i+1 >= len(content) {
+			break
+		}
+		if !IsMergeKey(content[i]) {
+			continue
+		}
+
+		valueNode := content[i+1]
+		resolved := ResolveAlias(valueNode)
+		if resolved == nil {
+			continue
+		}
+
+		collectMergedPairs(resolved, explicitKeys, seenMerged, &mergedContent, seen)
+	}
+
+	// Build final result: merged content first, then explicit keys
+	result := make([]*yaml.Node, 0, len(mergedContent)+len(content))
+	result = append(result, mergedContent...)
+
+	for i := 0; i < len(content); i += 2 {
+		if i+1 >= len(content) {
+			break
+		}
+		if IsMergeKey(content[i]) {
+			continue
+		}
+		result = append(result, content[i], content[i+1])
+	}
+
+	return result
+}
+
+// collectMergedPairs collects key-value pairs from a merge target (mapping or sequence of mappings),
+// recursively resolving any nested merge keys within the target.
+func collectMergedPairs(node *yaml.Node, explicitKeys, seenMerged map[string]bool, out *[]*yaml.Node, seen map[*yaml.Node]bool) {
+	switch node.Kind {
+	case yaml.MappingNode:
+		// Cycle guard: prevent infinite loops from circular aliases
+		if seen == nil {
+			seen = make(map[*yaml.Node]bool)
+		}
+		if seen[node] {
+			return
+		}
+		seen[node] = true
+
+		// Recursively flatten the merged mapping's own merge keys first
+		flatContent := resolveMergeKeys(node.Content, seen)
+
+		for j := 0; j < len(flatContent); j += 2 {
+			if j+1 < len(flatContent) {
+				key := resolveKeyValue(flatContent[j])
+				if !explicitKeys[key] && !seenMerged[key] {
+					*out = append(*out, flatContent[j], flatContent[j+1])
+					seenMerged[key] = true
+				}
+			}
+		}
+	case yaml.SequenceNode:
+		// Sequence of mappings merge: <<: [*alias1, *alias2]
+		for _, item := range node.Content {
+			resolvedItem := ResolveAlias(item)
+			if resolvedItem == nil || resolvedItem.Kind != yaml.MappingNode {
+				continue
+			}
+			collectMergedPairs(resolvedItem, explicitKeys, seenMerged, out, seen)
+		}
+	}
+}
+
 // EqualNodes compares two yaml.Node instances for equality.
 // It performs a deep comparison of the essential fields.
 func EqualNodes(a, b *yaml.Node) bool {

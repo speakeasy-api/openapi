@@ -360,6 +360,9 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 		}
 	}
 
+	// Resolve YAML merge keys (<<) before processing
+	content := yml.ResolveMergeKeys(resolvedNode.Content)
+
 	// Pre-scan for duplicate keys and determine which indices to skip
 	// For duplicate keys, we only process the last occurrence (YAML spec behavior)
 	// and report earlier occurrences as validation errors
@@ -371,8 +374,11 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 	indicesToSkip := make(map[int]bool) // indices that are duplicates (not the last occurrence)
 	var duplicateKeyErrs []error
 
-	for i := 0; i < len(resolvedNode.Content); i += 2 {
-		keyNode := resolvedNode.Content[i]
+	for i := 0; i < len(content); i += 2 {
+		keyNode := yml.ResolveAlias(content[i])
+		if keyNode == nil {
+			continue
+		}
 		key := keyNode.Value
 		if info, exists := seenKeys[key]; exists {
 			// This is a duplicate - mark the previous last occurrence for skipping
@@ -394,7 +400,7 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 	// Process YAML nodes and validate required fields in one pass
 	foundRequiredFields := sync.Map{}
 
-	numJobs := len(resolvedNode.Content) / 2
+	numJobs := len(content) / 2
 
 	var mapNode yaml.Node
 	var jobMapContent [][]*yaml.Node
@@ -416,17 +422,21 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 	// TODO allow concurrency to be configurable
 	g, ctx := errgroup.WithContext(ctx)
 
-	for i := 0; i < len(resolvedNode.Content); i += 2 {
+	for i := 0; i < len(content); i += 2 {
 		g.Go(func() error {
 			// Skip duplicate keys (all but the last occurrence)
 			if indicesToSkip[i/2] {
 				return nil
 			}
 
-			keyNode := resolvedNode.Content[i]
-			valueNode := resolvedNode.Content[i+1]
+			keyNode := content[i]
+			valueNode := content[i+1]
 
-			key := keyNode.Value
+			resolvedKeyNode := yml.ResolveAlias(keyNode)
+			if resolvedKeyNode == nil {
+				return nil
+			}
+			key := resolvedKeyNode.Value
 
 			// Direct field index lookup (eliminates map[string]Field allocation)
 			fieldIndex, ok := fieldMap.FieldIndexes[key]

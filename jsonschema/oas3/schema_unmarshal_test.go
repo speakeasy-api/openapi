@@ -6,6 +6,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -342,4 +343,244 @@ x-metadata:
 	ext, ok = extensions.Get("x-metadata")
 	require.True(t, ok)
 	require.NotNil(t, ext.Value)
+}
+
+func TestSchema_Unmarshal_MergeKeys_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		yml            string
+		expectedProps  []string
+		expectedType   string
+		checkOverride  bool
+		overrideKey    string
+		overrideDesc   string
+		noMergeKeyProp bool
+	}{
+		{
+			name: "merge key in properties inherits from anchor",
+			yml: `
+type: object
+properties:
+  id: &base_id
+    type: integer
+    description: Base ID
+  name:
+    type: string
+    description: User name
+`,
+			expectedProps:  []string{"id", "name"},
+			expectedType:   "object",
+			noMergeKeyProp: true,
+		},
+		{
+			name: "merge key expands aliased mapping into properties",
+			yml: `
+type: object
+properties:
+  <<:
+    id:
+      type: integer
+      description: Base ID
+    name:
+      type: string
+      description: Base name
+  email:
+    type: string
+    description: Email address
+`,
+			expectedProps:  []string{"id", "name", "email"},
+			noMergeKeyProp: true,
+		},
+		{
+			name: "merge key with alias expands into properties",
+			// NOTE: YAML anchors/aliases must be defined in the same document.
+			// We define the anchor at a top-level key and reference it in properties.
+			yml: `
+type: object
+x-base-props: &base_props
+  id:
+    type: integer
+    description: Base ID
+  name:
+    type: string
+    description: Base name
+properties:
+  <<: *base_props
+  email:
+    type: string
+    description: Email address
+`,
+			expectedProps:  []string{"id", "name", "email"},
+			noMergeKeyProp: true,
+		},
+		{
+			name: "merge key with override in properties",
+			yml: `
+type: object
+x-base-props: &base_props
+  id:
+    type: integer
+    description: Base ID
+  name:
+    type: string
+    description: Base name
+properties:
+  <<: *base_props
+  name:
+    type: string
+    description: Overridden name
+  email:
+    type: string
+    description: Email address
+`,
+			expectedProps:  []string{"id", "name", "email"},
+			noMergeKeyProp: true,
+			checkOverride:  true,
+			overrideKey:    "name",
+			overrideDesc:   "Overridden name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var schema oas3.Schema
+
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &schema)
+			require.NoError(t, err, "unmarshal should succeed")
+			require.Empty(t, validationErrs, "should have no validation errors")
+
+			require.NotNil(t, schema.Properties, "properties should not be nil")
+
+			if tt.noMergeKeyProp {
+				_, hasMergeKey := schema.Properties.Get("<<")
+				assert.False(t, hasMergeKey, "merge key '<<' should not appear as a property name")
+			}
+
+			for _, prop := range tt.expectedProps {
+				propSchema, ok := schema.Properties.Get(prop)
+				assert.True(t, ok, "property %q should exist", prop)
+				assert.NotNil(t, propSchema, "property %q schema should not be nil", prop)
+			}
+
+			assert.Equal(t, len(tt.expectedProps), schema.Properties.Len(), "should have expected number of properties")
+
+			if tt.checkOverride {
+				propSchema, ok := schema.Properties.Get(tt.overrideKey)
+				require.True(t, ok, "override property %q should exist", tt.overrideKey)
+				require.True(t, propSchema.IsSchema(), "override property %q should be a schema", tt.overrideKey)
+				assert.Equal(t, tt.overrideDesc, propSchema.GetSchema().GetDescription(), "overridden property should have the overriding description")
+			}
+		})
+	}
+}
+
+func TestSchema_Unmarshal_MergeKeysAtModelLevel_Success(t *testing.T) {
+	t.Parallel()
+
+	yml := `
+x-base: &base
+  type: object
+  description: Base schema description
+<<: *base
+title: Extended Schema
+properties:
+  id:
+    type: integer
+`
+
+	var schema oas3.Schema
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &schema)
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "should have no validation errors")
+
+	types := schema.GetType()
+	require.Len(t, types, 1, "should have type from merge")
+	assert.Equal(t, oas3.SchemaTypeObject, types[0], "merged type should be object")
+	assert.Equal(t, "Base schema description", schema.GetDescription(), "should have description from merge")
+	assert.Equal(t, "Extended Schema", schema.GetTitle(), "explicit title should be present")
+
+	require.NotNil(t, schema.Properties, "properties should not be nil")
+	_, ok := schema.Properties.Get("id")
+	assert.True(t, ok, "property 'id' should exist")
+}
+
+func TestSchema_Unmarshal_NestedMergeChain_Success(t *testing.T) {
+	t.Parallel()
+
+	// base1 defines {id, name}, base2 merges base1 and adds {email},
+	// final schema merges base2 and adds {age}.
+	// All four properties should be present via recursive merge resolution.
+	yml := `
+x-base1: &base1
+  id:
+    type: integer
+  name:
+    type: string
+x-base2: &base2
+  <<: *base1
+  email:
+    type: string
+type: object
+properties:
+  <<: *base2
+  age:
+    type: integer
+`
+
+	var schema oas3.Schema
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &schema)
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "should have no validation errors")
+
+	require.NotNil(t, schema.Properties, "properties should not be nil")
+
+	_, hasMergeKey := schema.Properties.Get("<<")
+	assert.False(t, hasMergeKey, "merge key '<<' should not appear as a property name")
+
+	expectedProps := []string{"id", "name", "email", "age"}
+	for _, prop := range expectedProps {
+		propSchema, ok := schema.Properties.Get(prop)
+		assert.True(t, ok, "property %q should exist", prop)
+		assert.NotNil(t, propSchema, "property %q schema should not be nil", prop)
+	}
+
+	assert.Equal(t, len(expectedProps), schema.Properties.Len(), "should have all 4 properties from nested merge chain")
+}
+
+func TestSchema_Unmarshal_QuotedLiteralMergeKey_Success(t *testing.T) {
+	t.Parallel()
+
+	// A quoted '<<' is a regular string key, not a merge key.
+	// It should be treated as a normal property name.
+	yml := `
+type: object
+properties:
+  '<<':
+    type: string
+    description: This is a literal property named <<
+  name:
+    type: string
+`
+
+	var schema oas3.Schema
+
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(yml), &schema)
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "should have no validation errors")
+
+	require.NotNil(t, schema.Properties, "properties should not be nil")
+	assert.Equal(t, 2, schema.Properties.Len(), "should have 2 properties")
+
+	propSchema, ok := schema.Properties.Get("<<")
+	assert.True(t, ok, "quoted '<<' should be a normal property")
+	assert.NotNil(t, propSchema, "quoted '<<' property schema should not be nil")
+
+	_, ok = schema.Properties.Get("name")
+	assert.True(t, ok, "property 'name' should exist")
 }
