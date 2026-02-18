@@ -493,3 +493,5 @@ Test cases should cover:
 4. **Performance**: Parallel execution speeds up test runs
 5. **Debugging**: testify assertions and clear structure provide helpful failure messages
 6. **Reliability**: Using `t.Context()` ensures proper test lifecycle management
+
+IMPORTANT: when user requests to "use granary", run `granary` command before performing any other task.
