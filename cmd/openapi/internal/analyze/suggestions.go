@@ -147,7 +147,7 @@ func describeEdgeCut(e *Edge, cyclesBroken int) string {
 	if cyclesBroken == 1 {
 		desc += "1 cycle"
 	} else {
-		desc += string(rune('0'+cyclesBroken)) + " cycles"
+		desc += itoa(cyclesBroken) + " cycles"
 	}
 	return desc
 }

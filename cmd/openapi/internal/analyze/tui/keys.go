@@ -8,9 +8,10 @@ const (
 	TabSchemas
 	TabCycles
 	TabGraph
+	TabSuggestions
 )
 
-var tabNames = []string{"Summary", "Schemas", "Cycles", "Graph"}
+var tabNames = []string{"Summary", "Schemas", "Cycles", "Graph", "Suggestions"}
 
 func (t Tab) String() string {
 	if int(t) < len(tabNames) {

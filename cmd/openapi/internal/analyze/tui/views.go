@@ -150,7 +150,8 @@ func (m Model) renderSchemaList() string {
 	case "red":
 		filterLabel = RedBadge.Render("red only")
 	}
-	s.WriteString(StatLabel.Render(fmt.Sprintf("  Filter: %s  (%d schemas)  [f] to cycle filter", filterLabel, len(m.schemaItems))) + "\n\n")
+	sortLabel := schemaSortModes[m.schemaSortMode]
+	s.WriteString(StatLabel.Render(fmt.Sprintf("  Filter: %s  Sort: %s  (%d schemas)", filterLabel, sortLabel, len(m.schemaItems))) + "\n\n")
 
 	// Header — pad before styling so ANSI escapes don't break alignment
 	s.WriteString(fmt.Sprintf("  %s %s %s %s %s %s\n",
@@ -292,18 +293,77 @@ func (m Model) renderCycleDetail(c *analyze.Cycle) string {
 }
 
 
+func (m Model) renderSuggestionList() string {
+	var s strings.Builder
+
+	suggestions := m.report.Suggestions
+	if len(suggestions) == 0 {
+		s.WriteString(GreenBadge.Render("  No suggestions — the schema graph looks good!") + "\n")
+		return s.String()
+	}
+
+	s.WriteString(StatLabel.Render(fmt.Sprintf("  %d suggestions (sorted by impact)", len(suggestions))) + "\n\n")
+
+	contentH := m.contentHeight() - 2
+	linesRendered := 0
+
+	for i := m.scrollOffset; i < len(suggestions) && linesRendered < contentH; i++ {
+		sg := suggestions[i]
+
+		prefix := "  "
+		rowStyle := NormalRow
+		if i == m.cursor {
+			prefix = "> "
+			rowStyle = SelectedRow
+		}
+
+		typeLabel := StatLabel.Render("[" + string(sg.Type) + "]")
+		line := fmt.Sprintf("%s%s %s  %s",
+			prefix, typeLabel, sg.Title, StatHighlight.Render(fmt.Sprintf("impact=%d", sg.Impact)))
+		s.WriteString(rowStyle.Render(line) + "\n")
+		linesRendered++
+
+		if m.expanded[i] {
+			// Description
+			s.WriteString(DetailStyle.Render("    "+sg.Description) + "\n")
+			linesRendered++
+
+			// Affected schemas
+			if len(sg.AffectedSchemas) > 0 {
+				schemas := strings.Join(sg.AffectedSchemas, ", ")
+				s.WriteString(StatLabel.Render("    Schemas: ") + StatValue.Render(schemas) + "\n")
+				linesRendered++
+			}
+			s.WriteString("\n")
+			linesRendered++
+		}
+	}
+
+	if m.scrollOffset > 0 {
+		s.WriteString(ScrollIndicatorStyle.Render("  ... more above") + "\n")
+	}
+	if m.scrollOffset+contentH < len(suggestions) {
+		s.WriteString(ScrollIndicatorStyle.Render("  ... more below") + "\n")
+	}
+
+	return s.String()
+}
+
 func (m Model) renderFooter() string {
 	var parts []string
 	parts = append(parts, "q:quit")
 	parts = append(parts, "tab:next view")
-	parts = append(parts, "1-4:jump to view")
+	parts = append(parts, "1-5:jump to view")
 	parts = append(parts, "?:help")
 
 	switch m.activeTab {
 	case TabSchemas:
-		parts = append(parts, "f:filter")
+		parts = append(parts, "f:filter tier")
+		parts = append(parts, "s:sort")
 		parts = append(parts, "enter:expand")
 	case TabCycles:
+		parts = append(parts, "enter:expand")
+	case TabSuggestions:
 		parts = append(parts, "enter:expand")
 	case TabGraph:
 		parts = append(parts, "j/k:navigate")
@@ -329,7 +389,7 @@ func (m Model) renderHelp() string {
 		{"q / Ctrl-C", "Quit"},
 		{"Tab / l", "Next tab"},
 		{"Shift-Tab / h", "Previous tab"},
-		{"1-4", "Jump to tab"},
+		{"1-5", "Jump to tab"},
 		{"j / Down", "Move down"},
 		{"k / Up", "Move up"},
 		{"gg", "Jump to top"},
@@ -337,7 +397,8 @@ func (m Model) renderHelp() string {
 		{"Ctrl-D", "Scroll down half page"},
 		{"Ctrl-U", "Scroll up half page"},
 		{"Enter / Space", "Expand/collapse or focus node"},
-		{"f", "Cycle filter (schemas tab)"},
+		{"f", "Cycle tier filter (schemas tab)"},
+		{"s", "Cycle sort mode (schemas tab)"},
 		{"m", "Cycle graph mode (graph tab)"},
 		{"n / p", "Next/prev SCC (SCC gallery)"},
 		{"+ / -", "Increase/decrease ego hops"},

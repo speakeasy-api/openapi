@@ -17,6 +17,8 @@ const (
 	layoutBuffer          = 2
 )
 
+var schemaSortModes = []string{"complexity", "name", "fan-in", "fan-out", "tier"}
+
 // Model is the top-level bubbletea model for the schema complexity analyzer TUI.
 type Model struct {
 	report *analyze.Report
@@ -31,9 +33,10 @@ type Model struct {
 	expanded     map[int]bool // expanded items in list views
 
 	// Schema list state
-	schemaFilter string // "" = all, "red", "yellow"
-	schemaSort   string // "name", "fan-in", "fan-out", "tier", "complexity"
-	schemaItems  []string
+	schemaFilter   string         // "" = all, "red", "yellow"
+	schemaSortMode int            // index into schemaSortModes
+	schemaItems    []string
+	schemaRanks    map[string]int // cached complexity ranks
 
 	// Cycle list state
 	cycleSelected int
@@ -56,17 +59,33 @@ type Model struct {
 
 // NewModel creates a new TUI model from an analysis report.
 func NewModel(report *analyze.Report) Model {
+	// Pre-compute complexity ranks
+	ranked := analyze.TopSchemasByComplexity(report.Metrics, len(report.Metrics))
+	ranks := make(map[string]int, len(ranked))
+	for i, r := range ranked {
+		ranks[r.NodeID] = i + 1
+	}
+
 	m := Model{
-		report:       report,
-		width:        80,
-		height:       24,
-		expanded:     make(map[int]bool),
+		report:      report,
+		width:       80,
+		height:      24,
+		expanded:    make(map[int]bool),
+		schemaRanks: ranks,
+
 		graphEgoHops: 2,
 		graphCache:   make(map[string]string),
 	}
 	m.rebuildSchemaItems()
 	m.rebuildGraphItems()
 	return m
+}
+
+func (m Model) schemaRank(nodeID string) int {
+	if r, ok := m.schemaRanks[nodeID]; ok {
+		return r
+	}
+	return 0
 }
 
 func (m *Model) rebuildGraphItems() {
@@ -147,7 +166,22 @@ func (m *Model) rebuildGraphItems() {
 
 func (m *Model) rebuildSchemaItems() {
 	m.schemaItems = nil
-	ranked := analyze.TopSchemasByComplexity(m.report.Metrics, len(m.report.Metrics))
+
+	var ranked []*analyze.SchemaMetrics
+	sortMode := schemaSortModes[m.schemaSortMode]
+	switch sortMode {
+	case "name":
+		ranked = analyze.TopSchemasByName(m.report.Metrics, len(m.report.Metrics))
+	case "fan-in":
+		ranked = analyze.TopSchemasByFanIn(m.report.Metrics, len(m.report.Metrics))
+	case "fan-out":
+		ranked = analyze.TopSchemasByFanOut(m.report.Metrics, len(m.report.Metrics))
+	case "tier":
+		ranked = analyze.TopSchemasByTier(m.report.Metrics, m.report.Codegen, len(m.report.Metrics))
+	default:
+		ranked = analyze.TopSchemasByComplexity(m.report.Metrics, len(m.report.Metrics))
+	}
+
 	for _, sm := range ranked {
 		if m.schemaFilter != "" {
 			d := m.report.Codegen.PerSchema[sm.NodeID]
@@ -341,6 +375,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.lastKeyAt = now
 			}
 
+		case "s":
+			if m.activeTab == TabSchemas {
+				m.schemaSortMode = (m.schemaSortMode + 1) % len(schemaSortModes)
+				m.rebuildSchemaItems()
+				m.cursor = 0
+				m.scrollOffset = 0
+			}
+
 		case "f":
 			if m.activeTab == TabSchemas {
 				switch m.schemaFilter {
@@ -373,6 +415,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cursor = 0
 			m.scrollOffset = 0
 			m.graphCursor = 0
+		case "5":
+			m.activeTab = TabSuggestions
+			m.cursor = 0
+			m.scrollOffset = 0
 		}
 	}
 
@@ -399,6 +445,8 @@ func (m Model) View() string {
 		content = m.renderCycleList()
 	case TabGraph:
 		content = m.renderGraphView()
+	case TabSuggestions:
+		content = m.renderSuggestionList()
 	}
 
 	s.WriteString(content)
@@ -428,6 +476,11 @@ func (m Model) maxCursorForTab() int {
 			return 0
 		}
 		return len(m.report.Cycles.Cycles) - 1
+	case TabSuggestions:
+		if len(m.report.Suggestions) == 0 {
+			return 0
+		}
+		return len(m.report.Suggestions) - 1
 	default:
 		return 0
 	}
@@ -473,16 +526,27 @@ func (m Model) itemHeight(index int) int {
 	if !m.expanded[index] {
 		return 1
 	}
-	// Estimate card height based on content
-	h := 12 // base: title, tier, types, props, fan, complexity, border
-	if m.activeTab == TabSchemas && index < len(m.schemaItems) {
-		id := m.schemaItems[index]
-		if d, ok := m.report.Codegen.PerSchema[id]; ok && len(d.Signals) > 0 {
-			h += len(d.Signals) + 1
+
+	switch m.activeTab {
+	case TabSchemas:
+		// Estimate card height based on content
+		h := 12 // base: title, tier, types, props, fan, complexity, border
+		if index < len(m.schemaItems) {
+			id := m.schemaItems[index]
+			if d, ok := m.report.Codegen.PerSchema[id]; ok && len(d.Signals) > 0 {
+				h += len(d.Signals) + 1
+			}
+			if edges := m.report.Graph.OutEdges[id]; len(edges) > 0 {
+				h += len(edges) + 1
+			}
 		}
-		if edges := m.report.Graph.OutEdges[id]; len(edges) > 0 {
-			h += len(edges) + 1
+		return h
+	case TabSuggestions:
+		return 4 // description + schemas + blank
+	case TabCycles:
+		if index < len(m.report.Cycles.Cycles) {
+			return m.report.Cycles.Cycles[index].Length + 3
 		}
 	}
-	return h
+	return 6
 }

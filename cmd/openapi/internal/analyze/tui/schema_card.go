@@ -32,17 +32,12 @@ func (m Model) renderSchemaCard(nodeID string) string {
 
 	// Pick border color based on tier
 	borderColor := colorGreen
-	tierEmoji := "🟢"
-	tierName := "green"
 	if d != nil {
-		tierName = strings.ToLower(d.Tier.String())
 		switch d.Tier {
 		case analyze.CodegenYellow:
 			borderColor = colorYellow
-			tierEmoji = "🟡"
 		case analyze.CodegenRed:
 			borderColor = colorRed
-			tierEmoji = "🔴"
 		}
 	}
 
@@ -54,18 +49,22 @@ func (m Model) renderSchemaCard(nodeID string) string {
 	content.WriteString(titleStyle.Render(nodeID) + "\n")
 
 	// Tier + score + rank
-	ranked := analyze.TopSchemasByComplexity(m.report.Metrics, len(m.report.Metrics))
-	rank := 0
-	for i, r := range ranked {
-		if r.NodeID == nodeID {
-			rank = i + 1
-			break
-		}
-	}
+	rank := m.schemaRank(nodeID)
+	tier := tierBadge(d)
 	content.WriteString(fmt.Sprintf("%s %s    %s %s    %s %s\n",
-		StatLabel.Render("Tier:"), StatValue.Render(tierEmoji+" "+tierName),
+		StatLabel.Render("Tier:"), tier,
 		StatLabel.Render("Score:"), StatValue.Render(fmt.Sprintf("%d", sm.ComplexityScore())),
 		StatLabel.Render("Rank:"), StatValue.Render(fmt.Sprintf("#%d", rank))))
+
+	// Score breakdown
+	breakdown := sm.ComplexityBreakdown()
+	if len(breakdown) > 0 {
+		var parts []string
+		for _, c := range breakdown {
+			parts = append(parts, fmt.Sprintf("%s=%d", c.Name, c.Value))
+		}
+		content.WriteString(StatLabel.Render("  "+strings.Join(parts, " + ")) + "\n")
+	}
 	content.WriteString("\n")
 
 	// Types + nullable

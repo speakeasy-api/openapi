@@ -1,14 +1,15 @@
 package openapi
 
 import (
-	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/speakeasy-api/openapi/cmd/openapi/internal/analyze"
 	"github.com/speakeasy-api/openapi/cmd/openapi/internal/analyze/tui"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var analyzeCmd = &cobra.Command{
@@ -23,10 +24,13 @@ This command examines schema references to identify:
 - Actionable refactoring suggestions
 
 Output formats:
-  tui   - Interactive terminal UI with progressive disclosure (default)
-  json  - Machine-readable JSON report for CI/CD pipelines
-  text  - Human-readable text summary
-  dot   - Graphviz DOT format for graph visualization
+  tui     - Interactive terminal UI with progressive disclosure (default)
+  json    - Machine-readable JSON report for CI/CD pipelines
+  text    - Human-readable text summary
+  dot     - Graphviz DOT format for graph visualization
+  mermaid - Mermaid diagram syntax
+
+The TUI format auto-falls back to text when stdout is not a terminal.
 
 Stdin is supported — pipe data or use '-':
   cat spec.yaml | openapi spec analyze
@@ -36,7 +40,7 @@ Stdin is supported — pipe data or use '-':
 }
 
 func init() {
-	analyzeCmd.Flags().StringP("format", "f", "tui", "output format: tui, json, text, dot")
+	analyzeCmd.Flags().StringP("format", "f", "tui", "output format: tui, json, text, dot, mermaid")
 	analyzeCmd.Flags().StringP("output", "o", "", "write output to file instead of stdout")
 }
 
@@ -55,11 +59,29 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	// Run analysis
 	report := analyze.Analyze(ctx, doc)
 
+	// Auto-fallback: if format is TUI but stdout is not a terminal, use text
+	if format == "tui" && outputFile == "" && !term.IsTerminal(int(os.Stdout.Fd())) {
+		format = "text"
+	}
+
+	// TUI is incompatible with --output; suggest text instead
+	if format == "tui" && outputFile != "" {
+		return fmt.Errorf("--output is not compatible with --format tui; use --format text, json, or dot instead")
+	}
+
+	// Open output writer
+	var w io.Writer = os.Stdout
+	if outputFile != "" {
+		f, err := os.Create(outputFile)
+		if err != nil {
+			return fmt.Errorf("failed to create output file: %w", err)
+		}
+		defer f.Close()
+		w = f
+	}
+
 	switch format {
 	case "tui":
-		if outputFile != "" {
-			return errors.New("--output is not compatible with --format tui")
-		}
 		m := tui.NewModel(report)
 		p := tea.NewProgram(m, tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
@@ -68,44 +90,21 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		return nil
 
 	case "json":
-		w := os.Stdout
-		if outputFile != "" {
-			f, err := os.Create(outputFile)
-			if err != nil {
-				return fmt.Errorf("failed to create output file: %w", err)
-			}
-			defer f.Close()
-			w = f
-		}
 		return analyze.WriteJSON(w, report)
 
 	case "text":
-		w := os.Stdout
-		if outputFile != "" {
-			f, err := os.Create(outputFile)
-			if err != nil {
-				return fmt.Errorf("failed to create output file: %w", err)
-			}
-			defer f.Close()
-			w = f
-		}
 		analyze.WriteText(w, report)
 		return nil
 
 	case "dot":
-		w := os.Stdout
-		if outputFile != "" {
-			f, err := os.Create(outputFile)
-			if err != nil {
-				return fmt.Errorf("failed to create output file: %w", err)
-			}
-			defer f.Close()
-			w = f
-		}
 		analyze.WriteDOT(w, report)
 		return nil
 
+	case "mermaid":
+		analyze.WriteMermaid(w, report)
+		return nil
+
 	default:
-		return fmt.Errorf("unknown format: %s (expected tui, json, text, or dot)", format)
+		return fmt.Errorf("unknown format: %s (expected tui, json, text, dot, or mermaid)", format)
 	}
 }

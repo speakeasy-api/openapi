@@ -12,7 +12,7 @@ const (
 	colorThemePurple = "#7C3AED"
 	colorBackground  = "#374151"
 	colorDetailGray  = "#9CA3AF"
-	colorFooterText  = "#000000"
+	colorFooterText  = "#E5E7EB"
 	colorWhite       = "#FFFFFF"
 	colorCyan        = "#06B6D4"
 	colorOrange      = "#F97316"
@@ -77,11 +77,6 @@ var (
 			PaddingLeft(2).
 			Foreground(lipgloss.Color(colorDetailGray))
 
-	DetailHeader = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(colorWhite)).
-			Bold(true).
-			MarginTop(1)
-
 	// Suggestion styles
 	SuggestionStyle = lipgloss.NewStyle().
 			PaddingLeft(2).
@@ -91,9 +86,6 @@ var (
 	RequiredEdge = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(colorRed)).
 			Bold(true)
-
-	OptionalEdge = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(colorGreen))
 
 	ArrayEdge = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(colorBlue))
@@ -123,32 +115,10 @@ var (
 			Align(lipgloss.Center).
 			Width(46)
 
-	// Box styles for dashboard cards
-	CardStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(colorGray)).
-			Padding(0, 1)
-
 	CardTitleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(colorThemePurple)).
 			Bold(true)
 
 	ScrollIndicatorStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color(colorGray))
-
-	// Card border styles by tier
-	CardBorderGreen = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(colorGreen)).
-			Padding(0, 1)
-
-	CardBorderYellow = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color(colorYellow)).
-				Padding(0, 1)
-
-	CardBorderRed = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(colorRed)).
-			Padding(0, 1)
 )

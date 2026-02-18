@@ -37,22 +37,29 @@ type JSONReport struct {
 
 // JSONSchemaEntry is the JSON form of per-schema analysis.
 type JSONSchemaEntry struct {
-	ID                string   `json:"id"`
-	Types             []string `json:"types,omitempty"`
-	PropertyCount     int      `json:"propertyCount"`
-	DeepPropertyCount int      `json:"deepPropertyCount,omitempty"`
-	FanIn             int      `json:"fanIn"`
-	FanOut            int      `json:"fanOut"`
-	NestingDepth      int      `json:"nestingDepth,omitempty"`
-	CompositionDepth  int      `json:"compositionDepth,omitempty"`
-	MaxUnionWidth     int      `json:"maxUnionWidth,omitempty"`
-	VariantProduct    int      `json:"variantProduct,omitempty"`
-	InSCC             bool     `json:"inSCC"`
-	CycleCount        int      `json:"cycleCount"`
-	ComplexityScore   int      `json:"complexityScore"`
-	Rank              int      `json:"rank"`
-	CodegenTier       string   `json:"codegenTier"`
-	Signals           []string `json:"signals,omitempty"`
+	ID                string            `json:"id"`
+	Types             []string          `json:"types,omitempty"`
+	PropertyCount     int               `json:"propertyCount"`
+	DeepPropertyCount int               `json:"deepPropertyCount,omitempty"`
+	FanIn             int               `json:"fanIn"`
+	FanOut            int               `json:"fanOut"`
+	NestingDepth      int               `json:"nestingDepth,omitempty"`
+	CompositionDepth  int               `json:"compositionDepth,omitempty"`
+	MaxUnionWidth     int               `json:"maxUnionWidth,omitempty"`
+	VariantProduct    int               `json:"variantProduct,omitempty"`
+	InSCC             bool              `json:"inSCC"`
+	CycleCount        int               `json:"cycleCount"`
+	ComplexityScore   int               `json:"complexityScore"`
+	Rank              int               `json:"rank"`
+	CodegenTier       string            `json:"codegenTier"`
+	Signals           []JSONSignalEntry `json:"signals,omitempty"`
+}
+
+// JSONSignalEntry is the JSON form of a codegen signal.
+type JSONSignalEntry struct {
+	ID          string `json:"id"`
+	Description string `json:"description"`
+	Severity    string `json:"severity"`
 }
 
 // JSONCycleEntry is the JSON form of a cycle.
@@ -114,7 +121,11 @@ func WriteJSON(w io.Writer, r *Report) error {
 		if d, ok := r.Codegen.PerSchema[sm.NodeID]; ok {
 			entry.CodegenTier = d.Tier.String()
 			for _, s := range d.Signals {
-				entry.Signals = append(entry.Signals, s.ID)
+				entry.Signals = append(entry.Signals, JSONSignalEntry{
+					ID:          s.ID,
+					Description: s.Description,
+					Severity:    s.Severity.String(),
+				})
 			}
 		}
 		jr.Schemas = append(jr.Schemas, entry)
@@ -191,6 +202,17 @@ func WriteDOT(w io.Writer, r *Report) {
 	fmt.Fprintf(w, "}\n")
 }
 
+// WriteMermaid writes the schema reference graph as a Mermaid diagram.
+func WriteMermaid(w io.Writer, r *Report) {
+	fmt.Fprintln(w, DAGOverviewToMermaid(r.Graph, r.Cycles, 0))
+
+	// Also output individual SCCs if present
+	for i := range r.Cycles.SCCs {
+		fmt.Fprintf(w, "\n%% SCC #%d\n", i+1)
+		fmt.Fprintln(w, SCCToMermaid(r.Graph, r.Cycles, i))
+	}
+}
+
 // WriteText writes a human-readable text summary to the given writer.
 func WriteText(w io.Writer, r *Report) {
 	fmt.Fprintf(w, "Schema Complexity Report: %s v%s (OpenAPI %s)\n", r.DocumentTitle, r.DocumentVersion, r.OpenAPIVersion)
@@ -251,11 +273,21 @@ func WriteText(w io.Writer, r *Report) {
 		fmt.Fprintf(w, "RED TIER SCHEMAS (%d)\n", len(reds))
 		for _, id := range reds {
 			d := r.Codegen.PerSchema[id]
-			var sigs []string
+			fmt.Fprintf(w, "  - %s\n", id)
 			for _, s := range d.Signals {
-				sigs = append(sigs, s.ID)
+				fmt.Fprintf(w, "      [%s] %s (%s)\n", s.Severity, s.Description, s.ID)
 			}
-			fmt.Fprintf(w, "  - %-30s [%s]\n", id, strings.Join(sigs, ", "))
+		}
+		fmt.Fprintln(w)
+	}
+	if len(yellows) > 0 {
+		fmt.Fprintf(w, "YELLOW TIER SCHEMAS (%d)\n", len(yellows))
+		for _, id := range yellows {
+			d := r.Codegen.PerSchema[id]
+			fmt.Fprintf(w, "  - %s\n", id)
+			for _, s := range d.Signals {
+				fmt.Fprintf(w, "      [%s] %s (%s)\n", s.Severity, s.Description, s.ID)
+			}
 		}
 		fmt.Fprintln(w)
 	}

@@ -105,6 +105,28 @@ func TopSchemasByComplexity(metrics map[string]*SchemaMetrics, n int) []*SchemaM
 	})
 }
 
+// TopSchemasByName returns all schemas sorted alphabetically by name.
+func TopSchemasByName(metrics map[string]*SchemaMetrics, n int) []*SchemaMetrics {
+	return topSchemasBy(metrics, n, func(a, b *SchemaMetrics) bool {
+		return a.NodeID < b.NodeID
+	})
+}
+
+// TopSchemasByTier returns schemas sorted by codegen tier (red first, then yellow, then green).
+func TopSchemasByTier(metrics map[string]*SchemaMetrics, codegen *CodegenReport, n int) []*SchemaMetrics {
+	return topSchemasBy(metrics, n, func(a, b *SchemaMetrics) bool {
+		tierA := CodegenGreen
+		if d, ok := codegen.PerSchema[a.NodeID]; ok {
+			tierA = d.Tier
+		}
+		tierB := CodegenGreen
+		if d, ok := codegen.PerSchema[b.NodeID]; ok {
+			tierB = d.Tier
+		}
+		return tierA > tierB // red (2) > yellow (1) > green (0)
+	})
+}
+
 // ComplexityScore returns a composite complexity score for this schema.
 func (m *SchemaMetrics) ComplexityScore() int {
 	score := m.FanIn + m.FanOut + m.DeepPropertyCount + m.CompositionDepth*3 + m.NestingDepth*2
@@ -129,13 +151,58 @@ func (m *SchemaMetrics) ComplexityScore() int {
 	return score
 }
 
+// ComplexityBreakdown returns a map of component names to their contribution to the complexity score.
+func (m *SchemaMetrics) ComplexityBreakdown() []ScoreComponent {
+	var components []ScoreComponent
+	add := func(name string, value int) {
+		if value > 0 {
+			components = append(components, ScoreComponent{Name: name, Value: value})
+		}
+	}
+	add("fan-in", m.FanIn)
+	add("fan-out", m.FanOut)
+	add("properties", m.DeepPropertyCount)
+	add("composition", m.CompositionDepth*3)
+	add("nesting", m.NestingDepth*2)
+	if m.InSCC {
+		add("in-SCC", 10)
+	}
+	add("cycle-membership", m.CycleMembership*5)
+	if m.VariantProduct > 1 {
+		vp := m.VariantProduct
+		logContrib := 0
+		for vp > 1 {
+			logContrib++
+			vp /= 2
+		}
+		add("variant-explosion", logContrib*5)
+	}
+	if m.UnionSiteCount > 1 {
+		add("multi-union", m.UnionSiteCount*3)
+	}
+	return components
+}
+
+// ScoreComponent is a named contribution to the complexity score.
+type ScoreComponent struct {
+	Name  string
+	Value int
+}
+
 func topSchemasBy(metrics map[string]*SchemaMetrics, n int, less func(a, b *SchemaMetrics) bool) []*SchemaMetrics {
 	all := make([]*SchemaMetrics, 0, len(metrics))
 	for _, m := range metrics {
 		all = append(all, m)
 	}
-	sort.Slice(all, func(i, j int) bool {
-		return less(all[i], all[j])
+	sort.SliceStable(all, func(i, j int) bool {
+		if less(all[i], all[j]) {
+			return true
+		}
+		if less(all[j], all[i]) {
+			return false
+		}
+		// Deterministic tie-break by name
+		return all[i].NodeID < all[j].NodeID
 	})
 	if n > len(all) {
 		n = len(all)
