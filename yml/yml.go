@@ -217,44 +217,42 @@ func resolveKeyValue(node *yaml.Node) string {
 }
 
 func resolveMergeKeys(content []*yaml.Node, seen map[*yaml.Node]bool) []*yaml.Node {
+	// Trim trailing orphan key (odd-length content) so all loops can assume pairs
+	if len(content)%2 == 1 {
+		content = content[:len(content)-1]
+	}
 	if len(content) < 2 {
 		return content
 	}
 
+	// Single pass: detect merge keys and collect explicit keys simultaneously
 	hasMergeKey := false
+	numMergePairs := 0
+	explicitKeys := make(map[string]struct{})
+
 	for i := 0; i < len(content); i += 2 {
 		if IsMergeKey(content[i]) {
 			hasMergeKey = true
-			break
+			numMergePairs++
+		} else {
+			explicitKeys[resolveKeyValue(content[i])] = struct{}{}
 		}
 	}
 	if !hasMergeKey {
 		return content
 	}
 
-	// Collect explicit (non-merge) keys, resolving aliases for correct identity
-	explicitKeys := make(map[string]bool)
-	for i := 0; i < len(content); i += 2 {
-		if !IsMergeKey(content[i]) {
-			explicitKeys[resolveKeyValue(content[i])] = true
-		}
-	}
-
 	// Build result: start with merged content, then explicit content
 	// (explicit keys override merged ones)
 	var mergedContent []*yaml.Node
-	seenMerged := make(map[string]bool)
+	seenMerged := make(map[string]struct{})
 
 	for i := 0; i < len(content); i += 2 {
-		if i+1 >= len(content) {
-			break
-		}
 		if !IsMergeKey(content[i]) {
 			continue
 		}
 
-		valueNode := content[i+1]
-		resolved := ResolveAlias(valueNode)
+		resolved := ResolveAlias(content[i+1])
 		if resolved == nil {
 			continue
 		}
@@ -263,13 +261,11 @@ func resolveMergeKeys(content []*yaml.Node, seen map[*yaml.Node]bool) []*yaml.No
 	}
 
 	// Build final result: merged content first, then explicit keys
-	result := make([]*yaml.Node, 0, len(mergedContent)+len(content))
+	explicitLen := len(content) - 2*numMergePairs
+	result := make([]*yaml.Node, 0, len(mergedContent)+explicitLen)
 	result = append(result, mergedContent...)
 
 	for i := 0; i < len(content); i += 2 {
-		if i+1 >= len(content) {
-			break
-		}
 		if IsMergeKey(content[i]) {
 			continue
 		}
@@ -281,7 +277,7 @@ func resolveMergeKeys(content []*yaml.Node, seen map[*yaml.Node]bool) []*yaml.No
 
 // collectMergedPairs collects key-value pairs from a merge target (mapping or sequence of mappings),
 // recursively resolving any nested merge keys within the target.
-func collectMergedPairs(node *yaml.Node, explicitKeys, seenMerged map[string]bool, out *[]*yaml.Node, seen map[*yaml.Node]bool) {
+func collectMergedPairs(node *yaml.Node, explicitKeys, seenMerged map[string]struct{}, out *[]*yaml.Node, seen map[*yaml.Node]bool) {
 	switch node.Kind {
 	case yaml.MappingNode:
 		// Cycle guard: prevent infinite loops from circular aliases
@@ -297,11 +293,11 @@ func collectMergedPairs(node *yaml.Node, explicitKeys, seenMerged map[string]boo
 		flatContent := resolveMergeKeys(node.Content, seen)
 
 		for j := 0; j < len(flatContent); j += 2 {
-			if j+1 < len(flatContent) {
-				key := resolveKeyValue(flatContent[j])
-				if !explicitKeys[key] && !seenMerged[key] {
+			key := resolveKeyValue(flatContent[j])
+			if _, isExplicit := explicitKeys[key]; !isExplicit {
+				if _, alreadyMerged := seenMerged[key]; !alreadyMerged {
 					*out = append(*out, flatContent[j], flatContent[j+1])
-					seenMerged[key] = true
+					seenMerged[key] = struct{}{}
 				}
 			}
 		}

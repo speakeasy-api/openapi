@@ -349,14 +349,12 @@ func TestSchema_Unmarshal_MergeKeys_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		yml            string
-		expectedProps  []string
-		expectedType   string
-		checkOverride  bool
-		overrideKey    string
-		overrideDesc   string
-		noMergeKeyProp bool
+		name          string
+		yml           string
+		expectedProps []string
+		checkOverride bool
+		overrideKey   string
+		overrideDesc  string
 	}{
 		{
 			name: "merge key in properties inherits from anchor",
@@ -370,9 +368,7 @@ properties:
     type: string
     description: User name
 `,
-			expectedProps:  []string{"id", "name"},
-			expectedType:   "object",
-			noMergeKeyProp: true,
+			expectedProps: []string{"id", "name"},
 		},
 		{
 			name: "merge key expands aliased mapping into properties",
@@ -390,8 +386,7 @@ properties:
     type: string
     description: Email address
 `,
-			expectedProps:  []string{"id", "name", "email"},
-			noMergeKeyProp: true,
+			expectedProps: []string{"id", "name", "email"},
 		},
 		{
 			name: "merge key with alias expands into properties",
@@ -412,8 +407,7 @@ properties:
     type: string
     description: Email address
 `,
-			expectedProps:  []string{"id", "name", "email"},
-			noMergeKeyProp: true,
+			expectedProps: []string{"id", "name", "email"},
 		},
 		{
 			name: "merge key with override in properties",
@@ -435,11 +429,10 @@ properties:
     type: string
     description: Email address
 `,
-			expectedProps:  []string{"id", "name", "email"},
-			noMergeKeyProp: true,
-			checkOverride:  true,
-			overrideKey:    "name",
-			overrideDesc:   "Overridden name",
+			expectedProps: []string{"id", "name", "email"},
+			checkOverride: true,
+			overrideKey:   "name",
+			overrideDesc:  "Overridden name",
 		},
 	}
 
@@ -455,10 +448,8 @@ properties:
 
 			require.NotNil(t, schema.Properties, "properties should not be nil")
 
-			if tt.noMergeKeyProp {
-				_, hasMergeKey := schema.Properties.Get("<<")
-				assert.False(t, hasMergeKey, "merge key '<<' should not appear as a property name")
-			}
+			_, hasMergeKey := schema.Properties.Get("<<")
+			assert.False(t, hasMergeKey, "merge key '<<' should not appear as a property name")
 
 			for _, prop := range tt.expectedProps {
 				propSchema, ok := schema.Properties.Get(prop)
