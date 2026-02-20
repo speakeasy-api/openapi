@@ -5,22 +5,15 @@ import (
 	"os"
 	"strconv"
 	"testing"
-	"unsafe"
 
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
+	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/overlay"
 	"github.com/speakeasy-api/openapi/overlay/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v4"
-	yamlv3 "gopkg.in/yaml.v3"
 )
-
-// queryV4 runs a jsonpath query using a v4 node by casting to v3 and back.
-func queryV4(path *jsonpath.JSONPath, node *yaml.Node) []*yaml.Node {
-	v3result := path.Query((*yamlv3.Node)(unsafe.Pointer(node)))
-	return *(*[]*yaml.Node)(unsafe.Pointer(&v3result))
-}
 
 // NodeMatchesFile is a test that marshals the YAML file from the given node,
 // then compares those bytes to those found in the expected file.
@@ -313,7 +306,7 @@ func TestApplyToOld(t *testing.T) {
 
 	path, err := jsonpath.NewPath(`$.paths["/anything/selectGlobalServer"]`)
 	require.NoError(t, err)
-	result := queryV4(path, nodeOld)
+	result := testutils.QueryV4(path, nodeOld)
 	require.NoError(t, err)
 	require.Empty(t, result)
 	o.JSONPathVersion = "rfc9535"
@@ -327,7 +320,7 @@ func TestApplyToOld(t *testing.T) {
 	o.Actions[0].Target = "$.paths[?(@[\"x-my-ignore\"])]" // @ should always refer to the child node in RFC 9535..
 	_, err = o.ApplyToStrict(nodeNew)
 	require.NoError(t, err)
-	result = queryV4(path, nodeNew)
+	result = testutils.QueryV4(path, nodeNew)
 	require.NoError(t, err)
 	require.Empty(t, result)
 }

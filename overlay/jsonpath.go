@@ -2,6 +2,8 @@ package overlay
 
 import (
 	"fmt"
+	"reflect"
+	"strconv"
 	"unsafe"
 
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
@@ -11,6 +13,33 @@ import (
 	"go.yaml.in/yaml/v4"
 	yamlv3 "gopkg.in/yaml.v3"
 )
+
+func init() {
+	// Runtime guard: verify that yaml.v4 Node's memory layout is a superset of yaml.v3 Node.
+	// The unsafe pointer casts below depend on the first 12 fields being identical.
+	v3Type := reflect.TypeOf(yamlv3.Node{})
+	v4Type := reflect.TypeOf(yaml.Node{})
+
+	if v4Type.NumField() < v3Type.NumField() {
+		panic("yaml.v4 Node has fewer fields than yaml.v3 Node — unsafe pointer cast is not safe")
+	}
+
+	for i := range v3Type.NumField() {
+		v3Field := v3Type.Field(i)
+		v4Field := v4Type.Field(i)
+
+		if v3Field.Name != v4Field.Name {
+			panic("yaml.v3/v4 Node field mismatch at index " + strconv.Itoa(i) +
+				": " + v3Field.Name + " vs " + v4Field.Name)
+		}
+		if v3Field.Offset != v4Field.Offset {
+			panic("yaml.v3/v4 Node field offset mismatch for " + v3Field.Name)
+		}
+		if v3Field.Type.Size() != v4Field.Type.Size() {
+			panic("yaml.v3/v4 Node field size mismatch for " + v3Field.Name)
+		}
+	}
+}
 
 // Queryable is an interface for querying YAML nodes using JSONPath expressions.
 type Queryable interface {
