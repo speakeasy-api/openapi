@@ -4,7 +4,9 @@ import (
 	"iter"
 	"testing"
 
+	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -507,4 +509,65 @@ func TestAssertEqualSequencedMap_NilChecks(t *testing.T) {
 		// Should detect difference between true nil and nil pointer
 		AssertEqualSequencedMap(mockT, nil, nilPtr)
 	})
+}
+
+func TestQueryV4_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		yml      string
+		query    string
+		expected string
+	}{
+		{
+			name:     "scalar value lookup",
+			yml:      "name: alice\nage: 30\n",
+			query:    "$.name",
+			expected: "alice",
+		},
+		{
+			name:     "nested value lookup",
+			yml:      "user:\n  name: bob\n",
+			query:    "$.user.name",
+			expected: "bob",
+		},
+		{
+			name:     "array element lookup",
+			yml:      "items:\n  - first\n  - second\n",
+			query:    "$.items[1]",
+			expected: "second",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var root yaml.Node
+			err := yaml.Unmarshal([]byte(tt.yml), &root)
+			require.NoError(t, err, "unmarshal should succeed")
+
+			path, err := jsonpath.NewPath(tt.query)
+			require.NoError(t, err, "jsonpath should be valid")
+
+			result := QueryV4(path, &root)
+			require.Len(t, result, 1, "should return exactly one match")
+			assert.Equal(t, tt.expected, result[0].Value, "should return correct value")
+		})
+	}
+}
+
+func TestQueryV4_NoMatch(t *testing.T) {
+	t.Parallel()
+
+	var root yaml.Node
+	err := yaml.Unmarshal([]byte("name: alice\n"), &root)
+	require.NoError(t, err, "unmarshal should succeed")
+
+	path, err := jsonpath.NewPath("$.missing")
+	require.NoError(t, err, "jsonpath should be valid")
+
+	result := QueryV4(path, &root)
+	assert.Empty(t, result, "should return no matches for missing path")
 }
