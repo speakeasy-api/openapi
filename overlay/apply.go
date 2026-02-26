@@ -204,6 +204,13 @@ func updateNode(node *yaml.Node, updateNode *yaml.Node) bool {
 
 func mergeNode(node *yaml.Node, merge *yaml.Node) bool {
 	if node.Kind != merge.Kind {
+		// Per Overlay 1.1.0 spec: "For arrays, the update value SHALL be
+		// appended to the targeted array. [...] otherwise the update value
+		// SHALL be appended as a single element."
+		if node.Kind == yaml.SequenceNode {
+			node.Content = append(node.Content, clone(merge))
+			return true
+		}
 		*node = *clone(merge)
 		return true
 	}
