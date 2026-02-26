@@ -285,6 +285,252 @@ func TestApplyTo_CopyVersionToHeader(t *testing.T) {
 	NodeMatchesFile(t, node, "testdata/openapi-version-header-expected.yaml")
 }
 
+func TestApplyTo_UpdateArrayAppend(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		inputYAML     string
+		overlayYAML   string
+		expectedTags  int
+		expectedNames []string
+	}{
+		{
+			name: "single object appended to array",
+			inputYAML: `openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+tags:
+  - name: existing
+    description: This tag already exists
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: Append single object
+  version: 1.0.0
+actions:
+  - target: "$.tags"
+    update:
+      name: newTag1
+      description: This tag should be appended
+`,
+			expectedTags:  2,
+			expectedNames: []string{"existing", "newTag1"},
+		},
+		{
+			name: "multiple objects appended to array via separate actions",
+			inputYAML: `openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+tags:
+  - name: existing
+    description: This tag already exists
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: Append multiple objects
+  version: 1.0.0
+actions:
+  - target: "$.tags"
+    update:
+      name: newTag1
+      description: First appended tag
+  - target: "$.tags"
+    update:
+      name: newTag2
+      description: Second appended tag
+`,
+			expectedTags:  3,
+			expectedNames: []string{"existing", "newTag1", "newTag2"},
+		},
+		{
+			name: "array appended to array",
+			inputYAML: `openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+tags:
+  - name: existing
+    description: This tag already exists
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: Append array to array
+  version: 1.0.0
+actions:
+  - target: "$.tags"
+    update:
+      - name: newTag1
+        description: First appended tag
+      - name: newTag2
+        description: Second appended tag
+`,
+			expectedTags:  3,
+			expectedNames: []string{"existing", "newTag1", "newTag2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Parse the input spec
+			var specNode yaml.Node
+			err := yaml.Unmarshal([]byte(tt.inputYAML), &specNode)
+			require.NoError(t, err, "unmarshal input spec should succeed")
+
+			// Parse the overlay
+			var o overlay.Overlay
+			err = yaml.Unmarshal([]byte(tt.overlayYAML), &o)
+			require.NoError(t, err, "unmarshal overlay should succeed")
+
+			// Apply the overlay
+			err = o.ApplyTo(&specNode)
+			require.NoError(t, err, "apply overlay should succeed")
+
+			// Find the tags node in the result
+			root := specNode.Content[0] // DocumentNode -> MappingNode
+			var tagsNode *yaml.Node
+			for i := 0; i < len(root.Content); i += 2 {
+				if root.Content[i].Value == "tags" {
+					tagsNode = root.Content[i+1]
+					break
+				}
+			}
+
+			require.NotNil(t, tagsNode, "tags node should exist")
+			assert.Equal(t, yaml.SequenceNode, tagsNode.Kind, "tags should remain a sequence/array")
+			assert.Len(t, tagsNode.Content, tt.expectedTags, "tags array should have expected number of elements")
+
+			// Verify each tag name
+			for i, expectedName := range tt.expectedNames {
+				require.Greater(t, len(tagsNode.Content), i, "should have enough tag elements")
+				tagNode := tagsNode.Content[i]
+				assert.Equal(t, yaml.MappingNode, tagNode.Kind, "each tag should be a mapping node")
+
+				// Find the "name" key in the tag
+				var nameValue string
+				for j := 0; j < len(tagNode.Content); j += 2 {
+					if tagNode.Content[j].Value == "name" {
+						nameValue = tagNode.Content[j+1].Value
+						break
+					}
+				}
+				assert.Equal(t, expectedName, nameValue, "tag name at index "+strconv.Itoa(i)+" should match")
+			}
+		})
+	}
+}
+
+func TestApplyTo_UpdateNestedArrayAppend(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		inputYAML    string
+		overlayYAML  string
+		expectedYAML string
+	}{
+		{
+			name: "nested array in object merge is concatenated",
+			inputYAML: `openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      parameters:
+        - name: limit
+          in: query
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: Append nested array
+  version: 1.0.0
+actions:
+  - target: "$.paths['/pets'].get"
+    update:
+      parameters:
+        - name: offset
+          in: query
+`,
+			expectedYAML: `openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      parameters:
+        - name: limit
+          in: query
+        - name: offset
+          in: query
+`,
+		},
+		{
+			name: "scalar update appended to array",
+			inputYAML: `openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      tags:
+        - pets
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: Append scalar to array
+  version: 1.0.0
+actions:
+  - target: "$.paths['/pets'].get.tags"
+    update: admin
+`,
+			expectedYAML: `openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      tags:
+        - pets
+        - admin
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var specNode yaml.Node
+			err := yaml.Unmarshal([]byte(tt.inputYAML), &specNode)
+			require.NoError(t, err, "unmarshal input spec should succeed")
+
+			var o overlay.Overlay
+			err = yaml.Unmarshal([]byte(tt.overlayYAML), &o)
+			require.NoError(t, err, "unmarshal overlay should succeed")
+
+			err = o.ApplyTo(&specNode)
+			require.NoError(t, err, "apply overlay should succeed")
+
+			var buf bytes.Buffer
+			enc := yaml.NewEncoder(&buf)
+			enc.SetIndent(2)
+			err = enc.Encode(&specNode)
+			require.NoError(t, err, "encode result should succeed")
+
+			assert.Equal(t, tt.expectedYAML, buf.String(), "output should match expected YAML")
+		})
+	}
+}
+
 func TestApplyToOld(t *testing.T) {
 	t.Parallel()
 
