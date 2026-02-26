@@ -20,9 +20,9 @@ func (o *Overlay) ApplyTo(root *yaml.Node) error {
 		case action.Remove:
 			err = o.applyRemoveAction(root, action, nil)
 		case !action.Update.IsZero():
-			err = o.applyUpdateAction(root, action, &[]string{})
+			err = o.applyUpdateAction(root, action, &[]string{}, false)
 		case action.Copy != "":
-			err = o.applyCopyAction(root, action, &[]string{})
+			err = o.applyCopyAction(root, action, &[]string{}, false)
 		}
 
 		if err != nil {
@@ -62,10 +62,10 @@ func (o *Overlay) ApplyToStrict(root *yaml.Node) ([]string, error) {
 			err = o.applyRemoveAction(root, action, &actionWarnings)
 		case !action.Update.IsZero():
 			actionType = "update"
-			err = o.applyUpdateAction(root, action, &actionWarnings)
+			err = o.applyUpdateAction(root, action, &actionWarnings, true)
 		case action.Copy != "":
 			actionType = "copy"
-			err = o.applyCopyAction(root, action, &actionWarnings)
+			err = o.applyCopyAction(root, action, &actionWarnings, true)
 		default:
 			err = fmt.Errorf("unknown action type: %v", action)
 		}
@@ -171,7 +171,13 @@ func removeNode(idx parentIndex, node *yaml.Node) {
 	}
 }
 
-func (o *Overlay) applyUpdateAction(root *yaml.Node, action Action, warnings *[]string) error {
+// mergeOptions carries version and strictness context through the merge call chain.
+type mergeOptions struct {
+	v110   bool
+	strict bool
+}
+
+func (o *Overlay) applyUpdateAction(root *yaml.Node, action Action, warnings *[]string, strict bool) error {
 	if action.Target == "" {
 		return nil
 	}
@@ -187,9 +193,26 @@ func (o *Overlay) applyUpdateAction(root *yaml.Node, action Action, warnings *[]
 
 	nodes := p.Query(root)
 
+	opts := mergeOptions{v110: o.IsV110OrLater(), strict: strict}
+
+	// Homogeneity check: 1.1.0 strict mode requires all targets to be the same kind
+	if strict && opts.v110 && len(nodes) > 1 {
+		firstKind := nodes[0].Kind
+		for _, n := range nodes[1:] {
+			if n.Kind != firstKind {
+				return fmt.Errorf("target selected mixed node types (%s and %s); all targets must be the same type",
+					nodeKindName(firstKind), nodeKindName(n.Kind))
+			}
+		}
+	}
+
 	didMakeChange := false
 	for _, node := range nodes {
-		didMakeChange = updateNode(node, &action.Update) || didMakeChange
+		changed, err := applyMerge(node, &action.Update, opts)
+		if err != nil {
+			return err
+		}
+		didMakeChange = changed || didMakeChange
 	}
 	if !didMakeChange {
 		*warnings = append(*warnings, "does nothing")
@@ -198,37 +221,85 @@ func (o *Overlay) applyUpdateAction(root *yaml.Node, action Action, warnings *[]
 	return nil
 }
 
-func updateNode(node *yaml.Node, updateNode *yaml.Node) bool {
-	return mergeNode(node, updateNode)
+// applyMerge is the top-level merge dispatch for update/copy actions.
+// It implements the Action Object rules (spec §4.4.3) which differ from
+// the recursive merge rules applied within object properties.
+func applyMerge(node *yaml.Node, update *yaml.Node, opts mergeOptions) (bool, error) {
+	if !opts.v110 {
+		// 1.0.0: delegate entirely to recursive merge (preserves existing behavior)
+		return mergeNode(node, update, opts)
+	}
+
+	// 1.1.0 top-level dispatch per spec §4.4.3:
+	switch node.Kind {
+	case yaml.SequenceNode:
+		// Array target: concatenate if update is array, append if object/primitive
+		if update.Kind == yaml.SequenceNode {
+			return mergeSequenceNode(node, update), nil
+		}
+		// Append non-array value as single element
+		node.Content = append(node.Content, clone(update))
+		return true, nil
+
+	case yaml.MappingNode:
+		if update.Kind != yaml.MappingNode {
+			// Spec: update MUST be an object for object targets
+			if opts.strict {
+				return false, fmt.Errorf("target is object but update is %s", nodeKindName(update.Kind))
+			}
+			// Lax: replace gracefully
+			*node = *clone(update)
+			return true, nil
+		}
+		return mergeNode(node, update, opts)
+
+	default:
+		// Primitive target: replace
+		if update.Kind != yaml.ScalarNode && update.Kind != 0 {
+			if opts.strict {
+				return false, fmt.Errorf("target is primitive but update is %s", nodeKindName(update.Kind))
+			}
+			// Non-scalar update replaces the whole node
+			isChanged := node.Value != update.Value || node.Kind != update.Kind
+			*node = *clone(update)
+			return isChanged, nil
+		}
+		// Scalar-to-scalar: update value only, preserving target's style/tag
+		isChanged := node.Value != update.Value
+		node.Value = update.Value
+		return isChanged, nil
+	}
 }
 
-func mergeNode(node *yaml.Node, merge *yaml.Node) bool {
+// mergeNode is the recursive merge function used within object property merging.
+// Type mismatches at this level follow the recursive merge rules, not the
+// top-level Action Object rules.
+func mergeNode(node *yaml.Node, merge *yaml.Node, opts mergeOptions) (bool, error) {
 	if node.Kind != merge.Kind {
-		// Per Overlay 1.1.0 spec: "For arrays, the update value SHALL be
-		// appended to the targeted array. [...] otherwise the update value
-		// SHALL be appended as a single element."
-		if node.Kind == yaml.SequenceNode {
-			node.Content = append(node.Content, clone(merge))
-			return true
+		// 1.1.0 strict: "Other property value combinations are incompatible and result in an error"
+		if opts.v110 && opts.strict {
+			return false, fmt.Errorf("type mismatch: target is %s but update is %s",
+				nodeKindName(node.Kind), nodeKindName(merge.Kind))
 		}
+		// 1.0.0 or 1.1.0 lax: gracefully replace (pre-existing behavior)
 		*node = *clone(merge)
-		return true
+		return true, nil
 	}
 	switch node.Kind {
+	case yaml.MappingNode:
+		return mergeMappingNode(node, merge, opts)
+	case yaml.SequenceNode:
+		return mergeSequenceNode(node, merge), nil
 	default:
 		isChanged := node.Value != merge.Value
 		node.Value = merge.Value
-		return isChanged
-	case yaml.MappingNode:
-		return mergeMappingNode(node, merge)
-	case yaml.SequenceNode:
-		return mergeSequenceNode(node, merge)
+		return isChanged, nil
 	}
 }
 
 // mergeMappingNode will perform a shallow merge of the merge node into the main
 // node.
-func mergeMappingNode(node *yaml.Node, merge *yaml.Node) bool {
+func mergeMappingNode(node *yaml.Node, merge *yaml.Node, opts mergeOptions) (bool, error) {
 	anyChange := false
 
 	// If the target is an empty flow-style mapping and we're merging content,
@@ -245,7 +316,11 @@ NextKey:
 		for j := 0; j < len(node.Content); j += 2 {
 			nodeKey := node.Content[j].Value
 			if nodeKey == mergeKey {
-				anyChange = mergeNode(node.Content[j+1], mergeValue) || anyChange
+				changed, err := mergeNode(node.Content[j+1], mergeValue, opts)
+				if err != nil {
+					return anyChange, fmt.Errorf("key %q: %w", mergeKey, err)
+				}
+				anyChange = changed || anyChange
 				continue NextKey
 			}
 		}
@@ -253,7 +328,21 @@ NextKey:
 		node.Content = append(node.Content, merge.Content[i], clone(mergeValue))
 		anyChange = true
 	}
-	return anyChange
+	return anyChange, nil
+}
+
+// nodeKindName returns a human-readable name for a YAML node kind.
+func nodeKindName(kind yaml.Kind) string {
+	switch kind {
+	case yaml.MappingNode:
+		return "object"
+	case yaml.SequenceNode:
+		return "array"
+	case yaml.ScalarNode:
+		return "scalar"
+	default:
+		return "unknown"
+	}
 }
 
 // mergeSequenceNode will append the merge node's content to the original node.
@@ -285,9 +374,8 @@ func clone(node *yaml.Node) *yaml.Node {
 	return newNode
 }
 
-// applyCopyAction applies a copy action to the document
-// This is a stub implementation for the copy feature from Overlay Specification v1.1.0
-func (o *Overlay) applyCopyAction(root *yaml.Node, action Action, warnings *[]string) error {
+// applyCopyAction applies a copy action to the document.
+func (o *Overlay) applyCopyAction(root *yaml.Node, action Action, warnings *[]string, strict bool) error {
 	if action.Target == "" {
 		return nil
 	}
@@ -328,6 +416,19 @@ func (o *Overlay) applyCopyAction(root *yaml.Node, action Action, warnings *[]st
 	// Query the target nodes
 	targetNodes := targetPath.Query(root)
 
+	opts := mergeOptions{v110: o.IsV110OrLater(), strict: strict}
+
+	// Homogeneity check: 1.1.0 strict mode requires all targets to be the same kind
+	if strict && opts.v110 && len(targetNodes) > 1 {
+		firstKind := targetNodes[0].Kind
+		for _, n := range targetNodes[1:] {
+			if n.Kind != firstKind {
+				return fmt.Errorf("target selected mixed node types (%s and %s); all targets must be the same type",
+					nodeKindName(firstKind), nodeKindName(n.Kind))
+			}
+		}
+	}
+
 	// Copy the source node to each target
 	didMakeChange := false
 	for _, targetNode := range targetNodes {
@@ -335,7 +436,11 @@ func (o *Overlay) applyCopyAction(root *yaml.Node, action Action, warnings *[]st
 		copiedNode := clone(sourceNode)
 
 		// Merge the copied node into the target
-		didMakeChange = mergeNode(targetNode, copiedNode) || didMakeChange
+		changed, err := applyMerge(targetNode, copiedNode, opts)
+		if err != nil {
+			return err
+		}
+		didMakeChange = changed || didMakeChange
 	}
 
 	if !didMakeChange && warnings != nil {

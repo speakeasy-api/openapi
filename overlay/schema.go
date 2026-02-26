@@ -3,6 +3,7 @@ package overlay
 import (
 	"bytes"
 
+	"github.com/speakeasy-api/openapi/internal/version"
 	"gopkg.in/yaml.v3"
 )
 
@@ -48,6 +49,18 @@ type Overlay struct {
 
 	// Actions is the list of actions to perform to apply the overlay.
 	Actions []Action `yaml:"actions"`
+}
+
+// IsV110OrLater returns true if the overlay version is 1.1.0 or later.
+// Invalid or missing versions default to false (1.0.0 behavior) for safety.
+func (o *Overlay) IsV110OrLater() bool {
+	overlayVersion, err := version.Parse(o.Version)
+	if err != nil {
+		return false
+	}
+
+	v110 := version.MustParse(Version110)
+	return !overlayVersion.LessThan(*v110)
 }
 
 func (o *Overlay) ToString() (string, error) {
