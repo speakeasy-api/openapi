@@ -2,17 +2,62 @@ package overlay
 
 import (
 	"fmt"
+	"reflect"
+	"strconv"
+	"unsafe"
 
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath/config"
 	"github.com/speakeasy-api/openapi/internal/version"
 	"github.com/vmware-labs/yaml-jsonpath/pkg/yamlpath"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
+	yamlv3 "gopkg.in/yaml.v3"
 )
+
+func init() {
+	// Runtime guard: verify that yaml.v4 Node's memory layout is a superset of yaml.v3 Node.
+	// The unsafe pointer casts below depend on the first 12 fields being identical.
+	v3Type := reflect.TypeOf(yamlv3.Node{})
+	v4Type := reflect.TypeOf(yaml.Node{})
+
+	if v4Type.NumField() < v3Type.NumField() {
+		panic("yaml.v4 Node has fewer fields than yaml.v3 Node — unsafe pointer cast is not safe")
+	}
+
+	for i := range v3Type.NumField() {
+		v3Field := v3Type.Field(i)
+		v4Field := v4Type.Field(i)
+
+		if v3Field.Name != v4Field.Name {
+			panic("yaml.v3/v4 Node field mismatch at index " + strconv.Itoa(i) +
+				": " + v3Field.Name + " vs " + v4Field.Name)
+		}
+		if v3Field.Offset != v4Field.Offset {
+			panic("yaml.v3/v4 Node field offset mismatch for " + v3Field.Name)
+		}
+		if v3Field.Type.Size() != v4Field.Type.Size() {
+			panic("yaml.v3/v4 Node field size mismatch for " + v3Field.Name)
+		}
+	}
+}
 
 // Queryable is an interface for querying YAML nodes using JSONPath expressions.
 type Queryable interface {
 	Query(root *yaml.Node) []*yaml.Node
+}
+
+// nodeV4toV3 converts a *yaml.v4.Node to a *yaml.v3.Node via unsafe pointer cast.
+// This is safe because v4.Node is a strict superset of v3.Node — the first 12 fields
+// have identical types, sizes, and offsets. The v3 code never accesses the extra v4 fields.
+func nodeV4toV3(n *yaml.Node) *yamlv3.Node {
+	return (*yamlv3.Node)(unsafe.Pointer(n)) //nolint:gosec // v4.Node is a strict superset of v3.Node (verified via reflect)
+}
+
+// nodesV3toV4 converts a []*yaml.v3.Node slice to []*yaml.v4.Node.
+// The underlying pointer types have identical memory layouts so the slice header
+// can be reinterpreted directly.
+func nodesV3toV4(nodes []*yamlv3.Node) []*yaml.Node {
+	return *(*[]*yaml.Node)(unsafe.Pointer(&nodes)) //nolint:gosec // pointer types have identical memory layouts
 }
 
 type yamlPathQueryable struct {
@@ -24,8 +69,17 @@ func (y yamlPathQueryable) Query(root *yaml.Node) []*yaml.Node {
 		return []*yaml.Node{}
 	}
 	// errors aren't actually possible from yamlpath.
-	result, _ := y.path.Find(root)
-	return result
+	result, _ := y.path.Find(nodeV4toV3(root))
+	return nodesV3toV4(result)
+}
+
+// rfcJSONPathQueryable wraps a jsonpath.JSONPath to implement Queryable with v4 nodes.
+type rfcJSONPathQueryable struct {
+	path *jsonpath.JSONPath
+}
+
+func (r rfcJSONPathQueryable) Query(root *yaml.Node) []*yaml.Node {
+	return nodesV3toV4(r.path.Query(nodeV4toV3(root)))
 }
 
 // NewPath creates a new JSONPath queryable from the given target expression.
@@ -35,7 +89,10 @@ func (y yamlPathQueryable) Query(root *yaml.Node) []*yaml.Node {
 func (o *Overlay) NewPath(target string, warnings *[]string) (Queryable, error) {
 	rfcJSONPath, rfcJSONPathErr := jsonpath.NewPath(target, config.WithPropertyNameExtension())
 	if o.UsesRFC9535() {
-		return rfcJSONPath, rfcJSONPathErr
+		if rfcJSONPathErr != nil {
+			return nil, rfcJSONPathErr
+		}
+		return rfcJSONPathQueryable{path: rfcJSONPath}, nil
 	}
 
 	// For version < 1.1.0 without explicit rfc9535, warn about future incompatibility

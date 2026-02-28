@@ -7,7 +7,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/validation"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Operator represents the operator used to compare the value of a criterion.

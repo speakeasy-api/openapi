@@ -12,10 +12,13 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"unsafe"
 
+	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
 	"github.com/speakeasy-api/openapi/yml"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
+	yamlv3 "gopkg.in/yaml.v3"
 )
 
 // TODO use these more in tests
@@ -182,4 +185,12 @@ func DownloadFile(url, cacheEnvVar, cacheDirName string) (io.ReadCloser, error) 
 
 	// Return the data as a ReadCloser
 	return io.NopCloser(bytes.NewReader(data)), nil
+}
+
+// QueryV4 runs a jsonpath query using a v4 node by casting to v3 and back.
+// This bridges the gap between jsonpath libraries that use yaml.v3 types and
+// the v4 types used throughout this codebase.
+func QueryV4(path *jsonpath.JSONPath, node *yaml.Node) []*yaml.Node {
+	v3result := path.Query((*yamlv3.Node)(unsafe.Pointer(node))) //nolint:gosec // v4.Node is a strict superset of v3.Node (verified at init)
+	return *(*[]*yaml.Node)(unsafe.Pointer(&v3result))           //nolint:gosec // pointer types have identical memory layouts
 }

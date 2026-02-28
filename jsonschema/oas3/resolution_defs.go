@@ -8,7 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/references"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // GetRootNoder is an interface for objects that can return a YAML root node.

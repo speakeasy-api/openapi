@@ -6,7 +6,7 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	values "github.com/speakeasy-api/openapi/values/core"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Responses is a container for the expected responses of an operation.

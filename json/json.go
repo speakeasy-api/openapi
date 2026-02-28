@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/speakeasy-api/openapi/yml"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // YAMLToJSON converts a YAML node to JSON using a custom JSON writer that preserves formatting.

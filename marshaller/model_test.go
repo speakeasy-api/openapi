@@ -6,7 +6,7 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/marshaller/tests/core"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // TestModel_GetPropertyNode_Success tests the GetPropertyNode method with valid inputs

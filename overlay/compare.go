@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Compare compares input specifications from two files and returns an overlay

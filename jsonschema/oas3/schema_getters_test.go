@@ -10,7 +10,7 @@ import (
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/values"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestSchema_GetExclusiveMaximum_Success(t *testing.T) {

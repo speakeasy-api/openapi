@@ -3,7 +3,7 @@ package overlay
 import (
 	"bytes"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Version constants for the Overlay specification

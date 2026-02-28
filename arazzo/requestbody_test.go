@@ -8,7 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestRequestBody_Validate_JSONPathInPayload_Success(t *testing.T) {

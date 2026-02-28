@@ -427,7 +427,7 @@ additionalProperties: "invalid"
 			wantErrs: []string{
 				"[2:1] error validation-type-mismatch schema.additionalProperties expected one of [`boolean`, `object`], got `string`",
 				"[2:1] error validation-type-mismatch schema.additionalProperties expected one of [`boolean`, `object`], got `string`",
-				"[3:23] error validation-type-mismatch schema.additionalProperties failed to validate either Schema [schema.additionalProperties expected `object`, got `invalid`] or bool [schema.additionalProperties line 3: cannot unmarshal !!str `invalid` into bool]",
+				"[3:23] error validation-type-mismatch schema.additionalProperties failed to validate either Schema [schema.additionalProperties expected `object`, got `invalid`] or bool [schema.additionalProperties line 3: cannot construct !!str `invalid` into bool]",
 			},
 		},
 		{
@@ -455,7 +455,7 @@ items: "invalid"
 			wantErrs: []string{
 				"[2:1] error validation-type-mismatch schema.items expected one of [`boolean`, `object`], got `string`",
 				"[2:1] error validation-type-mismatch schema.items expected one of [`boolean`, `object`], got `string`",
-				"[3:8] error validation-type-mismatch schema.items failed to validate either Schema [schema.items expected `object`, got `invalid`] or bool [schema.items line 3: cannot unmarshal !!str `invalid` into bool]",
+				"[3:8] error validation-type-mismatch schema.items failed to validate either Schema [schema.items expected `object`, got `invalid`] or bool [schema.items line 3: cannot construct !!str `invalid` into bool]",
 			},
 		},
 		{

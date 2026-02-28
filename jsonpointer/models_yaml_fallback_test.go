@@ -7,7 +7,7 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // TestModel represents a simple model for testing YAML fallback
@@ -39,7 +39,7 @@ knownField: "known value"
 unknownField: "unknown value"
 `,
 			jsonPointer:  "/unknownField",
-			expectedType: "*yaml.Node",
+			expectedType: "*libyaml.Node",
 			expectedVal:  "unknown value",
 		},
 		{
@@ -50,7 +50,7 @@ unknownObject:
   nestedField: "nested value"
 `,
 			jsonPointer:  "/unknownObject/nestedField",
-			expectedType: "*yaml.Node",
+			expectedType: "*libyaml.Node",
 			expectedVal:  "nested value",
 		},
 		{
@@ -62,7 +62,7 @@ unknownArray:
   - "item2"
 `,
 			jsonPointer:  "/unknownArray/1",
-			expectedType: "*yaml.Node",
+			expectedType: "*libyaml.Node",
 			expectedVal:  "item2",
 		},
 	}

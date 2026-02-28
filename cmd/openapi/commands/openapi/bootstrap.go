@@ -8,7 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/yml"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 var bootstrapCmd = &cobra.Command{

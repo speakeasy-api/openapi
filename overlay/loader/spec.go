@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/speakeasy-api/openapi/overlay"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // GetOverlayExtendsPath returns the path to file if the extends URL is a file

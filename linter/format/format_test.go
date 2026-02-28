@@ -10,7 +10,7 @@ import (
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // testFix is a minimal validation.Fix for testing formatter output.

@@ -3,7 +3,7 @@ package overlay
 import (
 	"fmt"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func NewTargetSelector(path, method string) string {

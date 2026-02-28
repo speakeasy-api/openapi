@@ -4,10 +4,11 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
+	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestCoreModel_GetJSONPath_Success(t *testing.T) {
@@ -178,7 +179,7 @@ func findNodeByJSONPath(t *testing.T, rootNode *yaml.Node, jsonPath string) *yam
 	require.NoError(t, err, "JSONPath should be valid: %s", jsonPath)
 
 	// Query the YAML node directly
-	result := path.Query(rootNode)
+	result := testutils.QueryV4(path, rootNode)
 	require.NotEmpty(t, result, "JSONPath query should return results: %s", jsonPath)
 
 	// The result should be a slice of *yaml.Node, so return the first one
@@ -196,7 +197,7 @@ func verifyJSONPathWorks(t *testing.T, rootNode *yaml.Node, jsonPath string, exp
 	path, err := jsonpath.NewPath(jsonPath)
 	require.NoError(t, err, "generated JSONPath should be valid: %s", jsonPath)
 
-	result := path.Query(rootNode)
+	result := testutils.QueryV4(path, rootNode)
 	require.NotEmpty(t, result, "JSONPath query should return results: %s", jsonPath)
 
 	// Special case for root node: the query might return the document node

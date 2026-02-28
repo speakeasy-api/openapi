@@ -7,7 +7,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/speakeasy-api/openapi/validation"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Runtime wraps a goja JavaScript runtime with custom rule support.

@@ -10,7 +10,7 @@ import (
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestUnmarshal_PrimitiveTypes_Success(t *testing.T) {
@@ -177,7 +177,7 @@ boolField: "not a bool"
 intField: 42
 float64Field: 3.14
 `,
-			wantErrs: []string{"[3:12] error validation-type-mismatch testPrimitiveModel.boolField line 3: cannot unmarshal !!str `not a bool` into bool"},
+			wantErrs: []string{"[3:12] error validation-type-mismatch testPrimitiveModel.boolField line 3: cannot construct !!str `not a bool` into bool"},
 		},
 		{
 			name: "type mismatch - int field gets string",
@@ -187,7 +187,7 @@ boolField: true
 intField: "not an int"
 float64Field: 3.14
 `,
-			wantErrs: []string{"[4:11] error validation-type-mismatch testPrimitiveModel.intField line 4: cannot unmarshal !!str `not an int` into int"},
+			wantErrs: []string{"[4:11] error validation-type-mismatch testPrimitiveModel.intField line 4: cannot construct !!str `not an int` into int"},
 		},
 		{
 			name: "type mismatch - float field gets string",
@@ -197,7 +197,7 @@ boolField: true
 intField: 42
 float64Field: "not a float"
 `,
-			wantErrs: []string{"[5:15] error validation-type-mismatch testPrimitiveModel.float64Field line 5: cannot unmarshal !!str `not a f...` into float64"},
+			wantErrs: []string{"[5:15] error validation-type-mismatch testPrimitiveModel.float64Field line 5: cannot construct !!str `not a f...` into float64"},
 		},
 		{
 			name: "multiple validation errors",
@@ -208,8 +208,8 @@ intField: "not an int"
 			wantErrs: []string{
 				"[2:1] error validation-required-field `testPrimitiveModel.float64Field` is required",
 				"[2:1] error validation-required-field `testPrimitiveModel.stringField` is required",
-				"[2:12] error validation-type-mismatch testPrimitiveModel.boolField line 2: cannot unmarshal !!str `not a bool` into bool",
-				"[3:11] error validation-type-mismatch testPrimitiveModel.intField line 3: cannot unmarshal !!str `not an int` into int",
+				"[2:12] error validation-type-mismatch testPrimitiveModel.boolField line 2: cannot construct !!str `not a bool` into bool",
+				"[3:11] error validation-type-mismatch testPrimitiveModel.intField line 3: cannot construct !!str `not an int` into int",
 			},
 		},
 	}

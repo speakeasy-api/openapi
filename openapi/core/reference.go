@@ -10,7 +10,7 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 type Reference[T marshaller.CoreModeler] struct {

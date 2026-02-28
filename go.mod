@@ -7,6 +7,7 @@ require (
 	github.com/speakeasy-api/jsonpath v0.6.3
 	github.com/stretchr/testify v1.11.1
 	github.com/vmware-labs/yaml-jsonpath v0.3.2
+	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	golang.org/x/sync v0.19.0
 	golang.org/x/text v0.34.0
 	gopkg.in/yaml.v3 v3.0.1

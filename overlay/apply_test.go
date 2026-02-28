@@ -7,11 +7,12 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
+	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/overlay"
 	"github.com/speakeasy-api/openapi/overlay/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // NodeMatchesFile is a test that marshals the YAML file from the given node,
@@ -551,7 +552,7 @@ func TestApplyToOld(t *testing.T) {
 
 	path, err := jsonpath.NewPath(`$.paths["/anything/selectGlobalServer"]`)
 	require.NoError(t, err)
-	result := path.Query(nodeOld)
+	result := testutils.QueryV4(path, nodeOld)
 	require.NoError(t, err)
 	require.Empty(t, result)
 	o.JSONPathVersion = "rfc9535"
@@ -565,7 +566,7 @@ func TestApplyToOld(t *testing.T) {
 	o.Actions[0].Target = "$.paths[?(@[\"x-my-ignore\"])]" // @ should always refer to the child node in RFC 9535..
 	_, err = o.ApplyToStrict(nodeNew)
 	require.NoError(t, err)
-	result = path.Query(nodeNew)
+	result = testutils.QueryV4(path, nodeNew)
 	require.NoError(t, err)
 	require.Empty(t, result)
 }

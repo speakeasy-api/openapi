@@ -12,7 +12,7 @@ import (
 	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/system"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 type ResolutionTarget interface {
