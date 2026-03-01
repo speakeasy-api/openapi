@@ -17,5 +17,6 @@ func Apply(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(optimizeCmd)
 	rootCmd.AddCommand(localizeCmd)
 	rootCmd.AddCommand(exploreCmd)
+	rootCmd.AddCommand(analyzeCmd)
 	rootCmd.AddCommand(snipCmd)
 }
