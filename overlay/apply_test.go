@@ -285,146 +285,51 @@ func TestApplyTo_CopyVersionToHeader(t *testing.T) {
 	NodeMatchesFile(t, node, "testdata/openapi-version-header-expected.yaml")
 }
 
-func TestApplyTo_UpdateArrayAppend(t *testing.T) {
-	t.Parallel()
+// applyOverlay is a test helper that unmarshals the input/overlay YAML,
+// applies the overlay (lax or strict), and returns the result.
+func applyOverlay(t *testing.T, inputYAML, overlayYAML string) *yaml.Node {
+	t.Helper()
+	var specNode yaml.Node
+	err := yaml.Unmarshal([]byte(inputYAML), &specNode)
+	require.NoError(t, err, "unmarshal input spec should succeed")
 
-	tests := []struct {
-		name          string
-		inputYAML     string
-		overlayYAML   string
-		expectedTags  int
-		expectedNames []string
-	}{
-		{
-			name: "single object appended to array",
-			inputYAML: `openapi: 3.1.0
-info:
-  title: Test API
-  version: 1.0.0
-tags:
-  - name: existing
-    description: This tag already exists
-`,
-			overlayYAML: `overlay: 1.1.0
-info:
-  title: Append single object
-  version: 1.0.0
-actions:
-  - target: "$.tags"
-    update:
-      name: newTag1
-      description: This tag should be appended
-`,
-			expectedTags:  2,
-			expectedNames: []string{"existing", "newTag1"},
-		},
-		{
-			name: "multiple objects appended to array via separate actions",
-			inputYAML: `openapi: 3.1.0
-info:
-  title: Test API
-  version: 1.0.0
-tags:
-  - name: existing
-    description: This tag already exists
-`,
-			overlayYAML: `overlay: 1.1.0
-info:
-  title: Append multiple objects
-  version: 1.0.0
-actions:
-  - target: "$.tags"
-    update:
-      name: newTag1
-      description: First appended tag
-  - target: "$.tags"
-    update:
-      name: newTag2
-      description: Second appended tag
-`,
-			expectedTags:  3,
-			expectedNames: []string{"existing", "newTag1", "newTag2"},
-		},
-		{
-			name: "array appended to array",
-			inputYAML: `openapi: 3.1.0
-info:
-  title: Test API
-  version: 1.0.0
-tags:
-  - name: existing
-    description: This tag already exists
-`,
-			overlayYAML: `overlay: 1.1.0
-info:
-  title: Append array to array
-  version: 1.0.0
-actions:
-  - target: "$.tags"
-    update:
-      - name: newTag1
-        description: First appended tag
-      - name: newTag2
-        description: Second appended tag
-`,
-			expectedTags:  3,
-			expectedNames: []string{"existing", "newTag1", "newTag2"},
-		},
-	}
+	var o overlay.Overlay
+	err = yaml.Unmarshal([]byte(overlayYAML), &o)
+	require.NoError(t, err, "unmarshal overlay should succeed")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			// Parse the input spec
-			var specNode yaml.Node
-			err := yaml.Unmarshal([]byte(tt.inputYAML), &specNode)
-			require.NoError(t, err, "unmarshal input spec should succeed")
-
-			// Parse the overlay
-			var o overlay.Overlay
-			err = yaml.Unmarshal([]byte(tt.overlayYAML), &o)
-			require.NoError(t, err, "unmarshal overlay should succeed")
-
-			// Apply the overlay
-			err = o.ApplyTo(&specNode)
-			require.NoError(t, err, "apply overlay should succeed")
-
-			// Find the tags node in the result
-			root := specNode.Content[0] // DocumentNode -> MappingNode
-			var tagsNode *yaml.Node
-			for i := 0; i < len(root.Content); i += 2 {
-				if root.Content[i].Value == "tags" {
-					tagsNode = root.Content[i+1]
-					break
-				}
-			}
-
-			require.NotNil(t, tagsNode, "tags node should exist")
-			assert.Equal(t, yaml.SequenceNode, tagsNode.Kind, "tags should remain a sequence/array")
-			assert.Len(t, tagsNode.Content, tt.expectedTags, "tags array should have expected number of elements")
-
-			// Verify each tag name
-			for i, expectedName := range tt.expectedNames {
-				require.Greater(t, len(tagsNode.Content), i, "should have enough tag elements")
-				tagNode := tagsNode.Content[i]
-				assert.Equal(t, yaml.MappingNode, tagNode.Kind, "each tag should be a mapping node")
-
-				// Find the "name" key in the tag
-				var nameValue string
-				for j := 0; j < len(tagNode.Content); j += 2 {
-					if tagNode.Content[j].Value == "name" {
-						nameValue = tagNode.Content[j+1].Value
-						break
-					}
-				}
-				assert.Equal(t, expectedName, nameValue, "tag name at index "+strconv.Itoa(i)+" should match")
-			}
-		})
-	}
+	err = o.ApplyTo(&specNode)
+	require.NoError(t, err, "apply overlay should succeed")
+	return &specNode
 }
 
-func TestApplyTo_UpdateNestedArrayAppend(t *testing.T) {
+// applyOverlayStrict is a test helper that applies in strict mode.
+func applyOverlayStrict(t *testing.T, inputYAML, overlayYAML string) ([]string, error) {
+	t.Helper()
+	var specNode yaml.Node
+	err := yaml.Unmarshal([]byte(inputYAML), &specNode)
+	require.NoError(t, err, "unmarshal input spec should succeed")
+
+	var o overlay.Overlay
+	err = yaml.Unmarshal([]byte(overlayYAML), &o)
+	require.NoError(t, err, "unmarshal overlay should succeed")
+
+	return o.ApplyToStrict(&specNode)
+}
+
+// marshalNode is a test helper that marshals a YAML node to a string.
+func marshalNode(t *testing.T, node *yaml.Node) string {
+	t.Helper()
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	err := enc.Encode(node)
+	require.NoError(t, err, "encode result should succeed")
+	return buf.String()
+}
+
+// --- 1.0.0 Tests: Preserve existing behavior ---
+
+func TestApplyTo_V100_TypeMismatchReplace(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -434,73 +339,62 @@ func TestApplyTo_UpdateNestedArrayAppend(t *testing.T) {
 		expectedYAML string
 	}{
 		{
-			name: "nested array in object merge is concatenated",
-			inputYAML: `openapi: 3.1.0
-info:
-  title: Test API
-  version: 1.0.0
-paths:
-  /pets:
-    get:
-      parameters:
-        - name: limit
-          in: query
+			name: "object replaces scalar",
+			inputYAML: `root:
+  key: value
 `,
-			overlayYAML: `overlay: 1.1.0
+			overlayYAML: `overlay: 1.0.0
 info:
-  title: Append nested array
+  title: test
   version: 1.0.0
 actions:
-  - target: "$.paths['/pets'].get"
+  - target: "$.root.key"
     update:
-      parameters:
-        - name: offset
-          in: query
+      nested: object
 `,
-			expectedYAML: `openapi: 3.1.0
-info:
-  title: Test API
-  version: 1.0.0
-paths:
-  /pets:
-    get:
-      parameters:
-        - name: limit
-          in: query
-        - name: offset
-          in: query
+			expectedYAML: `root:
+  key:
+    nested: object
 `,
 		},
 		{
-			name: "scalar update appended to array",
-			inputYAML: `openapi: 3.1.0
-info:
-  title: Test API
-  version: 1.0.0
-paths:
-  /pets:
-    get:
-      tags:
-        - pets
+			name: "scalar replaces object",
+			inputYAML: `root:
+  key:
+    nested: object
 `,
-			overlayYAML: `overlay: 1.1.0
+			overlayYAML: `overlay: 1.0.0
 info:
-  title: Append scalar to array
+  title: test
   version: 1.0.0
 actions:
-  - target: "$.paths['/pets'].get.tags"
-    update: admin
+  - target: "$.root.key"
+    update: simple
 `,
-			expectedYAML: `openapi: 3.1.0
+			expectedYAML: `root:
+  key: simple
+`,
+		},
+		{
+			name: "array replaces object",
+			inputYAML: `root:
+  key:
+    a: 1
+`,
+			overlayYAML: `overlay: 1.0.0
 info:
-  title: Test API
+  title: test
   version: 1.0.0
-paths:
-  /pets:
-    get:
-      tags:
-        - pets
-        - admin
+actions:
+  - target: "$.root.key"
+    update:
+      - item1
+      - item2
+`,
+			expectedYAML: `root:
+  key:
+    - item1
+    - item2
 `,
 		},
 	}
@@ -508,27 +402,493 @@ paths:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
-			var specNode yaml.Node
-			err := yaml.Unmarshal([]byte(tt.inputYAML), &specNode)
-			require.NoError(t, err, "unmarshal input spec should succeed")
-
-			var o overlay.Overlay
-			err = yaml.Unmarshal([]byte(tt.overlayYAML), &o)
-			require.NoError(t, err, "unmarshal overlay should succeed")
-
-			err = o.ApplyTo(&specNode)
-			require.NoError(t, err, "apply overlay should succeed")
-
-			var buf bytes.Buffer
-			enc := yaml.NewEncoder(&buf)
-			enc.SetIndent(2)
-			err = enc.Encode(&specNode)
-			require.NoError(t, err, "encode result should succeed")
-
-			assert.Equal(t, tt.expectedYAML, buf.String(), "output should match expected YAML")
+			result := applyOverlay(t, tt.inputYAML, tt.overlayYAML)
+			assert.Equal(t, tt.expectedYAML, marshalNode(t, result), "output should match expected YAML")
 		})
 	}
+}
+
+func TestApplyTo_V100_ArrayConcatenation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		inputYAML    string
+		overlayYAML  string
+		expectedYAML string
+	}{
+		{
+			name: "top-level array target with array update concatenates",
+			inputYAML: `items:
+  - a
+  - b
+`,
+			overlayYAML: `overlay: 1.0.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.items"
+    update:
+      - c
+      - d
+`,
+			expectedYAML: `items:
+  - a
+  - b
+  - c
+  - d
+`,
+		},
+		{
+			name: "nested array in object merge concatenates",
+			inputYAML: `root:
+  list:
+    - existing
+`,
+			overlayYAML: `overlay: 1.0.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.root"
+    update:
+      list:
+        - new
+`,
+			expectedYAML: `root:
+  list:
+    - existing
+    - new
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := applyOverlay(t, tt.inputYAML, tt.overlayYAML)
+			assert.Equal(t, tt.expectedYAML, marshalNode(t, result), "output should match expected YAML")
+		})
+	}
+}
+
+// --- 1.1.0 Tests: New spec-compliant behavior ---
+
+func TestApplyTo_V110_TopLevelArrayAppend(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		inputYAML    string
+		overlayYAML  string
+		expectedYAML string
+	}{
+		{
+			name: "object appended to array as single element",
+			inputYAML: `tags:
+  - name: existing
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.tags"
+    update:
+      name: newTag
+      description: appended
+`,
+			expectedYAML: `tags:
+  - name: existing
+  - name: newTag
+    description: appended
+`,
+		},
+		{
+			name: "scalar appended to array as single element",
+			inputYAML: `tags:
+  - pets
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.tags"
+    update: admin
+`,
+			expectedYAML: `tags:
+  - pets
+  - admin
+`,
+		},
+		{
+			name: "array update concatenated with array target",
+			inputYAML: `tags:
+  - name: existing
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.tags"
+    update:
+      - name: new1
+      - name: new2
+`,
+			expectedYAML: `tags:
+  - name: existing
+  - name: new1
+  - name: new2
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := applyOverlay(t, tt.inputYAML, tt.overlayYAML)
+			assert.Equal(t, tt.expectedYAML, marshalNode(t, result), "output should match expected YAML")
+		})
+	}
+}
+
+func TestApplyTo_V110_TopLevelObjectMerge(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		inputYAML    string
+		overlayYAML  string
+		expectedYAML string
+	}{
+		{
+			name: "new keys added to object",
+			inputYAML: `info:
+  title: Original
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.info"
+    update:
+      description: Added
+`,
+			expectedYAML: `info:
+  title: Original
+  description: Added
+`,
+		},
+		{
+			name: "existing key recursively merged",
+			inputYAML: `info:
+  title: Original
+  contact:
+    name: Old
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.info"
+    update:
+      contact:
+        email: new@example.com
+`,
+			expectedYAML: `info:
+  title: Original
+  contact:
+    name: Old
+    email: new@example.com
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := applyOverlay(t, tt.inputYAML, tt.overlayYAML)
+			assert.Equal(t, tt.expectedYAML, marshalNode(t, result), "output should match expected YAML")
+		})
+	}
+}
+
+func TestApplyTo_V110_TopLevelPrimitiveReplace(t *testing.T) {
+	t.Parallel()
+
+	inputYAML := `info:
+  title: Original
+`
+	overlayYAML := `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.info.title"
+    update: Replaced
+`
+	expectedYAML := `info:
+  title: Replaced
+`
+	result := applyOverlay(t, inputYAML, overlayYAML)
+	assert.Equal(t, expectedYAML, marshalNode(t, result), "scalar should be replaced")
+}
+
+func TestApplyTo_V110_RecursiveArrayConcat(t *testing.T) {
+	t.Parallel()
+
+	inputYAML := `paths:
+  /pets:
+    get:
+      parameters:
+        - name: limit
+          in: query
+`
+	overlayYAML := `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.paths['/pets'].get"
+    update:
+      parameters:
+        - name: offset
+          in: query
+`
+	expectedYAML := `paths:
+  /pets:
+    get:
+      parameters:
+        - name: limit
+          in: query
+        - name: offset
+          in: query
+`
+	result := applyOverlay(t, inputYAML, overlayYAML)
+	assert.Equal(t, expectedYAML, marshalNode(t, result), "nested arrays should be concatenated during object merge")
+}
+
+func TestApplyTo_V110_RecursiveTypeMismatch_Strict(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		inputYAML   string
+		overlayYAML string
+		errContains string
+	}{
+		{
+			name: "array target with object update within recursive merge",
+			inputYAML: `root:
+  key:
+    - item1
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.root"
+    update:
+      key:
+        nested: value
+`,
+			errContains: `key "key": type mismatch: target is array but update is object`,
+		},
+		{
+			name: "scalar target with array update within recursive merge",
+			inputYAML: `root:
+  key: scalar
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.root"
+    update:
+      key:
+        - item1
+`,
+			errContains: `key "key": type mismatch: target is scalar but update is array`,
+		},
+		{
+			name: "scalar target with object update within recursive merge",
+			inputYAML: `root:
+  key: scalar
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.root"
+    update:
+      key:
+        nested: value
+`,
+			errContains: `key "key": type mismatch: target is scalar but update is object`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := applyOverlayStrict(t, tt.inputYAML, tt.overlayYAML)
+			require.Error(t, err, "strict mode should return error on recursive type mismatch")
+			assert.Contains(t, err.Error(), tt.errContains, "error should describe the mismatch")
+		})
+	}
+}
+
+func TestApplyTo_V110_RecursiveTypeMismatch_Lax(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		inputYAML    string
+		overlayYAML  string
+		expectedYAML string
+	}{
+		{
+			name: "array target with object update replaces gracefully",
+			inputYAML: `root:
+  key:
+    - item1
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.root"
+    update:
+      key:
+        nested: value
+`,
+			expectedYAML: `root:
+  key:
+    nested: value
+`,
+		},
+		{
+			name: "scalar target with object update replaces gracefully",
+			inputYAML: `root:
+  key: scalar
+`,
+			overlayYAML: `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.root"
+    update:
+      key:
+        nested: value
+`,
+			expectedYAML: `root:
+  key:
+    nested: value
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := applyOverlay(t, tt.inputYAML, tt.overlayYAML)
+			assert.Equal(t, tt.expectedYAML, marshalNode(t, result), "lax mode should replace gracefully")
+		})
+	}
+}
+
+func TestApplyTo_V110_CopyArrayAppend(t *testing.T) {
+	t.Parallel()
+
+	inputYAML := `source:
+  name: copied
+  description: from source
+targets:
+  - name: existing
+`
+	overlayYAML := `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.targets"
+    copy: "$.source"
+`
+	result := applyOverlay(t, inputYAML, overlayYAML)
+	expectedYAML := `source:
+  name: copied
+  description: from source
+targets:
+  - name: existing
+  - name: copied
+    description: from source
+`
+	assert.Equal(t, expectedYAML, marshalNode(t, result), "copy into array should append the object")
+}
+
+func TestApplyTo_V110_HomogeneityCheck_Strict(t *testing.T) {
+	t.Parallel()
+
+	// This test uses a wildcard that selects nodes of different types.
+	// In 1.1.0 strict mode, this should error.
+	inputYAML := `root:
+  arrayKey:
+    - item1
+  objectKey:
+    nested: value
+`
+	overlayYAML := `overlay: 1.1.0
+info:
+  title: test
+  version: 1.0.0
+actions:
+  - target: "$.root.*"
+    update:
+      newKey: newValue
+`
+	_, err := applyOverlayStrict(t, inputYAML, overlayYAML)
+	require.Error(t, err, "strict mode should error on mixed node types")
+	assert.Contains(t, err.Error(), "mixed node types", "error should mention mixed types")
+}
+
+func TestApplyTo_V100_BackwardCompatibility(t *testing.T) {
+	t.Parallel()
+
+	node, err := loader.LoadSpecification("testdata/openapi.yaml")
+	require.NoError(t, err)
+
+	o, err := loader.LoadOverlay("testdata/overlay.yaml")
+	require.NoError(t, err)
+
+	err = o.ApplyTo(node)
+	require.NoError(t, err)
+
+	NodeMatchesFile(t, node, "testdata/openapi-overlayed.yaml", "1.0.0 overlay should produce identical output")
+}
+
+func TestApplyTo_V100_BackwardCompatibility_Strict(t *testing.T) {
+	t.Parallel()
+
+	node, err := loader.LoadSpecification("testdata/openapi.yaml")
+	require.NoError(t, err)
+
+	o, err := loader.LoadOverlay("testdata/overlay.yaml")
+	require.NoError(t, err)
+
+	_, err = o.ApplyToStrict(node)
+	require.NoError(t, err)
+
+	NodeMatchesFile(t, node, "testdata/openapi-overlayed.yaml", "1.0.0 strict overlay should produce identical output")
 }
 
 func TestApplyToOld(t *testing.T) {
