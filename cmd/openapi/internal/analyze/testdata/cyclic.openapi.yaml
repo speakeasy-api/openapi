@@ -1,0 +1,186 @@
+openapi: "3.1.0"
+info:
+  title: Cyclic Schema Test
+  version: "1.0.0"
+paths:
+  /tree:
+    get:
+      operationId: getTree
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TreeNode"
+components:
+  schemas:
+    TreeNode:
+      type: object
+      properties:
+        value:
+          type: string
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/TreeNode"
+        parent:
+          $ref: "#/components/schemas/TreeNode"
+      required:
+        - value
+
+    Person:
+      type: object
+      properties:
+        name:
+          type: string
+        employer:
+          $ref: "#/components/schemas/Company"
+      required:
+        - name
+        - employer
+
+    Company:
+      type: object
+      properties:
+        name:
+          type: string
+        ceo:
+          $ref: "#/components/schemas/Person"
+        employees:
+          type: array
+          items:
+            $ref: "#/components/schemas/Person"
+      required:
+        - name
+        - ceo
+
+    Animal:
+      oneOf:
+        - $ref: "#/components/schemas/Dog"
+        - $ref: "#/components/schemas/Cat"
+
+    Dog:
+      type: object
+      properties:
+        breed:
+          type: string
+        owner:
+          $ref: "#/components/schemas/Person"
+
+    Cat:
+      type: object
+      properties:
+        color:
+          type: string
+        lives:
+          type: integer
+
+    Organization:
+      type: object
+      properties:
+        name:
+          type: string
+        parent:
+          $ref: "#/components/schemas/Organization"
+        subsidiaries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Organization"
+        departments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Department"
+      required:
+        - name
+
+    Department:
+      type: object
+      properties:
+        name:
+          type: string
+        head:
+          $ref: "#/components/schemas/Person"
+        org:
+          $ref: "#/components/schemas/Organization"
+      required:
+        - name
+        - org
+
+    Event:
+      type:
+        - object
+        - "null"
+      properties:
+        name:
+          type: string
+        data:
+          anyOf:
+            - $ref: "#/components/schemas/Person"
+            - $ref: "#/components/schemas/Company"
+
+    BigSchema:
+      type: object
+      properties:
+        field1:
+          type: string
+        field2:
+          type: string
+        field3:
+          type: string
+        field4:
+          type: string
+        field5:
+          type: string
+        field6:
+          type: string
+        field7:
+          type: string
+        field8:
+          type: string
+        field9:
+          type: string
+        field10:
+          type: string
+        field11:
+          type: string
+        field12:
+          type: string
+        field13:
+          type: string
+        field14:
+          type: string
+        field15:
+          type: string
+        field16:
+          type: string
+        field17:
+          type: string
+        field18:
+          type: string
+        field19:
+          type: string
+        field20:
+          type: string
+        field21:
+          type: string
+        field22:
+          type: string
+        field23:
+          type: string
+        field24:
+          type: string
+        field25:
+          type: string
+        field26:
+          type: string
+        field27:
+          type: string
+        field28:
+          type: string
+        field29:
+          type: string
+        field30:
+          type: string
+        field31:
+          type: string
