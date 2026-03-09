@@ -985,6 +985,51 @@ func TestDecodeNode_Success(t *testing.T) {
 }
 
 // Helper functions
+
+// TestUnmarshal_ExtensionOrder_Stable verifies that extension keys are unmarshalled in document
+// order, not in non-deterministic goroutine scheduling order. This is a regression test for
+// GEN-2688 where x-internal and x-confluence-page-id swapped positions on each merge run.
+func TestUnmarshal_ExtensionOrder_Stable(t *testing.T) {
+	t.Parallel()
+
+	// Use the real extensions from GEN-2688 in their document order
+	input := `
+stringField: "test"
+boolField: true
+intField: 42
+float64Field: 3.14
+x-internal: true
+x-confluence-page-id: '553587772'
+x-speakeasy-test: true
+x-speakeasy-group: config
+x-speakeasy-name-override: moveUsers
+`
+	expectedOrder := []string{
+		"x-internal",
+		"x-confluence-page-id",
+		"x-speakeasy-test",
+		"x-speakeasy-group",
+		"x-speakeasy-name-override",
+	}
+
+	// Run multiple times to expose any non-determinism from goroutine scheduling
+	for range 20 {
+		var model core.TestPrimitiveModel
+		validationErrs, err := marshaller.UnmarshalCore(t.Context(), "", parseYAML(t, input), &model)
+		require.NoError(t, err)
+		require.Empty(t, validationErrs)
+
+		require.NotNil(t, model.Extensions)
+		require.Equal(t, len(expectedOrder), model.Extensions.Len(), "wrong number of extensions")
+
+		var gotKeys []string
+		for k := range model.Extensions.Keys() {
+			gotKeys = append(gotKeys, k)
+		}
+		require.Equal(t, expectedOrder, gotKeys, "extension keys not in document order")
+	}
+}
+
 func parseYAML(t *testing.T, yml string) *yaml.Node {
 	t.Helper()
 	var node yaml.Node
