@@ -416,8 +416,11 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 	var unknownPropertiesMutex sync.Mutex
 	unknownProperties := make([]string, 0, numJobs)
 
-	// Mutex to protect concurrent access to extensionsField
-	var extensionsMutex sync.Mutex
+	// Collect extension nodes indexed by document position for in-order processing after the parallel phase
+	var jobExtensionNodes [][2]*yaml.Node
+	if extensionsField != nil {
+		jobExtensionNodes = make([][2]*yaml.Node, numJobs)
+	}
 
 	// TODO allow concurrency to be configurable
 	g, ctx := errgroup.WithContext(ctx)
@@ -443,13 +446,8 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 			if !ok {
 				switch {
 				case strings.HasPrefix(key, "x-") && extensionsField != nil:
-					// Lock access to extensionsField to prevent concurrent modification
-					extensionsMutex.Lock()
-					defer extensionsMutex.Unlock()
-					err := UnmarshalExtension(keyNode, valueNode, *extensionsField)
-					if err != nil {
-						return err
-					}
+					// Record extension for sequential processing in document order after parallel phase
+					jobExtensionNodes[i/2] = [2]*yaml.Node{keyNode, valueNode}
 				case embeddedMap != nil:
 					// Skip alias definitions - these are nodes where:
 					// 1. The value node has an anchor (e.g., &keyAlias)
@@ -496,6 +494,18 @@ func unmarshalModel(ctx context.Context, parentName string, node *yaml.Node, str
 	}
 
 	var validationErrs []error
+
+	// Process extension nodes in document order to ensure stable insertion order into the core sequenced map
+	if extensionsField != nil {
+		for _, pair := range jobExtensionNodes {
+			if pair[0] == nil {
+				continue
+			}
+			if err := UnmarshalExtension(pair[0], pair[1], *extensionsField); err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	// Add duplicate key validation errors first
 	validationErrs = append(validationErrs, duplicateKeyErrs...)
