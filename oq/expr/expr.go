@@ -11,11 +11,10 @@ import (
 
 // Value represents a typed value in the expression system.
 type Value struct {
-	Kind   ValueKind
-	Str    string
-	Int    int
-	Bool   bool
-	isNull bool
+	Kind ValueKind
+	Str  string
+	Int  int
+	Bool bool
 }
 
 type ValueKind int
@@ -93,7 +92,7 @@ func (e *binaryExpr) Eval(row Row) Value {
 	case "<=":
 		return Value{Kind: KindBool, Bool: compare(e.left.Eval(row), e.right.Eval(row)) <= 0}
 	default:
-		return Value{Kind: KindNull, isNull: true}
+		return Value{Kind: KindNull}
 	}
 }
 
@@ -103,7 +102,7 @@ func (e *notExpr) Eval(row Row) Value {
 
 func (e *hasExpr) Eval(row Row) Value {
 	v := row.Field(e.field)
-	return Value{Kind: KindBool, Bool: !v.isNull && (v.Kind != KindInt || v.Int > 0) && (v.Kind != KindBool || v.Bool)}
+	return Value{Kind: KindBool, Bool: v.Kind != KindNull && (v.Kind != KindInt || v.Int > 0) && (v.Kind != KindBool || v.Bool) && (v.Kind != KindString || v.Str != "")}
 }
 
 func (e *matchesExpr) Eval(row Row) Value {
@@ -206,7 +205,7 @@ func BoolVal(b bool) Value {
 
 // NullVal creates a null Value.
 func NullVal() Value {
-	return Value{Kind: KindNull, isNull: true}
+	return Value{Kind: KindNull}
 }
 
 // --- Parser ---
