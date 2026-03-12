@@ -378,7 +378,7 @@ func TestExecute_Sample_Success(t *testing.T) {
 	// Running sample again should produce the same result (deterministic)
 	result2, err := oq.Execute("schemas.components | sample 3", g)
 	require.NoError(t, err)
-	assert.Equal(t, len(result.Rows), len(result2.Rows))
+	assert.Len(t, result2.Rows, len(result.Rows))
 }
 
 func TestExecute_Path_Success(t *testing.T) {
