@@ -150,3 +150,17 @@ func TestParse_UnterminatedBackslashString(t *testing.T) {
 		expr.Parse(`name == "x\`) //nolint:errcheck
 	})
 }
+
+func TestParse_UnterminatedFunction(t *testing.T) {
+	t.Parallel()
+
+	// Should not panic when tokens are exhausted inside a function call
+	assert.NotPanics(t, func() {
+		_, err := expr.Parse(`has(field`)
+		require.Error(t, err)
+	})
+	assert.NotPanics(t, func() {
+		_, err := expr.Parse(`matches(field,`)
+		require.Error(t, err)
+	})
+}

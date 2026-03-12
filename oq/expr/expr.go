@@ -243,8 +243,9 @@ func (p *parser) next() string {
 }
 
 func (p *parser) expect(tok string) error {
-	if p.next() != tok {
-		return fmt.Errorf("expected %q, got %q", tok, p.tokens[p.pos-1])
+	got := p.next()
+	if got != tok {
+		return fmt.Errorf("expected %q, got %q", tok, got)
 	}
 	return nil
 }
