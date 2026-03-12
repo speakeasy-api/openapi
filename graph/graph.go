@@ -91,12 +91,12 @@ type SchemaGraph struct {
 	inEdges  map[NodeID][]Edge
 
 	// Lookup maps
-	ptrToNode map[*oas3.JSONSchemaReferenceable]NodeID
+	ptrToNode  map[*oas3.JSONSchemaReferenceable]NodeID
 	nameToNode map[string]NodeID
 
 	// Operation-schema relationships
-	opSchemas  map[NodeID]map[NodeID]bool // operation -> set of schema NodeIDs
-	schemaOps  map[NodeID]map[NodeID]bool // schema -> set of operation NodeIDs
+	opSchemas map[NodeID]map[NodeID]bool // operation -> set of schema NodeIDs
+	schemaOps map[NodeID]map[NodeID]bool // schema -> set of operation NodeIDs
 }
 
 // Build constructs a SchemaGraph from an openapi.Index.

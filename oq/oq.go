@@ -20,7 +20,7 @@ import (
 type ResultKind int
 
 const (
-	SchemaResult    ResultKind = iota
+	SchemaResult ResultKind = iota
 	OperationResult
 )
 

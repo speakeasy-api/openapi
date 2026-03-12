@@ -10,11 +10,11 @@ import (
 
 // Value represents a typed value in the expression system.
 type Value struct {
-	Kind    ValueKind
-	Str     string
-	Int     int
-	Bool    bool
-	isNull  bool
+	Kind   ValueKind
+	Str    string
+	Int    int
+	Bool   bool
+	isNull bool
 }
 
 type ValueKind int
