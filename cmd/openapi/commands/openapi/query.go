@@ -14,47 +14,47 @@ import (
 )
 
 var queryCmd = &cobra.Command{
-	Use:   "query <input-file> <query>",
+	Use:   "query <query> [input-file]",
 	Short: "Query an OpenAPI specification using the oq pipeline language",
 	Long: `Query an OpenAPI specification using the oq pipeline language to answer
 structural and semantic questions about schemas and operations.
 
+The query argument comes first, followed by an optional input file. If no file
+is given, reads from stdin.
+
 Examples:
   # Deeply nested components
-  openapi spec query petstore.yaml 'schemas.components | sort depth desc | take 10 | select name, depth'
+  openapi spec query 'schemas.components | sort depth desc | take 10 | select name, depth' petstore.yaml
+
+  # Pipe from stdin
+  cat spec.yaml | openapi spec query 'schemas | count'
+
+  # Explicit stdin
+  openapi spec query 'schemas | count' -
 
   # Wide union trees
-  openapi spec query petstore.yaml 'schemas | where union_width > 0 | sort union_width desc | take 10'
-
-  # Central components (highest in-degree)
-  openapi spec query petstore.yaml 'schemas.components | sort in_degree desc | take 10 | select name, in_degree'
+  openapi spec query 'schemas | where union_width > 0 | sort union_width desc | take 10' petstore.yaml
 
   # Dead components (no incoming references)
-  openapi spec query petstore.yaml 'schemas.components | where in_degree == 0 | select name'
+  openapi spec query 'schemas.components | where in_degree == 0 | select name' petstore.yaml
 
   # Operation sprawl
-  openapi spec query petstore.yaml 'operations | sort schema_count desc | take 10 | select name, schema_count'
+  openapi spec query 'operations | sort schema_count desc | take 10 | select name, schema_count' petstore.yaml
 
   # Circular references
-  openapi spec query petstore.yaml 'schemas | where is_circular | select name, path'
-
-  # Schema count
-  openapi spec query petstore.yaml 'schemas | count'
-
-Stdin is supported — either pipe data directly or use '-' explicitly:
-  cat spec.yaml | openapi spec query - 'schemas | count'
+  openapi spec query 'schemas | where is_circular | select name, path' petstore.yaml
 
   # Shortest path between schemas
-  openapi spec query petstore.yaml 'schemas | path "Pet" "Address" | select name'
+  openapi spec query 'schemas | path "Pet" "Address" | select name' petstore.yaml
 
-  # Top 5 most connected schemas
-  openapi spec query petstore.yaml 'schemas.components | top 5 in_degree | select name, in_degree'
+  # Edge annotations
+  openapi spec query 'schemas.components | where name == "Pet" | refs-out | select name, edge_kind, edge_label' petstore.yaml
+
+  # Blast radius
+  openapi spec query 'schemas.components | where name == "Error" | blast-radius | count' petstore.yaml
 
   # Explain a query plan
-  openapi spec query petstore.yaml 'schemas.components | where depth > 5 | sort depth desc | explain'
-
-  # List available fields
-  openapi spec query petstore.yaml 'schemas | fields'
+  openapi spec query 'schemas.components | where depth > 5 | sort depth desc | explain' petstore.yaml
 
 Pipeline stages:
   Source:     schemas, schemas.components, schemas.inline, operations
@@ -80,9 +80,11 @@ func init() {
 
 func runQuery(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	inputFile := inputFileFromArgs(args)
 
+	// args[0] = query (or input file if using -f), args[1] = input file (optional)
 	queryStr := ""
+	inputFile := "-" // default to stdin
+
 	if queryFromFile != "" {
 		data, err := os.ReadFile(queryFromFile)
 		if err != nil {
@@ -90,8 +92,15 @@ func runQuery(cmd *cobra.Command, args []string) {
 			os.Exit(1)
 		}
 		queryStr = string(data)
-	} else if len(args) >= 2 {
-		queryStr = args[1]
+		// When using -f, all positional args are input files
+		if len(args) > 0 {
+			inputFile = args[0]
+		}
+	} else if len(args) >= 1 {
+		queryStr = args[0]
+		if len(args) >= 2 {
+			inputFile = args[1]
+		}
 	}
 
 	if queryStr == "" {

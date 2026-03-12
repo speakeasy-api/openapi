@@ -6,19 +6,19 @@
 
 ```bash
 # Count all schemas
-openapi spec query petstore.yaml 'schemas | count'
+openapi spec query 'schemas | count' petstore.yaml
 
 # Top 10 deepest component schemas
-openapi spec query petstore.yaml 'schemas.components | sort depth desc | take 10 | select name, depth'
+openapi spec query 'schemas.components | sort depth desc | take 10 | select name, depth' petstore.yaml
 
 # Dead components (unreferenced)
-openapi spec query petstore.yaml 'schemas.components | where in_degree == 0 | select name'
+openapi spec query 'schemas.components | where in_degree == 0 | select name' petstore.yaml
 ```
 
 Stdin is supported:
 
 ```bash
-cat spec.yaml | openapi spec query - 'schemas | count'
+cat spec.yaml | openapi spec query 'schemas | count'
 ```
 
 ## Pipeline Syntax
@@ -156,8 +156,8 @@ Operators: `==`, `!=`, `>`, `<`, `>=`, `<=`, `and`, `or`, `not`, `has()`, `match
 Use `--format` flag or inline `format` stage:
 
 ```bash
-openapi spec query spec.yaml 'schemas | count' --format json
-openapi spec query spec.yaml 'schemas | take 5 | format markdown'
+openapi spec query 'schemas | count' spec.yaml --format json
+openapi spec query 'schemas | take 5 | format markdown' spec.yaml
 ```
 
 | Format | Description |
@@ -232,11 +232,14 @@ operations | shared-refs | select name, op_count
 openapi spec query-reference
 
 # Inline query
-openapi spec query <spec-file> '<query>'
+openapi spec query '<query>' <spec-file>
 
 # Query from file
-openapi spec query <spec-file> -f query.oq
+openapi spec query -f query.oq <spec-file>
 
 # With output format
-openapi spec query <spec-file> '<query>' --format json
+openapi spec query '<query>' <spec-file> --format json
+
+# From stdin
+cat spec.yaml | openapi spec query '<query>'
 ```
