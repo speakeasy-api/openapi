@@ -42,16 +42,30 @@ source | stage | stage | ... | terminal
 
 | Stage | Description |
 |-------|-------------|
-| `refs-out` | Direct outgoing references |
-| `refs-in` | Direct incoming references |
+| `refs-out` | Direct outgoing references (with edge annotations) |
+| `refs-in` | Direct incoming references (with edge annotations) |
 | `reachable` | Transitive closure of outgoing refs |
 | `ancestors` | Transitive closure of incoming refs |
-| `properties` | Property sub-schemas |
-| `union-members` | allOf/oneOf/anyOf children |
-| `items` | Array items schema |
+| `properties` | Property sub-schemas (with edge annotations) |
+| `union-members` | allOf/oneOf/anyOf children (with edge annotations) |
+| `items` | Array items schema (with edge annotations) |
 | `ops` | Schemas → operations |
 | `schemas` | Operations → schemas |
 | `path <a> <b>` | Shortest path between two schemas |
+| `connected` | Full connected component (schemas + operations) |
+| `blast-radius` | Ancestors + all affected operations |
+| `neighbors <n>` | Bidirectional neighborhood within N hops |
+
+### Analysis Stages
+
+| Stage | Description |
+|-------|-------------|
+| `orphans` | Schemas with no incoming refs and no operation usage |
+| `leaves` | Schemas with no outgoing refs (terminal nodes) |
+| `cycles` | Strongly connected components (actual cycles) |
+| `clusters` | Weakly connected component grouping |
+| `tag-boundary` | Schemas used by operations across multiple tags |
+| `shared-refs` | Schemas shared by ALL operations in result set |
 
 ### Filter & Transform Stages
 
@@ -95,6 +109,8 @@ source | stage | stage | ... | terminal
 | `has_ref` | bool | Has $ref |
 | `hash` | string | Content hash |
 | `path` | string | JSON pointer |
+| `op_count` | int | Operations using this schema |
+| `tag_count` | int | Distinct tags across operations |
 
 ### Operation Fields
 
@@ -111,6 +127,16 @@ source | stage | stage | ... | terminal
 | `deprecated` | bool | Deprecated flag |
 | `description` | string | Description |
 | `summary` | string | Summary |
+
+### Edge Annotation Fields
+
+Available on rows produced by 1-hop traversal stages (`refs-out`, `refs-in`, `properties`, `union-members`, `items`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `edge_kind` | string | Edge type: property, items, allOf, oneOf, ref, ... |
+| `edge_label` | string | Edge label: property name, array index, etc. |
+| `edge_from` | string | Source node name |
 
 ## Where Expressions
 
@@ -170,6 +196,33 @@ schemas | where name matches "Error.*" | select name, path
 
 # Group by type
 schemas | group-by type
+
+# Edge annotations — how does Pet reference other schemas?
+schemas.components | where name == "Pet" | refs-out | select name, edge_kind, edge_label, edge_from
+
+# Blast radius — what breaks if Error changes?
+schemas.components | where name == "Error" | blast-radius | count
+
+# 2-hop neighborhood
+schemas.components | where name == "Pet" | neighbors 2 | select name
+
+# Orphaned schemas
+schemas.components | orphans | select name
+
+# Leaf nodes
+schemas.components | leaves | select name, in_degree
+
+# Detect cycles
+schemas | cycles
+
+# Discover clusters
+schemas.components | clusters
+
+# Cross-tag schemas
+schemas | tag-boundary | select name, tag_count
+
+# Schemas shared across all operations
+operations | shared-refs | select name, op_count
 ```
 
 ## CLI Reference

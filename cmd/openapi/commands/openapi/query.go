@@ -58,8 +58,11 @@ Stdin is supported — either pipe data directly or use '-' explicitly:
 
 Pipeline stages:
   Source:     schemas, schemas.components, schemas.inline, operations
-  Traversal:  refs-out, refs-in, reachable, ancestors, properties, union-members, items, ops, schemas, path <from> <to>
-  Filter:     where <expr>, select <fields>, sort <field> [asc|desc], take/head <n>, sample <n>, top <n> <field>, bottom <n> <field>, unique, group-by <field>, count
+  Traversal:  refs-out, refs-in, reachable, ancestors, properties, union-members, items,
+              ops, schemas, path <from> <to>, connected, blast-radius, neighbors <n>
+  Analysis:   orphans, leaves, cycles, clusters, tag-boundary, shared-refs
+  Filter:     where <expr>, select <fields>, sort <field> [asc|desc], take/head <n>,
+              sample <n>, top <n> <field>, bottom <n> <field>, unique, group-by <field>, count
   Meta:       explain, fields, format <table|json|markdown|toon>
 
 Where expressions support: ==, !=, >, <, >=, <=, and, or, not, has(), matches`,

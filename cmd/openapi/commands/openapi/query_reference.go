@@ -38,16 +38,29 @@ TRAVERSAL STAGES
 Graph navigation stages replace the current result set by following edges
 in the schema reference graph.
 
-  refs-out        Direct outgoing references (1 hop)
-  refs-in         Direct incoming references (1 hop)
-  reachable       Transitive closure of outgoing references
-  ancestors       Transitive closure of incoming references
-  properties      Expand to property sub-schemas
-  union-members   Expand allOf/oneOf/anyOf children
-  items           Expand to array items schema
-  ops             Schemas → operations that use them
-  schemas         Operations → schemas they touch
-  path <a> <b>   Shortest path between two named schemas
+  refs-out          Direct outgoing references (1 hop, with edge annotations)
+  refs-in           Direct incoming references (1 hop, with edge annotations)
+  reachable         Transitive closure of outgoing references
+  ancestors         Transitive closure of incoming references
+  properties        Expand to property sub-schemas (with edge annotations)
+  union-members     Expand allOf/oneOf/anyOf children (with edge annotations)
+  items             Expand to array items schema (with edge annotations)
+  ops               Schemas → operations that use them
+  schemas           Operations → schemas they touch
+  path <a> <b>      Shortest path between two named schemas
+  connected         Full connected component (schemas + operations)
+  blast-radius      Ancestors + all affected operations (change impact)
+  neighbors <n>     Bidirectional neighborhood within N hops
+
+ANALYSIS STAGES
+---------------
+
+  orphans            Schemas with no incoming refs and no operation usage
+  leaves             Schemas with no outgoing refs (leaf/terminal nodes)
+  cycles             Strongly connected components (actual reference cycles)
+  clusters           Weakly connected component grouping
+  tag-boundary       Schemas used by operations across multiple tags
+  shared-refs        Schemas shared by ALL operations in result set
 
 FILTER & TRANSFORM STAGES
 --------------------------
@@ -89,6 +102,8 @@ SCHEMA FIELDS
   has_ref           bool     Has a $ref
   hash              string   Content hash
   path              string   JSON pointer in document
+  op_count          int      Number of operations using this schema
+  tag_count         int      Number of distinct tags across operations
 
 OPERATION FIELDS
 ----------------
@@ -106,6 +121,17 @@ OPERATION FIELDS
   deprecated        bool     Whether the operation is deprecated
   description       string   Operation description
   summary           string   Operation summary
+
+EDGE ANNOTATION FIELDS
+----------------------
+Available on rows produced by 1-hop traversal stages (refs-out, refs-in,
+properties, union-members, items):
+
+  Field             Type     Description
+  ─────             ────     ───────────
+  edge_kind         string   Edge type: property, items, allOf, oneOf, ref, ...
+  edge_label        string   Edge label: property name, array index, etc.
+  edge_from         string   Source node name
 
 WHERE EXPRESSIONS
 -----------------
@@ -177,4 +203,31 @@ EXAMPLES
 
   # Complex filter
   schemas | where property_count > 3 and not is_component | select name, property_count, path
+
+  # Edge annotations — see how Pet references other schemas
+  schemas.components | where name == "Pet" | refs-out | select name, edge_kind, edge_label, edge_from
+
+  # Blast radius — what breaks if I change the Error schema?
+  schemas.components | where name == "Error" | blast-radius | count
+
+  # Neighborhood — schemas within 2 hops of Pet
+  schemas.components | where name == "Pet" | neighbors 2 | select name
+
+  # Orphaned schemas — unreferenced by anything
+  schemas.components | orphans | select name
+
+  # Leaf schemas — terminal nodes with no outgoing refs
+  schemas.components | leaves | select name, in_degree
+
+  # Detect reference cycles
+  schemas | cycles
+
+  # Discover schema clusters
+  schemas.components | clusters
+
+  # Cross-tag schemas — shared across team boundaries
+  schemas | tag-boundary | select name, tag_count
+
+  # Schemas shared by all operations
+  operations | shared-refs | select name, op_count
 `

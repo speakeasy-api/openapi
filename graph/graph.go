@@ -717,6 +717,187 @@ func (g *SchemaGraph) ShortestPath(from, to NodeID) []NodeID {
 	return nil
 }
 
+// SchemaOpCount returns the number of operations that reference the given schema.
+func (g *SchemaGraph) SchemaOpCount(id NodeID) int {
+	return len(g.schemaOps[id])
+}
+
+// Neighbors returns schema NodeIDs within maxDepth hops of the given node,
+// following both out-edges and in-edges (bidirectional BFS).
+// The result excludes the seed node itself.
+func (g *SchemaGraph) Neighbors(id NodeID, maxDepth int) []NodeID {
+	visited := map[NodeID]bool{id: true}
+	current := []NodeID{id}
+
+	for depth := 0; depth < maxDepth && len(current) > 0; depth++ {
+		var next []NodeID
+		for _, nid := range current {
+			for _, edge := range g.outEdges[nid] {
+				if !visited[edge.To] {
+					visited[edge.To] = true
+					next = append(next, edge.To)
+				}
+			}
+			for _, edge := range g.inEdges[nid] {
+				if !visited[edge.From] {
+					visited[edge.From] = true
+					next = append(next, edge.From)
+				}
+			}
+		}
+		current = next
+	}
+
+	delete(visited, id)
+	result := make([]NodeID, 0, len(visited))
+	for nid := range visited {
+		result = append(result, nid)
+	}
+	return result
+}
+
+// StronglyConnectedComponents returns the SCCs of the schema graph using
+// Tarjan's algorithm. Only returns components with more than one node
+// (i.e., actual cycles, not singleton nodes).
+func (g *SchemaGraph) StronglyConnectedComponents() [][]NodeID {
+	idx := 0
+	var stack []NodeID
+	onStack := make(map[NodeID]bool)
+	indices := make(map[NodeID]int)
+	lowlinks := make(map[NodeID]int)
+	defined := make(map[NodeID]bool)
+	var sccs [][]NodeID
+
+	var strongConnect func(v NodeID)
+	strongConnect = func(v NodeID) {
+		indices[v] = idx
+		lowlinks[v] = idx
+		defined[v] = true
+		idx++
+		stack = append(stack, v)
+		onStack[v] = true
+
+		for _, edge := range g.outEdges[v] {
+			w := edge.To
+			if !defined[w] {
+				strongConnect(w)
+				if lowlinks[w] < lowlinks[v] {
+					lowlinks[v] = lowlinks[w]
+				}
+			} else if onStack[w] {
+				if indices[w] < lowlinks[v] {
+					lowlinks[v] = indices[w]
+				}
+			}
+		}
+
+		if lowlinks[v] == indices[v] {
+			var scc []NodeID
+			for {
+				w := stack[len(stack)-1]
+				stack = stack[:len(stack)-1]
+				onStack[w] = false
+				scc = append(scc, w)
+				if w == v {
+					break
+				}
+			}
+			if len(scc) > 1 {
+				sccs = append(sccs, scc)
+			}
+		}
+	}
+
+	for i := range g.Schemas {
+		nid := NodeID(i)
+		if !defined[nid] {
+			strongConnect(nid)
+		}
+	}
+
+	return sccs
+}
+
+// ConnectedComponent computes the full connected component reachable from the
+// given seed schema and operation nodes. It treats schema edges as undirected
+// (follows both out-edges and in-edges) and crosses schema↔operation links.
+// Returns the sets of reachable schema and operation NodeIDs (including seeds).
+func (g *SchemaGraph) ConnectedComponent(schemaSeeds, opSeeds []NodeID) (schemas []NodeID, ops []NodeID) {
+	visitedSchemas := make(map[NodeID]bool)
+	visitedOps := make(map[NodeID]bool)
+
+	// Queues for BFS across both node types
+	schemaQueue := make([]NodeID, 0, len(schemaSeeds))
+	opQueue := make([]NodeID, 0, len(opSeeds))
+
+	for _, id := range schemaSeeds {
+		if !visitedSchemas[id] {
+			visitedSchemas[id] = true
+			schemaQueue = append(schemaQueue, id)
+		}
+	}
+	for _, id := range opSeeds {
+		if !visitedOps[id] {
+			visitedOps[id] = true
+			opQueue = append(opQueue, id)
+		}
+	}
+
+	for len(schemaQueue) > 0 || len(opQueue) > 0 {
+		// Process schema nodes
+		for len(schemaQueue) > 0 {
+			current := schemaQueue[0]
+			schemaQueue = schemaQueue[1:]
+
+			// Follow out-edges (undirected: treat as bidirectional)
+			for _, edge := range g.outEdges[current] {
+				if !visitedSchemas[edge.To] {
+					visitedSchemas[edge.To] = true
+					schemaQueue = append(schemaQueue, edge.To)
+				}
+			}
+			// Follow in-edges
+			for _, edge := range g.inEdges[current] {
+				if !visitedSchemas[edge.From] {
+					visitedSchemas[edge.From] = true
+					schemaQueue = append(schemaQueue, edge.From)
+				}
+			}
+			// Cross to operations
+			for opID := range g.schemaOps[current] {
+				if !visitedOps[opID] {
+					visitedOps[opID] = true
+					opQueue = append(opQueue, opID)
+				}
+			}
+		}
+
+		// Process operation nodes
+		for len(opQueue) > 0 {
+			current := opQueue[0]
+			opQueue = opQueue[1:]
+
+			// Cross to schemas
+			for sid := range g.opSchemas[current] {
+				if !visitedSchemas[sid] {
+					visitedSchemas[sid] = true
+					schemaQueue = append(schemaQueue, sid)
+				}
+			}
+		}
+	}
+
+	schemas = make([]NodeID, 0, len(visitedSchemas))
+	for id := range visitedSchemas {
+		schemas = append(schemas, id)
+	}
+	ops = make([]NodeID, 0, len(visitedOps))
+	for id := range visitedOps {
+		ops = append(ops, id)
+	}
+	return schemas, ops
+}
+
 func intStr(i int) string {
 	return strconv.Itoa(i)
 }

@@ -61,6 +61,15 @@ func TestParse_Success(t *testing.T) {
 		{"items", "schemas | items"},
 		{"ops", "schemas | ops"},
 		{"schemas from ops", "operations | schemas"},
+		{"connected", "schemas.components | where name == \"Pet\" | connected"},
+		{"blast-radius", "schemas.components | where name == \"Pet\" | blast-radius"},
+		{"neighbors", "schemas.components | where name == \"Pet\" | neighbors 2"},
+		{"orphans", "schemas.components | orphans"},
+		{"leaves", "schemas.components | leaves"},
+		{"cycles", "schemas | cycles"},
+		{"clusters", "schemas.components | clusters"},
+		{"tag-boundary", "schemas | tag-boundary"},
+		{"shared-refs", "operations | take 2 | shared-refs"},
 		{"full pipeline", "schemas.components | where depth > 0 | sort depth desc | take 5 | select name, depth"},
 	}
 
@@ -523,6 +532,189 @@ func TestExecute_Items_Success(t *testing.T) {
 	require.NoError(t, err)
 	// May or may not have results depending on spec, but should not error
 	assert.NotNil(t, result)
+}
+
+func TestExecute_Connected_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Start from Pet, connected should return schemas and operations in the same component
+	result, err := oq.Execute(`schemas.components | where name == "Pet" | connected`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	// Should have both schema and operation rows
+	hasSchema := false
+	hasOp := false
+	for _, row := range result.Rows {
+		if row.Kind == oq.SchemaResult {
+			hasSchema = true
+		}
+		if row.Kind == oq.OperationResult {
+			hasOp = true
+		}
+	}
+	assert.True(t, hasSchema, "connected should include schema nodes")
+	assert.True(t, hasOp, "connected should include operation nodes")
+}
+
+func TestExecute_Connected_FromOps_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Start from an operation, connected should also find schemas
+	result, err := oq.Execute(`operations | take 1 | connected`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	hasSchema := false
+	for _, row := range result.Rows {
+		if row.Kind == oq.SchemaResult {
+			hasSchema = true
+		}
+	}
+	assert.True(t, hasSchema, "connected from operation should include schema nodes")
+}
+
+func TestExecute_EdgeAnnotations_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | where name == "Pet" | refs-out | select name, edge_kind, edge_label, edge_from`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	// Every row should have edge annotations
+	for _, row := range result.Rows {
+		kind := oq.FieldValuePublic(row, "edge_kind", g)
+		assert.NotEmpty(t, kind.Str, "edge_kind should be set")
+		from := oq.FieldValuePublic(row, "edge_from", g)
+		assert.Equal(t, "Pet", from.Str)
+	}
+}
+
+func TestExecute_BlastRadius_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | where name == "Pet" | blast-radius`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	// Should include both schemas and operations
+	hasSchema := false
+	hasOp := false
+	for _, row := range result.Rows {
+		if row.Kind == oq.SchemaResult {
+			hasSchema = true
+		}
+		if row.Kind == oq.OperationResult {
+			hasOp = true
+		}
+	}
+	assert.True(t, hasSchema, "blast-radius should include schemas")
+	assert.True(t, hasOp, "blast-radius should include operations")
+}
+
+func TestExecute_Neighbors_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | where name == "Pet" | neighbors 1`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	// Depth-1 neighbors should include seed + direct refs in both directions
+	names := make(map[string]bool)
+	for _, row := range result.Rows {
+		n := oq.FieldValuePublic(row, "name", g)
+		names[n.Str] = true
+	}
+	assert.True(t, names["Pet"], "neighbors should include the seed node")
+}
+
+func TestExecute_Orphans_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | orphans | select name`, g)
+	require.NoError(t, err)
+	// Result may be empty if all schemas are referenced, that's fine
+	assert.NotNil(t, result)
+}
+
+func TestExecute_Leaves_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | leaves | select name, out_degree`, g)
+	require.NoError(t, err)
+	// All returned rows should have out_degree == 0
+	for _, row := range result.Rows {
+		od := oq.FieldValuePublic(row, "out_degree", g)
+		assert.Equal(t, 0, od.Int)
+	}
+}
+
+func TestExecute_Cycles_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas | cycles`, g)
+	require.NoError(t, err)
+	// Returns groups — may be empty if no cycles in petstore
+	assert.NotNil(t, result)
+}
+
+func TestExecute_Clusters_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | clusters`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Groups)
+
+	// Total names across all clusters should equal component count
+	total := 0
+	for _, grp := range result.Groups {
+		total += grp.Count
+	}
+	// Count component schemas
+	compCount, err := oq.Execute(`schemas.components | count`, g)
+	require.NoError(t, err)
+	assert.Equal(t, compCount.Count, total)
+}
+
+func TestExecute_TagBoundary_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas | tag-boundary | select name, tag_count`, g)
+	require.NoError(t, err)
+	// All returned rows should have tag_count > 1
+	for _, row := range result.Rows {
+		tc := oq.FieldValuePublic(row, "tag_count", g)
+		assert.Greater(t, tc.Int, 1)
+	}
+}
+
+func TestExecute_SharedRefs_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | shared-refs | select name`, g)
+	require.NoError(t, err)
+	// Schemas shared by ALL operations
+	assert.NotNil(t, result)
+}
+
+func TestExecute_OpCount_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | sort op_count desc | take 3 | select name, op_count`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
 }
 
 func TestFormatTable_Groups_Success(t *testing.T) {
