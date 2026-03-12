@@ -842,6 +842,678 @@ UpdateCallback:
 	assert.False(t, idx.HasErrors(), "should have no errors after multi-file reference fix")
 	assert.Empty(t, idx.GetResolutionErrors(), "should have 0 resolution errors (bug is fixed!)")
 }
+
+// TestBuildIndex_ExternalRef_NoFalseCircularReference_Success verifies that
+// multiple $ref pointers into the same external file (or an external file with
+// multiple properties that $ref other terminal external files) are NOT reported
+// as circular references. Regression test for OAPI-5684.
+func TestBuildIndex_ExternalRef_NoFalseCircularReference_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	vfs := NewMockVirtualFS()
+
+	// Main OpenAPI document references Product.json from two separate paths.
+	vfs.AddFile("/api/catalog.json", `{
+  "openapi": "3.1.0",
+  "info": { "title": "Catalog API", "version": "1.0.0" },
+  "paths": {
+    "/products/{id}": {
+      "get": {
+        "operationId": "getProduct",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "./components/schemas/Product.json" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products": {
+      "get": {
+        "operationId": "listProducts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "./components/schemas/Product.json" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`)
+
+	// Product.json — object with several properties that $ref terminal schemas.
+	// None of these schemas reference back to Product.json.
+	vfs.AddFile("/api/components/schemas/Product.json", `{
+  "type": "object",
+  "properties": {
+    "id":        { "type": "string" },
+    "pricing":   { "$ref": "./ProductPricing.json" },
+    "promotion": { "$ref": "./ProductPromotion.json" },
+    "variants":  { "$ref": "./Variant.json" },
+    "images": {
+      "type": "array",
+      "items": { "$ref": "./ProductImage.json" }
+    }
+  }
+}`)
+
+	// All terminal — no further $refs
+	vfs.AddFile("/api/components/schemas/ProductPricing.json", `{
+  "type": "object",
+  "properties": {
+    "price":    { "type": "number" },
+    "currency": { "type": "string" }
+  }
+}`)
+
+	vfs.AddFile("/api/components/schemas/ProductPromotion.json", `{
+  "type": "object",
+  "properties": {
+    "discount": { "type": "number" },
+    "label":    { "type": "string" }
+  }
+}`)
+
+	vfs.AddFile("/api/components/schemas/Variant.json", `{
+  "type": "object",
+  "properties": {
+    "sku":   { "type": "string" },
+    "color": { "type": "string" }
+  }
+}`)
+
+	vfs.AddFile("/api/components/schemas/ProductImage.json", `{
+  "type": "object",
+  "properties": {
+    "url": { "type": "string" },
+    "alt": { "type": "string" }
+  }
+}`)
+
+	doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(vfs.files["/api/catalog.json"]))
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	// Use a relative TargetLocation (matching customer usage: speakeasy lint --schema catalog.json)
+	resolveOpts := references.ResolveOptions{
+		TargetLocation: "/api/catalog.json",
+		RootDocument:   doc,
+		TargetDocument: doc,
+		VirtualFS:      vfs,
+	}
+	idx := openapi.BuildIndex(ctx, doc, resolveOpts)
+	require.NotNil(t, idx)
+
+	// The spec has NO circular references — every child of Product.json is terminal.
+	circularErrs := idx.GetCircularReferenceErrors()
+	for _, e := range circularErrs {
+		t.Errorf("unexpected circular reference error: %v", e)
+	}
+	assert.Empty(t, circularErrs, "should have no circular reference errors")
+	assert.Equal(t, 0, idx.GetInvalidCircularRefCount(), "should have 0 invalid circular refs")
+	assert.Equal(t, 0, idx.GetValidCircularRefCount(), "should have 0 valid circular refs")
+
+	// Verify schemas were indexed (sanity check)
+	assert.NotEmpty(t, idx.SchemaReferences, "should have schema references for $ref nodes")
+	assert.Empty(t, idx.GetResolutionErrors(), "should have no resolution errors")
+}
+
+// TestBuildIndex_ExternalRef_MultipleRefsToSameFile_NoFalseCircular_Success verifies that
+// when a single external schema file is referenced from multiple places (e.g., both as a
+// direct response schema and as an array item), it does NOT produce a false circular reference.
+// This is a variant that uses YAML and more closely matches the customer's reported structure.
+func TestBuildIndex_ExternalRef_MultipleRefsToSameFile_NoFalseCircular_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	vfs := NewMockVirtualFS()
+
+	// Main catalog spec — references Product.json from multiple response schemas.
+	vfs.AddFile("/catalog.json", `{
+  "openapi": "3.1.0",
+  "info": { "title": "Catalog", "version": "1.0.0" },
+  "paths": {
+    "/products/{id}": {
+      "get": {
+        "operationId": "getProduct",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "./components/schemas/Product.json" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products": {
+      "get": {
+        "operationId": "listProducts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "./components/schemas/Product.json" }
+                    },
+                    "featured": { "$ref": "./components/schemas/Product.json" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`)
+
+	// Product.json — an object with several properties that reference other terminal files.
+	vfs.AddFile("/components/schemas/Product.json", `{
+  "type": "object",
+  "properties": {
+    "id":        { "type": "string" },
+    "name":      { "type": "string" },
+    "pricing":   { "$ref": "./ProductPricing.json" },
+    "promotion": { "$ref": "./ProductPromotion.json" },
+    "bundle_items": {
+      "type": "array",
+      "items": { "$ref": "./ProductBundleItem.json" }
+    },
+    "variants": {
+      "type": "array",
+      "items": { "$ref": "./Variant.json" }
+    },
+    "images": {
+      "type": "array",
+      "items": { "$ref": "./ProductImage.json" }
+    },
+    "attributes": {
+      "type": "array",
+      "items": { "$ref": "./ProductAttribute.json" }
+    }
+  }
+}`)
+
+	// All terminal schemas — none reference back to Product.json
+	vfs.AddFile("/components/schemas/ProductPricing.json", `{
+  "type": "object",
+  "properties": { "price": { "type": "number" }, "currency": { "type": "string" } }
+}`)
+	vfs.AddFile("/components/schemas/ProductPromotion.json", `{
+  "type": "object",
+  "properties": { "discount": { "type": "number" }, "label": { "type": "string" } }
+}`)
+	vfs.AddFile("/components/schemas/ProductBundleItem.json", `{
+  "type": "object",
+  "properties": { "item_id": { "type": "string" }, "quantity": { "type": "integer" } }
+}`)
+	vfs.AddFile("/components/schemas/Variant.json", `{
+  "type": "object",
+  "properties": { "sku": { "type": "string" }, "color": { "type": "string" } }
+}`)
+	vfs.AddFile("/components/schemas/ProductImage.json", `{
+  "type": "object",
+  "properties": { "url": { "type": "string" }, "alt": { "type": "string" } }
+}`)
+	vfs.AddFile("/components/schemas/ProductAttribute.json", `{
+  "type": "object",
+  "properties": { "key": { "type": "string" }, "value": { "type": "string" } }
+}`)
+
+	doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(vfs.files["/catalog.json"]))
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	resolveOpts := references.ResolveOptions{
+		TargetLocation: "/catalog.json",
+		RootDocument:   doc,
+		TargetDocument: doc,
+		VirtualFS:      vfs,
+	}
+	idx := openapi.BuildIndex(ctx, doc, resolveOpts)
+	require.NotNil(t, idx)
+
+	circularErrs := idx.GetCircularReferenceErrors()
+	for _, e := range circularErrs {
+		t.Errorf("unexpected circular reference error: %v", e)
+	}
+	assert.Empty(t, circularErrs, "should have no circular reference errors")
+	assert.Equal(t, 0, idx.GetInvalidCircularRefCount(), "should have 0 invalid circular refs")
+	assert.Equal(t, 0, idx.GetValidCircularRefCount(), "should have 0 valid circular refs")
+	assert.Empty(t, idx.GetResolutionErrors(), "should have no resolution errors")
+}
+
+// TestBuildIndex_ExternalRef_RelativeTargetLocation_NoFalseCircular_Success verifies
+// that using a relative TargetLocation (like "catalog.json" without leading /) does NOT
+// produce false circular reference errors. This closely matches the customer's reported
+// usage: `speakeasy lint openapi --schema catalog.json`.
+func TestBuildIndex_ExternalRef_RelativeTargetLocation_NoFalseCircular_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	vfs := NewMockVirtualFS()
+
+	// Main catalog spec with relative target location (no leading /)
+	vfs.AddFile("catalog.json", `{
+  "openapi": "3.1.0",
+  "info": { "title": "Catalog", "version": "1.0.0" },
+  "paths": {
+    "/products/{id}": {
+      "get": {
+        "operationId": "getProduct",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "./components/schemas/Product.json" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products": {
+      "get": {
+        "operationId": "listProducts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "./components/schemas/Product.json" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`)
+
+	// Product.json with nested external refs to terminal schemas
+	vfs.AddFile("components/schemas/Product.json", `{
+  "type": "object",
+  "properties": {
+    "id":        { "type": "string" },
+    "pricing":   { "$ref": "./ProductPricing.json" },
+    "promotion": { "$ref": "./ProductPromotion.json" },
+    "variants":  { "$ref": "./Variant.json" },
+    "images": {
+      "type": "array",
+      "items": { "$ref": "./ProductImage.json" }
+    },
+    "attributes": {
+      "type": "array",
+      "items": { "$ref": "./ProductAttribute.json" }
+    }
+  }
+}`)
+
+	// All terminal schemas
+	vfs.AddFile("components/schemas/ProductPricing.json", `{
+  "type": "object",
+  "properties": { "price": { "type": "number" }, "currency": { "type": "string" } }
+}`)
+	vfs.AddFile("components/schemas/ProductPromotion.json", `{
+  "type": "object",
+  "properties": { "discount": { "type": "number" }, "label": { "type": "string" } }
+}`)
+	vfs.AddFile("components/schemas/Variant.json", `{
+  "type": "object",
+  "properties": { "sku": { "type": "string" }, "color": { "type": "string" } }
+}`)
+	vfs.AddFile("components/schemas/ProductImage.json", `{
+  "type": "object",
+  "properties": { "url": { "type": "string" }, "alt": { "type": "string" } }
+}`)
+	vfs.AddFile("components/schemas/ProductAttribute.json", `{
+  "type": "object",
+  "properties": { "key": { "type": "string" }, "value": { "type": "string" } }
+}`)
+
+	doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(vfs.files["catalog.json"]))
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	// Use relative TargetLocation — matching customer usage
+	resolveOpts := references.ResolveOptions{
+		TargetLocation: "catalog.json",
+		RootDocument:   doc,
+		TargetDocument: doc,
+		VirtualFS:      vfs,
+	}
+	idx := openapi.BuildIndex(ctx, doc, resolveOpts)
+	require.NotNil(t, idx)
+
+	circularErrs := idx.GetCircularReferenceErrors()
+	for _, e := range circularErrs {
+		t.Errorf("unexpected circular reference error: %v", e)
+	}
+	assert.Empty(t, circularErrs, "should have no circular reference errors")
+	assert.Equal(t, 0, idx.GetInvalidCircularRefCount(), "should have 0 invalid circular refs")
+	assert.Equal(t, 0, idx.GetValidCircularRefCount(), "should have 0 valid circular refs")
+	assert.Empty(t, idx.GetResolutionErrors(), "should have no resolution errors")
+}
+
+// TestBuildIndex_ExternalRef_DeepNesting_NoFalseCircular_Success verifies that
+// deeply nested external references (Product -> BundleItem -> Item -> terminal schemas)
+// do NOT produce false circular reference errors. This more closely matches the
+// customer's reported structure where intermediate schemas reference further external files.
+func TestBuildIndex_ExternalRef_DeepNesting_NoFalseCircular_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	vfs := NewMockVirtualFS()
+
+	// Main catalog spec
+	vfs.AddFile("catalog.json", `{
+  "openapi": "3.1.0",
+  "info": { "title": "Catalog", "version": "1.0.0" },
+  "paths": {
+    "/products/{id}": {
+      "get": {
+        "operationId": "getProduct",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "./components/schemas/Product.json" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`)
+
+	// Product.json — references multiple child schemas including non-terminal ones
+	vfs.AddFile("components/schemas/Product.json", `{
+  "type": "object",
+  "properties": {
+    "id":        { "type": "string" },
+    "pricing":   { "$ref": "./ProductPricing.json" },
+    "promotion": { "$ref": "./ProductPromotion.json" },
+    "bundle_items": {
+      "type": "array",
+      "items": { "$ref": "./ProductBundleItem.json" }
+    },
+    "variants": {
+      "type": "array",
+      "items": { "$ref": "./Variant.json" }
+    },
+    "images": {
+      "type": "array",
+      "items": { "$ref": "./ProductImage.json" }
+    },
+    "attributes": {
+      "type": "array",
+      "items": { "$ref": "./ProductAttribute.json" }
+    }
+  }
+}`)
+
+	// ProductPricing.json — terminal
+	vfs.AddFile("components/schemas/ProductPricing.json", `{
+  "type": "object",
+  "properties": { "price": { "type": "number" }, "currency": { "type": "string" } }
+}`)
+
+	// ProductPromotion.json — references promotion type schemas (non-terminal)
+	vfs.AddFile("components/schemas/ProductPromotion.json", `{
+  "type": "object",
+  "properties": {
+    "discount": { "type": "number" },
+    "type": { "$ref": "./PromotionType.json" }
+  }
+}`)
+
+	// PromotionType.json — terminal
+	vfs.AddFile("components/schemas/PromotionType.json", `{
+  "type": "object",
+  "properties": { "name": { "type": "string" }, "code": { "type": "string" } }
+}`)
+
+	// ProductBundleItem.json — references Item.json (non-terminal, 2 levels deep)
+	vfs.AddFile("components/schemas/ProductBundleItem.json", `{
+  "type": "object",
+  "properties": {
+    "quantity": { "type": "integer" },
+    "item": { "$ref": "./Item.json" }
+  }
+}`)
+
+	// Item.json — references various terminal schemas
+	vfs.AddFile("components/schemas/Item.json", `{
+  "type": "object",
+  "properties": {
+    "id":   { "type": "string" },
+    "name": { "type": "string" },
+    "category": { "$ref": "./ItemCategory.json" },
+    "pricing":  { "$ref": "./ItemPricing.json" }
+  }
+}`)
+
+	// ItemCategory.json — terminal
+	vfs.AddFile("components/schemas/ItemCategory.json", `{
+  "type": "object",
+  "properties": { "name": { "type": "string" }, "code": { "type": "string" } }
+}`)
+
+	// ItemPricing.json — terminal
+	vfs.AddFile("components/schemas/ItemPricing.json", `{
+  "type": "object",
+  "properties": { "amount": { "type": "number" }, "currency": { "type": "string" } }
+}`)
+
+	// Variant.json — terminal
+	vfs.AddFile("components/schemas/Variant.json", `{
+  "type": "object",
+  "properties": { "sku": { "type": "string" }, "color": { "type": "string" } }
+}`)
+
+	// ProductImage.json — terminal
+	vfs.AddFile("components/schemas/ProductImage.json", `{
+  "type": "object",
+  "properties": { "url": { "type": "string" }, "alt": { "type": "string" } }
+}`)
+
+	// ProductAttribute.json — references attribute-type schemas (non-terminal)
+	vfs.AddFile("components/schemas/ProductAttribute.json", `{
+  "type": "object",
+  "properties": {
+    "key":   { "type": "string" },
+    "value": { "type": "string" },
+    "type":  { "$ref": "./AttributeType.json" }
+  }
+}`)
+
+	// AttributeType.json — terminal
+	vfs.AddFile("components/schemas/AttributeType.json", `{
+  "type": "object",
+  "properties": { "name": { "type": "string" }, "code": { "type": "string" } }
+}`)
+
+	doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(vfs.files["catalog.json"]))
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	resolveOpts := references.ResolveOptions{
+		TargetLocation: "catalog.json",
+		RootDocument:   doc,
+		TargetDocument: doc,
+		VirtualFS:      vfs,
+	}
+	idx := openapi.BuildIndex(ctx, doc, resolveOpts)
+	require.NotNil(t, idx)
+
+	circularErrs := idx.GetCircularReferenceErrors()
+	for _, e := range circularErrs {
+		t.Errorf("unexpected circular reference error: %v", e)
+	}
+	assert.Empty(t, circularErrs, "should have no circular reference errors")
+	assert.Equal(t, 0, idx.GetInvalidCircularRefCount(), "should have 0 invalid circular refs")
+	assert.Equal(t, 0, idx.GetValidCircularRefCount(), "should have 0 valid circular refs")
+	assert.Empty(t, idx.GetResolutionErrors(), "should have no resolution errors")
+}
+
+// TestBuildIndex_ExternalRef_WithComponentsSchemasSection_NoFalseCircular_Success is the
+// primary regression test for OAPI-5684. It verifies that when paths reference component
+// schemas via internal $ref (e.g., #/components/schemas/Product) and those component schemas
+// themselves $ref external files (e.g., ./components/schemas/Product.json) containing nested
+// $refs to other external files, no false circular reference errors are produced.
+//
+// The bug was caused by the resolution pre-population step (resolution.go Walk) overwriting
+// already-correct referenceResolutionCache values on nested $ref schemas with incorrect
+// values that used the parent document path instead of the child's resolved path.
+func TestBuildIndex_ExternalRef_WithComponentsSchemasSection_NoFalseCircular_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	vfs := NewMockVirtualFS()
+
+	// Main catalog spec with components section that references external schemas
+	vfs.AddFile("catalog.json", `{
+  "openapi": "3.1.0",
+  "info": { "title": "Catalog", "version": "1.0.0" },
+  "paths": {
+    "/products/{id}": {
+      "get": {
+        "operationId": "getProduct",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Product" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products": {
+      "get": {
+        "operationId": "listProducts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Product" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Product": { "$ref": "./components/schemas/Product.json" }
+    }
+  }
+}`)
+
+	// Product.json with nested external refs
+	vfs.AddFile("components/schemas/Product.json", `{
+  "type": "object",
+  "properties": {
+    "id":        { "type": "string" },
+    "pricing":   { "$ref": "./ProductPricing.json" },
+    "promotion": { "$ref": "./ProductPromotion.json" },
+    "variants":  { "$ref": "./Variant.json" },
+    "images": {
+      "type": "array",
+      "items": { "$ref": "./ProductImage.json" }
+    },
+    "attributes": {
+      "type": "array",
+      "items": { "$ref": "./ProductAttribute.json" }
+    }
+  }
+}`)
+
+	vfs.AddFile("components/schemas/ProductPricing.json", `{
+  "type": "object",
+  "properties": { "price": { "type": "number" }, "currency": { "type": "string" } }
+}`)
+	vfs.AddFile("components/schemas/ProductPromotion.json", `{
+  "type": "object",
+  "properties": { "discount": { "type": "number" }, "label": { "type": "string" } }
+}`)
+	vfs.AddFile("components/schemas/Variant.json", `{
+  "type": "object",
+  "properties": { "sku": { "type": "string" }, "color": { "type": "string" } }
+}`)
+	vfs.AddFile("components/schemas/ProductImage.json", `{
+  "type": "object",
+  "properties": { "url": { "type": "string" }, "alt": { "type": "string" } }
+}`)
+	vfs.AddFile("components/schemas/ProductAttribute.json", `{
+  "type": "object",
+  "properties": { "key": { "type": "string" }, "value": { "type": "string" } }
+}`)
+
+	doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(vfs.files["catalog.json"]))
+	require.NoError(t, err)
+	require.Empty(t, validationErrs)
+
+	resolveOpts := references.ResolveOptions{
+		TargetLocation: "catalog.json",
+		RootDocument:   doc,
+		TargetDocument: doc,
+		VirtualFS:      vfs,
+	}
+	idx := openapi.BuildIndex(ctx, doc, resolveOpts)
+	require.NotNil(t, idx)
+
+	circularErrs := idx.GetCircularReferenceErrors()
+	for _, e := range circularErrs {
+		t.Errorf("unexpected circular reference error: %v", e)
+	}
+	assert.Empty(t, circularErrs, "should have no circular reference errors")
+	assert.Equal(t, 0, idx.GetInvalidCircularRefCount(), "should have 0 invalid circular refs")
+
+	assert.Equal(t, 0, idx.GetValidCircularRefCount(), "should have 0 valid circular refs")
+	assert.Empty(t, idx.GetResolutionErrors(), "should have no resolution errors")
+}
+
 func TestDebugExternalParameter(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

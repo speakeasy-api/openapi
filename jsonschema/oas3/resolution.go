@@ -304,13 +304,22 @@ func (s *JSONSchema[Referenceable]) resolve(ctx context.Context, opts references
 							localBaseURI = jsID
 						}
 					}
-					// Get the ref to build absolute reference with fragment
-					jsRef := js.GetRef()
-					absRef := utils.BuildAbsoluteReference(localBaseURI, string(jsRef.GetJSONPointer()))
-					js.referenceResolutionCache = &references.ResolveResult[JSONSchemaReferenceable]{
-						AbsoluteDocumentPath: localBaseURI,
-						AbsoluteReference:    references.Reference(absRef),
-						ResolvedDocument:     result.ResolvedDocument,
+
+					// Only pre-populate the cache if it hasn't already been fully resolved.
+					// A nested ref may already have a complete resolution from a previous walk
+					// (e.g., when multiple references point to the same external document).
+					// Overwriting a correct cache with a pre-populated one causes false circular
+					// reference detection because the pre-populated AbsoluteReference uses the
+					// parent document path rather than the resolved child path.
+					if js.referenceResolutionCache == nil || js.referenceResolutionCache.Object == nil {
+						// Get the ref to build absolute reference with fragment
+						jsRef := js.GetRef()
+						absRef := utils.BuildAbsoluteReference(localBaseURI, string(jsRef.GetJSONPointer()))
+						js.referenceResolutionCache = &references.ResolveResult[JSONSchemaReferenceable]{
+							AbsoluteDocumentPath: localBaseURI,
+							AbsoluteReference:    references.Reference(absRef),
+							ResolvedDocument:     result.ResolvedDocument,
+						}
 					}
 
 					// Collect this reference for setting parent links after the walk
