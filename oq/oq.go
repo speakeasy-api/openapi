@@ -380,7 +380,10 @@ func execGroupBy(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, er
 
 	grouped := &Result{Fields: result.Fields}
 	for _, key := range order {
-		grp := groups[key]
+		grp, ok := groups[key]
+		if !ok {
+			continue
+		}
 		grouped.Groups = append(grouped.Groups, GroupResult{
 			Key:   key,
 			Count: grp.count,
