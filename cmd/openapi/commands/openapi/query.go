@@ -44,10 +44,23 @@ Examples:
 Stdin is supported — either pipe data directly or use '-' explicitly:
   cat spec.yaml | openapi spec query - 'schemas | count'
 
+  # Shortest path between schemas
+  openapi spec query petstore.yaml 'schemas | path "Pet" "Address" | select name'
+
+  # Top 5 most connected schemas
+  openapi spec query petstore.yaml 'schemas.components | top 5 in_degree | select name, in_degree'
+
+  # Explain a query plan
+  openapi spec query petstore.yaml 'schemas.components | where depth > 5 | sort depth desc | explain'
+
+  # List available fields
+  openapi spec query petstore.yaml 'schemas | fields'
+
 Pipeline stages:
   Source:     schemas, schemas.components, schemas.inline, operations
-  Traversal:  refs-out, refs-in, reachable, ancestors, properties, union-members, items, ops, schemas
-  Filter:     where <expr>, select <fields>, sort <field> [asc|desc], take <n>, unique, group-by <field>, count
+  Traversal:  refs-out, refs-in, reachable, ancestors, properties, union-members, items, ops, schemas, path <from> <to>
+  Filter:     where <expr>, select <fields>, sort <field> [asc|desc], take/head <n>, sample <n>, top <n> <field>, bottom <n> <field>, unique, group-by <field>, count
+  Meta:       explain, fields, format <table|json|markdown>
 
 Where expressions support: ==, !=, >, <, >=, <=, and, or, not, has(), matches`,
 	Args: stdinOrFileArgs(2, 2),
@@ -58,7 +71,7 @@ var queryOutputFormat string
 var queryFromFile string
 
 func init() {
-	queryCmd.Flags().StringVar(&queryOutputFormat, "format", "table", "output format: table or json")
+	queryCmd.Flags().StringVar(&queryOutputFormat, "format", "table", "output format: table, json, or markdown")
 	queryCmd.Flags().StringVarP(&queryFromFile, "file", "f", "", "read query from file instead of argument")
 }
 
@@ -116,11 +129,18 @@ func queryOpenAPI(ctx context.Context, processor *OpenAPIProcessor, queryStr str
 		return fmt.Errorf("query error: %w", err)
 	}
 
-	// Format and output
+	// Format and output — inline format stage overrides CLI flag
+	format := queryOutputFormat
+	if result.FormatHint != "" {
+		format = result.FormatHint
+	}
+
 	var output string
-	switch queryOutputFormat {
+	switch format {
 	case "json":
 		output = oq.FormatJSON(result, g)
+	case "markdown":
+		output = oq.FormatMarkdown(result, g)
 	default:
 		output = oq.FormatTable(result, g)
 	}

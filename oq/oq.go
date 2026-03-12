@@ -6,6 +6,8 @@
 package oq
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
@@ -34,11 +36,13 @@ type Row struct {
 
 // Result is the output of a query execution.
 type Result struct {
-	Rows    []Row
-	Fields  []string // projected fields (empty = all)
-	IsCount bool
-	Count   int
-	Groups  []GroupResult
+	Rows       []Row
+	Fields     []string // projected fields (empty = all)
+	IsCount    bool
+	Count      int
+	Groups     []GroupResult
+	Explain    string // human-readable pipeline explanation
+	FormatHint string // format preference from format stage (table, json, markdown)
 }
 
 // GroupResult represents a group-by aggregation result.
@@ -80,6 +84,13 @@ const (
 	StageItems
 	StageOps
 	StageSchemas
+	StageExplain
+	StageFields
+	StageSample
+	StagePath
+	StageTop
+	StageBottom
+	StageFormat
 )
 
 // Stage represents a single stage in the query pipeline.
@@ -90,7 +101,10 @@ type Stage struct {
 	Fields    []string // for StageSelect, StageGroupBy
 	SortField string   // for StageSort
 	SortDesc  bool     // for StageSort
-	Limit     int      // for StageTake
+	Limit     int      // for StageTake, StageSample, StageTop, StageBottom
+	PathFrom  string   // for StagePath
+	PathTo    string   // for StagePath
+	Format    string   // for StageFormat
 }
 
 // Parse splits a pipeline query string into stages.
@@ -155,7 +169,7 @@ func parseStage(s string) (Stage, error) {
 		}
 		return Stage{Kind: StageSort, SortField: parts[0], SortDesc: desc}, nil
 
-	case "take":
+	case "take", "head":
 		n, err := strconv.Atoi(strings.TrimSpace(rest))
 		if err != nil {
 			return Stage{}, fmt.Errorf("take requires a number: %w", err)
@@ -202,6 +216,55 @@ func parseStage(s string) (Stage, error) {
 	case "schemas":
 		return Stage{Kind: StageSchemas}, nil
 
+	case "explain":
+		return Stage{Kind: StageExplain}, nil
+
+	case "fields":
+		return Stage{Kind: StageFields}, nil
+
+	case "sample":
+		n, err := strconv.Atoi(strings.TrimSpace(rest))
+		if err != nil {
+			return Stage{}, fmt.Errorf("sample requires a number: %w", err)
+		}
+		return Stage{Kind: StageSample, Limit: n}, nil
+
+	case "path":
+		from, to := parseTwoArgs(rest)
+		if from == "" || to == "" {
+			return Stage{}, errors.New("path requires two schema names")
+		}
+		return Stage{Kind: StagePath, PathFrom: from, PathTo: to}, nil
+
+	case "top":
+		parts := strings.Fields(rest)
+		if len(parts) < 2 {
+			return Stage{}, errors.New("top requires a number and a field name")
+		}
+		n, err := strconv.Atoi(parts[0])
+		if err != nil {
+			return Stage{}, fmt.Errorf("top requires a number: %w", err)
+		}
+		return Stage{Kind: StageTop, Limit: n, SortField: parts[1]}, nil
+
+	case "bottom":
+		parts := strings.Fields(rest)
+		if len(parts) < 2 {
+			return Stage{}, errors.New("bottom requires a number and a field name")
+		}
+		n, err := strconv.Atoi(parts[0])
+		if err != nil {
+			return Stage{}, fmt.Errorf("bottom requires a number: %w", err)
+		}
+		return Stage{Kind: StageBottom, Limit: n, SortField: parts[1]}, nil
+
+	case "format":
+		f := strings.TrimSpace(rest)
+		if f != "table" && f != "json" && f != "markdown" {
+			return Stage{}, fmt.Errorf("format must be table, json, or markdown, got %q", f)
+		}
+		return Stage{Kind: StageFormat, Format: f}, nil
+
 	default:
 		return Stage{}, fmt.Errorf("unknown stage: %q", keyword)
 	}
@@ -212,6 +275,13 @@ func parseStage(s string) (Stage, error) {
 func run(stages []Stage, g *graph.SchemaGraph) (*Result, error) {
 	if len(stages) == 0 {
 		return &Result{}, nil
+	}
+
+	// Check if explain stage is present
+	for _, stage := range stages {
+		if stage.Kind == StageExplain {
+			return &Result{Explain: buildExplain(stages)}, nil
+		}
 	}
 
 	// Execute source stage
@@ -295,6 +365,29 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		return execSchemasToOps(result, g)
 	case StageSchemas:
 		return execOpsToSchemas(result, g)
+	case StageFields:
+		return execFields(result)
+	case StageSample:
+		return execSample(stage, result)
+	case StagePath:
+		return execPath(stage, g)
+	case StageTop:
+		// Expand to sort desc + take
+		sorted, err := execSort(Stage{Kind: StageSort, SortField: stage.SortField, SortDesc: true}, result, g)
+		if err != nil {
+			return nil, err
+		}
+		return execTake(Stage{Kind: StageTake, Limit: stage.Limit}, sorted)
+	case StageBottom:
+		// Expand to sort asc + take
+		sorted, err := execSort(Stage{Kind: StageSort, SortField: stage.SortField, SortDesc: false}, result, g)
+		if err != nil {
+			return nil, err
+		}
+		return execTake(Stage{Kind: StageTake, Limit: stage.Limit}, sorted)
+	case StageFormat:
+		result.FormatHint = stage.Format
+		return result, nil
 	default:
 		return nil, fmt.Errorf("unimplemented stage kind: %d", stage.Kind)
 	}
@@ -627,6 +720,31 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.IntVal(o.SchemaCount)
 		case "component_count":
 			return expr.IntVal(o.ComponentCount)
+		case "tag":
+			if o.Operation != nil && len(o.Operation.Tags) > 0 {
+				return expr.StringVal(o.Operation.Tags[0])
+			}
+			return expr.StringVal("")
+		case "parameter_count":
+			if o.Operation != nil {
+				return expr.IntVal(len(o.Operation.Parameters))
+			}
+			return expr.IntVal(0)
+		case "deprecated":
+			if o.Operation != nil {
+				return expr.BoolVal(o.Operation.Deprecated != nil && *o.Operation.Deprecated)
+			}
+			return expr.BoolVal(false)
+		case "description":
+			if o.Operation != nil {
+				return expr.StringVal(o.Operation.GetDescription())
+			}
+			return expr.StringVal("")
+		case "summary":
+			if o.Operation != nil {
+				return expr.StringVal(o.Operation.GetSummary())
+			}
+			return expr.StringVal("")
 		}
 	}
 	return expr.NullVal()
@@ -673,10 +791,226 @@ func rowKey(row Row) string {
 	return "o:" + strconv.Itoa(row.OpIdx)
 }
 
+// --- Explain ---
+
+func buildExplain(stages []Stage) string {
+	var sb strings.Builder
+	for i, stage := range stages {
+		if stage.Kind == StageExplain {
+			continue
+		}
+		if i == 0 {
+			fmt.Fprintf(&sb, "Source: %s\n", stage.Source)
+		} else {
+			desc := describeStage(stage)
+			fmt.Fprintf(&sb, "  → %s\n", desc)
+		}
+	}
+	return sb.String()
+}
+
+func describeStage(stage Stage) string {
+	switch stage.Kind {
+	case StageWhere:
+		return "Filter: where " + stage.Expr
+	case StageSelect:
+		return "Project: select " + strings.Join(stage.Fields, ", ")
+	case StageSort:
+		dir := "ascending"
+		if stage.SortDesc {
+			dir = "descending"
+		}
+		return "Sort: " + stage.SortField + " " + dir
+	case StageTake:
+		return "Limit: take " + strconv.Itoa(stage.Limit)
+	case StageUnique:
+		return "Unique: deduplicate rows"
+	case StageGroupBy:
+		return "Group: group-by " + strings.Join(stage.Fields, ", ")
+	case StageCount:
+		return "Count: count rows"
+	case StageRefsOut:
+		return "Traverse: outgoing references"
+	case StageRefsIn:
+		return "Traverse: incoming references"
+	case StageReachable:
+		return "Traverse: all reachable nodes"
+	case StageAncestors:
+		return "Traverse: all ancestor nodes"
+	case StageProperties:
+		return "Traverse: property children"
+	case StageUnionMembers:
+		return "Traverse: union members"
+	case StageItems:
+		return "Traverse: array items"
+	case StageOps:
+		return "Navigate: schemas to operations"
+	case StageSchemas:
+		return "Navigate: operations to schemas"
+	case StageFields:
+		return "Terminal: list available fields"
+	case StageSample:
+		return "Sample: random " + strconv.Itoa(stage.Limit) + " rows"
+	case StagePath:
+		return "Path: shortest path from " + stage.PathFrom + " to " + stage.PathTo
+	case StageTop:
+		return "Top: " + strconv.Itoa(stage.Limit) + " by " + stage.SortField + " descending"
+	case StageBottom:
+		return "Bottom: " + strconv.Itoa(stage.Limit) + " by " + stage.SortField + " ascending"
+	case StageFormat:
+		return "Format: " + stage.Format
+	default:
+		return "Unknown stage"
+	}
+}
+
+// --- Fields ---
+
+func execFields(result *Result) (*Result, error) {
+	var sb strings.Builder
+	kind := SchemaResult
+	if len(result.Rows) > 0 {
+		kind = result.Rows[0].Kind
+	}
+
+	if kind == SchemaResult {
+		sb.WriteString("Field             Type\n")
+		sb.WriteString("-----------       ------\n")
+		fields := []struct{ name, typ string }{
+			{"name", "string"},
+			{"type", "string"},
+			{"depth", "int"},
+			{"in_degree", "int"},
+			{"out_degree", "int"},
+			{"union_width", "int"},
+			{"property_count", "int"},
+			{"is_component", "bool"},
+			{"is_inline", "bool"},
+			{"is_circular", "bool"},
+			{"has_ref", "bool"},
+			{"hash", "string"},
+			{"path", "string"},
+		}
+		for _, f := range fields {
+			fmt.Fprintf(&sb, "%-17s %s\n", f.name, f.typ)
+		}
+	} else {
+		sb.WriteString("Field             Type\n")
+		sb.WriteString("-----------       ------\n")
+		fields := []struct{ name, typ string }{
+			{"name", "string"},
+			{"method", "string"},
+			{"path", "string"},
+			{"operation_id", "string"},
+			{"schema_count", "int"},
+			{"component_count", "int"},
+			{"tag", "string"},
+			{"parameter_count", "int"},
+			{"deprecated", "bool"},
+			{"description", "string"},
+			{"summary", "string"},
+		}
+		for _, f := range fields {
+			fmt.Fprintf(&sb, "%-17s %s\n", f.name, f.typ)
+		}
+	}
+
+	return &Result{Explain: sb.String()}, nil
+}
+
+// --- Sample ---
+
+func execSample(stage Stage, result *Result) (*Result, error) {
+	if stage.Limit >= len(result.Rows) {
+		return result, nil
+	}
+
+	// Deterministic shuffle: sort by hash of row key, then take first n
+	type keyed struct {
+		hash string
+		row  Row
+	}
+	items := make([]keyed, len(result.Rows))
+	for i, row := range result.Rows {
+		h := sha256.Sum256([]byte(rowKey(row)))
+		items[i] = keyed{hash: hex.EncodeToString(h[:]), row: row}
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].hash < items[j].hash
+	})
+
+	out := &Result{Fields: result.Fields}
+	for i := 0; i < stage.Limit && i < len(items); i++ {
+		out.Rows = append(out.Rows, items[i].row)
+	}
+	return out, nil
+}
+
+// --- Path ---
+
+func execPath(stage Stage, g *graph.SchemaGraph) (*Result, error) {
+	fromNode, ok := g.SchemaByName(stage.PathFrom)
+	if !ok {
+		return nil, fmt.Errorf("schema %q not found", stage.PathFrom)
+	}
+	toNode, ok := g.SchemaByName(stage.PathTo)
+	if !ok {
+		return nil, fmt.Errorf("schema %q not found", stage.PathTo)
+	}
+
+	path := g.ShortestPath(fromNode.ID, toNode.ID)
+	out := &Result{}
+	for _, id := range path {
+		out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: int(id)})
+	}
+	return out, nil
+}
+
+// --- Arg parsing helpers ---
+
+func parseTwoArgs(s string) (string, string) {
+	s = strings.TrimSpace(s)
+	var args []string
+	for len(s) > 0 {
+		if s[0] == '"' {
+			// Quoted arg
+			end := strings.Index(s[1:], "\"")
+			if end < 0 {
+				args = append(args, s[1:])
+				break
+			}
+			args = append(args, s[1:end+1])
+			s = strings.TrimSpace(s[end+2:])
+		} else {
+			idx := strings.IndexAny(s, " \t")
+			if idx < 0 {
+				args = append(args, s)
+				break
+			}
+			args = append(args, s[:idx])
+			s = strings.TrimSpace(s[idx+1:])
+		}
+		if len(args) == 2 {
+			break
+		}
+	}
+	if len(args) < 2 {
+		if len(args) == 1 {
+			return args[0], ""
+		}
+		return "", ""
+	}
+	return args[0], args[1]
+}
+
 // --- Formatting ---
 
 // FormatTable formats a result as a simple table string.
 func FormatTable(result *Result, g *graph.SchemaGraph) string {
+	if result.Explain != "" {
+		return result.Explain
+	}
+
 	if result.IsCount {
 		return strconv.Itoa(result.Count)
 	}
@@ -752,6 +1086,10 @@ func FormatTable(result *Result, g *graph.SchemaGraph) string {
 
 // FormatJSON formats a result as JSON.
 func FormatJSON(result *Result, g *graph.SchemaGraph) string {
+	if result.Explain != "" {
+		return result.Explain
+	}
+
 	if result.IsCount {
 		return strconv.Itoa(result.Count)
 	}
@@ -790,6 +1128,66 @@ func FormatJSON(result *Result, g *graph.SchemaGraph) string {
 		sb.WriteString("}")
 	}
 	sb.WriteString("\n]")
+	return sb.String()
+}
+
+// FormatMarkdown formats a result as a markdown table.
+func FormatMarkdown(result *Result, g *graph.SchemaGraph) string {
+	if result.Explain != "" {
+		return result.Explain
+	}
+
+	if result.IsCount {
+		return strconv.Itoa(result.Count)
+	}
+
+	if len(result.Groups) > 0 {
+		var sb strings.Builder
+		sb.WriteString("| Key | Count |\n")
+		sb.WriteString("| --- | --- |\n")
+		for _, grp := range result.Groups {
+			fmt.Fprintf(&sb, "| %s | %d |\n", grp.Key, grp.Count)
+		}
+		return sb.String()
+	}
+
+	if len(result.Rows) == 0 {
+		return "(empty)"
+	}
+
+	fields := result.Fields
+	if len(fields) == 0 {
+		if result.Rows[0].Kind == SchemaResult {
+			fields = []string{"name", "type", "depth", "in_degree", "out_degree"}
+		} else {
+			fields = []string{"name", "method", "path", "schema_count"}
+		}
+	}
+
+	var sb strings.Builder
+	// Header
+	sb.WriteString("| ")
+	sb.WriteString(strings.Join(fields, " | "))
+	sb.WriteString(" |\n")
+	// Separator
+	sb.WriteString("|")
+	for range fields {
+		sb.WriteString(" --- |")
+	}
+	sb.WriteString("\n")
+	// Rows
+	for _, row := range result.Rows {
+		sb.WriteString("| ")
+		for i, f := range fields {
+			if i > 0 {
+				sb.WriteString(" | ")
+			}
+			v := valueToString(fieldValue(row, f, g))
+			sb.WriteString(v)
+		}
+		sb.WriteString(" |\n")
+	}
+
 	return sb.String()
 }
 

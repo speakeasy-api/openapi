@@ -159,6 +159,28 @@ func TestBuild_OperationSchemas_Success(t *testing.T) {
 	t.Fatal("listPets operation not found")
 }
 
+func TestBuild_ShortestPath_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	pet, _ := g.SchemaByName("Pet")
+	addr, _ := g.SchemaByName("Address")
+	path := g.ShortestPath(pet.ID, addr.ID)
+	assert.NotEmpty(t, path, "should find path from Pet to Address")
+	assert.Equal(t, pet.ID, path[0])
+	assert.Equal(t, addr.ID, path[len(path)-1])
+}
+
+func TestBuild_ShortestPath_NoPath_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	unused, _ := g.SchemaByName("Unused")
+	pet, _ := g.SchemaByName("Pet")
+	path := g.ShortestPath(unused.ID, pet.ID)
+	assert.Empty(t, path, "Unused should not reach Pet")
+}
+
 func TestBuild_Metrics_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)

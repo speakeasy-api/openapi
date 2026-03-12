@@ -321,6 +321,181 @@ func TestExecute_SortAsc_Success(t *testing.T) {
 	}
 }
 
+func TestExecute_Explain_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | where depth > 5 | sort depth desc | take 10 | explain", g)
+	require.NoError(t, err)
+	assert.Contains(t, result.Explain, "Source: schemas.components")
+	assert.Contains(t, result.Explain, "Filter: where depth > 5")
+	assert.Contains(t, result.Explain, "Sort: depth descending")
+	assert.Contains(t, result.Explain, "Limit: take 10")
+}
+
+func TestExecute_Fields_Schemas_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | fields", g)
+	require.NoError(t, err)
+	assert.Contains(t, result.Explain, "name")
+	assert.Contains(t, result.Explain, "depth")
+	assert.Contains(t, result.Explain, "property_count")
+	assert.Contains(t, result.Explain, "is_component")
+}
+
+func TestExecute_Fields_Operations_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("operations | fields", g)
+	require.NoError(t, err)
+	assert.Contains(t, result.Explain, "method")
+	assert.Contains(t, result.Explain, "operation_id")
+	assert.Contains(t, result.Explain, "schema_count")
+	assert.Contains(t, result.Explain, "tag")
+	assert.Contains(t, result.Explain, "deprecated")
+}
+
+func TestExecute_Head_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | head 3", g)
+	require.NoError(t, err)
+	assert.Len(t, result.Rows, 3)
+}
+
+func TestExecute_Sample_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | sample 3", g)
+	require.NoError(t, err)
+	assert.Len(t, result.Rows, 3)
+
+	// Running sample again should produce the same result (deterministic)
+	result2, err := oq.Execute("schemas.components | sample 3", g)
+	require.NoError(t, err)
+	assert.Equal(t, len(result.Rows), len(result2.Rows))
+}
+
+func TestExecute_Path_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas | path Pet Address | select name`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	names := collectNames(result, g)
+	// Path should include Pet, something in between, and Address
+	assert.Equal(t, "Pet", names[0])
+	assert.Equal(t, "Address", names[len(names)-1])
+}
+
+func TestExecute_Path_NotFound_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Unused has no outgoing edges to reach Pet
+	result, err := oq.Execute(`schemas | path Unused Pet | select name`, g)
+	require.NoError(t, err)
+	assert.Empty(t, result.Rows)
+}
+
+func TestExecute_Top_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | top 3 property_count | select name, property_count", g)
+	require.NoError(t, err)
+	assert.Len(t, result.Rows, 3)
+
+	// Verify descending order
+	for i := 1; i < len(result.Rows); i++ {
+		prev := oq.FieldValuePublic(result.Rows[i-1], "property_count", g)
+		curr := oq.FieldValuePublic(result.Rows[i], "property_count", g)
+		assert.GreaterOrEqual(t, prev.Int, curr.Int)
+	}
+}
+
+func TestExecute_Bottom_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | bottom 3 property_count | select name, property_count", g)
+	require.NoError(t, err)
+	assert.Len(t, result.Rows, 3)
+
+	// Verify ascending order
+	for i := 1; i < len(result.Rows); i++ {
+		prev := oq.FieldValuePublic(result.Rows[i-1], "property_count", g)
+		curr := oq.FieldValuePublic(result.Rows[i], "property_count", g)
+		assert.LessOrEqual(t, prev.Int, curr.Int)
+	}
+}
+
+func TestExecute_Format_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | take 3 | format json", g)
+	require.NoError(t, err)
+	assert.Equal(t, "json", result.FormatHint)
+}
+
+func TestFormatMarkdown_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | take 3 | select name, type", g)
+	require.NoError(t, err)
+
+	md := oq.FormatMarkdown(result, g)
+	assert.Contains(t, md, "| name")
+	assert.Contains(t, md, "| --- |")
+}
+
+func TestExecute_OperationTag_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("operations | select name, tag, parameter_count", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+}
+
+func TestParse_NewStages_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{"explain", "schemas | explain"},
+		{"fields", "schemas | fields"},
+		{"head", "schemas | head 5"},
+		{"sample", "schemas | sample 10"},
+		{"path", `schemas | path "User" "Order"`},
+		{"path unquoted", "schemas | path User Order"},
+		{"top", "schemas | top 5 depth"},
+		{"bottom", "schemas | bottom 5 depth"},
+		{"format", "schemas | format json"},
+		{"format markdown", "schemas | format markdown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			stages, err := oq.Parse(tt.query)
+			require.NoError(t, err)
+			assert.NotEmpty(t, stages)
+		})
+	}
+}
+
 // collectNames extracts the "name" field from all rows in the result.
 func collectNames(result *oq.Result, g *graph.SchemaGraph) []string {
 	var names []string

@@ -673,6 +673,50 @@ func (g *SchemaGraph) Ancestors(id NodeID) []NodeID {
 	return result
 }
 
+// ShortestPath returns the shortest path from `from` to `to` using out-edges (BFS).
+// Returns nil if no path exists. The returned slice includes both endpoints.
+func (g *SchemaGraph) ShortestPath(from, to NodeID) []NodeID {
+	if from == to {
+		return []NodeID{from}
+	}
+
+	parent := make(map[NodeID]NodeID)
+	visited := make(map[NodeID]bool)
+	visited[from] = true
+	queue := []NodeID{from}
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		for _, edge := range g.outEdges[current] {
+			if visited[edge.To] {
+				continue
+			}
+			visited[edge.To] = true
+			parent[edge.To] = current
+
+			if edge.To == to {
+				// Reconstruct path
+				var path []NodeID
+				for n := to; n != from; n = parent[n] {
+					path = append(path, n)
+				}
+				path = append(path, from)
+				// Reverse
+				for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+					path[i], path[j] = path[j], path[i]
+				}
+				return path
+			}
+
+			queue = append(queue, edge.To)
+		}
+	}
+
+	return nil
+}
+
 func intStr(i int) string {
 	return strconv.Itoa(i)
 }
