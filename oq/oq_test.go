@@ -496,6 +496,149 @@ func TestParse_NewStages_Success(t *testing.T) {
 	}
 }
 
+func TestExecute_RefsOut_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | where name == "Pet" | refs-out | select name`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+}
+
+func TestExecute_RefsIn_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | where name == "Owner" | refs-in | select name`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+}
+
+func TestExecute_Items_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// listPets response includes an array with items
+	result, err := oq.Execute(`schemas | where type == "array" | items | select name`, g)
+	require.NoError(t, err)
+	// May or may not have results depending on spec, but should not error
+	assert.NotNil(t, result)
+}
+
+func TestFormatTable_Groups_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | group-by type", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Groups)
+
+	table := oq.FormatTable(result, g)
+	assert.Contains(t, table, "count=")
+}
+
+func TestFormatJSON_Groups_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | group-by type", g)
+	require.NoError(t, err)
+
+	json := oq.FormatJSON(result, g)
+	assert.Contains(t, json, "\"key\"")
+	assert.Contains(t, json, "\"count\"")
+}
+
+func TestFormatMarkdown_Groups_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | group-by type", g)
+	require.NoError(t, err)
+
+	md := oq.FormatMarkdown(result, g)
+	assert.Contains(t, md, "| Key |")
+}
+
+func TestExecute_InlineSource_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.inline | count", g)
+	require.NoError(t, err)
+	assert.True(t, result.IsCount)
+}
+
+func TestExecute_SchemaFields_Coverage(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Select all schema fields to cover fieldValue branches
+	result, err := oq.Execute("schemas.components | take 1 | select name, type, depth, in_degree, out_degree, union_width, property_count, is_component, is_inline, is_circular, has_ref, hash, path", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	table := oq.FormatTable(result, g)
+	assert.NotEmpty(t, table)
+
+	json := oq.FormatJSON(result, g)
+	assert.Contains(t, json, "\"name\"")
+}
+
+func TestExecute_OperationFields_Coverage(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Select all operation fields to cover fieldValue branches
+	result, err := oq.Execute("operations | take 1 | select name, method, path, operation_id, schema_count, component_count, tag, parameter_count, deprecated, description, summary", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+}
+
+func TestFormatJSON_Empty_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | where name == "NonExistent"`, g)
+	require.NoError(t, err)
+
+	json := oq.FormatJSON(result, g)
+	assert.Equal(t, "[]", json)
+}
+
+func TestFormatMarkdown_Empty_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | where name == "NonExistent"`, g)
+	require.NoError(t, err)
+
+	md := oq.FormatMarkdown(result, g)
+	assert.Equal(t, "(empty)", md)
+}
+
+func TestFormatJSON_Count_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | count", g)
+	require.NoError(t, err)
+
+	json := oq.FormatJSON(result, g)
+	assert.NotEmpty(t, json)
+}
+
+func TestFormatMarkdown_Count_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | count", g)
+	require.NoError(t, err)
+
+	md := oq.FormatMarkdown(result, g)
+	assert.NotEmpty(t, md)
+}
+
 // collectNames extracts the "name" field from all rows in the result.
 func collectNames(result *oq.Result, g *graph.SchemaGraph) []string {
 	var names []string

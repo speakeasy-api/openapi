@@ -141,3 +141,12 @@ func TestParse_Error(t *testing.T) {
 	_, err = expr.Parse("name matches \"[invalid\"")
 	require.Error(t, err)
 }
+
+func TestParse_UnterminatedBackslashString(t *testing.T) {
+	t.Parallel()
+
+	// Should not panic on unterminated string ending with backslash
+	assert.NotPanics(t, func() {
+		expr.Parse(`name == "x\`) //nolint:errcheck
+	})
+}

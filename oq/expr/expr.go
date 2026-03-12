@@ -439,7 +439,7 @@ func tokenize(input string) []string {
 		if ch == '"' {
 			j := i + 1
 			for j < len(input) && input[j] != '"' {
-				if input[j] == '\\' {
+				if input[j] == '\\' && j+1 < len(input) {
 					j++
 				}
 				j++
