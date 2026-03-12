@@ -66,7 +66,7 @@ Pipeline stages:
   Meta:       explain, fields, format <table|json|markdown|toon>
 
 Where expressions support: ==, !=, >, <, >=, <=, and, or, not, has(), matches`,
-	Args: stdinOrFileArgs(1, 2),
+	Args: queryArgs(),
 	Run:  runQuery,
 }
 

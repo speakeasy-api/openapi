@@ -4,6 +4,7 @@ package graph
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -100,7 +101,7 @@ type SchemaGraph struct {
 }
 
 // Build constructs a SchemaGraph from an openapi.Index.
-func Build(ctx context.Context, idx *openapi.Index) *SchemaGraph {
+func Build(_ context.Context, idx *openapi.Index) *SchemaGraph {
 	g := &SchemaGraph{
 		outEdges:   make(map[NodeID][]Edge),
 		inEdges:    make(map[NodeID][]Edge),
@@ -144,22 +145,26 @@ func (g *SchemaGraph) SchemaByName(name string) (SchemaNode, bool) {
 }
 
 // OperationSchemas returns the schema NodeIDs reachable from the given operation.
+// Results are sorted by NodeID for deterministic output.
 func (g *SchemaGraph) OperationSchemas(opID NodeID) []NodeID {
 	set := g.opSchemas[opID]
 	ids := make([]NodeID, 0, len(set))
 	for id := range set {
 		ids = append(ids, id)
 	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	return ids
 }
 
 // SchemaOperations returns the operation NodeIDs that reference the given schema.
+// Results are sorted by NodeID for deterministic output.
 func (g *SchemaGraph) SchemaOperations(schemaID NodeID) []NodeID {
 	set := g.schemaOps[schemaID]
 	ids := make([]NodeID, 0, len(set))
 	for id := range set {
 		ids = append(ids, id)
 	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	return ids
 }
 
@@ -269,23 +274,23 @@ func (g *SchemaGraph) buildEdges() {
 		}
 
 		// AllOf
-		for i, child := range schema.AllOf {
+		for j, child := range schema.AllOf {
 			if childID, ok := g.resolveChild(child); ok {
-				g.addEdge(sn.ID, childID, EdgeAllOf, "allOf/"+intStr(i))
+				g.addEdge(sn.ID, childID, EdgeAllOf, "allOf/"+intStr(j))
 			}
 		}
 
 		// OneOf
-		for i, child := range schema.OneOf {
+		for j, child := range schema.OneOf {
 			if childID, ok := g.resolveChild(child); ok {
-				g.addEdge(sn.ID, childID, EdgeOneOf, "oneOf/"+intStr(i))
+				g.addEdge(sn.ID, childID, EdgeOneOf, "oneOf/"+intStr(j))
 			}
 		}
 
 		// AnyOf
-		for i, child := range schema.AnyOf {
+		for j, child := range schema.AnyOf {
 			if childID, ok := g.resolveChild(child); ok {
-				g.addEdge(sn.ID, childID, EdgeAnyOf, "anyOf/"+intStr(i))
+				g.addEdge(sn.ID, childID, EdgeAnyOf, "anyOf/"+intStr(j))
 			}
 		}
 
@@ -328,9 +333,9 @@ func (g *SchemaGraph) buildEdges() {
 		}
 
 		// PrefixItems
-		for i, child := range schema.PrefixItems {
+		for j, child := range schema.PrefixItems {
 			if childID, ok := g.resolveChild(child); ok {
-				g.addEdge(sn.ID, childID, EdgePrefixItems, "prefixItems/"+intStr(i))
+				g.addEdge(sn.ID, childID, EdgePrefixItems, "prefixItems/"+intStr(j))
 			}
 		}
 
@@ -562,13 +567,16 @@ func (g *SchemaGraph) reachableBFS(start NodeID, visited map[NodeID]bool) {
 
 // Phase 4: Compute metrics for each schema node.
 func (g *SchemaGraph) computeMetrics() {
-	// Detect circular nodes
+	// Detect circular nodes with a single shared DFS (O(V+E))
 	circularNodes := make(map[NodeID]bool)
+	visited := make(map[NodeID]bool)
+	inStack := make(map[NodeID]bool)
 	for i := range g.Schemas {
-		visited := make(map[NodeID]bool)
-		inStack := make(map[NodeID]bool)
-		if g.detectCycle(NodeID(i), visited, inStack, circularNodes) {
-			circularNodes[NodeID(i)] = true
+		nid := NodeID(i)
+		if !visited[nid] {
+			if g.detectCycle(nid, visited, inStack, circularNodes) {
+				circularNodes[nid] = true
+			}
 		}
 	}
 
