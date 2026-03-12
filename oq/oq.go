@@ -6,6 +6,7 @@
 package oq
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -97,7 +98,7 @@ func Parse(query string) ([]Stage, error) {
 	// Split by pipe, respecting quoted strings
 	parts := splitPipeline(query)
 	if len(parts) == 0 {
-		return nil, fmt.Errorf("empty query")
+		return nil, errors.New("empty query")
 	}
 
 	var stages []Stage
@@ -132,13 +133,13 @@ func parseStage(s string) (Stage, error) {
 	switch keyword {
 	case "where":
 		if rest == "" {
-			return Stage{}, fmt.Errorf("where requires an expression")
+			return Stage{}, errors.New("where requires an expression")
 		}
 		return Stage{Kind: StageWhere, Expr: rest}, nil
 
 	case "select":
 		if rest == "" {
-			return Stage{}, fmt.Errorf("select requires field names")
+			return Stage{}, errors.New("select requires field names")
 		}
 		fields := parseCSV(rest)
 		return Stage{Kind: StageSelect, Fields: fields}, nil
@@ -146,7 +147,7 @@ func parseStage(s string) (Stage, error) {
 	case "sort":
 		parts := strings.Fields(rest)
 		if len(parts) == 0 {
-			return Stage{}, fmt.Errorf("sort requires a field name")
+			return Stage{}, errors.New("sort requires a field name")
 		}
 		desc := false
 		if len(parts) >= 2 && strings.ToLower(parts[1]) == "desc" {
@@ -166,7 +167,7 @@ func parseStage(s string) (Stage, error) {
 
 	case "group-by":
 		if rest == "" {
-			return Stage{}, fmt.Errorf("group-by requires a field name")
+			return Stage{}, errors.New("group-by requires a field name")
 		}
 		fields := parseCSV(rest)
 		return Stage{Kind: StageGroupBy, Fields: fields}, nil
@@ -352,7 +353,7 @@ func execUnique(result *Result) (*Result, error) {
 
 func execGroupBy(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
 	if len(stage.Fields) == 0 {
-		return nil, fmt.Errorf("group-by requires at least one field")
+		return nil, errors.New("group-by requires at least one field")
 	}
 	field := stage.Fields[0]
 
@@ -855,13 +856,14 @@ func splitPipeline(input string) []string {
 
 	for i := 0; i < len(input); i++ {
 		ch := input[i]
-		if ch == '"' {
+		switch {
+		case ch == '"':
 			inQuote = !inQuote
 			current.WriteByte(ch)
-		} else if ch == '|' && !inQuote {
+		case ch == '|' && !inQuote:
 			parts = append(parts, current.String())
 			current.Reset()
-		} else {
+		default:
 			current.WriteByte(ch)
 		}
 	}

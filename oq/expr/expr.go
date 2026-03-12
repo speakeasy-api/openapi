@@ -2,6 +2,7 @@
 package expr
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -304,7 +305,7 @@ func (p *parser) parseComparison() (Expr, error) {
 		// left must be a field reference
 		fieldRef, ok := left.(*fieldExpr)
 		if !ok {
-			return nil, fmt.Errorf("matches requires a field on the left side")
+			return nil, errors.New("matches requires a field on the left side")
 		}
 		return &matchesExpr{field: fieldRef.name, pattern: re}, nil
 	}

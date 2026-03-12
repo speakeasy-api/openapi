@@ -84,7 +84,7 @@ func TestBuild_Edges_Success(t *testing.T) {
 	edges := g.OutEdges(pet.ID)
 
 	// Pet has properties: id, name, tag, owner
-	assert.Equal(t, 4, len(edges), "Pet should have 4 out-edges")
+	assert.Len(t, edges, 4, "Pet should have 4 out-edges")
 
 	edgeLabels := make(map[string]graph.EdgeKind)
 	for _, e := range edges {
@@ -153,7 +153,7 @@ func TestBuild_OperationSchemas_Success(t *testing.T) {
 		if op.OperationID == "listPets" {
 			schemas := g.OperationSchemas(op.ID)
 			assert.NotEmpty(t, schemas, "listPets should reference schemas")
-			assert.Greater(t, op.SchemaCount, 0)
+			assert.Positive(t, op.SchemaCount)
 			return
 		}
 	}
@@ -167,7 +167,7 @@ func TestBuild_Metrics_Success(t *testing.T) {
 	pet, _ := g.SchemaByName("Pet")
 	assert.Equal(t, 4, pet.PropertyCount, "Pet should have 4 properties")
 	assert.Equal(t, 4, pet.OutDegree, "Pet should have 4 out-edges")
-	assert.Greater(t, pet.InDegree, 0, "Pet should be referenced")
+	assert.Positive(t, pet.InDegree, "Pet should be referenced")
 	assert.NotEmpty(t, pet.Hash, "Pet should have a hash")
 
 	shape, _ := g.SchemaByName("Shape")
