@@ -628,6 +628,65 @@ func TestFormatJSON_Count_Success(t *testing.T) {
 	assert.NotEmpty(t, json)
 }
 
+func TestFormatToon_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | take 3 | select name, type", g)
+	require.NoError(t, err)
+
+	toon := oq.FormatToon(result, g)
+	assert.Contains(t, toon, "results[3]{name,type}:")
+	assert.Contains(t, toon, "object")
+}
+
+func TestFormatToon_Count_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | count", g)
+	require.NoError(t, err)
+
+	toon := oq.FormatToon(result, g)
+	assert.Contains(t, toon, "count:")
+}
+
+func TestFormatToon_Groups_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | group-by type", g)
+	require.NoError(t, err)
+
+	toon := oq.FormatToon(result, g)
+	assert.Contains(t, toon, "groups[")
+	assert.Contains(t, toon, "{key,count,names}:")
+}
+
+func TestFormatToon_Empty_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | where name == "NonExistent"`, g)
+	require.NoError(t, err)
+
+	toon := oq.FormatToon(result, g)
+	assert.Equal(t, "results[0]:\n", toon)
+}
+
+func TestFormatToon_Escaping_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Paths contain special chars like / that don't need escaping,
+	// but hash values and paths are good coverage
+	result, err := oq.Execute("schemas.components | take 1 | select name, hash, path", g)
+	require.NoError(t, err)
+
+	toon := oq.FormatToon(result, g)
+	assert.Contains(t, toon, "results[1]{name,hash,path}:")
+}
+
 func TestFormatMarkdown_Count_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)

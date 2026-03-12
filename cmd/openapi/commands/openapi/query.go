@@ -60,7 +60,7 @@ Pipeline stages:
   Source:     schemas, schemas.components, schemas.inline, operations
   Traversal:  refs-out, refs-in, reachable, ancestors, properties, union-members, items, ops, schemas, path <from> <to>
   Filter:     where <expr>, select <fields>, sort <field> [asc|desc], take/head <n>, sample <n>, top <n> <field>, bottom <n> <field>, unique, group-by <field>, count
-  Meta:       explain, fields, format <table|json|markdown>
+  Meta:       explain, fields, format <table|json|markdown|toon>
 
 Where expressions support: ==, !=, >, <, >=, <=, and, or, not, has(), matches`,
 	Args: stdinOrFileArgs(1, 2),
@@ -71,7 +71,7 @@ var queryOutputFormat string
 var queryFromFile string
 
 func init() {
-	queryCmd.Flags().StringVar(&queryOutputFormat, "format", "table", "output format: table, json, or markdown")
+	queryCmd.Flags().StringVar(&queryOutputFormat, "format", "table", "output format: table, json, markdown, or toon")
 	queryCmd.Flags().StringVarP(&queryFromFile, "file", "f", "", "read query from file instead of argument")
 }
 
@@ -141,6 +141,8 @@ func queryOpenAPI(ctx context.Context, processor *OpenAPIProcessor, queryStr str
 		output = oq.FormatJSON(result, g)
 	case "markdown":
 		output = oq.FormatMarkdown(result, g)
+	case "toon":
+		output = oq.FormatToon(result, g)
 	default:
 		output = oq.FormatTable(result, g)
 	}

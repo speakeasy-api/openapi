@@ -260,8 +260,8 @@ func parseStage(s string) (Stage, error) {
 
 	case "format":
 		f := strings.TrimSpace(rest)
-		if f != "table" && f != "json" && f != "markdown" {
-			return Stage{}, fmt.Errorf("format must be table, json, or markdown, got %q", f)
+		if f != "table" && f != "json" && f != "markdown" && f != "toon" {
+			return Stage{}, fmt.Errorf("format must be table, json, markdown, or toon, got %q", f)
 		}
 		return Stage{Kind: StageFormat, Format: f}, nil
 
@@ -1188,6 +1188,136 @@ func FormatMarkdown(result *Result, g *graph.SchemaGraph) string {
 		sb.WriteString(" |\n")
 	}
 
+	return sb.String()
+}
+
+// FormatToon formats a result in the TOON (Token-Oriented Object Notation) format.
+// TOON uses tabular array syntax for uniform rows: header[N]{field1,field2,...}:
+// followed by comma-delimited data rows. See https://github.com/toon-format/toon
+func FormatToon(result *Result, g *graph.SchemaGraph) string {
+	if result.Explain != "" {
+		return result.Explain
+	}
+
+	if result.IsCount {
+		return "count: " + strconv.Itoa(result.Count) + "\n"
+	}
+
+	if len(result.Groups) > 0 {
+		return formatGroupsToon(result)
+	}
+
+	if len(result.Rows) == 0 {
+		return "results[0]:\n"
+	}
+
+	fields := result.Fields
+	if len(fields) == 0 {
+		if result.Rows[0].Kind == SchemaResult {
+			fields = []string{"name", "type", "depth", "in_degree", "out_degree"}
+		} else {
+			fields = []string{"name", "method", "path", "schema_count"}
+		}
+	}
+
+	var sb strings.Builder
+
+	// Header: results[N]{field1,field2,...}:
+	fmt.Fprintf(&sb, "results[%d]{%s}:\n", len(result.Rows), strings.Join(fields, ","))
+
+	// Data rows: comma-separated values, indented by one space
+	for _, row := range result.Rows {
+		sb.WriteByte(' ')
+		for i, f := range fields {
+			if i > 0 {
+				sb.WriteByte(',')
+			}
+			v := fieldValue(row, f, g)
+			sb.WriteString(toonValue(v))
+		}
+		sb.WriteByte('\n')
+	}
+
+	return sb.String()
+}
+
+func formatGroupsToon(result *Result) string {
+	var sb strings.Builder
+
+	// Groups as tabular array
+	fmt.Fprintf(&sb, "groups[%d]{key,count,names}:\n", len(result.Groups))
+	for _, grp := range result.Groups {
+		names := strings.Join(grp.Names, ";")
+		fmt.Fprintf(&sb, " %s,%d,%s\n", toonEscape(grp.Key), grp.Count, toonEscape(names))
+	}
+	return sb.String()
+}
+
+// toonValue encodes an expr.Value for TOON format.
+func toonValue(v expr.Value) string {
+	switch v.Kind {
+	case expr.KindString:
+		return toonEscape(v.Str)
+	case expr.KindInt:
+		return strconv.Itoa(v.Int)
+	case expr.KindBool:
+		return strconv.FormatBool(v.Bool)
+	default:
+		return "null"
+	}
+}
+
+// toonEscape quotes a string if it needs escaping for TOON format.
+// A string must be quoted if it: is empty, contains comma/colon/quote/backslash/
+// brackets/braces/control chars, has leading/trailing whitespace, or matches
+// true/false/null or a numeric pattern.
+func toonEscape(s string) string {
+	if s == "" {
+		return `""`
+	}
+	if s == "true" || s == "false" || s == "null" {
+		return `"` + s + `"`
+	}
+	// Check if it looks numeric
+	if _, err := strconv.ParseFloat(s, 64); err == nil {
+		return `"` + s + `"`
+	}
+	needsQuote := false
+	for _, ch := range s {
+		if ch == ',' || ch == ':' || ch == '"' || ch == '\\' ||
+			ch == '[' || ch == ']' || ch == '{' || ch == '}' ||
+			ch == '\n' || ch == '\r' || ch == '\t' ||
+			ch < 0x20 {
+			needsQuote = true
+			break
+		}
+	}
+	if s[0] == ' ' || s[len(s)-1] == ' ' {
+		needsQuote = true
+	}
+	if !needsQuote {
+		return s
+	}
+	// Quote with escaping
+	var sb strings.Builder
+	sb.WriteByte('"')
+	for _, ch := range s {
+		switch ch {
+		case '\\':
+			sb.WriteString(`\\`)
+		case '"':
+			sb.WriteString(`\"`)
+		case '\n':
+			sb.WriteString(`\n`)
+		case '\r':
+			sb.WriteString(`\r`)
+		case '\t':
+			sb.WriteString(`\t`)
+		default:
+			sb.WriteRune(ch)
+		}
+	}
+	sb.WriteByte('"')
 	return sb.String()
 }
 
