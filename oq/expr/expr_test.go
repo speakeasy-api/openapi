@@ -136,8 +136,8 @@ func TestParse_Error(t *testing.T) {
 	t.Parallel()
 
 	_, err := expr.Parse("")
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = expr.Parse("name matches \"[invalid\"")
-	assert.Error(t, err)
+	require.Error(t, err)
 }

@@ -79,13 +79,13 @@ func TestParse_Error(t *testing.T) {
 	t.Parallel()
 
 	_, err := oq.Parse("")
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = oq.Parse("schemas | unknown_stage")
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	_, err = oq.Parse("schemas | take abc")
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestExecute_SchemasCount_Success(t *testing.T) {
@@ -95,7 +95,7 @@ func TestExecute_SchemasCount_Success(t *testing.T) {
 	result, err := oq.Execute("schemas | count", g)
 	require.NoError(t, err)
 	assert.True(t, result.IsCount)
-	assert.Greater(t, result.Count, 0)
+	assert.Positive(t, result.Count)
 }
 
 func TestExecute_ComponentSchemas_Success(t *testing.T) {
