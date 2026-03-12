@@ -1,7 +1,6 @@
 package graph_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -19,7 +18,7 @@ func loadTestGraph(t *testing.T) *graph.SchemaGraph {
 	require.NoError(t, err)
 	defer f.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	doc, _, err := openapi.Unmarshal(ctx, f, openapi.WithSkipValidation())
 	require.NoError(t, err)
 	require.NotNil(t, doc)

@@ -785,7 +785,7 @@ func FormatJSON(result *Result, g *graph.SchemaGraph) string {
 				sb.WriteString(", ")
 			}
 			v := fieldValue(row, f, g)
-			sb.WriteString(fmt.Sprintf("%q: %s", f, jsonValue(v)))
+			fmt.Fprintf(&sb, "%q: %s", f, jsonValue(v))
 		}
 		sb.WriteString("}")
 	}
@@ -809,14 +809,14 @@ func jsonValue(v expr.Value) string {
 func formatGroups(result *Result) string {
 	var sb strings.Builder
 	for _, g := range result.Groups {
-		sb.WriteString(fmt.Sprintf("%s: count=%d", g.Key, g.Count))
+		fmt.Fprintf(&sb, "%s: count=%d", g.Key, g.Count)
 		if len(g.Names) > 0 {
 			names := slices.Clone(g.Names)
 			if len(names) > 5 {
 				names = names[:5]
 				names = append(names, "...")
 			}
-			sb.WriteString(fmt.Sprintf(" names=[%s]", strings.Join(names, ", ")))
+			fmt.Fprintf(&sb, " names=[%s]", strings.Join(names, ", "))
 		}
 		sb.WriteString("\n")
 	}
@@ -830,12 +830,12 @@ func formatGroupsJSON(result *Result) string {
 		if i > 0 {
 			sb.WriteString(",\n")
 		}
-		sb.WriteString(fmt.Sprintf(`  {"key": %q, "count": %d, "names": [`, g.Key, g.Count))
+		fmt.Fprintf(&sb, `  {"key": %q, "count": %d, "names": [`, g.Key, g.Count)
 		for j, n := range g.Names {
 			if j > 0 {
 				sb.WriteString(", ")
 			}
-			sb.WriteString(fmt.Sprintf("%q", n))
+			fmt.Fprintf(&sb, "%q", n)
 		}
 		sb.WriteString("]}")
 	}

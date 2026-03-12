@@ -126,11 +126,8 @@ func queryOpenAPI(ctx context.Context, processor *OpenAPIProcessor, queryStr str
 	}
 
 	fmt.Fprint(processor.stdout(), output)
-	if !result.IsCount || queryOutputFormat != "table" {
-		// FormatTable already includes newlines for non-count results
-		if result.IsCount {
-			fmt.Fprintln(processor.stdout())
-		}
+	if result.IsCount {
+		fmt.Fprintln(processor.stdout())
 	}
 
 	return nil
