@@ -438,7 +438,13 @@ func (p *parser) parsePrimary() (Expr, error) {
 		return &matchesExpr{field: field, pattern: re}, nil
 	}
 
-	// String literal (possibly with interpolation)
+	// String literal (possibly with interpolation).
+	// Tokens prefixed with \x00 originated from single-quoted strings and skip interpolation.
+	if strings.HasPrefix(tok, "\x00\"") {
+		p.next()
+		inner := tok[2 : len(tok)-1] // strip \x00 prefix and quotes
+		return &literalExpr{val: StringVal(inner)}, nil
+	}
 	if strings.HasPrefix(tok, "\"") {
 		p.next()
 		inner := tok[1 : len(tok)-1] // strip quotes
@@ -599,10 +605,15 @@ func tokenize(input string) []string {
 			if j < len(input) {
 				j++
 			}
-			// Normalize single-quoted strings to double-quoted for downstream parsing
+			// Normalize single-quoted strings to double-quoted for downstream parsing.
+			// Mark single-quoted origins with a prefix so parsePrimary skips interpolation.
 			if quote == '\'' {
-				inner := input[i+1 : j-1]
-				tokens = append(tokens, "\""+inner+"\"")
+				end := j - 1
+				if end <= i {
+					end = i + 1 // unterminated quote: treat as empty string
+				}
+				inner := input[i+1 : end]
+				tokens = append(tokens, "\x00\""+inner+"\"")
 			} else {
 				tokens = append(tokens, input[i:j])
 			}

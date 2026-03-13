@@ -567,21 +567,29 @@ func splitSemicolonArgs(s string) []string {
 	var parts []string
 	var current strings.Builder
 	depth := 0
-	inQuote := false
+	var quoteChar byte
 
 	for i := 0; i < len(s); i++ {
 		ch := s[i]
 		switch {
-		case ch == '"':
-			inQuote = !inQuote
+		case quoteChar != 0:
 			current.WriteByte(ch)
-		case ch == '(' && !inQuote:
+			if ch == '\\' && i+1 < len(s) {
+				i++
+				current.WriteByte(s[i])
+			} else if ch == quoteChar {
+				quoteChar = 0
+			}
+		case ch == '"' || ch == '\'':
+			quoteChar = ch
+			current.WriteByte(ch)
+		case ch == '(':
 			depth++
 			current.WriteByte(ch)
-		case ch == ')' && !inQuote:
+		case ch == ')':
 			depth--
 			current.WriteByte(ch)
-		case ch == ';' && !inQuote && depth == 0:
+		case ch == ';' && depth == 0:
 			parts = append(parts, current.String())
 			current.Reset()
 		default:
@@ -634,22 +642,30 @@ func parseTwoArgs(s string) (string, string) {
 func splitPipeline(input string) []string {
 	var parts []string
 	var current strings.Builder
-	inQuote := false
-	depth := 0 // paren depth — don't split | inside parens
+	var quoteChar byte // 0 = not in quote, '"' or '\'' = in that quote
+	depth := 0         // paren depth — don't split | inside parens
 
 	for i := 0; i < len(input); i++ {
 		ch := input[i]
 		switch {
-		case ch == '"':
-			inQuote = !inQuote
+		case quoteChar != 0:
 			current.WriteByte(ch)
-		case ch == '(' && !inQuote:
+			if ch == '\\' && i+1 < len(input) {
+				i++
+				current.WriteByte(input[i])
+			} else if ch == quoteChar {
+				quoteChar = 0
+			}
+		case ch == '"' || ch == '\'':
+			quoteChar = ch
+			current.WriteByte(ch)
+		case ch == '(':
 			depth++
 			current.WriteByte(ch)
-		case ch == ')' && !inQuote:
+		case ch == ')':
 			depth--
 			current.WriteByte(ch)
-		case ch == '|' && !inQuote && depth == 0:
+		case ch == '|' && depth == 0:
 			parts = append(parts, current.String())
 			current.Reset()
 		default:

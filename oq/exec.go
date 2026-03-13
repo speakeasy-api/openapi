@@ -991,6 +991,8 @@ func describeStage(stage Stage) string {
 		return "Filter: schemas used by operations across multiple tags"
 	case StageSharedRefs:
 		return "Analyze: schemas shared by all operations in result"
+	case StageParent:
+		return "Traverse: navigate back to source schema of edge annotations"
 	default:
 		return "Unknown stage"
 	}
@@ -1003,6 +1005,20 @@ func execFields(result *Result) (*Result, error) {
 	kind := SchemaResult
 	if len(result.Rows) > 0 {
 		kind = result.Rows[0].Kind
+	}
+
+	if kind == GroupRowResult {
+		sb.WriteString("Field                          Type\n")
+		sb.WriteString("-----------------------------  ------\n")
+		fields := []struct{ name, typ string }{
+			{"key", "string"},
+			{"count", "int"},
+			{"names", "string"},
+		}
+		for _, f := range fields {
+			fmt.Fprintf(&sb, "%-30s %s\n", f.name, f.typ)
+		}
+		return &Result{Explain: sb.String()}, nil
 	}
 
 	if kind == SchemaResult {
