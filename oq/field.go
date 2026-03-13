@@ -73,11 +73,11 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.IntVal(g.SchemaOpCount(graph.NodeID(row.SchemaIdx)))
 		case "tag_count":
 			return expr.IntVal(schemaTagCount(row.SchemaIdx, g))
-		case "via", "edge_kind":
+		case "via":
 			return expr.StringVal(row.Via)
-		case "key", "edge_label":
+		case "key":
 			return expr.StringVal(row.Key)
-		case "from", "edge_from":
+		case "from":
 			return expr.StringVal(row.From)
 		default:
 			// Schema-content fields require the underlying schema object
@@ -126,11 +126,11 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 				return expr.StringVal(o.Operation.GetSummary())
 			}
 			return expr.StringVal("")
-		case "via", "edge_kind":
+		case "via":
 			return expr.StringVal(row.Via)
-		case "key", "edge_label":
+		case "key":
 			return expr.StringVal(row.Key)
-		case "from", "edge_from":
+		case "from":
 			return expr.StringVal(row.From)
 		default:
 			return operationContentField(o, name)

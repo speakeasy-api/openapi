@@ -198,8 +198,6 @@ source schema.
   key               string   Edge key: property name, array index, etc.
   from              string   Source node name
 
-  Legacy aliases: edge_kind → via, edge_label → key, edge_from → from
-
 EXPRESSIONS
 -----------
 The expression language is used in select(), let, and if-then-else:

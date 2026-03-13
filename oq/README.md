@@ -161,8 +161,6 @@ Available on rows produced by 1-hop traversal stages (`refs-out`, `refs-in`, `pr
 | `key` | string | Edge key: property name, array index, etc. |
 | `from` | string | Source node name |
 
-Legacy aliases `edge_kind`, `edge_label`, `edge_from` are still supported.
-
 ## Expressions
 
 oq supports a rich expression language used in `select()`, `let`, and `if-then-else`:
