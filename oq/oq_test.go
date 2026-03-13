@@ -349,10 +349,10 @@ func TestExecute_Fields_Schemas_Success(t *testing.T) {
 
 	result, err := oq.Execute("schemas | fields", g)
 	require.NoError(t, err)
-	assert.Contains(t, result.Explain, "name")
-	assert.Contains(t, result.Explain, "depth")
-	assert.Contains(t, result.Explain, "property_count")
-	assert.Contains(t, result.Explain, "is_component")
+	assert.Contains(t, result.Explain, "name", "fields output should list name")
+	assert.Contains(t, result.Explain, "depth", "fields output should list depth")
+	assert.Contains(t, result.Explain, "property_count", "fields output should list property_count")
+	assert.Contains(t, result.Explain, "is_component", "fields output should list is_component")
 }
 
 func TestExecute_Fields_Operations_Success(t *testing.T) {
@@ -361,11 +361,11 @@ func TestExecute_Fields_Operations_Success(t *testing.T) {
 
 	result, err := oq.Execute("operations | fields", g)
 	require.NoError(t, err)
-	assert.Contains(t, result.Explain, "method")
-	assert.Contains(t, result.Explain, "operation_id")
-	assert.Contains(t, result.Explain, "schema_count")
-	assert.Contains(t, result.Explain, "tag")
-	assert.Contains(t, result.Explain, "deprecated")
+	assert.Contains(t, result.Explain, "method", "fields output should list method")
+	assert.Contains(t, result.Explain, "operation_id", "fields output should list operation_id")
+	assert.Contains(t, result.Explain, "schema_count", "fields output should list schema_count")
+	assert.Contains(t, result.Explain, "tag", "fields output should list tag")
+	assert.Contains(t, result.Explain, "deprecated", "fields output should list deprecated")
 }
 
 func TestExecute_Head_Success(t *testing.T) {
@@ -374,7 +374,7 @@ func TestExecute_Head_Success(t *testing.T) {
 
 	result, err := oq.Execute("schemas.components | head 3", g)
 	require.NoError(t, err)
-	assert.Len(t, result.Rows, 3)
+	assert.Len(t, result.Rows, 3, "head should return exactly 3 rows")
 }
 
 func TestExecute_Sample_Success(t *testing.T) {
@@ -383,12 +383,12 @@ func TestExecute_Sample_Success(t *testing.T) {
 
 	result, err := oq.Execute("schemas.components | sample 3", g)
 	require.NoError(t, err)
-	assert.Len(t, result.Rows, 3)
+	assert.Len(t, result.Rows, 3, "sample should return exactly 3 rows")
 
 	// Running sample again should produce the same result (deterministic)
 	result2, err := oq.Execute("schemas.components | sample 3", g)
 	require.NoError(t, err)
-	assert.Len(t, result2.Rows, len(result.Rows))
+	assert.Len(t, result2.Rows, len(result.Rows), "sample should be deterministic")
 }
 
 func TestExecute_Path_Success(t *testing.T) {
@@ -397,12 +397,12 @@ func TestExecute_Path_Success(t *testing.T) {
 
 	result, err := oq.Execute(`schemas | path Pet Address | select name`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "path from Pet to Address should have results")
 
 	names := collectNames(result, g)
 	// Path should include Pet, something in between, and Address
-	assert.Equal(t, "Pet", names[0])
-	assert.Equal(t, "Address", names[len(names)-1])
+	assert.Equal(t, "Pet", names[0], "path should start at Pet")
+	assert.Equal(t, "Address", names[len(names)-1], "path should end at Address")
 }
 
 func TestExecute_Path_NotFound_Success(t *testing.T) {
@@ -412,7 +412,7 @@ func TestExecute_Path_NotFound_Success(t *testing.T) {
 	// Unused has no outgoing edges to reach Pet
 	result, err := oq.Execute(`schemas | path Unused Pet | select name`, g)
 	require.NoError(t, err)
-	assert.Empty(t, result.Rows)
+	assert.Empty(t, result.Rows, "no path should exist from Unused to Pet")
 }
 
 func TestExecute_Top_Success(t *testing.T) {
@@ -421,13 +421,13 @@ func TestExecute_Top_Success(t *testing.T) {
 
 	result, err := oq.Execute("schemas.components | top 3 property_count | select name, property_count", g)
 	require.NoError(t, err)
-	assert.Len(t, result.Rows, 3)
+	assert.Len(t, result.Rows, 3, "top should return exactly 3 rows")
 
 	// Verify descending order
 	for i := 1; i < len(result.Rows); i++ {
 		prev := oq.FieldValuePublic(result.Rows[i-1], "property_count", g)
 		curr := oq.FieldValuePublic(result.Rows[i], "property_count", g)
-		assert.GreaterOrEqual(t, prev.Int, curr.Int)
+		assert.GreaterOrEqual(t, prev.Int, curr.Int, "top should be in descending order")
 	}
 }
 
@@ -437,13 +437,13 @@ func TestExecute_Bottom_Success(t *testing.T) {
 
 	result, err := oq.Execute("schemas.components | bottom 3 property_count | select name, property_count", g)
 	require.NoError(t, err)
-	assert.Len(t, result.Rows, 3)
+	assert.Len(t, result.Rows, 3, "bottom should return exactly 3 rows")
 
 	// Verify ascending order
 	for i := 1; i < len(result.Rows); i++ {
 		prev := oq.FieldValuePublic(result.Rows[i-1], "property_count", g)
 		curr := oq.FieldValuePublic(result.Rows[i], "property_count", g)
-		assert.LessOrEqual(t, prev.Int, curr.Int)
+		assert.LessOrEqual(t, prev.Int, curr.Int, "bottom should be in ascending order")
 	}
 }
 
@@ -453,7 +453,7 @@ func TestExecute_Format_Success(t *testing.T) {
 
 	result, err := oq.Execute("schemas.components | take 3 | format json", g)
 	require.NoError(t, err)
-	assert.Equal(t, "json", result.FormatHint)
+	assert.Equal(t, "json", result.FormatHint, "format hint should be json")
 }
 
 func TestFormatMarkdown_Success(t *testing.T) {
@@ -464,8 +464,8 @@ func TestFormatMarkdown_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
-	assert.Contains(t, md, "| name")
-	assert.Contains(t, md, "| --- |")
+	assert.Contains(t, md, "| name", "markdown should include name column header")
+	assert.Contains(t, md, "| --- |", "markdown should include separator row")
 }
 
 func TestExecute_OperationTag_Success(t *testing.T) {
@@ -474,7 +474,7 @@ func TestExecute_OperationTag_Success(t *testing.T) {
 
 	result, err := oq.Execute("operations | select name, tag, parameter_count", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have operation rows")
 }
 
 func TestParse_NewStages_Success(t *testing.T) {
@@ -501,7 +501,7 @@ func TestParse_NewStages_Success(t *testing.T) {
 			t.Parallel()
 			stages, err := oq.Parse(tt.query)
 			require.NoError(t, err)
-			assert.NotEmpty(t, stages)
+			assert.NotEmpty(t, stages, "should parse into non-empty stages")
 		})
 	}
 }
@@ -512,7 +512,7 @@ func TestExecute_RefsOut_Success(t *testing.T) {
 
 	result, err := oq.Execute(`schemas.components | where name == "Pet" | refs-out | select name`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "Pet should have outgoing refs")
 }
 
 func TestExecute_RefsIn_Success(t *testing.T) {
@@ -521,7 +521,7 @@ func TestExecute_RefsIn_Success(t *testing.T) {
 
 	result, err := oq.Execute(`schemas.components | where name == "Owner" | refs-in | select name`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "Owner should have incoming refs")
 }
 
 func TestExecute_Items_Success(t *testing.T) {
@@ -532,7 +532,7 @@ func TestExecute_Items_Success(t *testing.T) {
 	result, err := oq.Execute(`schemas | where type == "array" | items | select name`, g)
 	require.NoError(t, err)
 	// May or may not have results depending on spec, but should not error
-	assert.NotNil(t, result)
+	assert.NotNil(t, result, "result should not be nil")
 }
 
 func TestExecute_Connected_Success(t *testing.T) {
@@ -542,7 +542,7 @@ func TestExecute_Connected_Success(t *testing.T) {
 	// Start from Pet, connected should return schemas and operations in the same component
 	result, err := oq.Execute(`schemas.components | where name == "Pet" | connected`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "connected should return rows")
 
 	// Should have both schema and operation rows
 	hasSchema := false
@@ -566,7 +566,7 @@ func TestExecute_Connected_FromOps_Success(t *testing.T) {
 	// Start from an operation, connected should also find schemas
 	result, err := oq.Execute(`operations | take 1 | connected`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "connected from operation should return rows")
 
 	hasSchema := false
 	for _, row := range result.Rows {
@@ -583,14 +583,14 @@ func TestExecute_EdgeAnnotations_Success(t *testing.T) {
 
 	result, err := oq.Execute(`schemas.components | where name == "Pet" | refs-out | select name, edge_kind, edge_label, edge_from`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "refs-out from Pet should have results")
 
 	// Every row should have edge annotations
 	for _, row := range result.Rows {
 		kind := oq.FieldValuePublic(row, "edge_kind", g)
 		assert.NotEmpty(t, kind.Str, "edge_kind should be set")
 		from := oq.FieldValuePublic(row, "edge_from", g)
-		assert.Equal(t, "Pet", from.Str)
+		assert.Equal(t, "Pet", from.Str, "edge_from should be Pet")
 	}
 }
 
@@ -600,7 +600,7 @@ func TestExecute_BlastRadius_Success(t *testing.T) {
 
 	result, err := oq.Execute(`schemas.components | where name == "Pet" | blast-radius`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "blast-radius should return rows")
 
 	// Should include both schemas and operations
 	hasSchema := false
@@ -623,7 +623,7 @@ func TestExecute_Neighbors_Success(t *testing.T) {
 
 	result, err := oq.Execute(`schemas.components | where name == "Pet" | neighbors 1`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "neighbors should return rows")
 
 	// Depth-1 neighbors should include seed + direct refs in both directions
 	names := make(map[string]bool)
@@ -641,7 +641,7 @@ func TestExecute_Orphans_Success(t *testing.T) {
 	result, err := oq.Execute(`schemas.components | orphans | select name`, g)
 	require.NoError(t, err)
 	// Result may be empty if all schemas are referenced, that's fine
-	assert.NotNil(t, result)
+	assert.NotNil(t, result, "result should not be nil")
 }
 
 func TestExecute_Leaves_Success(t *testing.T) {
@@ -653,7 +653,7 @@ func TestExecute_Leaves_Success(t *testing.T) {
 	// All returned rows should have out_degree == 0
 	for _, row := range result.Rows {
 		od := oq.FieldValuePublic(row, "out_degree", g)
-		assert.Equal(t, 0, od.Int)
+		assert.Equal(t, 0, od.Int, "leaf nodes should have out_degree 0")
 	}
 }
 
@@ -664,7 +664,7 @@ func TestExecute_Cycles_Success(t *testing.T) {
 	result, err := oq.Execute(`schemas | cycles`, g)
 	require.NoError(t, err)
 	// Returns groups — may be empty if no cycles in petstore
-	assert.NotNil(t, result)
+	assert.NotNil(t, result, "result should not be nil")
 }
 
 func TestExecute_Clusters_Success(t *testing.T) {
@@ -673,7 +673,7 @@ func TestExecute_Clusters_Success(t *testing.T) {
 
 	result, err := oq.Execute(`schemas.components | clusters`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Groups)
+	assert.NotEmpty(t, result.Groups, "should have clusters")
 
 	// Total names across all clusters should equal component count
 	total := 0
@@ -683,7 +683,7 @@ func TestExecute_Clusters_Success(t *testing.T) {
 	// Count component schemas
 	compCount, err := oq.Execute(`schemas.components | count`, g)
 	require.NoError(t, err)
-	assert.Equal(t, compCount.Count, total)
+	assert.Equal(t, compCount.Count, total, "cluster totals should equal component count")
 }
 
 func TestExecute_TagBoundary_Success(t *testing.T) {
@@ -695,7 +695,7 @@ func TestExecute_TagBoundary_Success(t *testing.T) {
 	// All returned rows should have tag_count > 1
 	for _, row := range result.Rows {
 		tc := oq.FieldValuePublic(row, "tag_count", g)
-		assert.Greater(t, tc.Int, 1)
+		assert.Greater(t, tc.Int, 1, "tag-boundary schemas should have tag_count > 1")
 	}
 }
 
@@ -706,7 +706,7 @@ func TestExecute_SharedRefs_Success(t *testing.T) {
 	result, err := oq.Execute(`operations | shared-refs | select name`, g)
 	require.NoError(t, err)
 	// Schemas shared by ALL operations
-	assert.NotNil(t, result)
+	assert.NotNil(t, result, "result should not be nil")
 }
 
 func TestExecute_OpCount_Success(t *testing.T) {
@@ -715,7 +715,7 @@ func TestExecute_OpCount_Success(t *testing.T) {
 
 	result, err := oq.Execute(`schemas.components | sort op_count desc | take 3 | select name, op_count`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have schemas sorted by op_count")
 }
 
 func TestFormatTable_Groups_Success(t *testing.T) {
@@ -724,10 +724,10 @@ func TestFormatTable_Groups_Success(t *testing.T) {
 
 	result, err := oq.Execute("schemas.components | group-by type", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Groups)
+	assert.NotEmpty(t, result.Groups, "should have groups")
 
 	table := oq.FormatTable(result, g)
-	assert.Contains(t, table, "count=")
+	assert.Contains(t, table, "count=", "group table should show count")
 }
 
 func TestFormatJSON_Groups_Success(t *testing.T) {
@@ -738,8 +738,8 @@ func TestFormatJSON_Groups_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	json := oq.FormatJSON(result, g)
-	assert.Contains(t, json, "\"key\"")
-	assert.Contains(t, json, "\"count\"")
+	assert.Contains(t, json, "\"key\"", "group JSON should include key field")
+	assert.Contains(t, json, "\"count\"", "group JSON should include count field")
 }
 
 func TestFormatMarkdown_Groups_Success(t *testing.T) {
@@ -750,7 +750,7 @@ func TestFormatMarkdown_Groups_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
-	assert.Contains(t, md, "| Key |")
+	assert.Contains(t, md, "| Key |", "group markdown should include Key column")
 }
 
 func TestExecute_InlineSource_Success(t *testing.T) {
@@ -759,7 +759,7 @@ func TestExecute_InlineSource_Success(t *testing.T) {
 
 	result, err := oq.Execute("schemas.inline | count", g)
 	require.NoError(t, err)
-	assert.True(t, result.IsCount)
+	assert.True(t, result.IsCount, "should be a count result")
 }
 
 func TestExecute_SchemaFields_Coverage(t *testing.T) {
@@ -769,13 +769,13 @@ func TestExecute_SchemaFields_Coverage(t *testing.T) {
 	// Select all schema fields to cover fieldValue branches
 	result, err := oq.Execute("schemas.components | take 1 | select name, type, depth, in_degree, out_degree, union_width, property_count, is_component, is_inline, is_circular, has_ref, hash, path", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have schema rows")
 
 	table := oq.FormatTable(result, g)
-	assert.NotEmpty(t, table)
+	assert.NotEmpty(t, table, "table output should not be empty")
 
 	json := oq.FormatJSON(result, g)
-	assert.Contains(t, json, "\"name\"")
+	assert.Contains(t, json, "\"name\"", "JSON should include name field")
 }
 
 func TestExecute_OperationFields_Coverage(t *testing.T) {
@@ -785,7 +785,7 @@ func TestExecute_OperationFields_Coverage(t *testing.T) {
 	// Select all operation fields to cover fieldValue branches
 	result, err := oq.Execute("operations | take 1 | select name, method, path, operation_id, schema_count, component_count, tag, parameter_count, deprecated, description, summary", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have operation rows")
 }
 
 func TestFormatJSON_Empty_Success(t *testing.T) {
@@ -796,7 +796,7 @@ func TestFormatJSON_Empty_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	json := oq.FormatJSON(result, g)
-	assert.Equal(t, "[]", json)
+	assert.Equal(t, "[]", json, "empty result JSON should be []")
 }
 
 func TestFormatMarkdown_Empty_Success(t *testing.T) {
@@ -807,7 +807,7 @@ func TestFormatMarkdown_Empty_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
-	assert.Equal(t, "(empty)", md)
+	assert.Equal(t, "(empty)", md, "empty result markdown should be (empty)")
 }
 
 func TestFormatJSON_Count_Success(t *testing.T) {
@@ -818,7 +818,7 @@ func TestFormatJSON_Count_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	json := oq.FormatJSON(result, g)
-	assert.NotEmpty(t, json)
+	assert.NotEmpty(t, json, "count JSON should not be empty")
 }
 
 func TestFormatToon_Success(t *testing.T) {
@@ -829,8 +829,8 @@ func TestFormatToon_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
-	assert.Contains(t, toon, "results[3]{name,type}:")
-	assert.Contains(t, toon, "object")
+	assert.Contains(t, toon, "results[3]{name,type}:", "toon should show result count and fields")
+	assert.Contains(t, toon, "object", "toon should include object type value")
 }
 
 func TestFormatToon_Count_Success(t *testing.T) {
@@ -841,7 +841,7 @@ func TestFormatToon_Count_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
-	assert.Contains(t, toon, "count:")
+	assert.Contains(t, toon, "count:", "toon should show count label")
 }
 
 func TestFormatToon_Groups_Success(t *testing.T) {
@@ -852,8 +852,8 @@ func TestFormatToon_Groups_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
-	assert.Contains(t, toon, "groups[")
-	assert.Contains(t, toon, "{key,count,names}:")
+	assert.Contains(t, toon, "groups[", "toon should show groups header")
+	assert.Contains(t, toon, "{key,count,names}:", "toon should show group fields")
 }
 
 func TestFormatToon_Empty_Success(t *testing.T) {
@@ -864,7 +864,7 @@ func TestFormatToon_Empty_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
-	assert.Equal(t, "results[0]:\n", toon)
+	assert.Equal(t, "results[0]:\n", toon, "empty toon should show results[0]")
 }
 
 func TestFormatToon_Escaping_Success(t *testing.T) {
@@ -877,7 +877,7 @@ func TestFormatToon_Escaping_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
-	assert.Contains(t, toon, "results[1]{name,hash,path}:")
+	assert.Contains(t, toon, "results[1]{name,hash,path}:", "toon should show result count and selected fields")
 }
 
 func TestFormatMarkdown_Count_Success(t *testing.T) {
@@ -888,7 +888,7 @@ func TestFormatMarkdown_Count_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
-	assert.NotEmpty(t, md)
+	assert.NotEmpty(t, md, "count markdown should not be empty")
 }
 
 func TestExecute_Explain_AllStages_Success(t *testing.T) {
@@ -1034,7 +1034,7 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 			result, err := oq.Execute(tt.query, g)
 			require.NoError(t, err)
 			for _, exp := range tt.expects {
-				assert.Contains(t, result.Explain, exp)
+				assert.Contains(t, result.Explain, exp, "explain should contain: "+exp)
 			}
 		})
 	}
@@ -1047,28 +1047,28 @@ func TestExecute_FieldValue_EdgeCases(t *testing.T) {
 	// Test operation fields that require nil checks
 	result, err := oq.Execute("operations | take 1 | select name, tag, parameter_count, deprecated, description, summary", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have operation rows")
 
 	// Test edge fields on non-traversal rows (should be empty strings)
 	result, err = oq.Execute("schemas.components | take 1 | select name, edge_kind, edge_label, edge_from", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have schema rows")
 	edgeKind := oq.FieldValuePublic(result.Rows[0], "edge_kind", g)
 	assert.Empty(t, edgeKind.Str, "edge_kind should be empty for non-traversal rows")
 
 	// Test tag_count field
 	result, err = oq.Execute("schemas.components | take 1 | select name, tag_count", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have rows for tag_count test")
 
 	// Test op_count field
 	result, err = oq.Execute("schemas.components | take 1 | select name, op_count", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have rows for op_count test")
 
 	// Test unknown field returns null (KindNull == 0)
 	v := oq.FieldValuePublic(result.Rows[0], "nonexistent_field", g)
-	assert.Equal(t, expr.KindNull, v.Kind)
+	assert.Equal(t, expr.KindNull, v.Kind, "unknown field should return KindNull")
 }
 
 func TestExecute_Cycles_NoCycles(t *testing.T) {
@@ -1088,7 +1088,7 @@ func TestExecute_SharedRefs_AllOps(t *testing.T) {
 	// shared-refs with all operations — returns schemas shared by all operations
 	result, err := oq.Execute("operations | shared-refs | select name", g)
 	require.NoError(t, err)
-	assert.NotNil(t, result)
+	assert.NotNil(t, result, "result should not be nil")
 }
 
 func TestFormatToon_SpecialChars(t *testing.T) {
@@ -1100,8 +1100,8 @@ func TestFormatToon_SpecialChars(t *testing.T) {
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
-	assert.NotEmpty(t, toon)
-	assert.Contains(t, toon, "results[1]")
+	assert.NotEmpty(t, toon, "toon output should not be empty")
+	assert.Contains(t, toon, "results[1]", "toon should show one result")
 }
 
 func TestFormatJSON_Operations(t *testing.T) {
@@ -1112,9 +1112,9 @@ func TestFormatJSON_Operations(t *testing.T) {
 	require.NoError(t, err)
 
 	json := oq.FormatJSON(result, g)
-	assert.True(t, strings.HasPrefix(json, "["))
-	assert.Contains(t, json, "\"name\"")
-	assert.Contains(t, json, "\"method\"")
+	assert.True(t, strings.HasPrefix(json, "["), "JSON output should start with [")
+	assert.Contains(t, json, "\"name\"", "JSON should include name field")
+	assert.Contains(t, json, "\"method\"", "JSON should include method field")
 }
 
 func TestFormatMarkdown_Operations(t *testing.T) {
@@ -1125,8 +1125,8 @@ func TestFormatMarkdown_Operations(t *testing.T) {
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
-	assert.Contains(t, md, "| name")
-	assert.Contains(t, md, "| method")
+	assert.Contains(t, md, "| name", "markdown should include name column")
+	assert.Contains(t, md, "| method", "markdown should include method column")
 }
 
 func TestParse_Error_MoreCases(t *testing.T) {
@@ -1185,7 +1185,7 @@ func TestParse_MoreStages_Success(t *testing.T) {
 			t.Parallel()
 			stages, err := oq.Parse(tt.query)
 			require.NoError(t, err)
-			assert.NotEmpty(t, stages)
+			assert.NotEmpty(t, stages, "should parse into non-empty stages")
 		})
 	}
 }
@@ -1197,7 +1197,7 @@ func TestExecute_WhereAndOr_Success(t *testing.T) {
 	// Test compound where expressions
 	result, err := oq.Execute(`schemas.components | where depth > 0 and is_component`, g)
 	require.NoError(t, err)
-	assert.NotNil(t, result)
+	assert.NotNil(t, result, "result should not be nil")
 
 	result, err = oq.Execute(`schemas.components | where depth > 100 or is_component`, g)
 	require.NoError(t, err)
@@ -1211,7 +1211,7 @@ func TestExecute_SortStringField_Success(t *testing.T) {
 	// Sort by string field
 	result, err := oq.Execute("schemas.components | sort type asc | select name, type", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have schemas sorted by type")
 }
 
 func TestExecute_GroupBy_Type_Details(t *testing.T) {
@@ -1220,12 +1220,12 @@ func TestExecute_GroupBy_Type_Details(t *testing.T) {
 
 	result, err := oq.Execute("schemas.components | group-by type", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Groups)
+	assert.NotEmpty(t, result.Groups, "should have groups")
 
 	// Each group should have Count and Names
 	for _, grp := range result.Groups {
-		assert.Positive(t, grp.Count)
-		assert.Len(t, grp.Names, grp.Count)
+		assert.Positive(t, grp.Count, "group count should be positive")
+		assert.Len(t, grp.Names, grp.Count, "group names length should match count")
 	}
 }
 
@@ -1237,8 +1237,8 @@ func TestFormatMarkdown_Groups_Details(t *testing.T) {
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
-	assert.Contains(t, md, "| Key |")
-	assert.Contains(t, md, "| Count |")
+	assert.Contains(t, md, "| Key |", "group markdown should include Key column")
+	assert.Contains(t, md, "| Count |", "group markdown should include Count column")
 }
 
 func TestFormatJSON_Explain(t *testing.T) {
@@ -1250,16 +1250,16 @@ func TestFormatJSON_Explain(t *testing.T) {
 
 	// All formats should handle explain
 	table := oq.FormatTable(result, g)
-	assert.Contains(t, table, "Source: schemas")
+	assert.Contains(t, table, "Source: schemas", "table should render explain output")
 
 	json := oq.FormatJSON(result, g)
-	assert.Contains(t, json, "Source: schemas")
+	assert.Contains(t, json, "Source: schemas", "JSON should render explain output")
 
 	md := oq.FormatMarkdown(result, g)
-	assert.Contains(t, md, "Source: schemas")
+	assert.Contains(t, md, "Source: schemas", "markdown should render explain output")
 
 	toon := oq.FormatToon(result, g)
-	assert.Contains(t, toon, "Source: schemas")
+	assert.Contains(t, toon, "Source: schemas", "toon should render explain output")
 }
 
 func TestExecute_Leaves_AllZeroOutDegree(t *testing.T) {
@@ -1283,12 +1283,12 @@ func TestExecute_OperationsTraversals(t *testing.T) {
 	// Operations going to schemas and back
 	result, err := oq.Execute("operations | take 1 | schemas | select name", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "operation schemas should have results")
 
 	// Schema to operations roundtrip
 	result, err = oq.Execute("schemas.components | where name == \"Pet\" | ops | select name", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "Pet should be used by operations")
 }
 
 func loadCyclicGraph(t *testing.T) *graph.SchemaGraph {
@@ -1336,7 +1336,7 @@ func TestExecute_CyclicSpec_EdgeAnnotations(t *testing.T) {
 	// Test refs-out to cover edgeKindString branches
 	result, err := oq.Execute(`schemas.components | where name == "NodeA" | refs-out | select name, edge_kind, edge_label`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "NodeA should have outgoing refs")
 
 	// Collect edge kinds
 	edgeKinds := make(map[string]bool)
@@ -1369,19 +1369,19 @@ func TestExecute_CyclicSpec_DeprecatedOp(t *testing.T) {
 	// The listNodes operation is deprecated with tags, summary, and description
 	result, err := oq.Execute("operations | select name, deprecated, summary, description, tag, parameter_count", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have operation rows")
 
 	dep := oq.FieldValuePublic(result.Rows[0], "deprecated", g)
 	assert.True(t, dep.Bool, "listNodes should be deprecated")
 
 	summary := oq.FieldValuePublic(result.Rows[0], "summary", g)
-	assert.Equal(t, "List all nodes", summary.Str)
+	assert.Equal(t, "List all nodes", summary.Str, "summary should match spec")
 
 	desc := oq.FieldValuePublic(result.Rows[0], "description", g)
-	assert.NotEmpty(t, desc.Str)
+	assert.NotEmpty(t, desc.Str, "description should not be empty")
 
 	tag := oq.FieldValuePublic(result.Rows[0], "tag", g)
-	assert.Equal(t, "nodes", tag.Str)
+	assert.Equal(t, "nodes", tag.Str, "tag should be nodes")
 }
 
 func TestExecute_ToonFormat_WithBoolAndInt(t *testing.T) {
@@ -1393,7 +1393,7 @@ func TestExecute_ToonFormat_WithBoolAndInt(t *testing.T) {
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
-	assert.NotEmpty(t, toon)
+	assert.NotEmpty(t, toon, "toon output should not be empty")
 }
 
 func TestExecute_ToonEscape_SpecialChars(t *testing.T) {
@@ -1405,7 +1405,7 @@ func TestExecute_ToonEscape_SpecialChars(t *testing.T) {
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
-	assert.NotEmpty(t, toon)
+	assert.NotEmpty(t, toon, "toon output should not be empty")
 }
 
 func TestFormatToon_Explain(t *testing.T) {
@@ -1416,7 +1416,7 @@ func TestFormatToon_Explain(t *testing.T) {
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
-	assert.Contains(t, toon, "Source: schemas")
+	assert.Contains(t, toon, "Source: schemas", "toon should render explain output")
 }
 
 func TestFormatMarkdown_Explain(t *testing.T) {
@@ -1427,7 +1427,7 @@ func TestFormatMarkdown_Explain(t *testing.T) {
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
-	assert.Contains(t, md, "Source: schemas")
+	assert.Contains(t, md, "Source: schemas", "markdown should render explain output")
 }
 
 // collectNames extracts the "name" field from all rows in the result.
