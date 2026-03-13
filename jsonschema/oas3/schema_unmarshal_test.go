@@ -23,6 +23,10 @@ $id: "https://example.com/schemas/user"
 $schema: "https://json-schema.org/draft/2020-12/schema"
 format: object
 pattern: "^user_"
+contentEncoding: base64
+contentMediaType: application/octet-stream
+contentSchema:
+  type: string
 multipleOf: 1.0
 minimum: 0.0
 maximum: 1000.0
@@ -173,6 +177,15 @@ x-metadata:
 	require.Equal(t, "A comprehensive schema representing a user with all possible properties", schema.GetDescription())
 	require.Equal(t, "object", schema.GetFormat())
 	require.Equal(t, "^user_", schema.GetPattern())
+
+	// Test content keywords
+	require.Equal(t, "base64", schema.GetContentEncoding())
+	require.Equal(t, "application/octet-stream", schema.GetContentMediaType())
+	require.NotNil(t, schema.GetContentSchema())
+	require.True(t, schema.GetContentSchema().IsSchema())
+	contentSchemaTypes := schema.GetContentSchema().GetSchema().GetType()
+	require.Len(t, contentSchemaTypes, 1)
+	require.Equal(t, oas3.SchemaTypeString, contentSchemaTypes[0])
 
 	// Test anchor, $id, and schema
 	require.NotNil(t, schema.Anchor)
@@ -574,4 +587,140 @@ properties:
 
 	_, ok = schema.Properties.Get("name")
 	assert.True(t, ok, "property 'name' should exist")
+}
+
+func TestSchema_Unmarshal_ContentKeywords_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                     string
+		yml                      string
+		expectedContentEncoding  string
+		expectedContentMediaType string
+		checkContentSchema       bool
+		contentSchemaType        oas3.SchemaType
+		contentSchemaRequired    []string
+		contentSchemaProperties  []string
+	}{
+		{
+			name: "contentEncoding only",
+			yml: `
+type: string
+contentEncoding: base64
+`,
+			expectedContentEncoding: "base64",
+		},
+		{
+			name: "contentMediaType only",
+			yml: `
+type: string
+contentMediaType: application/octet-stream
+`,
+			expectedContentMediaType: "application/octet-stream",
+		},
+		{
+			name: "contentEncoding with contentMediaType",
+			yml: `
+type: string
+contentEncoding: base64
+contentMediaType: image/png
+`,
+			expectedContentEncoding:  "base64",
+			expectedContentMediaType: "image/png",
+		},
+		{
+			name: "contentMediaType with contentSchema object",
+			yml: `
+type: string
+contentMediaType: application/json
+contentSchema:
+  type: object
+  required:
+    - subStringProperty
+  properties:
+    subStringProperty:
+      type: string
+`,
+			expectedContentMediaType: "application/json",
+			checkContentSchema:       true,
+			contentSchemaType:        oas3.SchemaTypeObject,
+			contentSchemaRequired:    []string{"subStringProperty"},
+			contentSchemaProperties:  []string{"subStringProperty"},
+		},
+		{
+			name: "all content keywords together",
+			yml: `
+type: string
+contentEncoding: base64
+contentMediaType: application/json
+contentSchema:
+  type: object
+  required:
+    - id
+    - name
+  properties:
+    id:
+      type: integer
+    name:
+      type: string
+    tags:
+      type: array
+      items:
+        type: string
+`,
+			expectedContentEncoding:  "base64",
+			expectedContentMediaType: "application/json",
+			checkContentSchema:       true,
+			contentSchemaType:        oas3.SchemaTypeObject,
+			contentSchemaRequired:    []string{"id", "name"},
+			contentSchemaProperties:  []string{"id", "name", "tags"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var schema oas3.Schema
+
+			validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString(tt.yml), &schema)
+			require.NoError(t, err, "unmarshal should succeed")
+			require.Empty(t, validationErrs, "should have no validation errors")
+
+			if tt.expectedContentEncoding != "" {
+				assert.Equal(t, tt.expectedContentEncoding, schema.GetContentEncoding())
+			} else {
+				assert.Empty(t, schema.GetContentEncoding())
+			}
+
+			if tt.expectedContentMediaType != "" {
+				assert.Equal(t, tt.expectedContentMediaType, schema.GetContentMediaType())
+			} else {
+				assert.Empty(t, schema.GetContentMediaType())
+			}
+
+			if tt.checkContentSchema {
+				require.NotNil(t, schema.GetContentSchema(), "contentSchema should not be nil")
+				require.True(t, schema.GetContentSchema().IsSchema(), "contentSchema should be a schema")
+
+				cs := schema.GetContentSchema().GetSchema()
+
+				types := cs.GetType()
+				require.Len(t, types, 1)
+				assert.Equal(t, tt.contentSchemaType, types[0])
+
+				assert.Equal(t, tt.contentSchemaRequired, cs.GetRequired())
+
+				require.NotNil(t, cs.GetProperties())
+				for _, prop := range tt.contentSchemaProperties {
+					propSchema, ok := cs.GetProperties().Get(prop)
+					assert.True(t, ok, "property %q should exist in contentSchema", prop)
+					assert.NotNil(t, propSchema, "property %q schema should not be nil", prop)
+				}
+				assert.Equal(t, len(tt.contentSchemaProperties), cs.GetProperties().Len())
+			} else {
+				assert.Nil(t, schema.GetContentSchema(), "contentSchema should be nil")
+			}
+		})
+	}
 }
