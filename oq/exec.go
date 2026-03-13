@@ -354,9 +354,9 @@ func traverseRefsOut(row Row, g *graph.SchemaGraph) []Row {
 		result = append(result, Row{
 			Kind:      SchemaResult,
 			SchemaIdx: int(edge.To),
-			Via:  edgeKindString(edge.Kind),
-			Key: edge.Label,
-			From:  fromName,
+			Via:       edgeKindString(edge.Kind),
+			Key:       edge.Label,
+			From:      fromName,
 		})
 	}
 	return result
@@ -372,9 +372,9 @@ func traverseRefsIn(row Row, g *graph.SchemaGraph) []Row {
 		result = append(result, Row{
 			Kind:      SchemaResult,
 			SchemaIdx: int(edge.From),
-			Via:  edgeKindString(edge.Kind),
-			Key: edge.Label,
-			From:  toName,
+			Via:       edgeKindString(edge.Kind),
+			Key:       edge.Label,
+			From:      toName,
 		})
 	}
 	return result
@@ -415,9 +415,9 @@ func traverseProperties(row Row, g *graph.SchemaGraph) []Row {
 			result = append(result, Row{
 				Kind:      SchemaResult,
 				SchemaIdx: int(edge.To),
-				Via:  edgeKindString(edge.Kind),
-				Key: edge.Label,
-				From:  fromName,
+				Via:       edgeKindString(edge.Kind),
+				Key:       edge.Label,
+				From:      fromName,
 			})
 		}
 	}
@@ -437,9 +437,9 @@ func traverseUnionMembers(row Row, g *graph.SchemaGraph) []Row {
 			result = append(result, Row{
 				Kind:      SchemaResult,
 				SchemaIdx: target,
-				Via:  edgeKindString(edge.Kind),
-				Key: edge.Label,
-				From:  fromName,
+				Via:       edgeKindString(edge.Kind),
+				Key:       edge.Label,
+				From:      fromName,
 			})
 		}
 	}
@@ -457,9 +457,9 @@ func traverseItems(row Row, g *graph.SchemaGraph) []Row {
 			result = append(result, Row{
 				Kind:      SchemaResult,
 				SchemaIdx: int(edge.To),
-				Via:  edgeKindString(edge.Kind),
-				Key: edge.Label,
-				From:  fromName,
+				Via:       edgeKindString(edge.Kind),
+				Key:       edge.Label,
+				From:      fromName,
 			})
 		}
 	}
