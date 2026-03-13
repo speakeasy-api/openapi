@@ -52,6 +52,9 @@ type Schema struct {
 	MaxLength             *int64
 	MinLength             *int64
 	Pattern               *string
+	ContentEncoding       *string
+	ContentMediaType      *string
+	ContentSchema         *JSONSchema[Referenceable]
 	Format                *string
 	MaxItems              *int64
 	MinItems              *int64
@@ -124,6 +127,9 @@ func (s *Schema) ShallowCopy() *Schema {
 		MaxLength:             s.MaxLength,
 		MinLength:             s.MinLength,
 		Pattern:               s.Pattern,
+		ContentEncoding:       s.ContentEncoding,
+		ContentMediaType:      s.ContentMediaType,
+		ContentSchema:         s.ContentSchema,
 		Format:                s.Format,
 		MaxItems:              s.MaxItems,
 		MinItems:              s.MinItems,
@@ -485,6 +491,30 @@ func (s *Schema) GetPattern() string {
 	return *s.Pattern
 }
 
+// GetContentEncoding returns the value of the ContentEncoding field. Returns empty string if not set.
+func (s *Schema) GetContentEncoding() string {
+	if s == nil || s.ContentEncoding == nil {
+		return ""
+	}
+	return *s.ContentEncoding
+}
+
+// GetContentMediaType returns the value of the ContentMediaType field. Returns empty string if not set.
+func (s *Schema) GetContentMediaType() string {
+	if s == nil || s.ContentMediaType == nil {
+		return ""
+	}
+	return *s.ContentMediaType
+}
+
+// GetContentSchema returns the value of the ContentSchema field. Returns nil if not set.
+func (s *Schema) GetContentSchema() *JSONSchema[Referenceable] {
+	if s == nil {
+		return nil
+	}
+	return s.ContentSchema
+}
+
 // GetFormat returns the value of the Format field. Returns empty string if not set.
 func (s *Schema) GetFormat() string {
 	if s == nil || s.Format == nil {
@@ -532,6 +562,9 @@ func (s *Schema) IsReferenceOnly() bool {
 		s.MaxLength == nil &&
 		s.MinLength == nil &&
 		s.Pattern == nil &&
+		s.ContentEncoding == nil &&
+		s.ContentMediaType == nil &&
+		s.ContentSchema == nil &&
 		s.Format == nil &&
 		s.MaxItems == nil &&
 		s.MinItems == nil &&
@@ -854,6 +887,15 @@ func (s *Schema) IsEqual(other *Schema) bool {
 		return false
 	}
 	if !equalPtrs(s.Pattern, other.Pattern) {
+		return false
+	}
+	if !equalPtrs(s.ContentEncoding, other.ContentEncoding) {
+		return false
+	}
+	if !equalPtrs(s.ContentMediaType, other.ContentMediaType) {
+		return false
+	}
+	if !equalJSONSchemas(s.ContentSchema, other.ContentSchema) {
 		return false
 	}
 	if !equalPtrs(s.Format, other.Format) {

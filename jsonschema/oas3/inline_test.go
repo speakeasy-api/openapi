@@ -225,6 +225,48 @@ func TestInline_Success(t *testing.T) {
 			}`,
 		},
 		{
+			name: "contentSchema reference",
+			input: `{
+				"type": "string",
+				"contentEncoding": "base64",
+				"contentMediaType": "application/json",
+				"contentSchema": {
+					"$ref": "#/$defs/Payload"
+				},
+				"$defs": {
+					"Payload": {
+						"type": "object",
+						"properties": {
+							"id": {
+								"type": "integer"
+							},
+							"name": {
+								"type": "string"
+							}
+						},
+						"required": ["id", "name"]
+					}
+				}
+			}`,
+			expected: `{
+				"type": "string",
+				"contentEncoding": "base64",
+				"contentMediaType": "application/json",
+				"contentSchema": {
+					"type": "object",
+					"properties": {
+						"id": {
+							"type": "integer"
+						},
+						"name": {
+							"type": "string"
+						}
+					},
+					"required": ["id", "name"]
+				}
+			}`,
+		},
+		{
 			name: "no reference",
 			input: `{
 				"type": "object",

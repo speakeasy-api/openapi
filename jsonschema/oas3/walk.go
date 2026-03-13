@@ -166,6 +166,11 @@ func walkSchema(ctx context.Context, schema *JSONSchema[Referenceable], loc walk
 			return false
 		}
 
+		// Visit contentSchema
+		if !walkSchema(ctx, js.ContentSchema, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "contentSchema"}), rootSchema, yield) {
+			return false
+		}
+
 		// Visit not schema
 		if !walkSchema(ctx, js.Not, append(loc, walk.LocationContext[SchemaMatchFunc]{ParentMatchFunc: schemaMatchFunc, ParentField: "not"}), rootSchema, yield) {
 			return false
