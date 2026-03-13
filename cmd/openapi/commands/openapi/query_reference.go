@@ -47,10 +47,10 @@ in the schema reference graph.
   items             Expand to array items schema (with edge annotations)
   ops               Schemas → operations that use them
   schemas           Operations → schemas they touch
-  path <a> <b>      Shortest path between two named schemas
+  path(A; B)        Shortest path between two named schemas
   connected         Full connected component (schemas + operations)
   blast-radius      Ancestors + all affected operations (change impact)
-  neighbors <n>     Bidirectional neighborhood within N hops
+  neighbors(N)      Bidirectional neighborhood within N hops
 
 ANALYSIS STAGES
 ---------------
@@ -65,24 +65,46 @@ ANALYSIS STAGES
 FILTER & TRANSFORM STAGES
 --------------------------
 
-  where <expr>         Filter rows by predicate expression
-  select <fields>      Project specific fields (comma-separated)
-  sort <field> [desc]  Sort by field (default ascending, add "desc" for descending)
-  take <n>             Limit to first N results
-  head <n>             Alias for take
-  sample <n>           Deterministic pseudo-random sample of N rows
-  top <n> <field>      Sort descending by field and take N (shorthand)
-  bottom <n> <field>   Sort ascending by field and take N (shorthand)
+  select(expr)         Filter rows by predicate expression (jq-style)
+  pick <fields>        Project specific fields (comma-separated)
+  sort_by(field)       Sort ascending by field
+  sort_by(field; desc) Sort descending by field
+  first(N)             Limit to first N results
+  last(N)              Limit to last N results
+  sample(N)            Deterministic pseudo-random sample of N rows
+  top(N; field)        Sort descending by field and take N (shorthand)
+  bottom(N; field)     Sort ascending by field and take N (shorthand)
   unique               Deduplicate rows by identity
-  group-by <field>     Group rows and aggregate counts
-  count                Count rows (terminal — returns a single number)
+  group_by(field)      Group rows and aggregate counts
+  length               Count rows (terminal — returns a single number)
+  let $var = expr      Bind expression result to a variable for later stages
+
+  Legacy syntax is still supported:
+    where <expr>, select <fields>, sort <field> [desc], take/head <n>,
+    group-by <field>, count
+
+FUNCTION DEFINITIONS & MODULES
+-------------------------------
+Define reusable pipeline fragments:
+
+  def hot: select(in_degree > 10);
+  def impact($name): select(name == $name) | blast-radius;
+
+  Syntax: def name: body;
+          def name($p1; $p2): body;
+
+Load definitions from .oq files:
+
+  include "stdlib.oq";
+
+  Search paths: current directory, then ~/.config/oq/
 
 META STAGES
 -----------
 
   explain              Print the query execution plan instead of running it
   fields               List available fields for the current result kind
-  format <fmt>         Set output format: table, json, markdown, or toon
+  format(fmt)          Set output format: table, json, markdown, or toon
 
 SCHEMA FIELDS
 -------------
@@ -133,17 +155,22 @@ properties, union-members, items):
   edge_label        string   Edge label: property name, array index, etc.
   edge_from         string   Source node name
 
-WHERE EXPRESSIONS
------------------
-The where clause supports a predicate expression language:
+EXPRESSIONS
+-----------
+The expression language is used in select(), let, and if-then-else:
 
-  Comparison:   ==  !=  >  <  >=  <=
-  Logical:      and  or  not
-  Functions:    has(<field>)  — true if field is non-null/non-zero
-                matches(<field>, "<regex>")  — regex match
-  Infix:        <field> matches "<regex>"
-  Grouping:     ( ... )
-  Literals:     "string"  42  true  false
+  Comparison:     ==  !=  >  <  >=  <=
+  Logical:        and  or  not
+  Alternative:    //  (returns left if truthy, else right)
+  Functions:      has(<field>)  — true if field is non-null/non-zero
+                  matches(<field>, "<regex>")  — regex match
+  Infix:          <field> matches "<regex>"
+  Conditional:    if <cond> then <expr> else <expr> end
+                  if <cond> then <expr> elif <cond> then <expr> else <expr> end
+  Interpolation:  "\(<expr>)" inside string literals
+  Grouping:       ( ... )
+  Literals:       "string"  42  true  false
+  Variables:      $var (bound by let)
 
 OUTPUT FORMATS
 --------------
@@ -154,70 +181,67 @@ OUTPUT FORMATS
   toon       TOON (Token-Oriented Object Notation) tabular format
 
 Set via --format flag or inline format stage:
-  schemas | count | format json
+  schemas | length | format(json)
 
 EXAMPLES
 --------
 
-  # Deeply nested components
-  schemas.components | sort depth desc | take 10 | select name, depth
+  # Deeply nested components (jq-style)
+  schemas.components | sort_by(depth; desc) | first(10) | pick name, depth
 
   # Wide union trees
-  schemas | where union_width > 0 | sort union_width desc | take 10
+  schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)
 
   # Most referenced schemas
-  schemas.components | sort in_degree desc | take 10 | select name, in_degree
+  schemas.components | sort_by(in_degree; desc) | first(10) | pick name, in_degree
 
   # Dead components (no incoming references)
-  schemas.components | where in_degree == 0 | select name
+  schemas.components | select(in_degree == 0) | pick name
 
   # Operation sprawl
-  operations | sort schema_count desc | take 10 | select name, schema_count
+  operations | sort_by(schema_count; desc) | first(10) | pick name, schema_count
 
   # Circular references
-  schemas | where is_circular | select name, path
+  schemas | select(is_circular) | pick name, path
 
   # Schema count
-  schemas | count
+  schemas | length
 
   # Shortest path between schemas
-  schemas | path "Pet" "Address" | select name
+  schemas | path(Pet; Address) | pick name
 
   # Top 5 by in-degree
-  schemas.components | top 5 in_degree | select name, in_degree
+  schemas.components | top(5; in_degree) | pick name, in_degree
 
   # Walk an operation to find all connected schemas
-  operations | where name == "GET /users" | schemas | select name, type
-
-  # Schemas used by an operation, then find connected operations
-  operations | where name == "GET /users" | schemas | ops | select name, method, path
+  operations | select(name == "GET /users") | schemas | pick name, type
 
   # Explain a query plan
-  schemas.components | where depth > 5 | sort depth desc | explain
+  schemas.components | select(depth > 5) | sort_by(depth; desc) | explain
 
   # List available fields
   schemas | fields
 
   # Regex filter
-  schemas | where name matches "Error.*" | select name, path
+  schemas | select(name matches "Error.*") | pick name, path
 
   # Complex filter
-  schemas | where property_count > 3 and not is_component | select name, property_count, path
+  schemas | select(property_count > 3 and not is_component) | pick name, property_count, path
 
   # Edge annotations — see how Pet references other schemas
-  schemas.components | where name == "Pet" | refs-out | select name, edge_kind, edge_label, edge_from
+  schemas.components | select(name == "Pet") | refs-out | pick name, edge_kind, edge_label, edge_from
 
   # Blast radius — what breaks if I change the Error schema?
-  schemas.components | where name == "Error" | blast-radius | count
+  schemas.components | select(name == "Error") | blast-radius | length
 
   # Neighborhood — schemas within 2 hops of Pet
-  schemas.components | where name == "Pet" | neighbors 2 | select name
+  schemas.components | select(name == "Pet") | neighbors(2) | pick name
 
   # Orphaned schemas — unreferenced by anything
-  schemas.components | orphans | select name
+  schemas.components | orphans | pick name
 
   # Leaf schemas — terminal nodes with no outgoing refs
-  schemas.components | leaves | select name, in_degree
+  schemas.components | leaves | pick name, in_degree
 
   # Detect reference cycles
   schemas | cycles
@@ -226,8 +250,26 @@ EXAMPLES
   schemas.components | clusters
 
   # Cross-tag schemas — shared across team boundaries
-  schemas | tag-boundary | select name, tag_count
+  schemas | tag-boundary | pick name, tag_count
 
   # Schemas shared by all operations
-  operations | shared-refs | select name, op_count
+  operations | shared-refs | pick name, op_count
+
+  # Variable binding — find Pet's reachable schemas (excluding Pet itself)
+  schemas | select(name == "Pet") | let $pet = name | reachable | select(name != $pet) | pick name
+
+  # Alternative operator — fallback for missing values
+  schemas | select(name // "unnamed" != "unnamed")
+
+  # If-then-else — conditional filtering
+  schemas | select(if is_component then depth > 3 else true end)
+
+  # User-defined functions
+  def hot: select(in_degree > 10);
+  def impact($name): select(name == $name) | blast-radius;
+  schemas.components | hot | pick name, in_degree
+
+  # Load functions from a module file
+  include "stdlib.oq";
+  schemas.components | hot | pick name, in_degree
 `

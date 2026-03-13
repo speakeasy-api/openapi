@@ -1551,7 +1551,7 @@ func TestExecute_DefExpansion_Success(t *testing.T) {
 	// All results should have in_degree > 0
 	for _, row := range result.Rows {
 		v := oq.FieldValuePublic(row, "in_degree", g)
-		assert.Greater(t, v.Int, 0, "hot filter should require in_degree > 0")
+		assert.Positive(t, v.Int, "hot filter should require in_degree > 0")
 	}
 }
 

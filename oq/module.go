@@ -14,7 +14,7 @@ func LoadModule(path string, searchPaths []string) ([]FuncDef, error) {
 		return nil, err
 	}
 
-	data, err := os.ReadFile(resolved)
+	data, err := os.ReadFile(resolved) //nolint:gosec // module paths are user-provided query inputs, not untrusted
 	if err != nil {
 		return nil, fmt.Errorf("reading module %q: %w", resolved, err)
 	}
@@ -29,7 +29,7 @@ func LoadModule(path string, searchPaths []string) ([]FuncDef, error) {
 
 func resolveModulePath(path string, searchPaths []string) (string, error) {
 	if !strings.HasSuffix(path, ".oq") {
-		path = path + ".oq"
+		path += ".oq"
 	}
 
 	if filepath.IsAbs(path) {

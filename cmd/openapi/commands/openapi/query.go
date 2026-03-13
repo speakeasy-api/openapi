@@ -23,8 +23,8 @@ The query argument comes first, followed by an optional input file. If no file
 is given, reads from stdin.
 
 Examples:
-  # Deeply nested components
-  openapi spec query 'schemas.components | sort depth desc | take 10 | select name, depth' petstore.yaml
+  # Deeply nested components (jq-style syntax)
+  openapi spec query 'schemas.components | sort_by(depth; desc) | first(10) | pick name, depth' petstore.yaml
 
   # Pipe from stdin
   cat spec.yaml | openapi spec query 'schemas | count'
@@ -32,40 +32,45 @@ Examples:
   # Explicit stdin
   openapi spec query 'schemas | count' -
 
-  # Wide union trees
-  openapi spec query 'schemas | where union_width > 0 | sort union_width desc | take 10' petstore.yaml
+  # Filter with select()
+  openapi spec query 'schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)' petstore.yaml
 
   # Dead components (no incoming references)
-  openapi spec query 'schemas.components | where in_degree == 0 | select name' petstore.yaml
+  openapi spec query 'schemas.components | select(in_degree == 0) | pick name' petstore.yaml
 
-  # Operation sprawl
-  openapi spec query 'operations | sort schema_count desc | take 10 | select name, schema_count' petstore.yaml
+  # Variable binding — exclude seed from reachable results
+  openapi spec query 'schemas | select(name == "Pet") | let $pet = name | reachable | select(name != $pet)' petstore.yaml
 
-  # Circular references
-  openapi spec query 'schemas | where is_circular | select name, path' petstore.yaml
+  # User-defined functions
+  openapi spec query 'def hot: select(in_degree > 5); schemas.components | hot | pick name' petstore.yaml
 
-  # Shortest path between schemas
-  openapi spec query 'schemas | path "Pet" "Address" | select name' petstore.yaml
+  # Alternative operator — fallback for null/falsy values
+  openapi spec query 'schemas | select(name // "none" != "none")' petstore.yaml
 
-  # Edge annotations
-  openapi spec query 'schemas.components | where name == "Pet" | refs-out | select name, edge_kind, edge_label' petstore.yaml
+  # If-then-else conditional
+  openapi spec query 'schemas | select(if is_component then depth > 3 else true end)' petstore.yaml
 
   # Blast radius
-  openapi spec query 'schemas.components | where name == "Error" | blast-radius | count' petstore.yaml
+  openapi spec query 'schemas.components | select(name == "Error") | blast-radius | length' petstore.yaml
 
   # Explain a query plan
-  openapi spec query 'schemas.components | where depth > 5 | sort depth desc | explain' petstore.yaml
+  openapi spec query 'schemas.components | select(depth > 5) | sort_by(depth; desc) | explain' petstore.yaml
 
-Pipeline stages:
+Pipeline stages (jq-style):
   Source:     schemas, schemas.components, schemas.inline, operations
   Traversal:  refs-out, refs-in, reachable, ancestors, properties, union-members, items,
-              ops, schemas, path <from> <to>, connected, blast-radius, neighbors <n>
+              ops, schemas, path(A; B), connected, blast-radius, neighbors(N)
   Analysis:   orphans, leaves, cycles, clusters, tag-boundary, shared-refs
-  Filter:     where <expr>, select <fields>, sort <field> [asc|desc], take/head <n>,
-              sample <n>, top <n> <field>, bottom <n> <field>, unique, group-by <field>, count
-  Meta:       explain, fields, format <table|json|markdown|toon>
+  Filter:     select(expr), pick <fields>, sort_by(field; desc), first(N), last(N),
+              sample(N), top(N; field), bottom(N; field), unique, group_by(field), length
+  Variables:  let $var = expr
+  Functions:  def name: body;  def name($p): body;  include "file.oq";
+  Meta:       explain, fields, format(table|json|markdown|toon)
 
-Where expressions support: ==, !=, >, <, >=, <=, and, or, not, has(), matches`,
+  Legacy syntax (where, sort, take, head, select fields, group-by, count) is still supported.
+
+Expression operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches,
+                      if-then-else-end, string interpolation \(expr)`,
 	Args: queryArgs(),
 	Run:  runQuery,
 }

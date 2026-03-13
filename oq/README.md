@@ -8,11 +8,11 @@
 # Count all schemas
 openapi spec query 'schemas | count' petstore.yaml
 
-# Top 10 deepest component schemas
-openapi spec query 'schemas.components | sort depth desc | take 10 | select name, depth' petstore.yaml
+# Top 10 deepest component schemas (new jq-style)
+openapi spec query 'schemas.components | sort_by(depth; desc) | first(10) | pick name, depth' petstore.yaml
 
 # Dead components (unreferenced)
-openapi spec query 'schemas.components | where in_degree == 0 | select name' petstore.yaml
+openapi spec query 'schemas.components | select(in_degree == 0) | pick name' petstore.yaml
 ```
 
 Stdin is supported:
@@ -51,10 +51,10 @@ source | stage | stage | ... | terminal
 | `items` | Array items schema (with edge annotations) |
 | `ops` | Schemas → operations |
 | `schemas` | Operations → schemas |
-| `path <a> <b>` | Shortest path between two schemas |
+| `path(A; B)` | Shortest path between two schemas |
 | `connected` | Full connected component (schemas + operations) |
 | `blast-radius` | Ancestors + all affected operations |
-| `neighbors <n>` | Bidirectional neighborhood within N hops |
+| `neighbors(N)` | Bidirectional neighborhood within N hops |
 
 ### Analysis Stages
 
@@ -71,16 +71,20 @@ source | stage | stage | ... | terminal
 
 | Stage | Description |
 |-------|-------------|
-| `where <expr>` | Filter by predicate |
-| `select <fields>` | Project fields |
-| `sort <field> [desc]` | Sort (ascending by default) |
-| `take <n>` / `head <n>` | Limit results |
-| `sample <n>` | Deterministic random sample |
-| `top <n> <field>` | Sort desc + take |
-| `bottom <n> <field>` | Sort asc + take |
+| `select(expr)` | Filter by predicate (jq-style) |
+| `pick f1, f2` | Project fields |
+| `sort_by(field)` / `sort_by(field; desc)` | Sort (ascending by default) |
+| `first(N)` | Limit to first N results |
+| `last(N)` | Limit to last N results |
+| `sample(N)` | Deterministic random sample |
+| `top(N; field)` | Sort desc + take |
+| `bottom(N; field)` | Sort asc + take |
 | `unique` | Deduplicate |
-| `group-by <field>` | Group and count |
-| `count` | Count rows |
+| `group_by(field)` | Group and count |
+| `length` | Count rows |
+| `let $var = expr` | Bind expression result to a variable |
+
+**Legacy syntax** (`where`, `sort`, `take`, `head`, `select fields`, `group-by`, `count`) is still supported.
 
 ### Meta Stages
 
@@ -88,7 +92,25 @@ source | stage | stage | ... | terminal
 |-------|-------------|
 | `explain` | Print query plan |
 | `fields` | List available fields |
-| `format <fmt>` | Set output format (table/json/markdown/toon) |
+| `format(fmt)` | Set output format (table/json/markdown/toon) |
+
+### Function Definitions & Modules
+
+Define reusable functions with `def` and load them from `.oq` files with `include`:
+
+```
+# Inline definitions
+def hot: select(in_degree > 10);
+def impact($name): select(name == $name) | blast-radius;
+schemas.components | hot | pick name, in_degree
+
+# Load from file
+include "stdlib.oq";
+schemas.components | hot | pick name, in_degree
+```
+
+Def syntax: `def name: body;` or `def name($p1; $p2): body;`
+Module search paths: current directory, then `~/.config/oq/`
 
 ## Fields
 
@@ -138,7 +160,9 @@ Available on rows produced by 1-hop traversal stages (`refs-out`, `refs-in`, `pr
 | `edge_label` | string | Edge label: property name, array index, etc. |
 | `edge_from` | string | Source node name |
 
-## Where Expressions
+## Expressions
+
+oq supports a rich expression language used in `select()`, `let`, and `if-then-else`:
 
 ```
 depth > 5
@@ -147,9 +171,30 @@ name matches "Error.*"
 property_count > 3 and not is_component
 has(oneOf) and not has(discriminator)
 (depth > 10 or union_width > 5) and is_component
+name // "unnamed"                              # alternative: fallback if null/falsy
+if is_component then depth > 3 else true end   # conditional
+"prefix_\(name)"                               # string interpolation
 ```
 
-Operators: `==`, `!=`, `>`, `<`, `>=`, `<=`, `and`, `or`, `not`, `has()`, `matches()`
+### Operators
+
+| Operator | Description |
+|----------|-------------|
+| `==`, `!=`, `>`, `<`, `>=`, `<=` | Comparison |
+| `and`, `or`, `not` | Logical |
+| `//` | Alternative (returns left if truthy, else right) |
+| `has(field)` | True if field is non-null/non-zero |
+| `matches "regex"` | Regex match |
+| `if cond then a else b end` | Conditional (elif supported) |
+| `\(expr)` | String interpolation inside `"..."` |
+
+### Variables
+
+Use `let` to bind values for use in later stages:
+
+```
+schemas | select(name == "Pet") | let $pet = name | reachable | select(name != $pet)
+```
 
 ## Output Formats
 
@@ -157,7 +202,7 @@ Use `--format` flag or inline `format` stage:
 
 ```bash
 openapi spec query 'schemas | count' spec.yaml --format json
-openapi spec query 'schemas | take 5 | format markdown' spec.yaml
+openapi spec query 'schemas | first(5) | format(markdown)' spec.yaml
 ```
 
 | Format | Description |
@@ -171,46 +216,46 @@ openapi spec query 'schemas | take 5 | format markdown' spec.yaml
 
 ```bash
 # Wide union trees
-schemas | where union_width > 0 | sort union_width desc | take 10
+schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)
 
 # Central schemas (most referenced)
-schemas.components | sort in_degree desc | take 10 | select name, in_degree
+schemas.components | sort_by(in_degree; desc) | first(10) | pick name, in_degree
 
 # Operation sprawl
-operations | sort schema_count desc | take 10 | select name, schema_count
+operations | sort_by(schema_count; desc) | first(10) | pick name, schema_count
 
 # Circular references
-schemas | where is_circular | select name, path
+schemas | select(is_circular) | pick name, path
 
 # Shortest path between schemas
-schemas | path "Pet" "Address" | select name
+schemas | path(Pet; Address) | pick name
 
 # Walk an operation to connected schemas and back to operations
-operations | where name == "GET /users" | schemas | ops | select name, method, path
+operations | select(name == "GET /users") | schemas | ops | pick name, method, path
 
 # Explain query plan
-schemas.components | where depth > 5 | sort depth desc | explain
+schemas.components | select(depth > 5) | sort_by(depth; desc) | explain
 
 # Regex filter
-schemas | where name matches "Error.*" | select name, path
+schemas | select(name matches "Error.*") | pick name, path
 
 # Group by type
-schemas | group-by type
+schemas | group_by(type)
 
 # Edge annotations — how does Pet reference other schemas?
-schemas.components | where name == "Pet" | refs-out | select name, edge_kind, edge_label, edge_from
+schemas.components | select(name == "Pet") | refs-out | pick name, edge_kind, edge_label, edge_from
 
 # Blast radius — what breaks if Error changes?
-schemas.components | where name == "Error" | blast-radius | count
+schemas.components | select(name == "Error") | blast-radius | length
 
 # 2-hop neighborhood
-schemas.components | where name == "Pet" | neighbors 2 | select name
+schemas.components | select(name == "Pet") | neighbors(2) | pick name
 
 # Orphaned schemas
-schemas.components | orphans | select name
+schemas.components | orphans | pick name
 
 # Leaf nodes
-schemas.components | leaves | select name, in_degree
+schemas.components | leaves | pick name, in_degree
 
 # Detect cycles
 schemas | cycles
@@ -219,10 +264,21 @@ schemas | cycles
 schemas.components | clusters
 
 # Cross-tag schemas
-schemas | tag-boundary | select name, tag_count
+schemas | tag-boundary | pick name, tag_count
 
 # Schemas shared across all operations
-operations | shared-refs | select name, op_count
+operations | shared-refs | pick name, op_count
+
+# Variable binding — find Pet's reachable schemas (excluding Pet itself)
+schemas | select(name == "Pet") | let $pet = name | reachable | select(name != $pet) | pick name
+
+# User-defined functions
+def hot: select(in_degree > 10);
+def impact($name): select(name == $name) | blast-radius;
+schemas.components | hot | pick name, in_degree
+
+# Alternative operator — fallback for missing values
+schemas | select(name // "unnamed" != "unnamed") | pick name
 ```
 
 ## CLI Reference

@@ -117,7 +117,7 @@ func (e *notExpr) Eval(row Row) Value {
 
 func (e *hasExpr) Eval(row Row) Value {
 	v := row.Field(e.field)
-	return Value{Kind: KindBool, Bool: v.Kind != KindNull && (v.Kind != KindInt || v.Int > 0) && (v.Kind != KindBool || v.Bool) && (v.Kind != KindString || v.Str != "")}
+	return Value{Kind: KindBool, Bool: v.Kind != KindNull && (v.Kind != KindInt || v.Int != 0) && (v.Kind != KindBool || v.Bool) && (v.Kind != KindString || v.Str != "")}
 }
 
 func (e *matchesExpr) Eval(row Row) Value {

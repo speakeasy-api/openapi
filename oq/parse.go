@@ -43,7 +43,7 @@ func parseDeclarations(query string) (*declarations, error) {
 			rest := remaining[len("def "):]
 			colonIdx := strings.Index(rest, ":")
 			if colonIdx < 0 {
-				return nil, errors.New("def missing :")
+				return nil, errors.New("def missing colon separator")
 			}
 			sig := strings.TrimSpace(rest[:colonIdx])
 			body := rest[colonIdx+1:]

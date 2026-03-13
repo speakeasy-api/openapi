@@ -1,8 +1,10 @@
 // Package oq implements a pipeline query language for OpenAPI schema graphs.
 //
-// Queries are written as pipeline expressions like:
+// Queries are written as pipeline expressions with jq-inspired syntax:
 //
-//	schemas.components | where depth > 5 | sort depth desc | take 10 | select name, depth
+//	schemas.components | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth
+//
+// Legacy syntax (where, sort, take, select fields) is also supported.
 package oq
 
 import (
