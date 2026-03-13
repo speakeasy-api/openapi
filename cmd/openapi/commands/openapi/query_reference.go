@@ -104,7 +104,7 @@ META STAGES
 
   explain              Print the query execution plan instead of running it
   fields               List available fields for the current result kind
-  format(fmt)          Set output format: table, json, markdown, or toon
+  format(fmt)          Set output format: table, json, markdown, toon, or yaml
 
 SCHEMA FIELDS
 -------------
@@ -220,9 +220,13 @@ OUTPUT FORMATS
   json       JSON array of objects
   markdown   Markdown table
   toon       TOON (Token-Oriented Object Notation) tabular format
+  yaml       Raw YAML from underlying schema/operation objects (pipe into yq)
 
 Set via --format flag or inline format stage:
   schemas | length | format(json)
+
+The yaml format is especially useful for piping into yq for content queries:
+  openapi spec query 'schemas | select(name == "Pet") | format(yaml)' spec.yaml | yq '.properties | keys'
 
 EXAMPLES
 --------

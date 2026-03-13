@@ -8,6 +8,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/graph"
 	"github.com/speakeasy-api/openapi/oq/expr"
+	"gopkg.in/yaml.v3"
 )
 
 // FormatTable formats a result as a simple table string.
@@ -236,6 +237,90 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 	}
 
 	return sb.String()
+}
+
+// FormatYAML formats results as raw YAML from the underlying schema/operation objects.
+// For multiple results, outputs a YAML stream with --- separators.
+// This enables piping into yq for content-level queries.
+func FormatYAML(result *Result, g *graph.SchemaGraph) string {
+	if result.Explain != "" {
+		return result.Explain
+	}
+
+	if result.IsCount {
+		return strconv.Itoa(result.Count)
+	}
+
+	syncGroupsFromRows(result)
+
+	if len(result.Groups) > 0 {
+		return formatGroupsJSON(result)
+	}
+
+	if len(result.Rows) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	for i, row := range result.Rows {
+		if i > 0 {
+			sb.WriteString("---\n")
+		}
+
+		node := getRootNode(row, g)
+		if node == nil {
+			// Fallback: emit as comment with the name
+			fields := result.Fields
+			if len(fields) == 0 {
+				fields = defaultFieldsForKind(row.Kind)
+			}
+			sb.WriteString("# ")
+			name := valueToString(fieldValue(row, "name", g))
+			sb.WriteString(name)
+			sb.WriteString(" (no YAML node available)\n")
+			continue
+		}
+
+		data, err := yaml.Marshal(node)
+		if err != nil {
+			sb.WriteString("# error marshalling: " + err.Error() + "\n")
+			continue
+		}
+		sb.Write(data)
+	}
+
+	return sb.String()
+}
+
+// getRootNode extracts the underlying yaml.Node from a result row.
+func getRootNode(row Row, g *graph.SchemaGraph) *yaml.Node {
+	switch row.Kind {
+	case SchemaResult:
+		if row.SchemaIdx < 0 || row.SchemaIdx >= len(g.Schemas) {
+			return nil
+		}
+		s := &g.Schemas[row.SchemaIdx]
+		if s.Schema == nil {
+			return nil
+		}
+		schema := s.Schema.GetSchema()
+		if schema == nil {
+			return nil
+		}
+		return schema.GetRootNode()
+	case OperationResult:
+		if row.OpIdx < 0 || row.OpIdx >= len(g.Operations) {
+			return nil
+		}
+		o := &g.Operations[row.OpIdx]
+		if o.Operation == nil {
+			return nil
+		}
+		return o.Operation.GetRootNode()
+	case GroupRowResult:
+		return nil
+	}
+	return nil
 }
 
 func formatGroupsToon(result *Result) string {

@@ -394,8 +394,8 @@ func parseStage(s string) (Stage, error) {
 		if isCall {
 			f = strings.TrimSpace(args)
 		}
-		if f != "table" && f != "json" && f != "markdown" && f != "toon" {
-			return Stage{}, fmt.Errorf("format must be table, json, markdown, or toon, got %q", f)
+		if f != "table" && f != "json" && f != "markdown" && f != "toon" && f != "yaml" {
+			return Stage{}, fmt.Errorf("format must be table, json, markdown, toon, or yaml, got %q", f)
 		}
 		return Stage{Kind: StageFormat, Format: f}, nil
 

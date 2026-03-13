@@ -65,7 +65,7 @@ Pipeline stages (jq-style):
               sample(N), top(N; field), bottom(N; field), unique, group_by(field), length
   Variables:  let $var = expr
   Functions:  def name: body;  def name($p): body;  include "file.oq";
-  Meta:       explain, fields, format(table|json|markdown|toon)
+  Meta:       explain, fields, format(table|json|markdown|toon|yaml)
 
   Legacy syntax (where, sort, take, head, select fields, group-by, count) is still supported.
 
@@ -79,7 +79,7 @@ var queryOutputFormat string
 var queryFromFile string
 
 func init() {
-	queryCmd.Flags().StringVar(&queryOutputFormat, "format", "table", "output format: table, json, markdown, or toon")
+	queryCmd.Flags().StringVar(&queryOutputFormat, "format", "table", "output format: table, json, markdown, toon, or yaml")
 	queryCmd.Flags().StringVarP(&queryFromFile, "file", "f", "", "read query from file instead of argument")
 }
 
@@ -160,6 +160,8 @@ func queryOpenAPI(ctx context.Context, processor *OpenAPIProcessor, queryStr str
 		output = oq.FormatMarkdown(result, g)
 	case "toon":
 		output = oq.FormatToon(result, g)
+	case "yaml":
+		output = oq.FormatYAML(result, g)
 	default:
 		output = oq.FormatTable(result, g)
 	}
