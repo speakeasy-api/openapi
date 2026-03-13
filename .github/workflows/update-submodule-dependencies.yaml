@@ -18,6 +18,8 @@ jobs:
   update-dependencies:
     name: Update submodule dependencies
     runs-on: ubuntu-latest
+    env:
+      GOPROXY: direct
     steps:
       - uses: actions/checkout@v6
 
