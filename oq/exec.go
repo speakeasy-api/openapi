@@ -305,6 +305,12 @@ func execGroupBy(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, er
 			Count: grp.count,
 			Names: grp.names,
 		})
+		grouped.Rows = append(grouped.Rows, Row{
+			Kind:       GroupRowResult,
+			GroupKey:   key,
+			GroupCount: grp.count,
+			GroupNames: grp.names,
+		})
 	}
 	return grouped, nil
 }
@@ -665,10 +671,17 @@ func execCycles(result *Result, g *graph.SchemaGraph) (*Result, error) {
 				names = append(names, g.Schemas[id].Name)
 			}
 		}
+		key := "cycle-" + strconv.Itoa(i+1)
 		out.Groups = append(out.Groups, GroupResult{
-			Key:   "cycle-" + strconv.Itoa(i+1),
+			Key:   key,
 			Count: len(scc),
 			Names: names,
+		})
+		out.Rows = append(out.Rows, Row{
+			Kind:       GroupRowResult,
+			GroupKey:   key,
+			GroupCount: len(scc),
+			GroupNames: names,
 		})
 	}
 
@@ -741,10 +754,17 @@ func execClusters(result *Result, g *graph.SchemaGraph) (*Result, error) {
 			}
 		}
 		if len(component) > 0 {
+			key := "cluster-" + strconv.Itoa(clusterNum)
 			out.Groups = append(out.Groups, GroupResult{
-				Key:   "cluster-" + strconv.Itoa(clusterNum),
+				Key:   key,
 				Count: len(component),
 				Names: names,
+			})
+			out.Rows = append(out.Rows, Row{
+				Kind:       GroupRowResult,
+				GroupKey:   key,
+				GroupCount: len(component),
+				GroupNames: names,
 			})
 		}
 	}

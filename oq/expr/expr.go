@@ -586,10 +586,11 @@ func tokenize(input string) []string {
 			continue
 		}
 
-		// Quoted string
-		if ch == '"' {
+		// Quoted string (double or single quotes)
+		if ch == '"' || ch == '\'' {
+			quote := ch
 			j := i + 1
-			for j < len(input) && input[j] != '"' {
+			for j < len(input) && input[j] != quote {
 				if input[j] == '\\' && j+1 < len(input) {
 					j++
 				}
@@ -598,7 +599,13 @@ func tokenize(input string) []string {
 			if j < len(input) {
 				j++
 			}
-			tokens = append(tokens, input[i:j])
+			// Normalize single-quoted strings to double-quoted for downstream parsing
+			if quote == '\'' {
+				inner := input[i+1 : j-1]
+				tokens = append(tokens, "\""+inner+"\"")
+			} else {
+				tokens = append(tokens, input[i:j])
+			}
 			i = j
 			continue
 		}

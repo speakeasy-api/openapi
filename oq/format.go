@@ -20,6 +20,8 @@ func FormatTable(result *Result, g *graph.SchemaGraph) string {
 		return strconv.Itoa(result.Count)
 	}
 
+	syncGroupsFromRows(result)
+
 	if len(result.Groups) > 0 {
 		return formatGroups(result)
 	}
@@ -30,11 +32,7 @@ func FormatTable(result *Result, g *graph.SchemaGraph) string {
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		if result.Rows[0].Kind == SchemaResult {
-			fields = []string{"name", "type", "depth", "in_degree", "out_degree"}
-		} else {
-			fields = []string{"name", "method", "path", "schema_count"}
-		}
+		fields = defaultFieldsForKind(result.Rows[0].Kind)
 	}
 
 	// Build header
@@ -99,6 +97,8 @@ func FormatJSON(result *Result, g *graph.SchemaGraph) string {
 		return strconv.Itoa(result.Count)
 	}
 
+	syncGroupsFromRows(result)
+
 	if len(result.Groups) > 0 {
 		return formatGroupsJSON(result)
 	}
@@ -109,11 +109,7 @@ func FormatJSON(result *Result, g *graph.SchemaGraph) string {
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		if result.Rows[0].Kind == SchemaResult {
-			fields = []string{"name", "type", "depth", "in_degree", "out_degree"}
-		} else {
-			fields = []string{"name", "method", "path", "schema_count"}
-		}
+		fields = defaultFieldsForKind(result.Rows[0].Kind)
 	}
 
 	var sb strings.Builder
@@ -146,6 +142,8 @@ func FormatMarkdown(result *Result, g *graph.SchemaGraph) string {
 		return strconv.Itoa(result.Count)
 	}
 
+	syncGroupsFromRows(result)
+
 	if len(result.Groups) > 0 {
 		var sb strings.Builder
 		sb.WriteString("| Key | Count |\n")
@@ -162,11 +160,7 @@ func FormatMarkdown(result *Result, g *graph.SchemaGraph) string {
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		if result.Rows[0].Kind == SchemaResult {
-			fields = []string{"name", "type", "depth", "in_degree", "out_degree"}
-		} else {
-			fields = []string{"name", "method", "path", "schema_count"}
-		}
+		fields = defaultFieldsForKind(result.Rows[0].Kind)
 	}
 
 	var sb strings.Builder
@@ -208,6 +202,8 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 		return "count: " + strconv.Itoa(result.Count)
 	}
 
+	syncGroupsFromRows(result)
+
 	if len(result.Groups) > 0 {
 		return formatGroupsToon(result)
 	}
@@ -218,11 +214,7 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		if result.Rows[0].Kind == SchemaResult {
-			fields = []string{"name", "type", "depth", "in_degree", "out_degree"}
-		} else {
-			fields = []string{"name", "method", "path", "schema_count"}
-		}
+		fields = defaultFieldsForKind(result.Rows[0].Kind)
 	}
 
 	var sb strings.Builder
@@ -374,6 +366,42 @@ func formatGroupsJSON(result *Result) string {
 	}
 	sb.WriteString("\n]")
 	return sb.String()
+}
+
+func defaultFieldsForKind(kind ResultKind) []string {
+	switch kind {
+	case SchemaResult:
+		return []string{"name", "type", "depth", "in_degree", "out_degree"}
+	case GroupRowResult:
+		return []string{"key", "count", "names"}
+	default:
+		return []string{"name", "method", "path", "schema_count"}
+	}
+}
+
+// syncGroupsFromRows rebuilds result.Groups from GroupRowResult rows.
+// This ensures Groups stays in sync after filtering/sorting/limiting.
+func syncGroupsFromRows(result *Result) {
+	hasGroupRows := false
+	for _, row := range result.Rows {
+		if row.Kind == GroupRowResult {
+			hasGroupRows = true
+			break
+		}
+	}
+	if !hasGroupRows {
+		return
+	}
+	result.Groups = nil
+	for _, row := range result.Rows {
+		if row.Kind == GroupRowResult {
+			result.Groups = append(result.Groups, GroupResult{
+				Key:   row.GroupKey,
+				Count: row.GroupCount,
+				Names: row.GroupNames,
+			})
+		}
+	}
 }
 
 func padRight(s string, width int) string {

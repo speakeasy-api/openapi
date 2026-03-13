@@ -127,6 +127,17 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		case "edge_from":
 			return expr.StringVal(row.EdgeFrom)
 		}
+	case GroupRowResult:
+		switch name {
+		case "key":
+			return expr.StringVal(row.GroupKey)
+		case "count":
+			return expr.IntVal(row.GroupCount)
+		case "name":
+			return expr.StringVal(row.GroupKey)
+		case "names":
+			return expr.StringVal(strings.Join(row.GroupNames, ", "))
+		}
 	}
 	return expr.NullVal()
 }
@@ -166,8 +177,12 @@ func valueToString(v expr.Value) string {
 }
 
 func rowKey(row Row) string {
-	if row.Kind == SchemaResult {
+	switch row.Kind {
+	case SchemaResult:
 		return "s:" + strconv.Itoa(row.SchemaIdx)
+	case GroupRowResult:
+		return "g:" + row.GroupKey
+	default:
+		return "o:" + strconv.Itoa(row.OpIdx)
 	}
-	return "o:" + strconv.Itoa(row.OpIdx)
 }

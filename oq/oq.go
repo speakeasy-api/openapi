@@ -19,6 +19,7 @@ type ResultKind int
 const (
 	SchemaResult ResultKind = iota
 	OperationResult
+	GroupRowResult
 )
 
 // Row represents a single result in the pipeline.
@@ -31,6 +32,11 @@ type Row struct {
 	EdgeKind  string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
 	EdgeLabel string // edge label: property name, array index, etc.
 	EdgeFrom  string // source node name
+
+	// Group annotations (populated by group-by stages)
+	GroupKey   string   // group key value
+	GroupCount int      // number of members in the group
+	GroupNames []string // member names
 }
 
 // Result is the output of a query execution.
