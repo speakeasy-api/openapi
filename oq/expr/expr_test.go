@@ -164,3 +164,197 @@ func TestParse_UnterminatedFunction(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestEval_Operators_Coverage(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		exprStr  string
+		row      testRow
+		expected bool
+	}{
+		{
+			name:     "greater or equal true",
+			exprStr:  `depth >= 5`,
+			row:      testRow{"depth": expr.IntVal(5)},
+			expected: true,
+		},
+		{
+			name:     "less or equal true",
+			exprStr:  `depth <= 5`,
+			row:      testRow{"depth": expr.IntVal(3)},
+			expected: true,
+		},
+		{
+			name:     "less than true",
+			exprStr:  `depth < 10`,
+			row:      testRow{"depth": expr.IntVal(3)},
+			expected: true,
+		},
+		{
+			name:     "and short-circuit false",
+			exprStr:  `depth > 100 and is_component`,
+			row:      testRow{"depth": expr.IntVal(1), "is_component": expr.BoolVal(true)},
+			expected: false,
+		},
+		{
+			name:     "or short-circuit true",
+			exprStr:  `is_component or depth > 100`,
+			row:      testRow{"depth": expr.IntVal(1), "is_component": expr.BoolVal(true)},
+			expected: true,
+		},
+		{
+			name:     "not true value",
+			exprStr:  `not is_component`,
+			row:      testRow{"is_component": expr.BoolVal(true)},
+			expected: false,
+		},
+		{
+			name:     "has null field",
+			exprStr:  `has(missing)`,
+			row:      testRow{},
+			expected: false,
+		},
+		{
+			name:     "has empty string",
+			exprStr:  `has(name)`,
+			row:      testRow{"name": expr.StringVal("")},
+			expected: false,
+		},
+		{
+			name:     "has non-empty string",
+			exprStr:  `has(name)`,
+			row:      testRow{"name": expr.StringVal("Pet")},
+			expected: true,
+		},
+		{
+			name:     "has false bool",
+			exprStr:  `has(flag)`,
+			row:      testRow{"flag": expr.BoolVal(false)},
+			expected: false,
+		},
+		{
+			name:     "matches non-string field",
+			exprStr:  `name matches ".*"`,
+			row:      testRow{"name": expr.IntVal(42)},
+			expected: false,
+		},
+		{
+			name:     "integer equality both sides",
+			exprStr:  `depth == 0`,
+			row:      testRow{"depth": expr.IntVal(0)},
+			expected: true,
+		},
+		{
+			name:     "boolean equality",
+			exprStr:  `is_component == is_inline`,
+			row:      testRow{"is_component": expr.BoolVal(true), "is_inline": expr.BoolVal(true)},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parsed, err := expr.Parse(tt.exprStr)
+			require.NoError(t, err)
+			result := parsed.Eval(tt.row)
+			assert.Equal(t, tt.expected, result.Bool)
+		})
+	}
+}
+
+func TestEval_TypeConversion_Coverage(t *testing.T) {
+	t.Parallel()
+
+	// Test toBool with int
+	e, err := expr.Parse(`depth`)
+	require.NoError(t, err)
+	row := testRow{"depth": expr.IntVal(5)}
+	result := e.Eval(row)
+	assert.Equal(t, expr.KindInt, result.Kind)
+
+	// Test toBool with string (non-empty = truthy in boolean context)
+	e, err = expr.Parse(`name and depth > 0`)
+	require.NoError(t, err)
+	row = testRow{"name": expr.StringVal("Pet"), "depth": expr.IntVal(1)}
+	result = e.Eval(row)
+	assert.True(t, result.Bool)
+
+	// Test toBool with empty string (falsy)
+	e, err = expr.Parse(`name and depth > 0`)
+	require.NoError(t, err)
+	row = testRow{"name": expr.StringVal(""), "depth": expr.IntVal(1)}
+	result = e.Eval(row)
+	assert.False(t, result.Bool)
+
+	// Test comparison with string-to-int coercion
+	e, err = expr.Parse(`depth > 0`)
+	require.NoError(t, err)
+	row = testRow{"depth": expr.BoolVal(true)} // bool true -> 1 in comparison
+	result = e.Eval(row)
+	assert.True(t, result.Bool)
+
+	// Test string equality with int (cross-type via toString)
+	e, err = expr.Parse(`name == "5"`)
+	require.NoError(t, err)
+	row = testRow{"name": expr.IntVal(5)}
+	result = e.Eval(row)
+	assert.True(t, result.Bool)
+}
+
+func TestParse_NullVal(t *testing.T) {
+	t.Parallel()
+
+	v := expr.NullVal()
+	assert.Equal(t, expr.KindNull, v.Kind)
+}
+
+func TestParse_LiteralValues(t *testing.T) {
+	t.Parallel()
+
+	// true literal
+	e, err := expr.Parse(`true`)
+	require.NoError(t, err)
+	result := e.Eval(testRow{})
+	assert.Equal(t, expr.KindBool, result.Kind)
+	assert.True(t, result.Bool)
+
+	// false literal
+	e, err = expr.Parse(`false`)
+	require.NoError(t, err)
+	result = e.Eval(testRow{})
+	assert.Equal(t, expr.KindBool, result.Kind)
+	assert.False(t, result.Bool)
+
+	// numeric literal
+	e, err = expr.Parse(`depth > 0`)
+	require.NoError(t, err)
+	result = e.Eval(testRow{"depth": expr.IntVal(5)})
+	assert.True(t, result.Bool)
+}
+
+func TestParse_ComplexPrecedence(t *testing.T) {
+	t.Parallel()
+
+	// a and b or c and d — "and" binds tighter, so this is (a and b) or (c and d)
+	e, err := expr.Parse(`depth > 0 and is_component or depth < 0 and is_inline`)
+	require.NoError(t, err)
+
+	// Both "and" groups are false -> false
+	result := e.Eval(testRow{
+		"depth":        expr.IntVal(0),
+		"is_component": expr.BoolVal(true),
+		"is_inline":    expr.BoolVal(true),
+	})
+	assert.False(t, result.Bool)
+
+	// First "and" group is true -> true
+	result = e.Eval(testRow{
+		"depth":        expr.IntVal(5),
+		"is_component": expr.BoolVal(true),
+		"is_inline":    expr.BoolVal(false),
+	})
+	assert.True(t, result.Bool)
+}

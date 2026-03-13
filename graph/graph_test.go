@@ -197,3 +197,108 @@ func TestBuild_Metrics_Success(t *testing.T) {
 	unused, _ := g.SchemaByName("Unused")
 	assert.Equal(t, 0, unused.InDegree, "Unused should have no incoming edges from other schemas")
 }
+
+func TestBuild_InEdges_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Owner is referenced by Pet via the "owner" property (possibly through a $ref node)
+	owner, _ := g.SchemaByName("Owner")
+	inEdges := g.InEdges(owner.ID)
+	assert.NotEmpty(t, inEdges, "Owner should have incoming edges")
+
+	// Verify the InEdges returns edges with correct To field
+	for _, e := range inEdges {
+		assert.Equal(t, owner.ID, e.To, "InEdge To should match the queried node")
+	}
+}
+
+func TestBuild_SchemaOperations_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	pet, _ := g.SchemaByName("Pet")
+	ops := g.SchemaOperations(pet.ID)
+	assert.NotEmpty(t, ops, "Pet should be referenced by operations")
+}
+
+func TestBuild_SchemaOpCount_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	pet, _ := g.SchemaByName("Pet")
+	count := g.SchemaOpCount(pet.ID)
+	assert.Positive(t, count, "Pet should have operations referencing it")
+
+	unused, _ := g.SchemaByName("Unused")
+	count = g.SchemaOpCount(unused.ID)
+	assert.Equal(t, 0, count, "Unused should have no operations")
+}
+
+func TestBuild_Neighbors_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	pet, _ := g.SchemaByName("Pet")
+
+	// Depth 1: direct out-edges and in-edges
+	n1 := g.Neighbors(pet.ID, 1)
+	assert.NotEmpty(t, n1, "Pet should have depth-1 neighbors")
+
+	// Depth 0: should return nothing (no hops)
+	n0 := g.Neighbors(pet.ID, 0)
+	assert.Empty(t, n0, "depth-0 neighbors should be empty")
+
+	// Depth 2: should be >= depth 1
+	n2 := g.Neighbors(pet.ID, 2)
+	assert.GreaterOrEqual(t, len(n2), len(n1), "depth-2 should include at least depth-1 neighbors")
+}
+
+func TestBuild_StronglyConnectedComponents_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	sccs := g.StronglyConnectedComponents()
+	// Petstore shouldn't have cycles, so SCCs should be empty (no multi-node components)
+	assert.Empty(t, sccs, "petstore should have no strongly connected components")
+}
+
+func TestBuild_ConnectedComponent_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	pet, _ := g.SchemaByName("Pet")
+	schemas, ops := g.ConnectedComponent([]graph.NodeID{pet.ID}, nil)
+	assert.NotEmpty(t, schemas, "connected component from Pet should include schemas")
+	assert.NotEmpty(t, ops, "connected component from Pet should include operations")
+
+	// Should include Pet itself
+	hasPet := false
+	for _, id := range schemas {
+		if id == pet.ID {
+			hasPet = true
+		}
+	}
+	assert.True(t, hasPet, "connected component should include the seed")
+}
+
+func TestBuild_ConnectedComponent_FromOp_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Start from first operation
+	require.NotEmpty(t, g.Operations)
+	schemas, ops := g.ConnectedComponent(nil, []graph.NodeID{g.Operations[0].ID})
+	assert.NotEmpty(t, schemas, "connected component from operation should include schemas")
+	assert.NotEmpty(t, ops, "connected component from operation should include the seed operation")
+}
+
+func TestBuild_ShortestPath_SameNode_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	pet, _ := g.SchemaByName("Pet")
+	path := g.ShortestPath(pet.ID, pet.ID)
+	assert.Len(t, path, 1, "path from node to itself should be length 1")
+	assert.Equal(t, pet.ID, path[0])
+}

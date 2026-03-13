@@ -8,6 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/graph"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/oq"
+	"github.com/speakeasy-api/openapi/oq/expr"
 	"github.com/speakeasy-api/openapi/references"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -888,6 +889,542 @@ func TestFormatMarkdown_Count_Success(t *testing.T) {
 
 	md := oq.FormatMarkdown(result, g)
 	assert.NotEmpty(t, md)
+}
+
+func TestExecute_Explain_AllStages_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Cover more stage descriptions in explain
+	tests := []struct {
+		name    string
+		query   string
+		expects []string
+	}{
+		{
+			"explain with unique and count",
+			"schemas.components | unique | count | explain",
+			[]string{"Unique:", "Count:"},
+		},
+		{
+			"explain with group-by",
+			"schemas.components | group-by type | explain",
+			[]string{"Group: group-by"},
+		},
+		{
+			"explain with traversals",
+			"schemas.components | where name == \"Pet\" | refs-out | explain",
+			[]string{"Traverse: outgoing references"},
+		},
+		{
+			"explain with refs-in",
+			"schemas.components | where name == \"Owner\" | refs-in | explain",
+			[]string{"Traverse: incoming references"},
+		},
+		{
+			"explain with reachable",
+			"schemas.components | where name == \"Pet\" | reachable | explain",
+			[]string{"Traverse: all reachable"},
+		},
+		{
+			"explain with ancestors",
+			"schemas.components | where name == \"Address\" | ancestors | explain",
+			[]string{"Traverse: all ancestor"},
+		},
+		{
+			"explain with properties",
+			"schemas.components | where name == \"Pet\" | properties | explain",
+			[]string{"Traverse: property children"},
+		},
+		{
+			"explain with union-members",
+			"schemas.components | where name == \"Shape\" | union-members | explain",
+			[]string{"Traverse: union members"},
+		},
+		{
+			"explain with items",
+			"schemas | where type == \"array\" | items | explain",
+			[]string{"Traverse: array items"},
+		},
+		{
+			"explain with ops",
+			"schemas.components | where name == \"Pet\" | ops | explain",
+			[]string{"Navigate: schemas to operations"},
+		},
+		{
+			"explain with schemas from ops",
+			"operations | schemas | explain",
+			[]string{"Navigate: operations to schemas"},
+		},
+		{
+			"explain with sample",
+			"schemas.components | sample 3 | explain",
+			[]string{"Sample: random 3"},
+		},
+		{
+			"explain with path",
+			"schemas | path Pet Address | explain",
+			[]string{"Path: shortest path from Pet to Address"},
+		},
+		{
+			"explain with top",
+			"schemas.components | top 3 depth | explain",
+			[]string{"Top: 3 by depth"},
+		},
+		{
+			"explain with bottom",
+			"schemas.components | bottom 3 depth | explain",
+			[]string{"Bottom: 3 by depth"},
+		},
+		{
+			"explain with format",
+			"schemas.components | format json | explain",
+			[]string{"Format: json"},
+		},
+		{
+			"explain with connected",
+			"schemas.components | where name == \"Pet\" | connected | explain",
+			[]string{"Traverse: full connected"},
+		},
+		{
+			"explain with blast-radius",
+			"schemas.components | where name == \"Pet\" | blast-radius | explain",
+			[]string{"Traverse: blast radius"},
+		},
+		{
+			"explain with neighbors",
+			"schemas.components | where name == \"Pet\" | neighbors 2 | explain",
+			[]string{"Traverse: bidirectional neighbors within 2"},
+		},
+		{
+			"explain with orphans",
+			"schemas.components | orphans | explain",
+			[]string{"Filter: schemas with no incoming"},
+		},
+		{
+			"explain with leaves",
+			"schemas.components | leaves | explain",
+			[]string{"Filter: schemas with no outgoing"},
+		},
+		{
+			"explain with cycles",
+			"schemas | cycles | explain",
+			[]string{"Analyze: strongly connected"},
+		},
+		{
+			"explain with clusters",
+			"schemas.components | clusters | explain",
+			[]string{"Analyze: weakly connected"},
+		},
+		{
+			"explain with tag-boundary",
+			"schemas | tag-boundary | explain",
+			[]string{"Filter: schemas used by operations across multiple"},
+		},
+		{
+			"explain with shared-refs",
+			"operations | shared-refs | explain",
+			[]string{"Analyze: schemas shared"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := oq.Execute(tt.query, g)
+			require.NoError(t, err)
+			for _, exp := range tt.expects {
+				assert.Contains(t, result.Explain, exp)
+			}
+		})
+	}
+}
+
+func TestExecute_FieldValue_EdgeCases(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test operation fields that require nil checks
+	result, err := oq.Execute("operations | take 1 | select name, tag, parameter_count, deprecated, description, summary", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	// Test edge fields on non-traversal rows (should be empty strings)
+	result, err = oq.Execute("schemas.components | take 1 | select name, edge_kind, edge_label, edge_from", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+	edgeKind := oq.FieldValuePublic(result.Rows[0], "edge_kind", g)
+	assert.Equal(t, "", edgeKind.Str)
+
+	// Test tag_count field
+	result, err = oq.Execute("schemas.components | take 1 | select name, tag_count", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	// Test op_count field
+	result, err = oq.Execute("schemas.components | take 1 | select name, op_count", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	// Test unknown field returns null (KindNull == 0)
+	v := oq.FieldValuePublic(result.Rows[0], "nonexistent_field", g)
+	assert.Equal(t, expr.KindNull, v.Kind)
+}
+
+func TestExecute_Cycles_NoCycles(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Petstore has no cycles, so cycles should return empty groups
+	result, err := oq.Execute("schemas | cycles", g)
+	require.NoError(t, err)
+	assert.Empty(t, result.Groups, "petstore should have no cycles")
+}
+
+func TestExecute_SharedRefs_AllOps(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// shared-refs with all operations — returns schemas shared by all operations
+	result, err := oq.Execute("operations | shared-refs | select name", g)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestFormatToon_SpecialChars(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test TOON format with bool and int fields to cover toonValue branches
+	result, err := oq.Execute("schemas.components | take 1 | select name, depth, is_component", g)
+	require.NoError(t, err)
+
+	toon := oq.FormatToon(result, g)
+	assert.NotEmpty(t, toon)
+	assert.Contains(t, toon, "results[1]")
+}
+
+func TestFormatJSON_Operations(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("operations | take 2 | select name, method, path", g)
+	require.NoError(t, err)
+
+	json := oq.FormatJSON(result, g)
+	assert.True(t, strings.HasPrefix(json, "["))
+	assert.Contains(t, json, "\"name\"")
+	assert.Contains(t, json, "\"method\"")
+}
+
+func TestFormatMarkdown_Operations(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("operations | take 2 | select name, method", g)
+	require.NoError(t, err)
+
+	md := oq.FormatMarkdown(result, g)
+	assert.Contains(t, md, "| name")
+	assert.Contains(t, md, "| method")
+}
+
+func TestParse_Error_MoreCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{"empty query", ""},
+		{"unknown stage", "schemas | bogus_stage"},
+		{"take non-integer", "schemas | take abc"},
+		{"sample non-integer", "schemas | sample xyz"},
+		{"head non-integer", "schemas | head xyz"},
+		{"neighbors non-integer", "schemas | neighbors abc"},
+		{"top missing field", "schemas | top 5"},
+		{"bottom missing field", "schemas | bottom 5"},
+		{"path missing args", "schemas | path"},
+		{"path one arg", "schemas | path Pet"},
+		{"where empty expr", "schemas | where"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := oq.Parse(tt.query)
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestParse_MoreStages_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{"format table", "schemas | format table"},
+		{"format toon", "schemas | format toon"},
+		{"sort asc explicit", "schemas | sort name asc"},
+		{"sort default asc", "schemas | sort name"},
+		{"select single field", "schemas | select name"},
+		{"select many fields", "schemas | select name, type, depth, in_degree"},
+		{"where with string", `schemas | where name == "Pet"`},
+		{"where with bool", "schemas | where is_component"},
+		{"where with not", "schemas | where not is_inline"},
+		{"where with has", "schemas | where has(hash)"},
+		{"where with matches", `schemas | where name matches ".*Pet.*"`},
+		{"path quoted", `schemas | path "Pet" "Address"`},
+		{"shared-refs stage", "operations | take 2 | shared-refs"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			stages, err := oq.Parse(tt.query)
+			require.NoError(t, err)
+			assert.NotEmpty(t, stages)
+		})
+	}
+}
+
+func TestExecute_WhereAndOr_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test compound where expressions
+	result, err := oq.Execute(`schemas.components | where depth > 0 and is_component`, g)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+
+	result, err = oq.Execute(`schemas.components | where depth > 100 or is_component`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "or should match is_component=true schemas")
+}
+
+func TestExecute_SortStringField_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Sort by string field
+	result, err := oq.Execute("schemas.components | sort type asc | select name, type", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+}
+
+func TestExecute_GroupBy_Type_Details(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | group-by type", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Groups)
+
+	// Each group should have Count and Names
+	for _, grp := range result.Groups {
+		assert.Positive(t, grp.Count)
+		assert.Len(t, grp.Names, grp.Count)
+	}
+}
+
+func TestFormatMarkdown_Groups_Details(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | group-by type", g)
+	require.NoError(t, err)
+
+	md := oq.FormatMarkdown(result, g)
+	assert.Contains(t, md, "| Key |")
+	assert.Contains(t, md, "| Count |")
+}
+
+func TestFormatJSON_Explain(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | explain", g)
+	require.NoError(t, err)
+
+	// All formats should handle explain
+	table := oq.FormatTable(result, g)
+	assert.Contains(t, table, "Source: schemas")
+
+	json := oq.FormatJSON(result, g)
+	assert.Contains(t, json, "Source: schemas")
+
+	md := oq.FormatMarkdown(result, g)
+	assert.Contains(t, md, "Source: schemas")
+
+	toon := oq.FormatToon(result, g)
+	assert.Contains(t, toon, "Source: schemas")
+}
+
+func TestExecute_Leaves_AllZeroOutDegree(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | leaves | select name, out_degree", g)
+	require.NoError(t, err)
+
+	// Verify leaves are leaf nodes
+	for _, row := range result.Rows {
+		od := oq.FieldValuePublic(row, "out_degree", g)
+		assert.Equal(t, 0, od.Int, "leaves should have 0 out_degree")
+	}
+}
+
+func TestExecute_OperationsTraversals(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Operations going to schemas and back
+	result, err := oq.Execute("operations | take 1 | schemas | select name", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	// Schema to operations roundtrip
+	result, err = oq.Execute("schemas.components | where name == \"Pet\" | ops | select name", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+}
+
+func loadCyclicGraph(t *testing.T) *graph.SchemaGraph {
+	t.Helper()
+
+	f, err := os.Open("testdata/cyclic.yaml")
+	require.NoError(t, err)
+	defer f.Close()
+
+	ctx := t.Context()
+	doc, _, err := openapi.Unmarshal(ctx, f, openapi.WithSkipValidation())
+	require.NoError(t, err)
+	require.NotNil(t, doc)
+
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "testdata/cyclic.yaml",
+	})
+
+	return graph.Build(ctx, idx)
+}
+
+func TestExecute_Cycles_WithCyclicSpec(t *testing.T) {
+	t.Parallel()
+	g := loadCyclicGraph(t)
+
+	// NodeA -> NodeB -> NodeA is a cycle
+	result, err := oq.Execute("schemas | cycles", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Groups, "cyclic spec should have cycles")
+
+	// Format the groups
+	table := oq.FormatTable(result, g)
+	assert.Contains(t, table, "cycle-")
+
+	json := oq.FormatJSON(result, g)
+	assert.Contains(t, json, "cycle-")
+}
+
+func TestExecute_CyclicSpec_EdgeAnnotations(t *testing.T) {
+	t.Parallel()
+	g := loadCyclicGraph(t)
+
+	// Test refs-out to cover edgeKindString branches
+	result, err := oq.Execute(`schemas.components | where name == "NodeA" | refs-out | select name, edge_kind, edge_label`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	// Collect edge kinds
+	edgeKinds := make(map[string]bool)
+	for _, row := range result.Rows {
+		k := oq.FieldValuePublic(row, "edge_kind", g)
+		edgeKinds[k.Str] = true
+	}
+	// NodeA has properties, allOf, anyOf, items etc.
+	assert.True(t, edgeKinds["property"], "should have property edges")
+}
+
+func TestExecute_CyclicSpec_IsCircular(t *testing.T) {
+	t.Parallel()
+	g := loadCyclicGraph(t)
+
+	result, err := oq.Execute("schemas.components | where is_circular | select name", g)
+	require.NoError(t, err)
+	names := collectNames(result, g)
+	assert.Contains(t, names, "NodeA")
+	assert.Contains(t, names, "NodeB")
+}
+
+func TestExecute_CyclicSpec_DeprecatedOp(t *testing.T) {
+	t.Parallel()
+	g := loadCyclicGraph(t)
+
+	// The listNodes operation is deprecated with tags, summary, and description
+	result, err := oq.Execute("operations | select name, deprecated, summary, description, tag, parameter_count", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	dep := oq.FieldValuePublic(result.Rows[0], "deprecated", g)
+	assert.True(t, dep.Bool, "listNodes should be deprecated")
+
+	summary := oq.FieldValuePublic(result.Rows[0], "summary", g)
+	assert.Equal(t, "List all nodes", summary.Str)
+
+	desc := oq.FieldValuePublic(result.Rows[0], "description", g)
+	assert.NotEmpty(t, desc.Str)
+
+	tag := oq.FieldValuePublic(result.Rows[0], "tag", g)
+	assert.Equal(t, "nodes", tag.Str)
+}
+
+func TestExecute_ToonFormat_WithBoolAndInt(t *testing.T) {
+	t.Parallel()
+	g := loadCyclicGraph(t)
+
+	// Select fields that cover all toonValue branches (string, int, bool)
+	result, err := oq.Execute("schemas.components | take 1 | select name, depth, is_circular", g)
+	require.NoError(t, err)
+
+	toon := oq.FormatToon(result, g)
+	assert.NotEmpty(t, toon)
+}
+
+func TestExecute_ToonEscape_SpecialChars(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// path fields contain "/" which doesn't need quoting, but let's cover the formatter
+	result, err := oq.Execute("schemas | take 3 | select path", g)
+	require.NoError(t, err)
+
+	toon := oq.FormatToon(result, g)
+	assert.NotEmpty(t, toon)
+}
+
+func TestFormatToon_Explain(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | where depth > 0 | explain", g)
+	require.NoError(t, err)
+
+	toon := oq.FormatToon(result, g)
+	assert.Contains(t, toon, "Source: schemas")
+}
+
+func TestFormatMarkdown_Explain(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | explain", g)
+	require.NoError(t, err)
+
+	md := oq.FormatMarkdown(result, g)
+	assert.Contains(t, md, "Source: schemas")
 }
 
 // collectNames extracts the "name" field from all rows in the result.
