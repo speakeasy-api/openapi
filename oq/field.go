@@ -2,6 +2,7 @@ package oq
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/speakeasy-api/openapi/graph"
 	"github.com/speakeasy-api/openapi/oq/expr"
@@ -12,9 +13,16 @@ import (
 type rowAdapter struct {
 	row Row
 	g   *graph.SchemaGraph
+	env map[string]expr.Value
 }
 
 func (r rowAdapter) Field(name string) expr.Value {
+	if strings.HasPrefix(name, "$") && r.env != nil {
+		if v, ok := r.env[name]; ok {
+			return v
+		}
+		return expr.NullVal()
+	}
 	return fieldValue(r.row, name, r.g)
 }
 

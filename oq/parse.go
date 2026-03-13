@@ -7,9 +7,111 @@ import (
 	"strings"
 )
 
-// Parse splits a pipeline query string into stages.
+// declarations holds parsed includes, defs, and the raw remaining pipeline text.
+type declarations struct {
+	Includes     []string
+	Defs         []FuncDef
+	PipelineText string
+}
+
+// parseDeclarations scans for include/def declarations at the start of a query.
+func parseDeclarations(query string) (*declarations, error) {
+	d := &declarations{}
+	remaining := strings.TrimSpace(query)
+
+	for {
+		remaining = strings.TrimSpace(remaining)
+		if remaining == "" {
+			break
+		}
+		if strings.HasPrefix(remaining, "include ") {
+			rest := remaining[len("include "):]
+			semi := findUnquotedSemicolon(rest)
+			if semi < 0 {
+				return nil, errors.New("include missing terminating ;")
+			}
+			path := strings.TrimSpace(rest[:semi])
+			path = strings.Trim(path, "\"")
+			if path == "" {
+				return nil, errors.New("include requires a path")
+			}
+			d.Includes = append(d.Includes, path)
+			remaining = rest[semi+1:]
+			continue
+		}
+		if strings.HasPrefix(remaining, "def ") {
+			rest := remaining[len("def "):]
+			colonIdx := strings.Index(rest, ":")
+			if colonIdx < 0 {
+				return nil, errors.New("def missing :")
+			}
+			sig := strings.TrimSpace(rest[:colonIdx])
+			body := rest[colonIdx+1:]
+			semi := findUnquotedSemicolon(body)
+			if semi < 0 {
+				return nil, errors.New("def missing terminating ;")
+			}
+			bodyStr := strings.TrimSpace(body[:semi])
+			remaining = body[semi+1:]
+
+			fd, err := parseFuncSig(sig)
+			if err != nil {
+				return nil, err
+			}
+			fd.Body = bodyStr
+			d.Defs = append(d.Defs, fd)
+			continue
+		}
+		break
+	}
+
+	d.PipelineText = remaining
+	return d, nil
+}
+
+// ParseQuery parses a full query string including optional includes, defs, and pipeline.
+func ParseQuery(query string) (*Query, error) {
+	d, err := parseDeclarations(query)
+	if err != nil {
+		return nil, err
+	}
+
+	q := &Query{
+		Includes: d.Includes,
+		Defs:     d.Defs,
+	}
+
+	if d.PipelineText == "" {
+		if len(q.Defs) > 0 || len(q.Includes) > 0 {
+			return q, nil
+		}
+		return nil, errors.New("empty query")
+	}
+
+	// Expand defs at text level before parsing
+	expanded, err := ExpandDefs(d.PipelineText, d.Defs)
+	if err != nil {
+		return nil, err
+	}
+
+	stages, err := parsePipeline(expanded)
+	if err != nil {
+		return nil, err
+	}
+	q.Stages = stages
+	return q, nil
+}
+
+// Parse splits a pipeline query string into stages (backward compat).
 func Parse(query string) ([]Stage, error) {
-	// Split by pipe, respecting quoted strings
+	q, err := ParseQuery(query)
+	if err != nil {
+		return nil, err
+	}
+	return q.Stages, nil
+}
+
+func parsePipeline(query string) ([]Stage, error) {
 	parts := splitPipeline(query)
 	if len(parts) == 0 {
 		return nil, errors.New("empty query")
@@ -24,7 +126,6 @@ func Parse(query string) ([]Stage, error) {
 		}
 
 		if i == 0 {
-			// First part is a source
 			stages = append(stages, Stage{Kind: StageSource, Source: part})
 			continue
 		}
@@ -40,26 +141,62 @@ func Parse(query string) ([]Stage, error) {
 }
 
 func parseStage(s string) (Stage, error) {
-	// Extract the keyword
-	keyword, rest := splitFirst(s)
+	// Try keyword-call syntax first: select(...), sort_by(...), etc.
+	keyword, args, isCall := splitKeywordCall(s)
+	if !isCall {
+		keyword, args = splitFirst(s)
+	}
 	keyword = strings.ToLower(keyword)
 
 	switch keyword {
-	case "where":
-		if rest == "" {
-			return Stage{}, errors.New("where requires an expression")
-		}
-		return Stage{Kind: StageWhere, Expr: rest}, nil
-
+	// New jq-style: select(expr) replaces where
 	case "select":
-		if rest == "" {
+		if isCall {
+			// select(expr) → filter
+			if args == "" {
+				return Stage{}, errors.New("select() requires an expression")
+			}
+			return Stage{Kind: StageWhere, Expr: args}, nil
+		}
+		// select f1, f2 → old-style field projection — use pick instead
+		// But keep for backward compat during migration
+		if args == "" {
 			return Stage{}, errors.New("select requires field names")
 		}
-		fields := parseCSV(rest)
+		fields := parseCSV(args)
 		return Stage{Kind: StageSelect, Fields: fields}, nil
 
+	case "pick":
+		if args == "" {
+			return Stage{}, errors.New("pick requires field names")
+		}
+		fields := parseCSV(args)
+		return Stage{Kind: StageSelect, Fields: fields}, nil
+
+	// where (legacy, still supported)
+	case "where":
+		if args == "" {
+			return Stage{}, errors.New("where requires an expression")
+		}
+		return Stage{Kind: StageWhere, Expr: args}, nil
+
+	case "sort_by":
+		if isCall {
+			parts := splitSemicolonArgs(args)
+			if len(parts) == 0 || parts[0] == "" {
+				return Stage{}, errors.New("sort_by requires a field name")
+			}
+			desc := false
+			if len(parts) >= 2 && strings.TrimSpace(parts[1]) == "desc" {
+				desc = true
+			}
+			return Stage{Kind: StageSort, SortField: strings.TrimSpace(parts[0]), SortDesc: desc}, nil
+		}
+		return Stage{}, errors.New("sort_by requires parentheses: sort_by(field) or sort_by(field; desc)")
+
+	// Legacy sort
 	case "sort":
-		parts := strings.Fields(rest)
+		parts := strings.Fields(args)
 		if len(parts) == 0 {
 			return Stage{}, errors.New("sort requires a field name")
 		}
@@ -69,21 +206,65 @@ func parseStage(s string) (Stage, error) {
 		}
 		return Stage{Kind: StageSort, SortField: parts[0], SortDesc: desc}, nil
 
+	case "first":
+		if isCall {
+			n, err := strconv.Atoi(strings.TrimSpace(args))
+			if err != nil {
+				return Stage{}, fmt.Errorf("first requires a number: %w", err)
+			}
+			return Stage{Kind: StageTake, Limit: n}, nil
+		}
+		// bare "first" with space arg
+		n, err := strconv.Atoi(strings.TrimSpace(args))
+		if err != nil {
+			return Stage{}, fmt.Errorf("first requires a number: %w", err)
+		}
+		return Stage{Kind: StageTake, Limit: n}, nil
+
+	case "last":
+		if isCall {
+			n, err := strconv.Atoi(strings.TrimSpace(args))
+			if err != nil {
+				return Stage{}, fmt.Errorf("last requires a number: %w", err)
+			}
+			return Stage{Kind: StageLast, Limit: n}, nil
+		}
+		n, err := strconv.Atoi(strings.TrimSpace(args))
+		if err != nil {
+			return Stage{}, fmt.Errorf("last requires a number: %w", err)
+		}
+		return Stage{Kind: StageLast, Limit: n}, nil
+
+	// Legacy take/head
 	case "take", "head":
-		n, err := strconv.Atoi(strings.TrimSpace(rest))
+		n, err := strconv.Atoi(strings.TrimSpace(args))
 		if err != nil {
 			return Stage{}, fmt.Errorf("take requires a number: %w", err)
 		}
 		return Stage{Kind: StageTake, Limit: n}, nil
 
+	case "length":
+		return Stage{Kind: StageCount}, nil
+
 	case "unique":
 		return Stage{Kind: StageUnique}, nil
 
+	case "group_by":
+		if isCall {
+			if args == "" {
+				return Stage{}, errors.New("group_by requires a field name")
+			}
+			fields := parseCSV(args)
+			return Stage{Kind: StageGroupBy, Fields: fields}, nil
+		}
+		return Stage{}, errors.New("group_by requires parentheses: group_by(field)")
+
+	// Legacy group-by
 	case "group-by":
-		if rest == "" {
+		if args == "" {
 			return Stage{}, errors.New("group-by requires a field name")
 		}
-		fields := parseCSV(rest)
+		fields := parseCSV(args)
 		return Stage{Kind: StageGroupBy, Fields: fields}, nil
 
 	case "count":
@@ -123,21 +304,60 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageFields}, nil
 
 	case "sample":
-		n, err := strconv.Atoi(strings.TrimSpace(rest))
+		if isCall {
+			n, err := strconv.Atoi(strings.TrimSpace(args))
+			if err != nil {
+				return Stage{}, fmt.Errorf("sample requires a number: %w", err)
+			}
+			return Stage{Kind: StageSample, Limit: n}, nil
+		}
+		n, err := strconv.Atoi(strings.TrimSpace(args))
 		if err != nil {
 			return Stage{}, fmt.Errorf("sample requires a number: %w", err)
 		}
 		return Stage{Kind: StageSample, Limit: n}, nil
 
+	case "neighbors":
+		if isCall {
+			n, err := strconv.Atoi(strings.TrimSpace(args))
+			if err != nil {
+				return Stage{}, fmt.Errorf("neighbors requires a depth number: %w", err)
+			}
+			return Stage{Kind: StageNeighbors, Limit: n}, nil
+		}
+		n, err := strconv.Atoi(strings.TrimSpace(args))
+		if err != nil {
+			return Stage{}, fmt.Errorf("neighbors requires a depth number: %w", err)
+		}
+		return Stage{Kind: StageNeighbors, Limit: n}, nil
+
 	case "path":
-		from, to := parseTwoArgs(rest)
+		if isCall {
+			parts := splitSemicolonArgs(args)
+			if len(parts) < 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+				return Stage{}, errors.New("path requires two schema names")
+			}
+			return Stage{Kind: StagePath, PathFrom: strings.TrimSpace(parts[0]), PathTo: strings.TrimSpace(parts[1])}, nil
+		}
+		from, to := parseTwoArgs(args)
 		if from == "" || to == "" {
 			return Stage{}, errors.New("path requires two schema names")
 		}
 		return Stage{Kind: StagePath, PathFrom: from, PathTo: to}, nil
 
 	case "top":
-		parts := strings.Fields(rest)
+		if isCall {
+			parts := splitSemicolonArgs(args)
+			if len(parts) < 2 {
+				return Stage{}, errors.New("top requires a number and a field name")
+			}
+			n, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+			if err != nil {
+				return Stage{}, fmt.Errorf("top requires a number: %w", err)
+			}
+			return Stage{Kind: StageTop, Limit: n, SortField: strings.TrimSpace(parts[1])}, nil
+		}
+		parts := strings.Fields(args)
 		if len(parts) < 2 {
 			return Stage{}, errors.New("top requires a number and a field name")
 		}
@@ -148,7 +368,18 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageTop, Limit: n, SortField: parts[1]}, nil
 
 	case "bottom":
-		parts := strings.Fields(rest)
+		if isCall {
+			parts := splitSemicolonArgs(args)
+			if len(parts) < 2 {
+				return Stage{}, errors.New("bottom requires a number and a field name")
+			}
+			n, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+			if err != nil {
+				return Stage{}, fmt.Errorf("bottom requires a number: %w", err)
+			}
+			return Stage{Kind: StageBottom, Limit: n, SortField: strings.TrimSpace(parts[1])}, nil
+		}
+		parts := strings.Fields(args)
 		if len(parts) < 2 {
 			return Stage{}, errors.New("bottom requires a number and a field name")
 		}
@@ -159,7 +390,10 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageBottom, Limit: n, SortField: parts[1]}, nil
 
 	case "format":
-		f := strings.TrimSpace(rest)
+		f := strings.TrimSpace(args)
+		if isCall {
+			f = strings.TrimSpace(args)
+		}
 		if f != "table" && f != "json" && f != "markdown" && f != "toon" {
 			return Stage{}, fmt.Errorf("format must be table, json, markdown, or toon, got %q", f)
 		}
@@ -170,13 +404,6 @@ func parseStage(s string) (Stage, error) {
 
 	case "blast-radius":
 		return Stage{Kind: StageBlastRadius}, nil
-
-	case "neighbors":
-		n, err := strconv.Atoi(strings.TrimSpace(rest))
-		if err != nil {
-			return Stage{}, fmt.Errorf("neighbors requires a depth number: %w", err)
-		}
-		return Stage{Kind: StageNeighbors, Limit: n}, nil
 
 	case "orphans":
 		return Stage{Kind: StageOrphans}, nil
@@ -196,9 +423,172 @@ func parseStage(s string) (Stage, error) {
 	case "shared-refs":
 		return Stage{Kind: StageSharedRefs}, nil
 
+	case "let":
+		return parseLet(args)
+
 	default:
 		return Stage{}, fmt.Errorf("unknown stage: %q", keyword)
 	}
+}
+
+func parseLet(args string) (Stage, error) {
+	// let $var = expr
+	if args == "" || !strings.HasPrefix(args, "$") {
+		return Stage{}, errors.New("let requires $variable = expression")
+	}
+	eqIdx := strings.Index(args, "=")
+	if eqIdx < 0 {
+		return Stage{}, errors.New("let requires $variable = expression")
+	}
+	varName := strings.TrimSpace(args[:eqIdx])
+	exprStr := strings.TrimSpace(args[eqIdx+1:])
+	if !strings.HasPrefix(varName, "$") || len(varName) < 2 {
+		return Stage{}, errors.New("let variable must start with $")
+	}
+	if exprStr == "" {
+		return Stage{}, errors.New("let requires an expression after =")
+	}
+	return Stage{Kind: StageLet, VarName: varName, Expr: exprStr}, nil
+}
+
+func parseFuncSig(sig string) (FuncDef, error) {
+	fd := FuncDef{}
+	parenIdx := strings.Index(sig, "(")
+	if parenIdx < 0 {
+		fd.Name = strings.TrimSpace(sig)
+		if fd.Name == "" {
+			return fd, errors.New("def requires a name")
+		}
+		return fd, nil
+	}
+	fd.Name = strings.TrimSpace(sig[:parenIdx])
+	if fd.Name == "" {
+		return fd, errors.New("def requires a name")
+	}
+	closeIdx := strings.LastIndex(sig, ")")
+	if closeIdx < 0 {
+		return fd, errors.New("def params missing closing )")
+	}
+	paramStr := sig[parenIdx+1 : closeIdx]
+	for _, p := range splitSemicolonArgs(paramStr) {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			if !strings.HasPrefix(p, "$") {
+				return fd, fmt.Errorf("def param %q must start with $", p)
+			}
+			fd.Params = append(fd.Params, p)
+		}
+	}
+	return fd, nil
+}
+
+func findUnquotedSemicolon(s string) int {
+	inQuote := false
+	depth := 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '"':
+			inQuote = !inQuote
+		case '(':
+			if !inQuote {
+				depth++
+			}
+		case ')':
+			if !inQuote {
+				depth--
+			}
+		case ';':
+			if !inQuote && depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+// splitKeywordCall splits "select(expr)" into ("select", "expr", true).
+// Returns ("", "", false) if s doesn't match keyword(...) form.
+// The keyword must be a single word (no spaces before the opening paren).
+func splitKeywordCall(s string) (string, string, bool) {
+	s = strings.TrimSpace(s)
+	parenIdx := strings.Index(s, "(")
+	if parenIdx < 0 {
+		return "", "", false
+	}
+	keyword := s[:parenIdx]
+	// Keyword must not contain spaces (single word only)
+	if strings.ContainsAny(keyword, " \t") {
+		return "", "", false
+	}
+	if keyword == "" {
+		return "", "", false
+	}
+	// Find matching closing paren (not just the last one — handle nested parens)
+	rest := s[parenIdx+1:]
+	depth := 1
+	inQuote := false
+	end := -1
+	for i := 0; i < len(rest); i++ {
+		switch rest[i] {
+		case '"':
+			inQuote = !inQuote
+		case '(':
+			if !inQuote {
+				depth++
+			}
+		case ')':
+			if !inQuote {
+				depth--
+				if depth == 0 {
+					end = i
+				}
+			}
+		}
+		if end >= 0 {
+			break
+		}
+	}
+	if end < 0 {
+		return "", "", false
+	}
+	// Ensure nothing after the closing paren
+	trailing := strings.TrimSpace(rest[end+1:])
+	if trailing != "" {
+		return "", "", false
+	}
+	args := rest[:end]
+	return keyword, args, true
+}
+
+func splitSemicolonArgs(s string) []string {
+	var parts []string
+	var current strings.Builder
+	depth := 0
+	inQuote := false
+
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		switch {
+		case ch == '"':
+			inQuote = !inQuote
+			current.WriteByte(ch)
+		case ch == '(' && !inQuote:
+			depth++
+			current.WriteByte(ch)
+		case ch == ')' && !inQuote:
+			depth--
+			current.WriteByte(ch)
+		case ch == ';' && !inQuote && depth == 0:
+			parts = append(parts, current.String())
+			current.Reset()
+		default:
+			current.WriteByte(ch)
+		}
+	}
+	if current.Len() > 0 {
+		parts = append(parts, current.String())
+	}
+	return parts
 }
 
 func parseTwoArgs(s string) (string, string) {
@@ -242,6 +632,7 @@ func splitPipeline(input string) []string {
 	var parts []string
 	var current strings.Builder
 	inQuote := false
+	depth := 0 // paren depth — don't split | inside parens
 
 	for i := 0; i < len(input); i++ {
 		ch := input[i]
@@ -249,7 +640,13 @@ func splitPipeline(input string) []string {
 		case ch == '"':
 			inQuote = !inQuote
 			current.WriteByte(ch)
-		case ch == '|' && !inQuote:
+		case ch == '(' && !inQuote:
+			depth++
+			current.WriteByte(ch)
+		case ch == ')' && !inQuote:
+			depth--
+			current.WriteByte(ch)
+		case ch == '|' && !inQuote && depth == 0:
 			parts = append(parts, current.String())
 			current.Reset()
 		default:

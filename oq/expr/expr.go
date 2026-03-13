@@ -44,6 +44,21 @@ type binaryExpr struct {
 	right Expr
 }
 
+type alternativeExpr struct {
+	left  Expr
+	right Expr
+}
+
+type ifExpr struct {
+	cond  Expr
+	then_ Expr
+	else_ Expr // nil means return null
+}
+
+type interpExpr struct {
+	parts []Expr
+}
+
 type notExpr struct {
 	inner Expr
 }
@@ -116,6 +131,34 @@ func (e *fieldExpr) Eval(row Row) Value {
 
 func (e *literalExpr) Eval(_ Row) Value {
 	return e.val
+}
+
+func (e *alternativeExpr) Eval(row Row) Value {
+	l := e.left.Eval(row)
+	if l.Kind != KindNull && toBool(l) {
+		return l
+	}
+	return e.right.Eval(row)
+}
+
+func (e *ifExpr) Eval(row Row) Value {
+	cond := e.cond.Eval(row)
+	if toBool(cond) {
+		return e.then_.Eval(row)
+	}
+	if e.else_ != nil {
+		return e.else_.Eval(row)
+	}
+	return Value{Kind: KindNull}
+}
+
+func (e *interpExpr) Eval(row Row) Value {
+	var sb strings.Builder
+	for _, part := range e.parts {
+		v := part.Eval(row)
+		sb.WriteString(toString(v))
+	}
+	return StringVal(sb.String())
 }
 
 // --- Helpers ---
@@ -282,7 +325,7 @@ func (p *parser) parseAnd() (Expr, error) {
 }
 
 func (p *parser) parseComparison() (Expr, error) {
-	left, err := p.parseUnary()
+	left, err := p.parseAlternative()
 	if err != nil {
 		return nil, err
 	}
@@ -312,6 +355,22 @@ func (p *parser) parseComparison() (Expr, error) {
 	return left, nil
 }
 
+func (p *parser) parseAlternative() (Expr, error) {
+	left, err := p.parseUnary()
+	if err != nil {
+		return nil, err
+	}
+	for p.peek() == "//" {
+		p.next()
+		right, err := p.parseUnary()
+		if err != nil {
+			return nil, err
+		}
+		left = &alternativeExpr{left: left, right: right}
+	}
+	return left, nil
+}
+
 func (p *parser) parseUnary() (Expr, error) {
 	if p.peek() == "not" {
 		p.next()
@@ -326,6 +385,11 @@ func (p *parser) parseUnary() (Expr, error) {
 
 func (p *parser) parsePrimary() (Expr, error) {
 	tok := p.peek()
+
+	// if-then-else-end
+	if tok == "if" {
+		return p.parseIf()
+	}
 
 	// Parenthesized expression
 	if tok == "(" {
@@ -374,10 +438,14 @@ func (p *parser) parsePrimary() (Expr, error) {
 		return &matchesExpr{field: field, pattern: re}, nil
 	}
 
-	// String literal
+	// String literal (possibly with interpolation)
 	if strings.HasPrefix(tok, "\"") {
 		p.next()
-		return &literalExpr{val: StringVal(strings.Trim(tok, "\""))}, nil
+		inner := tok[1 : len(tok)-1] // strip quotes
+		if strings.Contains(inner, "\\(") {
+			return parseInterpolation(inner)
+		}
+		return &literalExpr{val: StringVal(inner)}, nil
 	}
 
 	// Boolean literals
@@ -405,6 +473,89 @@ func (p *parser) parsePrimary() (Expr, error) {
 	return nil, fmt.Errorf("unexpected token: %q", tok)
 }
 
+func (p *parser) parseIf() (Expr, error) {
+	p.next() // consume "if"
+	cond, err := p.parseOr()
+	if err != nil {
+		return nil, err
+	}
+	if err := p.expect("then"); err != nil {
+		return nil, err
+	}
+	then_, err := p.parseOr()
+	if err != nil {
+		return nil, err
+	}
+	var else_ Expr
+	switch p.peek() {
+	case "elif":
+		// elif chains into a nested ifExpr
+		// Rewrite "elif" token as "if" for recursive parsing
+		p.tokens[p.pos] = "if"
+		else_, err = p.parseIf()
+		if err != nil {
+			return nil, err
+		}
+	case "else":
+		p.next()
+		else_, err = p.parseOr()
+		if err != nil {
+			return nil, err
+		}
+		if err := p.expect("end"); err != nil {
+			return nil, err
+		}
+	case "end":
+		p.next()
+	default:
+		return nil, fmt.Errorf("expected \"else\", \"elif\", or \"end\", got %q", p.peek())
+	}
+	return &ifExpr{cond: cond, then_: then_, else_: else_}, nil
+}
+
+func parseInterpolation(s string) (Expr, error) {
+	var parts []Expr
+	for len(s) > 0 {
+		idx := strings.Index(s, "\\(")
+		if idx < 0 {
+			parts = append(parts, &literalExpr{val: StringVal(s)})
+			break
+		}
+		if idx > 0 {
+			parts = append(parts, &literalExpr{val: StringVal(s[:idx])})
+		}
+		s = s[idx+2:]
+		// Find matching closing paren
+		depth := 1
+		end := 0
+		for end < len(s) {
+			if s[end] == '(' {
+				depth++
+			} else if s[end] == ')' {
+				depth--
+				if depth == 0 {
+					break
+				}
+			}
+			end++
+		}
+		if depth != 0 {
+			return nil, errors.New("unterminated interpolation \\(")
+		}
+		inner := s[:end]
+		e, err := Parse(inner)
+		if err != nil {
+			return nil, fmt.Errorf("interpolation error: %w", err)
+		}
+		parts = append(parts, e)
+		s = s[end+1:]
+	}
+	if len(parts) == 1 {
+		return parts[0], nil
+	}
+	return &interpExpr{parts: parts}, nil
+}
+
 // tokenize splits an expression into tokens.
 func tokenize(input string) []string {
 	var tokens []string
@@ -421,7 +572,7 @@ func tokenize(input string) []string {
 		// Two-character operators
 		if i+1 < len(input) {
 			two := input[i : i+2]
-			if two == "==" || two == "!=" || two == ">=" || two == "<=" {
+			if two == "==" || two == "!=" || two == ">=" || two == "<=" || two == "//" {
 				tokens = append(tokens, two)
 				i += 2
 				continue
@@ -456,7 +607,7 @@ func tokenize(input string) []string {
 		j := i
 		for j < len(input) && input[j] != ' ' && input[j] != '\t' && input[j] != '\n' &&
 			input[j] != '(' && input[j] != ')' && input[j] != ',' &&
-			input[j] != '>' && input[j] != '<' && input[j] != '=' && input[j] != '!' {
+			input[j] != '>' && input[j] != '<' && input[j] != '=' && input[j] != '!' && input[j] != '/' {
 			j++
 		}
 		if j > i {

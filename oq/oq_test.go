@@ -338,9 +338,9 @@ func TestExecute_Explain_Success(t *testing.T) {
 	result, err := oq.Execute("schemas.components | where depth > 5 | sort depth desc | take 10 | explain", g)
 	require.NoError(t, err)
 	assert.Contains(t, result.Explain, "Source: schemas.components", "explain should show source")
-	assert.Contains(t, result.Explain, "Filter: where depth > 5", "explain should show filter stage")
-	assert.Contains(t, result.Explain, "Sort: depth descending", "explain should show sort stage")
-	assert.Contains(t, result.Explain, "Limit: take 10", "explain should show limit stage")
+	assert.Contains(t, result.Explain, "Filter: select(depth > 5)", "explain should show filter stage")
+	assert.Contains(t, result.Explain, "Sort: sort_by(depth; desc)", "explain should show sort stage")
+	assert.Contains(t, result.Explain, "Limit: first(10)", "explain should show limit stage")
 }
 
 func TestExecute_Fields_Schemas_Success(t *testing.T) {
@@ -1428,6 +1428,215 @@ func TestFormatMarkdown_Explain(t *testing.T) {
 
 	md := oq.FormatMarkdown(result, g)
 	assert.Contains(t, md, "Source: schemas", "markdown should render explain output")
+}
+
+// --- New jq-style syntax tests ---
+
+func TestParse_NewSyntax_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{"select filter", `schemas | select(depth > 3)`},
+		{"pick fields", "schemas | pick name, depth"},
+		{"sort_by asc", "schemas | sort_by(depth)"},
+		{"sort_by desc", "schemas | sort_by(depth; desc)"},
+		{"first", "schemas | first(5)"},
+		{"last", "schemas | last(5)"},
+		{"length", "schemas | length"},
+		{"group_by", "schemas | group_by(type)"},
+		{"sample call", "schemas | sample(3)"},
+		{"neighbors call", "schemas | neighbors(2)"},
+		{"path call", "schemas | path(Pet; Address)"},
+		{"top call", "schemas | top(3; depth)"},
+		{"bottom call", "schemas | bottom(3; depth)"},
+		{"format call", "schemas | format(json)"},
+		{"let binding", `schemas | select(name == "Pet") | let $pet = name`},
+		{"full new pipeline", `schemas.components | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth`},
+		{"def inline", `def hot: select(in_degree > 0); schemas.components | hot`},
+		{"def with params", `def impact($name): select(name == $name); schemas.components | impact("Pet")`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			stages, err := oq.Parse(tt.query)
+			require.NoError(t, err, "query: %s", tt.query)
+			assert.NotEmpty(t, stages, "should parse into non-empty stages")
+		})
+	}
+}
+
+func TestExecute_SelectFilter_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | select(type == "object") | pick name`, g)
+	require.NoError(t, err)
+
+	names := collectNames(result, g)
+	assert.Contains(t, names, "Pet", "select filter should match Pet")
+	assert.Contains(t, names, "Owner", "select filter should match Owner")
+}
+
+func TestExecute_SortBy_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | sort_by(property_count; desc) | first(3) | pick name, property_count", g)
+	require.NoError(t, err)
+	assert.LessOrEqual(t, len(result.Rows), 3, "should return at most 3 rows")
+}
+
+func TestExecute_First_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | first(3)", g)
+	require.NoError(t, err)
+	assert.Len(t, result.Rows, 3, "first should return exactly 3 rows")
+}
+
+func TestExecute_Last_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | last(2)", g)
+	require.NoError(t, err)
+	assert.Len(t, result.Rows, 2, "last should return exactly 2 rows")
+}
+
+func TestExecute_Length_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | length", g)
+	require.NoError(t, err)
+	assert.True(t, result.IsCount, "length should be a count result")
+	assert.Positive(t, result.Count, "count should be positive")
+}
+
+func TestExecute_GroupBy_NewSyntax_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | group_by(type)", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Groups, "should have groups")
+}
+
+func TestExecute_LetBinding_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// let $pet = name, then use $pet in subsequent filter
+	result, err := oq.Execute(`schemas.components | select(name == "Pet") | let $pet = name | reachable | select(name != $pet) | pick name`, g)
+	require.NoError(t, err)
+
+	names := collectNames(result, g)
+	assert.NotContains(t, names, "Pet", "should not include the $pet variable value")
+	assert.Contains(t, names, "Owner", "should include reachable schemas")
+}
+
+func TestExecute_DefExpansion_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`def hot: select(in_degree > 0); schemas.components | hot | pick name`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "def expansion should produce results")
+
+	// All results should have in_degree > 0
+	for _, row := range result.Rows {
+		v := oq.FieldValuePublic(row, "in_degree", g)
+		assert.Greater(t, v.Int, 0, "hot filter should require in_degree > 0")
+	}
+}
+
+func TestExecute_DefWithParams_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`def impact($name): select(name == $name) | blast-radius; schemas.components | impact("Pet")`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "parameterized def should produce results")
+}
+
+func TestExecute_AlternativeOperator_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// name // "none" — name is always set, so should not be "none"
+	result, err := oq.Execute(`schemas.components | select(name // "none" != "none") | pick name`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "alternative operator should work")
+}
+
+func TestExecute_IfThenElse_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | select(if is_component then depth >= 0 else true end) | pick name`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "if-then-else should work in select")
+}
+
+func TestExecute_ExplainNewSyntax_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth | explain`, g)
+	require.NoError(t, err)
+	assert.Contains(t, result.Explain, "Filter: select(depth > 5)", "explain should show select filter")
+	assert.Contains(t, result.Explain, "Sort: sort_by(depth; desc)", "explain should show sort_by")
+	assert.Contains(t, result.Explain, "Limit: first(10)", "explain should show first")
+	assert.Contains(t, result.Explain, "Project: pick name, depth", "explain should show pick")
+}
+
+func TestExecute_ExplainLast_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas.components | last(3) | explain", g)
+	require.NoError(t, err)
+	assert.Contains(t, result.Explain, "Limit: last(3)", "explain should show last")
+}
+
+func TestExecute_ExplainLet_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas.components | select(name == "Pet") | let $pet = name | explain`, g)
+	require.NoError(t, err)
+	assert.Contains(t, result.Explain, "Bind: let $pet = name", "explain should show let binding")
+}
+
+func TestParse_NewSyntax_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{"select call empty", "schemas | select()"},
+		{"sort_by no parens", "schemas | sort_by depth"},
+		{"group_by no parens", "schemas | group_by type"},
+		{"let no dollar", "schemas | let x = name"},
+		{"let no equals", "schemas | let $x name"},
+		{"let empty expr", "schemas | let $x ="},
+		{"def missing colon", "def hot select(depth > 0); schemas | hot"},
+		{"def missing semicolon", "def hot: select(depth > 0) schemas | hot"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := oq.Parse(tt.query)
+			assert.Error(t, err, "query should fail: %s", tt.query)
+		})
+	}
 }
 
 // collectNames extracts the "name" field from all rows in the result.

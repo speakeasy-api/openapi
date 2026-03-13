@@ -51,10 +51,40 @@ type GroupResult struct {
 
 // Execute parses and executes a query against the given graph.
 func Execute(query string, g *graph.SchemaGraph) (*Result, error) {
-	stages, err := Parse(query)
+	return ExecuteWithSearchPaths(query, g, nil)
+}
+
+// ExecuteWithSearchPaths parses and executes a query, searching for modules in the given paths.
+func ExecuteWithSearchPaths(query string, g *graph.SchemaGraph, searchPaths []string) (*Result, error) {
+	decls, err := parseDeclarations(query)
 	if err != nil {
 		return nil, fmt.Errorf("parse error: %w", err)
 	}
+
+	// Resolve includes
+	for _, inc := range decls.Includes {
+		defs, loadErr := LoadModule(inc, searchPaths)
+		if loadErr != nil {
+			return nil, fmt.Errorf("include %q: %w", inc, loadErr)
+		}
+		decls.Defs = append(decls.Defs, defs...)
+	}
+
+	// Text-level def expansion before parsing pipeline
+	pipelineText, err := ExpandDefs(decls.PipelineText, decls.Defs)
+	if err != nil {
+		return nil, fmt.Errorf("def expansion: %w", err)
+	}
+
+	if pipelineText == "" {
+		return &Result{}, nil
+	}
+
+	stages, err := parsePipeline(pipelineText)
+	if err != nil {
+		return nil, fmt.Errorf("parse error: %w", err)
+	}
+
 	return run(stages, g)
 }
 
@@ -97,18 +127,35 @@ const (
 	StageClusters
 	StageTagBoundary
 	StageSharedRefs
+	StageLast
+	StageLet
 )
 
 // Stage represents a single stage in the query pipeline.
 type Stage struct {
 	Kind      StageKind
 	Source    string   // for StageSource
-	Expr      string   // for StageWhere
+	Expr      string   // for StageWhere, StageLet
 	Fields    []string // for StageSelect, StageGroupBy
 	SortField string   // for StageSort
 	SortDesc  bool     // for StageSort
-	Limit     int      // for StageTake, StageSample, StageTop, StageBottom
+	Limit     int      // for StageTake, StageLast, StageSample, StageTop, StageBottom
 	PathFrom  string   // for StagePath
 	PathTo    string   // for StagePath
 	Format    string   // for StageFormat
+	VarName   string   // for StageLet
+}
+
+// Query represents a parsed query with optional includes, defs, and pipeline stages.
+type Query struct {
+	Includes []string
+	Defs     []FuncDef
+	Stages   []Stage
+}
+
+// FuncDef represents a user-defined function.
+type FuncDef struct {
+	Name   string
+	Params []string // with $ prefix
+	Body   string   // raw pipeline text
 }

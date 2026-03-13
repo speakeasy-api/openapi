@@ -335,6 +335,192 @@ func TestParse_LiteralValues(t *testing.T) {
 	assert.True(t, result.Bool)
 }
 
+func TestParse_AlternativeOperator(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		exprStr  string
+		row      testRow
+		expected expr.Value
+	}{
+		{
+			name:     "left is truthy",
+			exprStr:  `name // "default"`,
+			row:      testRow{"name": expr.StringVal("Pet")},
+			expected: expr.StringVal("Pet"),
+		},
+		{
+			name:     "left is null",
+			exprStr:  `missing // "default"`,
+			row:      testRow{},
+			expected: expr.StringVal("default"),
+		},
+		{
+			name:     "left is empty string (falsy)",
+			exprStr:  `name // "default"`,
+			row:      testRow{"name": expr.StringVal("")},
+			expected: expr.StringVal("default"),
+		},
+		{
+			name:     "left is false",
+			exprStr:  `flag // true`,
+			row:      testRow{"flag": expr.BoolVal(false)},
+			expected: expr.BoolVal(true),
+		},
+		{
+			name:     "left is zero (falsy int)",
+			exprStr:  `count // 42`,
+			row:      testRow{"count": expr.IntVal(0)},
+			expected: expr.IntVal(42),
+		},
+		{
+			name:     "left is nonzero int (truthy)",
+			exprStr:  `count // 42`,
+			row:      testRow{"count": expr.IntVal(5)},
+			expected: expr.IntVal(5),
+		},
+		{
+			name:     "chained alternative",
+			exprStr:  `a // b // "fallback"`,
+			row:      testRow{"a": expr.NullVal(), "b": expr.StringVal("")},
+			expected: expr.StringVal("fallback"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parsed, err := expr.Parse(tt.exprStr)
+			require.NoError(t, err)
+			result := parsed.Eval(tt.row)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestParse_IfThenElse(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		exprStr  string
+		row      testRow
+		expected expr.Value
+	}{
+		{
+			name:     "if true then value",
+			exprStr:  `if is_component then depth else 0 end`,
+			row:      testRow{"is_component": expr.BoolVal(true), "depth": expr.IntVal(5)},
+			expected: expr.IntVal(5),
+		},
+		{
+			name:     "if false else value",
+			exprStr:  `if is_component then depth else 0 end`,
+			row:      testRow{"is_component": expr.BoolVal(false), "depth": expr.IntVal(5)},
+			expected: expr.IntVal(0),
+		},
+		{
+			name:     "if without else returns null",
+			exprStr:  `if is_component then depth end`,
+			row:      testRow{"is_component": expr.BoolVal(false), "depth": expr.IntVal(5)},
+			expected: expr.NullVal(),
+		},
+		{
+			name:     "nested if-then-else",
+			exprStr:  `if depth > 10 then "deep" elif depth > 5 then "medium" else "shallow" end`,
+			row:      testRow{"depth": expr.IntVal(7)},
+			expected: expr.StringVal("medium"),
+		},
+		{
+			name:     "if in boolean context",
+			exprStr:  `if is_component then depth > 3 else depth > 5 end`,
+			row:      testRow{"is_component": expr.BoolVal(true), "depth": expr.IntVal(4)},
+			expected: expr.BoolVal(true),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parsed, err := expr.Parse(tt.exprStr)
+			require.NoError(t, err)
+			result := parsed.Eval(tt.row)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestParse_StringInterpolation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		exprStr  string
+		row      testRow
+		expected string
+	}{
+		{
+			name:     "simple interpolation",
+			exprStr:  `"hello \(name)"`,
+			row:      testRow{"name": expr.StringVal("world")},
+			expected: "hello world",
+		},
+		{
+			name:     "interpolation with expr",
+			exprStr:  `"\(name) has depth \(depth)"`,
+			row:      testRow{"name": expr.StringVal("Pet"), "depth": expr.IntVal(3)},
+			expected: "Pet has depth 3",
+		},
+		{
+			name:     "no interpolation",
+			exprStr:  `"plain string"`,
+			row:      testRow{},
+			expected: "plain string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parsed, err := expr.Parse(tt.exprStr)
+			require.NoError(t, err)
+			result := parsed.Eval(tt.row)
+			assert.Equal(t, expr.KindString, result.Kind)
+			assert.Equal(t, tt.expected, result.Str)
+		})
+	}
+}
+
+func TestParse_IfThenElse_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		exprStr string
+	}{
+		{"missing then", `if true depth end`},
+		{"missing end", `if true then depth`},
+		{"missing end after else", `if true then depth else 0`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := expr.Parse(tt.exprStr)
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestParse_InterpolationError(t *testing.T) {
+	t.Parallel()
+
+	// Unterminated interpolation
+	_, err := expr.Parse(`"hello \(name"`)
+	require.Error(t, err)
+}
+
 func TestParse_ComplexPrecedence(t *testing.T) {
 	t.Parallel()
 

@@ -31,9 +31,12 @@ func run(stages []Stage, g *graph.SchemaGraph) (*Result, error) {
 		return nil, err
 	}
 
+	// Thread env through stages for let bindings
+	env := map[string]expr.Value{}
+
 	// Execute remaining stages
 	for _, stage := range stages[1:] {
-		result, err = execStage(stage, result, g)
+		result, env, err = execStageWithEnv(stage, result, g, env)
 		if err != nil {
 			return nil, err
 		}
@@ -71,10 +74,26 @@ func execSource(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 	return result, nil
 }
 
+func execStageWithEnv(stage Stage, result *Result, g *graph.SchemaGraph, env map[string]expr.Value) (*Result, map[string]expr.Value, error) {
+	switch stage.Kind {
+	case StageLet:
+		r, newEnv, err := execLet(stage, result, g, env)
+		return r, newEnv, err
+	case StageWhere:
+		r, err := execWhere(stage, result, g, env)
+		return r, env, err
+	default:
+		r, err := execStage(stage, result, g)
+		return r, env, err
+	}
+}
+
 func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
 	switch stage.Kind {
 	case StageWhere:
-		return execWhere(stage, result, g)
+		return execWhere(stage, result, g, nil)
+	case StageLast:
+		return execLast(stage, result)
 	case StageSelect:
 		result.Fields = stage.Fields
 		return result, nil
@@ -152,7 +171,7 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 	}
 }
 
-func execWhere(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
+func execWhere(stage Stage, result *Result, g *graph.SchemaGraph, env map[string]expr.Value) (*Result, error) {
 	predicate, err := expr.Parse(stage.Expr)
 	if err != nil {
 		return nil, fmt.Errorf("where expression error: %w", err)
@@ -160,13 +179,48 @@ func execWhere(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 
 	filtered := &Result{Fields: result.Fields}
 	for _, row := range result.Rows {
-		r := rowAdapter{row: row, g: g}
+		r := rowAdapter{row: row, g: g, env: env}
 		val := predicate.Eval(r)
 		if val.Kind == expr.KindBool && val.Bool {
 			filtered.Rows = append(filtered.Rows, row)
 		}
 	}
 	return filtered, nil
+}
+
+func execLast(stage Stage, result *Result) (*Result, error) {
+	rows := result.Rows
+	if stage.Limit < len(rows) {
+		rows = rows[len(rows)-stage.Limit:]
+	}
+	return &Result{
+		Fields:     result.Fields,
+		FormatHint: result.FormatHint,
+		Rows:       slices.Clone(rows),
+	}, nil
+}
+
+func execLet(stage Stage, result *Result, g *graph.SchemaGraph, env map[string]expr.Value) (*Result, map[string]expr.Value, error) {
+	predicate, err := expr.Parse(stage.Expr)
+	if err != nil {
+		return nil, env, fmt.Errorf("let expression error: %w", err)
+	}
+
+	// Evaluate against first row
+	newEnv := make(map[string]expr.Value, len(env)+1)
+	for k, v := range env {
+		newEnv[k] = v
+	}
+
+	if len(result.Rows) > 0 {
+		r := rowAdapter{row: result.Rows[0], g: g, env: env}
+		val := predicate.Eval(r)
+		newEnv[stage.VarName] = val
+	} else {
+		newEnv[stage.VarName] = expr.NullVal()
+	}
+
+	return result, newEnv, nil
 }
 
 func execSort(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
@@ -844,17 +898,21 @@ func buildExplain(stages []Stage) string {
 func describeStage(stage Stage) string {
 	switch stage.Kind {
 	case StageWhere:
-		return "Filter: where " + stage.Expr
+		return "Filter: select(" + stage.Expr + ")"
 	case StageSelect:
-		return "Project: select " + strings.Join(stage.Fields, ", ")
+		return "Project: pick " + strings.Join(stage.Fields, ", ")
 	case StageSort:
-		dir := "ascending"
+		dir := "asc"
 		if stage.SortDesc {
-			dir = "descending"
+			dir = "desc"
 		}
-		return "Sort: " + stage.SortField + " " + dir
+		return "Sort: sort_by(" + stage.SortField + "; " + dir + ")"
 	case StageTake:
-		return "Limit: take " + strconv.Itoa(stage.Limit)
+		return "Limit: first(" + strconv.Itoa(stage.Limit) + ")"
+	case StageLast:
+		return "Limit: last(" + strconv.Itoa(stage.Limit) + ")"
+	case StageLet:
+		return "Bind: let " + stage.VarName + " = " + stage.Expr
 	case StageUnique:
 		return "Unique: deduplicate rows"
 	case StageGroupBy:
