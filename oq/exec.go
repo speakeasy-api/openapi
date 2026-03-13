@@ -530,6 +530,8 @@ func execConnected(result *Result, g *graph.SchemaGraph) (*Result, error) {
 			schemaSeeds = append(schemaSeeds, graph.NodeID(row.SchemaIdx))
 		case OperationResult:
 			opSeeds = append(opSeeds, graph.NodeID(row.OpIdx))
+		case GroupRowResult:
+			// Group rows don't participate in connectivity analysis
 		}
 	}
 
@@ -1002,9 +1004,10 @@ func execFields(result *Result) (*Result, error) {
 	}
 
 	if kind == SchemaResult {
-		sb.WriteString("Field             Type\n")
-		sb.WriteString("-----------       ------\n")
+		sb.WriteString("Field                          Type\n")
+		sb.WriteString("-----------------------------  ------\n")
 		fields := []struct{ name, typ string }{
+			// Graph-level (pre-computed)
 			{"name", "string"},
 			{"type", "string"},
 			{"depth", "int"},
@@ -1023,13 +1026,43 @@ func execFields(result *Result) (*Result, error) {
 			{"edge_kind", "string"},
 			{"edge_label", "string"},
 			{"edge_from", "string"},
+			// Schema content
+			{"description", "string"},
+			{"has_description", "bool"},
+			{"title", "string"},
+			{"has_title", "bool"},
+			{"format", "string"},
+			{"pattern", "string"},
+			{"nullable", "bool"},
+			{"read_only", "bool"},
+			{"write_only", "bool"},
+			{"deprecated", "bool"},
+			{"unique_items", "bool"},
+			{"has_discriminator", "bool"},
+			{"discriminator_property", "string"},
+			{"discriminator_mapping_count", "int"},
+			{"required_count", "int"},
+			{"enum_count", "int"},
+			{"has_default", "bool"},
+			{"has_example", "bool"},
+			{"minimum", "int?"},
+			{"maximum", "int?"},
+			{"min_length", "int?"},
+			{"max_length", "int?"},
+			{"min_items", "int?"},
+			{"max_items", "int?"},
+			{"min_properties", "int?"},
+			{"max_properties", "int?"},
+			{"extension_count", "int"},
+			{"content_encoding", "string"},
+			{"content_media_type", "string"},
 		}
 		for _, f := range fields {
-			fmt.Fprintf(&sb, "%-17s %s\n", f.name, f.typ)
+			fmt.Fprintf(&sb, "%-30s %s\n", f.name, f.typ)
 		}
 	} else {
-		sb.WriteString("Field             Type\n")
-		sb.WriteString("-----------       ------\n")
+		sb.WriteString("Field                          Type\n")
+		sb.WriteString("-----------------------------  ------\n")
 		fields := []struct{ name, typ string }{
 			{"name", "string"},
 			{"method", "string"},
@@ -1038,16 +1071,21 @@ func execFields(result *Result) (*Result, error) {
 			{"schema_count", "int"},
 			{"component_count", "int"},
 			{"tag", "string"},
+			{"tags", "string"},
 			{"parameter_count", "int"},
 			{"deprecated", "bool"},
 			{"description", "string"},
 			{"summary", "string"},
+			{"response_count", "int"},
+			{"has_error_response", "bool"},
+			{"has_request_body", "bool"},
+			{"security_count", "int"},
 			{"edge_kind", "string"},
 			{"edge_label", "string"},
 			{"edge_from", "string"},
 		}
 		for _, f := range fields {
-			fmt.Fprintf(&sb, "%-17s %s\n", f.name, f.typ)
+			fmt.Fprintf(&sb, "%-30s %s\n", f.name, f.typ)
 		}
 	}
 

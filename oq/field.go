@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/speakeasy-api/openapi/graph"
+	oas3 "github.com/speakeasy-api/openapi/jsonschema/oas3"
+	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/oq/expr"
 )
 
@@ -40,6 +42,7 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		}
 		s := &g.Schemas[row.SchemaIdx]
 		switch name {
+		// --- Graph-level fields (pre-computed) ---
 		case "name":
 			return expr.StringVal(s.Name)
 		case "type":
@@ -76,6 +79,9 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal(row.EdgeLabel)
 		case "edge_from":
 			return expr.StringVal(row.EdgeFrom)
+		default:
+			// Schema-content fields require the underlying schema object
+			return schemaContentField(s, name)
 		}
 	case OperationResult:
 		if row.OpIdx < 0 || row.OpIdx >= len(g.Operations) {
@@ -126,6 +132,8 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal(row.EdgeLabel)
 		case "edge_from":
 			return expr.StringVal(row.EdgeFrom)
+		default:
+			return operationContentField(o, name)
 		}
 	case GroupRowResult:
 		switch name {
@@ -140,6 +148,198 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		}
 	}
 	return expr.NullVal()
+}
+
+// schemaContentField resolves fields by reading the underlying schema object.
+func schemaContentField(s *graph.SchemaNode, name string) expr.Value {
+	schema := getSchema(s)
+
+	switch name {
+	// --- Metadata ---
+	case "description":
+		if schema != nil && schema.Description != nil {
+			return expr.StringVal(*schema.Description)
+		}
+		return expr.StringVal("")
+	case "has_description":
+		return expr.BoolVal(schema != nil && schema.Description != nil && *schema.Description != "")
+	case "title":
+		if schema != nil && schema.Title != nil {
+			return expr.StringVal(*schema.Title)
+		}
+		return expr.StringVal("")
+	case "has_title":
+		return expr.BoolVal(schema != nil && schema.Title != nil && *schema.Title != "")
+
+	// --- Format & Pattern ---
+	case "format":
+		if schema != nil && schema.Format != nil {
+			return expr.StringVal(*schema.Format)
+		}
+		return expr.StringVal("")
+	case "pattern":
+		if schema != nil && schema.Pattern != nil {
+			return expr.StringVal(*schema.Pattern)
+		}
+		return expr.StringVal("")
+
+	// --- Flags ---
+	case "nullable":
+		return expr.BoolVal(schema != nil && schema.Nullable != nil && *schema.Nullable)
+	case "read_only":
+		return expr.BoolVal(schema != nil && schema.ReadOnly != nil && *schema.ReadOnly)
+	case "write_only":
+		return expr.BoolVal(schema != nil && schema.WriteOnly != nil && *schema.WriteOnly)
+	case "deprecated":
+		return expr.BoolVal(schema != nil && schema.Deprecated != nil && *schema.Deprecated)
+	case "unique_items":
+		return expr.BoolVal(schema != nil && schema.UniqueItems != nil && *schema.UniqueItems)
+
+	// --- Discriminator ---
+	case "has_discriminator":
+		return expr.BoolVal(schema != nil && schema.Discriminator != nil)
+	case "discriminator_property":
+		if schema != nil && schema.Discriminator != nil {
+			return expr.StringVal(schema.Discriminator.PropertyName)
+		}
+		return expr.StringVal("")
+	case "discriminator_mapping_count":
+		if schema != nil && schema.Discriminator != nil && schema.Discriminator.Mapping != nil {
+			return expr.IntVal(schema.Discriminator.Mapping.Len())
+		}
+		return expr.IntVal(0)
+
+	// --- Counts ---
+	case "required_count":
+		if schema != nil {
+			return expr.IntVal(len(schema.Required))
+		}
+		return expr.IntVal(0)
+	case "enum_count":
+		if schema != nil {
+			return expr.IntVal(len(schema.Enum))
+		}
+		return expr.IntVal(0)
+
+	// --- Defaults & Examples ---
+	case "has_default":
+		return expr.BoolVal(schema != nil && schema.Default != nil)
+	case "has_example":
+		return expr.BoolVal(schema != nil && (schema.Example != nil || len(schema.Examples) > 0))
+
+	// --- Numeric constraints ---
+	case "minimum":
+		if schema != nil && schema.Minimum != nil {
+			return expr.IntVal(int(*schema.Minimum))
+		}
+		return expr.NullVal()
+	case "maximum":
+		if schema != nil && schema.Maximum != nil {
+			return expr.IntVal(int(*schema.Maximum))
+		}
+		return expr.NullVal()
+
+	// --- String constraints ---
+	case "min_length":
+		if schema != nil && schema.MinLength != nil {
+			return expr.IntVal(int(*schema.MinLength))
+		}
+		return expr.NullVal()
+	case "max_length":
+		if schema != nil && schema.MaxLength != nil {
+			return expr.IntVal(int(*schema.MaxLength))
+		}
+		return expr.NullVal()
+
+	// --- Array constraints ---
+	case "min_items":
+		if schema != nil && schema.MinItems != nil {
+			return expr.IntVal(int(*schema.MinItems))
+		}
+		return expr.NullVal()
+	case "max_items":
+		if schema != nil && schema.MaxItems != nil {
+			return expr.IntVal(int(*schema.MaxItems))
+		}
+		return expr.NullVal()
+
+	// --- Object constraints ---
+	case "min_properties":
+		if schema != nil && schema.MinProperties != nil {
+			return expr.IntVal(int(*schema.MinProperties))
+		}
+		return expr.NullVal()
+	case "max_properties":
+		if schema != nil && schema.MaxProperties != nil {
+			return expr.IntVal(int(*schema.MaxProperties))
+		}
+		return expr.NullVal()
+
+	// --- Extensions ---
+	case "extension_count":
+		if schema != nil && schema.Extensions != nil {
+			return expr.IntVal(schema.Extensions.Len())
+		}
+		return expr.IntVal(0)
+
+	// --- Content encoding (OAS 3.1+) ---
+	case "content_encoding":
+		if schema != nil && schema.ContentEncoding != nil {
+			return expr.StringVal(*schema.ContentEncoding)
+		}
+		return expr.StringVal("")
+	case "content_media_type":
+		if schema != nil && schema.ContentMediaType != nil {
+			return expr.StringVal(*schema.ContentMediaType)
+		}
+		return expr.StringVal("")
+	}
+
+	return expr.NullVal()
+}
+
+// operationContentField resolves fields by reading the underlying operation object.
+func operationContentField(o *graph.OperationNode, name string) expr.Value {
+	op := o.Operation
+	if op == nil {
+		return expr.NullVal()
+	}
+
+	switch name {
+	case "response_count":
+		return expr.IntVal(op.Responses.Len())
+	case "has_error_response":
+		return expr.BoolVal(hasErrorResponse(op))
+	case "has_request_body":
+		return expr.BoolVal(op.RequestBody != nil)
+	case "security_count":
+		return expr.IntVal(len(op.Security))
+	case "tags":
+		return expr.StringVal(strings.Join(op.Tags, ", "))
+	}
+
+	return expr.NullVal()
+}
+
+// getSchema extracts the underlying *Schema from a SchemaNode, if available.
+func getSchema(s *graph.SchemaNode) *oas3.Schema {
+	if s.Schema == nil {
+		return nil
+	}
+	return s.Schema.GetSchema()
+}
+
+// hasErrorResponse returns true if the operation has any 4xx/5xx response codes
+// or a default response (which conventionally represents errors).
+func hasErrorResponse(op *openapi.Operation) bool {
+	if op.Responses.Map != nil {
+		for code := range op.Responses.All() {
+			if len(code) >= 1 && (code[0] == '4' || code[0] == '5') {
+				return true
+			}
+		}
+	}
+	return op.Responses.Default != nil
 }
 
 func compareValues(a, b expr.Value) int {

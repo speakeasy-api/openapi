@@ -24,6 +24,8 @@ OpenAPI specifications define REST APIs in a standard format. These commands hel
   - [`localize`](#localize)
   - [`explore`](#explore)
   - [`snip`](#snip)
+  - [`query`](#query)
+  - [`query-reference`](#query-reference)
 - [Common Options](#common-options)
 - [Output Formats](#output-formats)
 - [Examples](#examples)
@@ -1195,6 +1197,56 @@ components:
 - You're preparing a public API specification and need to remove internal endpoints
 - You want to reduce the size and complexity of a specification
 - You need to create different API variants from a single source
+
+### `query`
+
+Query an OpenAPI specification using the oq pipeline language to answer structural and semantic questions about schemas and operations.
+
+```bash
+# Find deeply nested components
+openapi spec query 'schemas.components | sort_by(depth; desc) | first(10) | pick name, depth' ./spec.yaml
+
+# OneOf unions missing discriminator
+openapi spec query 'schemas.components | select(union_width > 0 and not has_discriminator) | pick name, union_width' ./spec.yaml
+
+# Schemas missing descriptions
+openapi spec query 'schemas.components | select(not has_description) | pick name, type' ./spec.yaml
+
+# Operations missing error responses
+openapi spec query 'operations | select(not has_error_response) | pick name, method, path' ./spec.yaml
+
+# Blast radius — what breaks if I change a schema?
+openapi spec query 'schemas | select(name == "Error") | blast-radius | length' ./spec.yaml
+
+# Duplicate inline schemas
+openapi spec query 'schemas.inline | group_by(hash) | select(count > 1)' ./spec.yaml
+
+# Pipe from stdin
+cat spec.yaml | openapi spec query 'schemas | length'
+
+# Read query from file
+openapi spec query -f analysis.oq ./spec.yaml
+
+# Output as JSON
+openapi spec query --format json 'schemas.components | first(5)' ./spec.yaml
+```
+
+**Flags:**
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--format` | | Output format: `table` (default), `json`, `markdown`, or `toon` |
+| `--file` | `-f` | Read query from file instead of argument |
+
+For the full query language reference, run `openapi spec query-reference`.
+
+### `query-reference`
+
+Print the complete reference for the oq pipeline query language, including all sources, stages, fields, operators, and examples.
+
+```bash
+openapi spec query-reference
+```
 
 ## Common Options
 

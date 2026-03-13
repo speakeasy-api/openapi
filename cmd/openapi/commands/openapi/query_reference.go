@@ -109,6 +109,8 @@ META STAGES
 SCHEMA FIELDS
 -------------
 
+Graph-level (pre-computed):
+
   Field             Type     Description
   ─────             ────     ───────────
   name              string   Component name or JSON pointer
@@ -127,22 +129,61 @@ SCHEMA FIELDS
   op_count          int      Number of operations using this schema
   tag_count         int      Number of distinct tags across operations
 
+Content-level (from schema object):
+
+  Field                        Type     Description
+  ─────                        ────     ───────────
+  description                  string   Schema description text
+  has_description              bool     Whether description is non-empty
+  title                        string   Schema title
+  has_title                    bool     Whether title is non-empty
+  format                       string   Format hint (date-time, uuid, int32, ...)
+  pattern                      string   Regex validation pattern
+  nullable                     bool     Nullable flag
+  read_only                    bool     Read-only flag
+  write_only                   bool     Write-only flag
+  deprecated                   bool     Deprecated flag
+  unique_items                 bool     Array unique items constraint
+  has_discriminator            bool     Has discriminator object
+  discriminator_property       string   Discriminator property name
+  discriminator_mapping_count  int      Number of discriminator mappings
+  required_count               int      Number of required properties
+  enum_count                   int      Number of enum values
+  has_default                  bool     Has a default value
+  has_example                  bool     Has example(s)
+  minimum                      int?     Minimum numeric value (null if unset)
+  maximum                      int?     Maximum numeric value (null if unset)
+  min_length                   int?     Minimum string length (null if unset)
+  max_length                   int?     Maximum string length (null if unset)
+  min_items                    int?     Minimum array items (null if unset)
+  max_items                    int?     Maximum array items (null if unset)
+  min_properties               int?     Minimum object properties (null if unset)
+  max_properties               int?     Maximum object properties (null if unset)
+  extension_count              int      Number of x- extensions
+  content_encoding             string   Content encoding (base64, ...)
+  content_media_type           string   Content media type
+
 OPERATION FIELDS
 ----------------
 
-  Field             Type     Description
-  ─────             ────     ───────────
-  name              string   operationId or "METHOD /path"
-  method            string   HTTP method (GET, POST, ...)
-  path              string   URL path
-  operation_id      string   operationId
-  schema_count      int      Total reachable schema count
-  component_count   int      Reachable component schema count
-  tag               string   First tag
-  parameter_count   int      Number of parameters
-  deprecated        bool     Whether the operation is deprecated
-  description       string   Operation description
-  summary           string   Operation summary
+  Field               Type     Description
+  ─────               ────     ───────────
+  name                string   operationId or "METHOD /path"
+  method              string   HTTP method (GET, POST, ...)
+  path                string   URL path
+  operation_id        string   operationId
+  schema_count        int      Total reachable schema count
+  component_count     int      Reachable component schema count
+  tag                 string   First tag
+  tags                string   All tags (comma-separated)
+  parameter_count     int      Number of parameters
+  deprecated          bool     Whether the operation is deprecated
+  description         string   Operation description
+  summary             string   Operation summary
+  response_count      int      Number of response status codes
+  has_error_response  bool     Has 4xx/5xx or default response
+  has_request_body    bool     Has a request body
+  security_count      int      Number of security requirements
 
 EDGE ANNOTATION FIELDS
 ----------------------
@@ -272,4 +313,24 @@ EXAMPLES
   # Load functions from a module file
   include "stdlib.oq";
   schemas.components | hot | pick name, in_degree
+
+  # Schema content queries —
+
+  # OneOf unions missing discriminator
+  schemas.components | select(union_width > 0 and not has_discriminator) | pick name, union_width
+
+  # Schemas missing descriptions
+  schemas.components | select(not has_description) | pick name, type
+
+  # Schemas with enums
+  schemas.components | select(enum_count > 0) | pick name, enum_count
+
+  # Operations missing error responses
+  operations | select(not has_error_response) | pick name, method, path
+
+  # Duplicate inline schemas
+  schemas.inline | group_by(hash) | select(count > 1)
+
+  # Operations with request bodies but no error handling
+  operations | select(has_request_body and not has_error_response) | pick name, method, path
 `

@@ -138,6 +138,15 @@ If you add new packages to the root module (e.g., `oq/`, `graph/`) that `cmd/ope
 
 This gives `cmd/openapi/go.mod` a pseudo-version (e.g., `v1.19.6-0.20260312183335-395c19cd8edd`) that resolves correctly both locally and in CI. Each subsequent push that changes the root module requires repeating step 2 with the new commit SHA.
 
+## CLI Documentation
+
+When adding or modifying subcommands under `openapi spec`, you **must** update both:
+
+1. `README.md` (root) — the command list and Quick Examples section
+2. `cmd/openapi/commands/openapi/README.md` — detailed command documentation with examples, flags, and usage patterns
+
+The command README (`cmd/openapi/commands/openapi/README.md`) serves as the primary reference for each subcommand and should include usage examples, flag tables, and before/after demonstrations where applicable.
+
 ## Linter Rules
 
 This project uses `golangci-lint` with strict rules. Run `mise lint` to check. The most common violations are listed below. **When you encounter a new common lint pattern not documented here, add it to this section so future sessions avoid the same mistakes.**
