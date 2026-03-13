@@ -581,16 +581,16 @@ func TestExecute_EdgeAnnotations_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | where name == "Pet" | refs-out | select name, edge_kind, edge_label, edge_from`, g)
+	result, err := oq.Execute(`schemas.components | where name == "Pet" | refs-out | select name, via, key, from`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "refs-out from Pet should have results")
 
 	// Every row should have edge annotations
 	for _, row := range result.Rows {
-		kind := oq.FieldValuePublic(row, "edge_kind", g)
-		assert.NotEmpty(t, kind.Str, "edge_kind should be set")
-		from := oq.FieldValuePublic(row, "edge_from", g)
-		assert.Equal(t, "Pet", from.Str, "edge_from should be Pet")
+		kind := oq.FieldValuePublic(row, "via", g)
+		assert.NotEmpty(t, kind.Str, "via should be set")
+		from := oq.FieldValuePublic(row, "from", g)
+		assert.Equal(t, "Pet", from.Str, "from should be Pet")
 	}
 }
 
@@ -1050,11 +1050,11 @@ func TestExecute_FieldValue_EdgeCases(t *testing.T) {
 	assert.NotEmpty(t, result.Rows, "should have operation rows")
 
 	// Test edge fields on non-traversal rows (should be empty strings)
-	result, err = oq.Execute("schemas.components | take 1 | select name, edge_kind, edge_label, edge_from", g)
+	result, err = oq.Execute("schemas.components | take 1 | select name, via, key, from", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "should have schema rows")
-	edgeKind := oq.FieldValuePublic(result.Rows[0], "edge_kind", g)
-	assert.Empty(t, edgeKind.Str, "edge_kind should be empty for non-traversal rows")
+	viaVal := oq.FieldValuePublic(result.Rows[0], "via", g)
+	assert.Empty(t, viaVal.Str, "via should be empty for non-traversal rows")
 
 	// Test tag_count field
 	result, err = oq.Execute("schemas.components | take 1 | select name, tag_count", g)
@@ -1334,14 +1334,14 @@ func TestExecute_CyclicSpec_EdgeAnnotations(t *testing.T) {
 	g := loadCyclicGraph(t)
 
 	// Test refs-out to cover edgeKindString branches
-	result, err := oq.Execute(`schemas.components | where name == "NodeA" | refs-out | select name, edge_kind, edge_label`, g)
+	result, err := oq.Execute(`schemas.components | where name == "NodeA" | refs-out | select name, via, key`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "NodeA should have outgoing refs")
 
-	// Collect edge kinds
+	// Collect edge kinds (via)
 	edgeKinds := make(map[string]bool)
 	for _, row := range result.Rows {
-		k := oq.FieldValuePublic(row, "edge_kind", g)
+		k := oq.FieldValuePublic(row, "via", g)
 		edgeKinds[k.Str] = true
 	}
 	// NodeA has properties, allOf, anyOf, items etc.

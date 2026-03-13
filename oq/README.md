@@ -49,6 +49,7 @@ source | stage | stage | ... | terminal
 | `properties` | Property sub-schemas (with edge annotations) |
 | `union-members` | allOf/oneOf/anyOf children (with edge annotations) |
 | `items` | Array items schema (with edge annotations) |
+| `parent` | Navigate back to source schema of edge annotations |
 | `ops` | Schemas → operations |
 | `schemas` | Operations → schemas |
 | `path(A; B)` | Shortest path between two schemas |
@@ -152,13 +153,15 @@ Module search paths: current directory, then `~/.config/oq/`
 
 ### Edge Annotation Fields
 
-Available on rows produced by 1-hop traversal stages (`refs-out`, `refs-in`, `properties`, `union-members`, `items`):
+Available on rows produced by 1-hop traversal stages (`refs-out`, `refs-in`, `properties`, `union-members`, `items`). Use `parent` to navigate back to the source schema.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `edge_kind` | string | Edge type: property, items, allOf, oneOf, ref, ... |
-| `edge_label` | string | Edge label: property name, array index, etc. |
-| `edge_from` | string | Source node name |
+| `via` | string | Edge type: property, items, allOf, oneOf, ref, ... |
+| `key` | string | Edge key: property name, array index, etc. |
+| `from` | string | Source node name |
+
+Legacy aliases `edge_kind`, `edge_label`, `edge_from` are still supported.
 
 ## Expressions
 
@@ -243,7 +246,7 @@ schemas | select(name matches "Error.*") | pick name, path
 schemas | group_by(type)
 
 # Edge annotations — how does Pet reference other schemas?
-schemas.components | select(name == "Pet") | refs-out | pick name, edge_kind, edge_label, edge_from
+schemas.components | select(name == "Pet") | refs-out | pick name, via, key, from
 
 # Blast radius — what breaks if Error changes?
 schemas.components | select(name == "Error") | blast-radius | length

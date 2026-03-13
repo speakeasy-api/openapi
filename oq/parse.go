@@ -291,6 +291,9 @@ func parseStage(s string) (Stage, error) {
 	case "items":
 		return Stage{Kind: StageItems}, nil
 
+	case "parent":
+		return Stage{Kind: StageParent}, nil
+
 	case "ops":
 		return Stage{Kind: StageOps}, nil
 

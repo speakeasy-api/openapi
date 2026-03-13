@@ -166,6 +166,8 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		return execTagBoundary(result, g)
 	case StageSharedRefs:
 		return execSharedRefs(result, g)
+	case StageParent:
+		return execParent(result, g)
 	default:
 		return nil, fmt.Errorf("unimplemented stage kind: %d", stage.Kind)
 	}
@@ -336,10 +338,10 @@ func execTraversal(result *Result, g *graph.SchemaGraph, fn traversalFunc) (*Res
 
 func edgeRowKey(row Row) string {
 	base := rowKey(row)
-	if row.EdgeKind == "" {
+	if row.Via == "" {
 		return base
 	}
-	return base + "|" + row.EdgeFrom + "|" + row.EdgeKind + "|" + row.EdgeLabel
+	return base + "|" + row.From + "|" + row.Via + "|" + row.Key
 }
 
 func traverseRefsOut(row Row, g *graph.SchemaGraph) []Row {
@@ -352,9 +354,9 @@ func traverseRefsOut(row Row, g *graph.SchemaGraph) []Row {
 		result = append(result, Row{
 			Kind:      SchemaResult,
 			SchemaIdx: int(edge.To),
-			EdgeKind:  edgeKindString(edge.Kind),
-			EdgeLabel: edge.Label,
-			EdgeFrom:  fromName,
+			Via:  edgeKindString(edge.Kind),
+			Key: edge.Label,
+			From:  fromName,
 		})
 	}
 	return result
@@ -370,9 +372,9 @@ func traverseRefsIn(row Row, g *graph.SchemaGraph) []Row {
 		result = append(result, Row{
 			Kind:      SchemaResult,
 			SchemaIdx: int(edge.From),
-			EdgeKind:  edgeKindString(edge.Kind),
-			EdgeLabel: edge.Label,
-			EdgeFrom:  toName,
+			Via:  edgeKindString(edge.Kind),
+			Key: edge.Label,
+			From:  toName,
 		})
 	}
 	return result
@@ -413,9 +415,9 @@ func traverseProperties(row Row, g *graph.SchemaGraph) []Row {
 			result = append(result, Row{
 				Kind:      SchemaResult,
 				SchemaIdx: int(edge.To),
-				EdgeKind:  edgeKindString(edge.Kind),
-				EdgeLabel: edge.Label,
-				EdgeFrom:  fromName,
+				Via:  edgeKindString(edge.Kind),
+				Key: edge.Label,
+				From:  fromName,
 			})
 		}
 	}
@@ -435,9 +437,9 @@ func traverseUnionMembers(row Row, g *graph.SchemaGraph) []Row {
 			result = append(result, Row{
 				Kind:      SchemaResult,
 				SchemaIdx: target,
-				EdgeKind:  edgeKindString(edge.Kind),
-				EdgeLabel: edge.Label,
-				EdgeFrom:  fromName,
+				Via:  edgeKindString(edge.Kind),
+				Key: edge.Label,
+				From:  fromName,
 			})
 		}
 	}
@@ -455,9 +457,9 @@ func traverseItems(row Row, g *graph.SchemaGraph) []Row {
 			result = append(result, Row{
 				Kind:      SchemaResult,
 				SchemaIdx: int(edge.To),
-				EdgeKind:  edgeKindString(edge.Kind),
-				EdgeLabel: edge.Label,
-				EdgeFrom:  fromName,
+				Via:  edgeKindString(edge.Kind),
+				Key: edge.Label,
+				From:  fromName,
 			})
 		}
 	}
@@ -1023,9 +1025,9 @@ func execFields(result *Result) (*Result, error) {
 			{"path", "string"},
 			{"op_count", "int"},
 			{"tag_count", "int"},
-			{"edge_kind", "string"},
-			{"edge_label", "string"},
-			{"edge_from", "string"},
+			{"via", "string"},
+			{"key", "string"},
+			{"from", "string"},
 			// Schema content
 			{"description", "string"},
 			{"has_description", "bool"},
@@ -1080,9 +1082,9 @@ func execFields(result *Result) (*Result, error) {
 			{"has_error_response", "bool"},
 			{"has_request_body", "bool"},
 			{"security_count", "int"},
-			{"edge_kind", "string"},
-			{"edge_label", "string"},
-			{"edge_from", "string"},
+			{"via", "string"},
+			{"key", "string"},
+			{"from", "string"},
 		}
 		for _, f := range fields {
 			fmt.Fprintf(&sb, "%-30s %s\n", f.name, f.typ)
@@ -1090,6 +1092,42 @@ func execFields(result *Result) (*Result, error) {
 	}
 
 	return &Result{Explain: sb.String()}, nil
+}
+
+// --- Parent ---
+
+// execParent navigates back to the source schema of 1-hop edge annotations.
+// After properties, union-members, items, refs-out, or refs-in, each row has
+// a From field naming the source node. This stage looks up those source schemas
+// by name, replacing the result set with the parent schemas.
+func execParent(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := &Result{Fields: result.Fields}
+	seen := make(map[int]bool)
+
+	// Build name→index lookup
+	nameIdx := make(map[string]int, len(g.Schemas))
+	for i := range g.Schemas {
+		nameIdx[schemaName(i, g)] = i
+	}
+
+	for _, row := range result.Rows {
+		if row.From == "" {
+			continue
+		}
+		idx, ok := nameIdx[row.From]
+		if !ok {
+			continue
+		}
+		if seen[idx] {
+			continue
+		}
+		seen[idx] = true
+		out.Rows = append(out.Rows, Row{
+			Kind:      SchemaResult,
+			SchemaIdx: idx,
+		})
+	}
+	return out, nil
 }
 
 // --- Sample ---

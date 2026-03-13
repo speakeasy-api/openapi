@@ -29,9 +29,9 @@ type Row struct {
 	OpIdx     int // index into SchemaGraph.Operations
 
 	// Edge annotations (populated by 1-hop traversal stages)
-	EdgeKind  string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
-	EdgeLabel string // edge label: property name, array index, etc.
-	EdgeFrom  string // source node name
+	Via  string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
+	Key  string // edge key: property name, array index, etc.
+	From string // source node name
 
 	// Group annotations (populated by group-by stages)
 	GroupKey   string   // group key value
@@ -137,6 +137,7 @@ const (
 	StageSharedRefs
 	StageLast
 	StageLet
+	StageParent
 )
 
 // Stage represents a single stage in the query pipeline.

@@ -45,6 +45,7 @@ in the schema reference graph.
   properties        Expand to property sub-schemas (with edge annotations)
   union-members     Expand allOf/oneOf/anyOf children (with edge annotations)
   items             Expand to array items schema (with edge annotations)
+  parent            Navigate back to source schema of edge annotations
   ops               Schemas → operations that use them
   schemas           Operations → schemas they touch
   path(A; B)        Shortest path between two named schemas
@@ -188,13 +189,16 @@ OPERATION FIELDS
 EDGE ANNOTATION FIELDS
 ----------------------
 Available on rows produced by 1-hop traversal stages (refs-out, refs-in,
-properties, union-members, items):
+properties, union-members, items). Use 'parent' to navigate back to the
+source schema.
 
   Field             Type     Description
   ─────             ────     ───────────
-  edge_kind         string   Edge type: property, items, allOf, oneOf, ref, ...
-  edge_label        string   Edge label: property name, array index, etc.
-  edge_from         string   Source node name
+  via               string   Edge type: property, items, allOf, oneOf, ref, ...
+  key               string   Edge key: property name, array index, etc.
+  from              string   Source node name
+
+  Legacy aliases: edge_kind → via, edge_label → key, edge_from → from
 
 EXPRESSIONS
 -----------
@@ -274,7 +278,10 @@ EXAMPLES
   schemas | select(property_count > 3 and not is_component) | pick name, property_count, path
 
   # Edge annotations — see how Pet references other schemas
-  schemas.components | select(name == "Pet") | refs-out | pick name, edge_kind, edge_label, edge_from
+  schemas.components | select(name == "Pet") | refs-out | pick name, via, key, from
+
+  # Parent — find schemas containing a property matching a pattern
+  schemas | properties | select(key matches "(?i)date.?time") | parent | unique | format(yaml)
 
   # Blast radius — what breaks if I change the Error schema?
   schemas.components | select(name == "Error") | blast-radius | length
