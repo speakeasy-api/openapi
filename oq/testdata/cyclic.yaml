@@ -1,0 +1,89 @@
+openapi: "3.1.0"
+info:
+  title: Cyclic Test
+  version: "1.0.0"
+paths:
+  /nodes:
+    get:
+      operationId: listNodes
+      tags:
+        - nodes
+        - admin
+      deprecated: true
+      summary: List all nodes
+      description: Returns a list of all node objects
+      responses:
+        "200":
+          description: A list of nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NodeA'
+components:
+  schemas:
+    NodeA:
+      type: object
+      properties:
+        name:
+          type: string
+        child:
+          $ref: '#/components/schemas/NodeB'
+        extra:
+          allOf:
+            - $ref: '#/components/schemas/NodeC'
+        variant:
+          anyOf:
+            - type: string
+            - type: integer
+        meta:
+          additionalProperties:
+            type: string
+        items:
+          type: array
+          items:
+            type: string
+          prefixItems:
+            - type: integer
+        guard:
+          if:
+            type: string
+          then:
+            type: string
+          else:
+            type: integer
+        negative:
+          not:
+            type: null
+        contained:
+          type: array
+          contains:
+            type: string
+        propNames:
+          type: object
+          propertyNames:
+            type: string
+        pattern:
+          type: object
+          patternProperties:
+            "^S_":
+              type: string
+        deps:
+          type: object
+          dependentSchemas:
+            bar:
+              type: object
+              properties:
+                barValue:
+                  type: string
+    NodeB:
+      type: object
+      properties:
+        ref_back:
+          $ref: '#/components/schemas/NodeA'
+    NodeC:
+      type: object
+      properties:
+        value:
+          type: string

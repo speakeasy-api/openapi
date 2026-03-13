@@ -18,4 +18,6 @@ func Apply(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(localizeCmd)
 	rootCmd.AddCommand(exploreCmd)
 	rootCmd.AddCommand(snipCmd)
+	rootCmd.AddCommand(queryCmd)
+	rootCmd.AddCommand(queryReferenceCmd)
 }

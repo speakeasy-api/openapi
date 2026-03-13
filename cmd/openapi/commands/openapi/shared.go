@@ -31,6 +31,23 @@ func stdinOrFileArgs(minArgs, maxArgs int) cobra.PositionalArgs {
 	return cmdutil.StdinOrFileArgs(minArgs, maxArgs)
 }
 
+// queryArgs returns a PositionalArgs validator for the query command.
+// When -f/--file is provided, 0 positional args are allowed (spec from stdin).
+// Otherwise requires 1–2 positional args (query + optional spec file).
+func queryArgs() cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		fromFile, _ := cmd.Flags().GetString("file")
+		if fromFile != "" {
+			// -f flag present: 0 or 1 positional arg (optional spec file)
+			if len(args) > 1 {
+				return fmt.Errorf("accepts at most 1 arg when using --file, received %d", len(args))
+			}
+			return nil
+		}
+		return cmdutil.StdinOrFileArgs(1, 2)(cmd, args)
+	}
+}
+
 // OpenAPIProcessor handles common OpenAPI document processing operations
 type OpenAPIProcessor struct {
 	InputFile     string

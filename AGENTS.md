@@ -114,6 +114,30 @@ git commit -m "feat: implement prefixEncoding and itemEncoding for OpenAPI 3.2
 3. **Searchability**: Easier to search and filter commits
 4. **Tool Compatibility**: Works better with automated tools and scripts
 
+## Multi-Module Dependency Management
+
+This repository uses Go workspaces (`go.work`) with multiple modules. The `cmd/openapi` module depends on the root `github.com/speakeasy-api/openapi` module.
+
+### How Local Development Works
+
+The `go.work` file lists all modules, so during local development the workspace resolves cross-module imports automatically. You do **not** need a `replace` directive in `cmd/openapi/go.mod`.
+
+### When Adding New Packages to the Root Module
+
+If you add new packages to the root module (e.g., `oq/`, `graph/`) that `cmd/openapi` imports, the published module version won't contain them yet. The workspace handles this locally, but `cmd/openapi/go.mod` must reference a version that includes the new packages for CI to pass `mod-check`.
+
+**Do NOT use `replace` directives.** Instead:
+
+1. Push your branch with the new root module packages.
+2. From the repo root, update `cmd/openapi` to reference your branch commit:
+   ```bash
+   GOWORK=off go get -C cmd/openapi github.com/speakeasy-api/openapi@<commit-sha>
+   GOWORK=off go mod tidy -C cmd/openapi
+   ```
+3. Verify with `mise run mod-check`.
+
+This gives `cmd/openapi/go.mod` a pseudo-version (e.g., `v1.19.6-0.20260312183335-395c19cd8edd`) that resolves correctly both locally and in CI. Each subsequent push that changes the root module requires repeating step 2 with the new commit SHA.
+
 ## Linter Rules
 
 This project uses `golangci-lint` with strict rules. Run `mise lint` to check. The most common violations are listed below. **When you encounter a new common lint pattern not documented here, add it to this section so future sessions avoid the same mistakes.**
