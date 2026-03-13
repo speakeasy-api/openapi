@@ -574,9 +574,7 @@ func (g *SchemaGraph) computeMetrics() {
 	for i := range g.Schemas {
 		nid := NodeID(i)
 		if !visited[nid] {
-			if g.detectCycle(nid, visited, inStack, circularNodes) {
-				circularNodes[nid] = true
-			}
+			g.detectCycle(nid, visited, inStack, circularNodes)
 		}
 	}
 
@@ -620,27 +618,35 @@ func (g *SchemaGraph) computeDepth(id NodeID, visited map[NodeID]bool) int {
 	return maxChild
 }
 
-func (g *SchemaGraph) detectCycle(id NodeID, visited, inStack map[NodeID]bool, circular map[NodeID]bool) bool {
+// detectCycle performs a DFS from id, marking nodes that participate in cycles.
+// It returns the NodeID of the cycle entry point that still needs to be "closed"
+// by an ancestor frame, or -1 if no open cycle passes through this node.
+func (g *SchemaGraph) detectCycle(id NodeID, visited, inStack map[NodeID]bool, circular map[NodeID]bool) NodeID {
 	if inStack[id] {
 		circular[id] = true
-		return true
+		return id // back-edge found; id is the cycle entry point
 	}
 	if visited[id] {
-		return false
+		return -1
 	}
 	visited[id] = true
 	inStack[id] = true
 
-	found := false
+	var outerEntry NodeID = -1
 	for _, edge := range g.outEdges[id] {
-		if g.detectCycle(edge.To, visited, inStack, circular) {
+		entry := g.detectCycle(edge.To, visited, inStack, circular)
+		if entry != -1 {
 			circular[id] = true
-			found = true
+			// If the cycle entry is this node, the cycle is closed — don't propagate.
+			// Otherwise, remember the outermost open entry to propagate upward.
+			if entry != id {
+				outerEntry = entry
+			}
 		}
 	}
 
 	inStack[id] = false
-	return found
+	return outerEntry
 }
 
 // Reachable returns all schema NodeIDs transitively reachable from the given node via out-edges.

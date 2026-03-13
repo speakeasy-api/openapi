@@ -103,8 +103,8 @@ func TestExecute_SchemasCount_Success(t *testing.T) {
 
 	result, err := oq.Execute("schemas | count", g)
 	require.NoError(t, err)
-	assert.True(t, result.IsCount)
-	assert.Positive(t, result.Count)
+	assert.True(t, result.IsCount, "should be a count result")
+	assert.Positive(t, result.Count, "count should be positive")
 }
 
 func TestExecute_ComponentSchemas_Success(t *testing.T) {
@@ -113,16 +113,16 @@ func TestExecute_ComponentSchemas_Success(t *testing.T) {
 
 	result, err := oq.Execute("schemas.components | select name", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have component schema rows")
 
 	// Check that we have the expected component schemas
 	names := collectNames(result, g)
-	assert.Contains(t, names, "Pet")
-	assert.Contains(t, names, "Owner")
-	assert.Contains(t, names, "Address")
-	assert.Contains(t, names, "Error")
-	assert.Contains(t, names, "Shape")
-	assert.Contains(t, names, "Unused")
+	assert.Contains(t, names, "Pet", "should include Pet schema")
+	assert.Contains(t, names, "Owner", "should include Owner schema")
+	assert.Contains(t, names, "Address", "should include Address schema")
+	assert.Contains(t, names, "Error", "should include Error schema")
+	assert.Contains(t, names, "Shape", "should include Shape schema")
+	assert.Contains(t, names, "Unused", "should include Unused schema")
 }
 
 func TestExecute_Where_Success(t *testing.T) {
@@ -133,8 +133,8 @@ func TestExecute_Where_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
-	assert.Contains(t, names, "Pet")
-	assert.Contains(t, names, "Owner")
+	assert.Contains(t, names, "Pet", "should include Pet schema")
+	assert.Contains(t, names, "Owner", "should include Owner schema")
 }
 
 func TestExecute_WhereInDegree_Success(t *testing.T) {
@@ -147,7 +147,7 @@ func TestExecute_WhereInDegree_Success(t *testing.T) {
 
 	names := collectNames(result, g)
 	// Unused should have no references from other schemas
-	assert.Contains(t, names, "Unused")
+	assert.Contains(t, names, "Unused", "should include Unused schema with in_degree 0")
 }
 
 func TestExecute_Sort_Success(t *testing.T) {
@@ -156,7 +156,7 @@ func TestExecute_Sort_Success(t *testing.T) {
 
 	result, err := oq.Execute("schemas.components | sort property_count desc | take 3 | select name, property_count", g)
 	require.NoError(t, err)
-	assert.LessOrEqual(t, len(result.Rows), 3)
+	assert.LessOrEqual(t, len(result.Rows), 3, "should return at most 3 rows")
 }
 
 func TestExecute_Reachable_Success(t *testing.T) {
@@ -168,8 +168,8 @@ func TestExecute_Reachable_Success(t *testing.T) {
 
 	names := collectNames(result, g)
 	// Pet references Owner, Owner references Address
-	assert.Contains(t, names, "Owner")
-	assert.Contains(t, names, "Address")
+	assert.Contains(t, names, "Owner", "Pet should reach Owner")
+	assert.Contains(t, names, "Address", "Pet should reach Address")
 }
 
 func TestExecute_Ancestors_Success(t *testing.T) {
@@ -181,7 +181,7 @@ func TestExecute_Ancestors_Success(t *testing.T) {
 
 	names := collectNames(result, g)
 	// Address is referenced by Owner, which is referenced by Pet
-	assert.Contains(t, names, "Owner")
+	assert.Contains(t, names, "Owner", "Address ancestors should include Owner")
 }
 
 func TestExecute_Properties_Success(t *testing.T) {
@@ -191,7 +191,7 @@ func TestExecute_Properties_Success(t *testing.T) {
 	result, err := oq.Execute(`schemas.components | where name == "Pet" | properties | select name`, g)
 	require.NoError(t, err)
 	// Pet has 4 properties: id, name, tag, owner
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "Pet should have properties")
 }
 
 func TestExecute_UnionMembers_Success(t *testing.T) {
@@ -202,8 +202,8 @@ func TestExecute_UnionMembers_Success(t *testing.T) {
 	require.NoError(t, err)
 	// Shape has oneOf with Circle and Square
 	names := collectNames(result, g)
-	assert.Contains(t, names, "Circle")
-	assert.Contains(t, names, "Square")
+	assert.Contains(t, names, "Circle", "Shape union members should include Circle")
+	assert.Contains(t, names, "Square", "Shape union members should include Square")
 }
 
 func TestExecute_Operations_Success(t *testing.T) {
@@ -212,7 +212,7 @@ func TestExecute_Operations_Success(t *testing.T) {
 
 	result, err := oq.Execute("operations | select name, method, path", g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have operations")
 }
 
 func TestExecute_OperationSchemas_Success(t *testing.T) {
@@ -223,7 +223,7 @@ func TestExecute_OperationSchemas_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
-	assert.Contains(t, names, "Pet")
+	assert.Contains(t, names, "Pet", "listPets operation should reference Pet schema")
 }
 
 func TestExecute_GroupBy_Success(t *testing.T) {
@@ -232,7 +232,7 @@ func TestExecute_GroupBy_Success(t *testing.T) {
 
 	result, err := oq.Execute(`schemas.components | group-by type`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Groups)
+	assert.NotEmpty(t, result.Groups, "should have groups")
 }
 
 func TestExecute_Unique_Success(t *testing.T) {
@@ -257,7 +257,7 @@ func TestExecute_SchemasToOps_Success(t *testing.T) {
 
 	result, err := oq.Execute(`schemas.components | where name == "Pet" | ops | select name`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows)
+	assert.NotEmpty(t, result.Rows, "should have operations using Pet schema")
 }
 
 func TestFormatTable_Success(t *testing.T) {
@@ -268,9 +268,9 @@ func TestFormatTable_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	table := oq.FormatTable(result, g)
-	assert.Contains(t, table, "name")
-	assert.Contains(t, table, "type")
-	assert.NotEmpty(t, table)
+	assert.Contains(t, table, "name", "table should include name column")
+	assert.Contains(t, table, "type", "table should include type column")
+	assert.NotEmpty(t, table, "table should not be empty")
 }
 
 func TestFormatJSON_Success(t *testing.T) {
@@ -281,8 +281,8 @@ func TestFormatJSON_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	json := oq.FormatJSON(result, g)
-	assert.True(t, strings.HasPrefix(json, "["))
-	assert.True(t, strings.HasSuffix(json, "]"))
+	assert.True(t, strings.HasPrefix(json, "["), "JSON output should start with [")
+	assert.True(t, strings.HasSuffix(json, "]"), "JSON output should end with ]")
 }
 
 func TestFormatTable_Count_Success(t *testing.T) {
@@ -293,7 +293,7 @@ func TestFormatTable_Count_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	table := oq.FormatTable(result, g)
-	assert.NotEmpty(t, table)
+	assert.NotEmpty(t, table, "count table should not be empty")
 }
 
 func TestFormatTable_Empty_Success(t *testing.T) {
@@ -304,7 +304,7 @@ func TestFormatTable_Empty_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	table := oq.FormatTable(result, g)
-	assert.Equal(t, "(empty)", table)
+	assert.Equal(t, "(empty)", table, "empty result should format as (empty)")
 }
 
 func TestExecute_MatchesExpression_Success(t *testing.T) {
@@ -315,7 +315,7 @@ func TestExecute_MatchesExpression_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
-	assert.Contains(t, names, "Error")
+	assert.Contains(t, names, "Error", "regex match should return Error schema")
 }
 
 func TestExecute_SortAsc_Success(t *testing.T) {
@@ -327,7 +327,7 @@ func TestExecute_SortAsc_Success(t *testing.T) {
 
 	names := collectNames(result, g)
 	for i := 1; i < len(names); i++ {
-		assert.LessOrEqual(t, names[i-1], names[i])
+		assert.LessOrEqual(t, names[i-1], names[i], "names should be in ascending order")
 	}
 }
 
@@ -337,10 +337,10 @@ func TestExecute_Explain_Success(t *testing.T) {
 
 	result, err := oq.Execute("schemas.components | where depth > 5 | sort depth desc | take 10 | explain", g)
 	require.NoError(t, err)
-	assert.Contains(t, result.Explain, "Source: schemas.components")
-	assert.Contains(t, result.Explain, "Filter: where depth > 5")
-	assert.Contains(t, result.Explain, "Sort: depth descending")
-	assert.Contains(t, result.Explain, "Limit: take 10")
+	assert.Contains(t, result.Explain, "Source: schemas.components", "explain should show source")
+	assert.Contains(t, result.Explain, "Filter: where depth > 5", "explain should show filter stage")
+	assert.Contains(t, result.Explain, "Sort: depth descending", "explain should show sort stage")
+	assert.Contains(t, result.Explain, "Limit: take 10", "explain should show limit stage")
 }
 
 func TestExecute_Fields_Schemas_Success(t *testing.T) {
@@ -1054,7 +1054,7 @@ func TestExecute_FieldValue_EdgeCases(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows)
 	edgeKind := oq.FieldValuePublic(result.Rows[0], "edge_kind", g)
-	assert.Equal(t, "", edgeKind.Str)
+	assert.Empty(t, edgeKind.Str, "edge_kind should be empty for non-traversal rows")
 
 	// Test tag_count field
 	result, err = oq.Execute("schemas.components | take 1 | select name, tag_count", g)
@@ -1355,8 +1355,11 @@ func TestExecute_CyclicSpec_IsCircular(t *testing.T) {
 	result, err := oq.Execute("schemas.components | where is_circular | select name", g)
 	require.NoError(t, err)
 	names := collectNames(result, g)
-	assert.Contains(t, names, "NodeA")
-	assert.Contains(t, names, "NodeB")
+	assert.Contains(t, names, "NodeA", "NodeA is in the A↔B cycle")
+	assert.Contains(t, names, "NodeB", "NodeB is in the A↔B cycle")
+
+	// NodeC is NOT in the cycle — it's only referenced by NodeA via allOf
+	assert.NotContains(t, names, "NodeC", "NodeC should not be marked circular")
 }
 
 func TestExecute_CyclicSpec_DeprecatedOp(t *testing.T) {

@@ -205,7 +205,7 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 	}
 
 	if result.IsCount {
-		return "count: " + strconv.Itoa(result.Count) + "\n"
+		return "count: " + strconv.Itoa(result.Count)
 	}
 
 	if len(result.Groups) > 0 {
