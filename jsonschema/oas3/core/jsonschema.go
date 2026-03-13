@@ -46,6 +46,9 @@ type Schema struct {
 	MaxLength             marshaller.Node[*int64]                                                 `key:"maxLength"`
 	MinLength             marshaller.Node[*int64]                                                 `key:"minLength"`
 	Pattern               marshaller.Node[*string]                                                `key:"pattern"`
+	ContentEncoding       marshaller.Node[*string]                                                `key:"contentEncoding"`
+	ContentMediaType      marshaller.Node[*string]                                                `key:"contentMediaType"`
+	ContentSchema         marshaller.Node[JSONSchema]                                             `key:"contentSchema"`
 	Format                marshaller.Node[*string]                                                `key:"format"`
 	MaxItems              marshaller.Node[*int64]                                                 `key:"maxItems"`
 	MinItems              marshaller.Node[*int64]                                                 `key:"minItems"`

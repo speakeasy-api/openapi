@@ -379,6 +379,10 @@ func analyzeReferences(ctx context.Context, schema *JSONSchema[Referenceable], o
 		}
 	}
 
+	if err := analyzeReferences(ctx, js.ContentSchema, opts, refTracker, visited, counter); err != nil {
+		return err
+	}
+
 	if err := analyzeReferences(ctx, js.Not, opts, refTracker, visited, counter); err != nil {
 		return err
 	}
@@ -575,6 +579,13 @@ func inlineRecursive(ctx context.Context, schema *JSONSchema[Referenceable], opt
 		return nil, err
 	}
 	js.Items = s
+
+	// Visit contentSchema
+	s, err = inlineRecursive(ctx, js.ContentSchema, opts, refTracker, visited, counter)
+	if err != nil {
+		return nil, err
+	}
+	js.ContentSchema = s
 
 	// Visit not schema
 	s, err = inlineRecursive(ctx, js.Not, opts, refTracker, visited, counter)
