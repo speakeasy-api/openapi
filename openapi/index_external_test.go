@@ -947,7 +947,7 @@ func TestBuildIndex_ExternalRef_NoFalseCircularReference_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
-	// Use a relative TargetLocation (matching customer usage: speakeasy lint --schema catalog.json)
+	// Use a rooted virtual path TargetLocation so relative refs resolve from /api.
 	resolveOpts := references.ResolveOptions{
 		TargetLocation: "/api/catalog.json",
 		RootDocument:   doc,
@@ -974,7 +974,7 @@ func TestBuildIndex_ExternalRef_NoFalseCircularReference_Success(t *testing.T) {
 // TestBuildIndex_ExternalRef_MultipleRefsToSameFile_NoFalseCircular_Success verifies that
 // when a single external schema file is referenced from multiple places (e.g., both as a
 // direct response schema and as an array item), it does NOT produce a false circular reference.
-// This is a variant that uses YAML and more closely matches the customer's reported structure.
+// This JSON-backed variant more closely matches the customer's reported structure.
 func TestBuildIndex_ExternalRef_MultipleRefsToSameFile_NoFalseCircular_Success(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -1088,6 +1088,7 @@ func TestBuildIndex_ExternalRef_MultipleRefsToSameFile_NoFalseCircular_Success(t
 	require.NoError(t, err)
 	require.Empty(t, validationErrs)
 
+	// Use a rooted virtual path TargetLocation for the /catalog.json fixture.
 	resolveOpts := references.ResolveOptions{
 		TargetLocation: "/catalog.json",
 		RootDocument:   doc,
