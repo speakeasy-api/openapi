@@ -2,6 +2,8 @@ openapi: "3.1.0"
 info:
   title: Petstore
   version: "1.0.0"
+security:
+  - bearerAuth: []
 paths:
   /pets:
     get:
@@ -11,6 +13,11 @@ paths:
           in: query
           schema:
             type: integer
+        - name: format
+          in: query
+          deprecated: true
+          schema:
+            type: string
       responses:
         "200":
           description: A list of pets
@@ -22,14 +29,28 @@ paths:
                   $ref: '#/components/schemas/Pet'
     post:
       operationId: createPet
+      security:
+        - bearerAuth: [pets:write]
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/Pet'
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
       responses:
         "201":
           description: Created
+          headers:
+            X-Request-Id:
+              schema:
+                type: string
+              required: true
           content:
             application/json:
               schema:
@@ -56,6 +77,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /events:
+    get:
+      operationId: streamEvents
+      security: []
+      responses:
+        "200":
+          description: Event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
   /owners:
     get:
       operationId: listOwners
@@ -69,6 +101,25 @@ paths:
                 items:
                   $ref: '#/components/schemas/Owner'
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 20
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   schemas:
     Pet:
       type: object

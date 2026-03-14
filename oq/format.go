@@ -269,11 +269,7 @@ func FormatYAML(result *Result, g *graph.SchemaGraph) string {
 		}
 
 		node := getRootNode(row, g)
-		// Use path for full attribution; fall back to name for non-schema rows
-		key := valueToString(fieldValue(row, "path", g))
-		if key == "" {
-			key = valueToString(fieldValue(row, "name", g))
-		}
+		key := emitKey(row, g)
 
 		if node == nil {
 			sb.WriteString("# ")
@@ -534,6 +530,61 @@ func syncGroupsFromRows(result *Result) {
 				Names: row.GroupNames,
 			})
 		}
+	}
+}
+
+// emitKey returns the YAML wrapper key for a result row.
+// Uses path for schemas (full JSON pointer attribution), and contextual
+// compound keys for navigation rows (e.g., "listEntities/200" for responses).
+func emitKey(row Row, g *graph.SchemaGraph) string {
+	switch row.Kind {
+	case SchemaResult:
+		// Use path for full attribution; fall back to name
+		if path := valueToString(fieldValue(row, "path", g)); path != "" {
+			return path
+		}
+		return valueToString(fieldValue(row, "name", g))
+	case OperationResult:
+		return valueToString(fieldValue(row, "name", g))
+	case ResponseResult:
+		op := operationName(row.SourceOpIdx, g)
+		if op != "" {
+			return op + "/" + row.StatusCode
+		}
+		return row.StatusCode
+	case RequestBodyResult:
+		op := operationName(row.SourceOpIdx, g)
+		if op != "" {
+			return op + "/request-body"
+		}
+		return "request-body"
+	case ContentTypeResult:
+		op := operationName(row.SourceOpIdx, g)
+		parts := []string{}
+		if op != "" {
+			parts = append(parts, op)
+		}
+		if row.StatusCode != "" {
+			parts = append(parts, row.StatusCode)
+		}
+		parts = append(parts, row.MediaTypeName)
+		return strings.Join(parts, "/")
+	case ParameterResult:
+		op := operationName(row.SourceOpIdx, g)
+		if op != "" {
+			return op + "/parameters/" + row.ParamName
+		}
+		return row.ParamName
+	case HeaderResult:
+		op := operationName(row.SourceOpIdx, g)
+		if op != "" {
+			return op + "/" + row.StatusCode + "/headers/" + row.HeaderName
+		}
+		return row.HeaderName
+	case SecuritySchemeResult:
+		return row.SchemeName
+	default:
+		return valueToString(fieldValue(row, "name", g))
 	}
 }
 

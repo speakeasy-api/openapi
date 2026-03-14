@@ -114,7 +114,7 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 	case StageTake:
 		return execTake(stage, result)
 	case StageUnique:
-		return execUnique(result)
+		return execUnique(result, g)
 	case StageGroupBy:
 		return execGroupBy(stage, result, g)
 	case StageCount:
@@ -280,11 +280,24 @@ func execTake(stage Stage, result *Result) (*Result, error) {
 	return out, nil
 }
 
-func execUnique(result *Result) (*Result, error) {
+func execUnique(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	seen := make(map[string]bool)
 	filtered := deriveResult(result)
 	for _, row := range result.Rows {
-		key := rowKey(row)
+		var key string
+		if len(result.Fields) > 0 {
+			// When pick is active, deduplicate by projected field values
+			var sb strings.Builder
+			for i, f := range result.Fields {
+				if i > 0 {
+					sb.WriteByte('\x00')
+				}
+				sb.WriteString(valueToString(fieldValue(row, f, g)))
+			}
+			key = sb.String()
+		} else {
+			key = rowKey(row)
+		}
 		if !seen[key] {
 			seen[key] = true
 			filtered.Rows = append(filtered.Rows, row)
@@ -1459,7 +1472,7 @@ func execSchema(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	out := deriveResult(result)
 	seen := make(map[int]bool)
 
-	resolveAndAdd := func(js *oas3.JSONSchemaReferenceable, _ int) {
+	resolveAndAdd := func(js *oas3.JSONSchemaReferenceable) {
 		if js == nil {
 			return
 		}
@@ -1468,6 +1481,8 @@ func execSchema(result *Result, g *graph.SchemaGraph) (*Result, error) {
 			return
 		}
 		idx := int(id)
+		// Follow $ref edges to get the actual component schema
+		idx = resolveRefTarget(idx, g)
 		if seen[idx] {
 			return
 		}
@@ -1479,15 +1494,15 @@ func execSchema(result *Result, g *graph.SchemaGraph) (*Result, error) {
 		switch row.Kind {
 		case ParameterResult:
 			if row.Parameter != nil && row.Parameter.Schema != nil {
-				resolveAndAdd(row.Parameter.Schema, row.OpIdx)
+				resolveAndAdd(row.Parameter.Schema)
 			}
 		case ContentTypeResult:
 			if row.ContentType != nil && row.ContentType.Schema != nil {
-				resolveAndAdd(row.ContentType.Schema, row.OpIdx)
+				resolveAndAdd(row.ContentType.Schema)
 			}
 		case HeaderResult:
 			if row.Header != nil && row.Header.Schema != nil {
-				resolveAndAdd(row.Header.Schema, row.OpIdx)
+				resolveAndAdd(row.Header.Schema)
 			}
 		default:
 			// schema only works on parameter, content-type, and header rows
@@ -1656,7 +1671,12 @@ func execSecurity(result *Result, g *graph.SchemaGraph) (*Result, error) {
 		if op.Operation == nil {
 			continue
 		}
-		for _, req := range op.Operation.Security {
+		// Use per-operation security if explicitly set, otherwise inherit global
+		secReqs := op.Operation.Security
+		if secReqs == nil && g.Index != nil && g.Index.Doc != nil {
+			secReqs = g.Index.Doc.GetSecurity()
+		}
+		for _, req := range secReqs {
 			if req == nil {
 				continue
 			}

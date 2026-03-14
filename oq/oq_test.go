@@ -1628,6 +1628,422 @@ func TestParse_NewSyntax_Error(t *testing.T) {
 	}
 }
 
+// --- Navigation stage tests ---
+
+func TestExecute_Parameters(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("operations | parameters", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "should find parameters")
+
+	// Check that parameters have the right fields
+	for _, row := range result.Rows {
+		assert.Equal(t, oq.ParameterResult, row.Kind)
+		name := oq.FieldValuePublic(row, "name", g)
+		assert.NotEmpty(t, name.Str, "parameter should have a name")
+		in := oq.FieldValuePublic(row, "in", g)
+		assert.Contains(t, []string{"query", "path", "header", "cookie"}, in.Str)
+	}
+
+	// Operation back-navigation
+	ops, err := oq.Execute("operations | parameters | operation | unique", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, ops.Rows, "should find source operations")
+	for _, row := range ops.Rows {
+		assert.Equal(t, oq.OperationResult, row.Kind)
+	}
+}
+
+func TestExecute_Responses(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("operations | first(1) | responses", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "should find responses")
+
+	for _, row := range result.Rows {
+		assert.Equal(t, oq.ResponseResult, row.Kind)
+		sc := oq.FieldValuePublic(row, "status_code", g)
+		assert.NotEmpty(t, sc.Str, "response should have status_code")
+	}
+}
+
+func TestExecute_ContentTypes(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("operations | first(1) | responses | content-types", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "should find content types")
+
+	for _, row := range result.Rows {
+		assert.Equal(t, oq.ContentTypeResult, row.Kind)
+		mt := oq.FieldValuePublic(row, "media_type", g)
+		assert.NotEmpty(t, mt.Str, "content type should have media_type")
+	}
+}
+
+func TestExecute_RequestBody(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// createPet has a request body
+	result, err := oq.Execute(`operations | select(name == "createPet") | request-body`, g)
+	require.NoError(t, err)
+	assert.Len(t, result.Rows, 1, "createPet should have one request body")
+	assert.Equal(t, oq.RequestBodyResult, result.Rows[0].Kind)
+
+	// request-body | content-types
+	ct, err := oq.Execute(`operations | select(name == "createPet") | request-body | content-types`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, ct.Rows, "request body should have content types")
+}
+
+func TestExecute_SchemaResolvesRef(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// The schema stage should resolve $ref wrappers to the component they reference
+	result, err := oq.Execute("operations | first(1) | responses | content-types | schema", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "should resolve schemas")
+
+	for _, row := range result.Rows {
+		assert.Equal(t, oq.SchemaResult, row.Kind)
+		// After resolving $ref, the schema should not be a bare $ref wrapper
+		hasRef := oq.FieldValuePublic(row, "has_ref", g)
+		isComp := oq.FieldValuePublic(row, "is_component", g)
+		// If the original was a $ref, the resolved schema should be the component
+		if hasRef.Bool {
+			assert.True(t, isComp.Bool, "resolved $ref schema should be a component")
+		}
+	}
+}
+
+func TestExecute_SchemaFromParameterBridgesToGraph(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Get schema from a parameter, then use graph traversal on it
+	result, err := oq.Execute("operations | parameters | first(1) | schema", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "parameter should have a schema")
+	assert.Equal(t, oq.SchemaResult, result.Rows[0].Kind)
+}
+
+func TestExecute_UniqueAfterPick(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Without pick, unique deduplicates by row identity
+	all, err := oq.Execute("operations | responses | content-types", g)
+	require.NoError(t, err)
+
+	// With pick media_type + unique, should deduplicate by the projected value
+	deduped, err := oq.Execute("operations | responses | content-types | pick media_type | unique", g)
+	require.NoError(t, err)
+	assert.Less(t, len(deduped.Rows), len(all.Rows), "unique after pick should reduce rows")
+
+	// All remaining rows should have distinct media_type values
+	seen := make(map[string]bool)
+	for _, row := range deduped.Rows {
+		mt := oq.FieldValuePublic(row, "media_type", g)
+		assert.False(t, seen[mt.Str], "media_type %q should not be duplicated", mt.Str)
+		seen[mt.Str] = true
+	}
+}
+
+func TestExecute_UniqueWithoutPick_UsesRowKey(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Without pick, unique should use row identity (original behavior)
+	result, err := oq.Execute("schemas | select(is_component) | unique | length", g)
+	require.NoError(t, err)
+	assert.True(t, result.IsCount)
+
+	all, err := oq.Execute("schemas | select(is_component) | length", g)
+	require.NoError(t, err)
+	assert.Equal(t, all.Count, result.Count, "unique on already-unique rows should keep all")
+}
+
+func TestExecute_NavStageOnWrongType_EmptyNotError(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// parameters on schemas should be empty, not error
+	result, err := oq.Execute("schemas | first(1) | parameters", g)
+	require.NoError(t, err)
+	assert.Empty(t, result.Rows)
+
+	// headers on operations (need responses first) should be empty
+	result, err = oq.Execute("operations | first(1) | headers", g)
+	require.NoError(t, err)
+	assert.Empty(t, result.Rows)
+
+	// content-types on schemas should be empty
+	result, err = oq.Execute("schemas | first(1) | content-types", g)
+	require.NoError(t, err)
+	assert.Empty(t, result.Rows)
+}
+
+func TestExecute_ComponentsSources(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// components.schemas = schemas | select(is_component)
+	compSchemas, err := oq.Execute("components.schemas | length", g)
+	require.NoError(t, err)
+	filteredSchemas, err := oq.Execute("schemas | select(is_component) | length", g)
+	require.NoError(t, err)
+	assert.Equal(t, filteredSchemas.Count, compSchemas.Count)
+
+	// components.parameters should work (may be 0 for petstore)
+	_, err = oq.Execute("components.parameters | length", g)
+	require.NoError(t, err)
+
+	// components.responses should work
+	_, err = oq.Execute("components.responses | length", g)
+	require.NoError(t, err)
+}
+
+func TestExecute_NavigationFullChain(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Full navigation chain: operation → responses → content-types → schema → graph traversal
+	result, err := oq.Execute("operations | first(1) | responses | content-types | schema | refs-out | first(3)", g)
+	require.NoError(t, err)
+	// May be empty depending on whether the schema has refs, but should not error
+	for _, row := range result.Rows {
+		assert.Equal(t, oq.SchemaResult, row.Kind)
+	}
+}
+
+func TestExecute_OperationBackNav(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Get distinct operations from responses
+	result, err := oq.Execute("operations | responses | operation | unique | length", g)
+	require.NoError(t, err)
+	assert.True(t, result.IsCount)
+
+	opCount, err := oq.Execute("operations | length", g)
+	require.NoError(t, err)
+	// Every operation should have responses, so back-nav should recover all ops
+	assert.Equal(t, opCount.Count, result.Count, "back-nav should recover all operations")
+}
+
+func TestExecute_ResponseContextPropagation(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Content-type rows should inherit status_code from their parent response
+	result, err := oq.Execute("operations | first(1) | responses | content-types | pick status_code, media_type, operation", g)
+	require.NoError(t, err)
+	for _, row := range result.Rows {
+		sc := oq.FieldValuePublic(row, "status_code", g)
+		assert.NotEmpty(t, sc.Str, "content-type should inherit status_code")
+		op := oq.FieldValuePublic(row, "operation", g)
+		assert.NotEmpty(t, op.Str, "content-type should inherit operation")
+	}
+}
+
+func TestParse_NavigationStages(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{"parameters", "operations | parameters"},
+		{"responses", "operations | responses"},
+		{"request-body", "operations | request-body"},
+		{"content-types", "operations | responses | content-types"},
+		{"headers", "operations | responses | headers"},
+		{"schema", "operations | parameters | schema"},
+		{"operation", "operations | parameters | operation"},
+		{"security", "operations | security"},
+		{"components.schemas", "components.schemas"},
+		{"components.parameters", "components.parameters"},
+		{"components.responses", "components.responses"},
+		{"components.request-bodies", "components.request-bodies"},
+		{"components.headers", "components.headers"},
+		{"components.security-schemes", "components.security-schemes"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := oq.Parse(tt.query)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestExecute_SecurityGlobalInheritance(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// listPets has no per-operation security, should inherit global bearerAuth
+	result, err := oq.Execute(`operations | select(name == "listPets") | security`, g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1, "listPets should inherit global security")
+	assert.Equal(t, oq.SecurityRequirementResult, result.Rows[0].Kind)
+
+	schemeName := oq.FieldValuePublic(result.Rows[0], "scheme_name", g)
+	assert.Equal(t, "bearerAuth", schemeName.Str)
+
+	schemeType := oq.FieldValuePublic(result.Rows[0], "scheme_type", g)
+	assert.Equal(t, "http", schemeType.Str)
+}
+
+func TestExecute_SecurityPerOperation(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// createPet has per-operation security with scopes
+	result, err := oq.Execute(`operations | select(name == "createPet") | security`, g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+
+	scopes := oq.FieldValuePublic(result.Rows[0], "scopes", g)
+	assert.Equal(t, expr.KindArray, scopes.Kind)
+	assert.Equal(t, []string{"pets:write"}, scopes.Arr)
+}
+
+func TestExecute_SecurityOptOut(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// streamEvents has security: [] (explicit opt-out)
+	result, err := oq.Execute(`operations | select(name == "streamEvents") | security`, g)
+	require.NoError(t, err)
+	assert.Empty(t, result.Rows, "streamEvents should have no security (explicit opt-out)")
+}
+
+func TestExecute_ComponentsSecuritySchemes(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("components.security-schemes", g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+
+	name := oq.FieldValuePublic(result.Rows[0], "name", g)
+	assert.Equal(t, "bearerAuth", name.Str)
+
+	schemeType := oq.FieldValuePublic(result.Rows[0], "type", g)
+	assert.Equal(t, "http", schemeType.Str)
+
+	scheme := oq.FieldValuePublic(result.Rows[0], "scheme", g)
+	assert.Equal(t, "bearer", scheme.Str)
+}
+
+func TestExecute_ComponentsParameters(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("components.parameters", g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+
+	name := oq.FieldValuePublic(result.Rows[0], "name", g)
+	assert.Equal(t, "LimitParam", name.Str)
+}
+
+func TestExecute_ComponentsResponses(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("components.responses", g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+
+	name := oq.FieldValuePublic(result.Rows[0], "name", g)
+	assert.Equal(t, "NotFound", name.Str)
+}
+
+func TestExecute_DeprecatedParameters(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("operations | parameters | select(deprecated) | pick name, operation", g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+
+	name := oq.FieldValuePublic(result.Rows[0], "name", g)
+	assert.Equal(t, "format", name.Str)
+}
+
+func TestExecute_SSEContentType(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | responses | content-types | select(media_type == "text/event-stream") | operation | unique`, g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+
+	name := oq.FieldValuePublic(result.Rows[0], "name", g)
+	assert.Equal(t, "streamEvents", name.Str)
+}
+
+func TestExecute_MultipleContentTypes(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// createPet request body has both application/json and multipart/form-data
+	result, err := oq.Execute(`operations | select(name == "createPet") | request-body | content-types | pick media_type`, g)
+	require.NoError(t, err)
+	assert.Len(t, result.Rows, 2)
+
+	types := make([]string, len(result.Rows))
+	for i, row := range result.Rows {
+		types[i] = oq.FieldValuePublic(row, "media_type", g).Str
+	}
+	assert.Contains(t, types, "application/json")
+	assert.Contains(t, types, "multipart/form-data")
+}
+
+func TestExecute_ResponseHeaders(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// createPet 201 response has X-Request-Id header
+	result, err := oq.Execute(`operations | select(name == "createPet") | responses | select(status_code == "201") | headers`, g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+
+	name := oq.FieldValuePublic(result.Rows[0], "name", g)
+	assert.Equal(t, "X-Request-Id", name.Str)
+
+	req := oq.FieldValuePublic(result.Rows[0], "required", g)
+	assert.True(t, req.Bool)
+}
+
+func TestExecute_UniqueContentTypes(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Unique after pick should deduplicate by projected values
+	result, err := oq.Execute("operations | responses | content-types | pick media_type | unique", g)
+	require.NoError(t, err)
+
+	seen := make(map[string]bool)
+	for _, row := range result.Rows {
+		mt := oq.FieldValuePublic(row, "media_type", g).Str
+		assert.False(t, seen[mt], "duplicate media_type %q after unique", mt)
+		seen[mt] = true
+	}
+	// Should have application/json and text/event-stream
+	assert.True(t, seen["application/json"])
+	assert.True(t, seen["text/event-stream"])
+}
+
 // collectNames extracts the "name" field from all rows in the result.
 func collectNames(result *oq.Result, g *graph.SchemaGraph) []string {
 	var names []string
