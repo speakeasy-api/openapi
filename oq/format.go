@@ -270,10 +270,6 @@ func FormatYAML(result *Result, g *graph.SchemaGraph) string {
 		node := getRootNode(row, g)
 		if node == nil {
 			// Fallback: emit as comment with the name
-			fields := result.Fields
-			if len(fields) == 0 {
-				fields = defaultFieldsForKind(row.Kind)
-			}
 			sb.WriteString("# ")
 			name := valueToString(fieldValue(row, "name", g))
 			sb.WriteString(name)
