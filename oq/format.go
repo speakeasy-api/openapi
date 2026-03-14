@@ -269,21 +269,23 @@ func FormatYAML(result *Result, g *graph.SchemaGraph) string {
 		}
 
 		node := getRootNode(row, g)
-		name := valueToString(fieldValue(row, "name", g))
+		// Use path for full attribution; fall back to name for non-schema rows
+		key := valueToString(fieldValue(row, "path", g))
+		if key == "" {
+			key = valueToString(fieldValue(row, "name", g))
+		}
 
 		if node == nil {
-			// Fallback: emit as comment with the name
 			sb.WriteString("# ")
-			sb.WriteString(name)
+			sb.WriteString(key)
 			sb.WriteString(" (no YAML node available)\n")
 			continue
 		}
 
-		// Wrap the node under its key name for context
 		wrapper := &yaml.Node{
 			Kind: yaml.MappingNode,
 			Content: []*yaml.Node{
-				{Kind: yaml.ScalarNode, Value: name},
+				{Kind: yaml.ScalarNode, Value: key},
 				node,
 			},
 		}
@@ -323,10 +325,9 @@ func getRootNode(row Row, g *graph.SchemaGraph) *yaml.Node {
 			return nil
 		}
 		return o.Operation.GetRootNode()
-	case GroupRowResult:
+	default:
 		return nil
 	}
-	return nil
 }
 
 func formatGroupsToon(result *Result) string {
@@ -463,10 +464,22 @@ func defaultFieldsForKind(kind ResultKind) []string {
 	switch kind {
 	case SchemaResult:
 		return []string{"name", "type", "depth", "in_degree", "out_degree"}
+	case OperationResult:
+		return []string{"name", "method", "path", "schema_count"}
 	case GroupRowResult:
 		return []string{"key", "count", "names"}
+	case ParameterResult:
+		return []string{"name", "in", "required", "deprecated", "operation"}
+	case ResponseResult:
+		return []string{"status_code", "description", "content_type_count", "operation"}
+	case RequestBodyResult:
+		return []string{"description", "required", "content_type_count", "operation"}
+	case ContentTypeResult:
+		return []string{"media_type", "has_schema", "status_code", "operation"}
+	case HeaderResult:
+		return []string{"name", "required", "status_code", "operation"}
 	default:
-		return []string{"name", "method", "path", "schema_count"}
+		return []string{"name"}
 	}
 }
 

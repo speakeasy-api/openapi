@@ -43,8 +43,8 @@ func TestParse_Success(t *testing.T) {
 		query string
 	}{
 		{"simple source", "schemas"},
-		{"components source", "schemas.components"},
-		{"inline source", "schemas.inline"},
+		{"components source", "schemas | select(is_component)"},
+		{"inline source", "schemas | select(is_inline)"},
 		{"operations source", "operations"},
 		{"sort_by", "schemas | sort_by(depth; desc)"},
 		{"first", "schemas | first(5)"},
@@ -62,16 +62,16 @@ func TestParse_Success(t *testing.T) {
 		{"items", "schemas | items"},
 		{"ops", "schemas | ops"},
 		{"schemas from ops", "operations | schemas"},
-		{"connected", "schemas.components | select(name == \"Pet\") | connected"},
-		{"blast-radius", "schemas.components | select(name == \"Pet\") | blast-radius"},
-		{"neighbors", "schemas.components | select(name == \"Pet\") | neighbors 2"},
-		{"orphans", "schemas.components | orphans"},
-		{"leaves", "schemas.components | leaves"},
+		{"connected", "schemas | select(is_component) | select(name == \"Pet\") | connected"},
+		{"blast-radius", "schemas | select(is_component) | select(name == \"Pet\") | blast-radius"},
+		{"neighbors", "schemas | select(is_component) | select(name == \"Pet\") | neighbors 2"},
+		{"orphans", "schemas | select(is_component) | orphans"},
+		{"leaves", "schemas | select(is_component) | leaves"},
 		{"cycles", "schemas | cycles"},
-		{"clusters", "schemas.components | clusters"},
+		{"clusters", "schemas | select(is_component) | clusters"},
 		{"tag-boundary", "schemas | tag-boundary"},
 		{"shared-refs", "operations | first(2) | shared-refs"},
-		{"full pipeline", "schemas.components | select(depth > 0) | sort_by(depth; desc) | first(5) | pick name, depth"},
+		{"full pipeline", "schemas | select(is_component) | select(depth > 0) | sort_by(depth; desc) | first(5) | pick name, depth"},
 	}
 
 	for _, tt := range tests {
@@ -111,7 +111,7 @@ func TestExecute_ComponentSchemas_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | pick name", g)
+	result, err := oq.Execute("schemas | select(is_component) | pick name", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "should have component schema rows")
 
@@ -129,7 +129,7 @@ func TestExecute_Where_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(type == "object") | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(type == "object") | pick name`, g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
@@ -142,7 +142,7 @@ func TestExecute_WhereInDegree_Success(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Unused schema has no incoming references (from other schemas in components)
-	result, err := oq.Execute(`schemas.components | select(in_degree == 0) | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(in_degree == 0) | pick name`, g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
@@ -154,7 +154,7 @@ func TestExecute_Sort_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | sort_by(property_count; desc) | first(3) | pick name, property_count", g)
+	result, err := oq.Execute("schemas | select(is_component) | sort_by(property_count; desc) | first(3) | pick name, property_count", g)
 	require.NoError(t, err)
 	assert.LessOrEqual(t, len(result.Rows), 3, "should return at most 3 rows")
 }
@@ -163,7 +163,7 @@ func TestExecute_Reachable_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "Pet") | reachable | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | reachable | pick name`, g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
@@ -176,7 +176,7 @@ func TestExecute_Ancestors_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "Address") | ancestors | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Address") | ancestors | pick name`, g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
@@ -188,7 +188,7 @@ func TestExecute_Properties_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "Pet") | properties | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | properties | pick name`, g)
 	require.NoError(t, err)
 	// Pet has 4 properties: id, name, tag, owner
 	assert.NotEmpty(t, result.Rows, "Pet should have properties")
@@ -198,7 +198,7 @@ func TestExecute_UnionMembers_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "Shape") | union-members | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Shape") | union-members | pick name`, g)
 	require.NoError(t, err)
 	// Shape has oneOf with Circle and Square
 	names := collectNames(result, g)
@@ -230,7 +230,7 @@ func TestExecute_GroupBy_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | group_by(type)`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | group_by(type)`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Groups, "should have groups")
 }
@@ -239,7 +239,7 @@ func TestExecute_Unique_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | unique", g)
+	result, err := oq.Execute("schemas | select(is_component) | unique", g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
@@ -255,7 +255,7 @@ func TestExecute_SchemasToOps_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "Pet") | ops | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | ops | pick name`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "should have operations using Pet schema")
 }
@@ -264,7 +264,7 @@ func TestFormatTable_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | first(3) | pick name, type", g)
+	result, err := oq.Execute("schemas | select(is_component) | first(3) | pick name, type", g)
 	require.NoError(t, err)
 
 	table := oq.FormatTable(result, g)
@@ -277,7 +277,7 @@ func TestFormatJSON_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | first(3) | pick name, type", g)
+	result, err := oq.Execute("schemas | select(is_component) | first(3) | pick name, type", g)
 	require.NoError(t, err)
 
 	json := oq.FormatJSON(result, g)
@@ -300,7 +300,7 @@ func TestFormatTable_Empty_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "NonExistent")`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "NonExistent")`, g)
 	require.NoError(t, err)
 
 	table := oq.FormatTable(result, g)
@@ -311,7 +311,7 @@ func TestExecute_MatchesExpression_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name matches ".*Error.*") | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name matches ".*Error.*") | pick name`, g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
@@ -322,7 +322,7 @@ func TestExecute_SortAsc_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | sort_by(name) | pick name", g)
+	result, err := oq.Execute("schemas | select(is_component) | sort_by(name) | pick name", g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
@@ -335,9 +335,9 @@ func TestExecute_Explain_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | select(depth > 5) | sort_by(depth; desc) | first(10) | explain", g)
+	result, err := oq.Execute("schemas | select(is_component) | select(depth > 5) | sort_by(depth; desc) | first(10) | explain", g)
 	require.NoError(t, err)
-	assert.Contains(t, result.Explain, "Source: schemas.components", "explain should show source")
+	assert.Contains(t, result.Explain, "Source: schemas", "explain should show source")
 	assert.Contains(t, result.Explain, "Filter: select(depth > 5)", "explain should show filter stage")
 	assert.Contains(t, result.Explain, "Sort: sort_by(depth; desc)", "explain should show sort stage")
 	assert.Contains(t, result.Explain, "Limit: first(10)", "explain should show limit stage")
@@ -372,12 +372,12 @@ func TestExecute_Sample_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | sample 3", g)
+	result, err := oq.Execute("schemas | select(is_component) | sample 3", g)
 	require.NoError(t, err)
 	assert.Len(t, result.Rows, 3, "sample should return exactly 3 rows")
 
 	// Running sample again should produce the same result (deterministic)
-	result2, err := oq.Execute("schemas.components | sample 3", g)
+	result2, err := oq.Execute("schemas | select(is_component) | sample 3", g)
 	require.NoError(t, err)
 	assert.Len(t, result2.Rows, len(result.Rows), "sample should be deterministic")
 }
@@ -410,7 +410,7 @@ func TestExecute_Top_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | top 3 property_count | pick name, property_count", g)
+	result, err := oq.Execute("schemas | select(is_component) | top 3 property_count | pick name, property_count", g)
 	require.NoError(t, err)
 	assert.Len(t, result.Rows, 3, "top should return exactly 3 rows")
 
@@ -426,7 +426,7 @@ func TestExecute_Bottom_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | bottom 3 property_count | pick name, property_count", g)
+	result, err := oq.Execute("schemas | select(is_component) | bottom 3 property_count | pick name, property_count", g)
 	require.NoError(t, err)
 	assert.Len(t, result.Rows, 3, "bottom should return exactly 3 rows")
 
@@ -442,7 +442,7 @@ func TestExecute_Format_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | first(3) | format json", g)
+	result, err := oq.Execute("schemas | select(is_component) | first(3) | format json", g)
 	require.NoError(t, err)
 	assert.Equal(t, "json", result.FormatHint, "format hint should be json")
 }
@@ -451,7 +451,7 @@ func TestFormatMarkdown_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | first(3) | pick name, type", g)
+	result, err := oq.Execute("schemas | select(is_component) | first(3) | pick name, type", g)
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
@@ -501,7 +501,7 @@ func TestExecute_RefsOut_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "Pet") | refs-out | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | refs-out | pick name`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "Pet should have outgoing refs")
 }
@@ -510,7 +510,7 @@ func TestExecute_RefsIn_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "Owner") | refs-in | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Owner") | refs-in | pick name`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "Owner should have incoming refs")
 }
@@ -531,7 +531,7 @@ func TestExecute_Connected_Success(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Start from Pet, connected should return schemas and operations in the same component
-	result, err := oq.Execute(`schemas.components | select(name == "Pet") | connected`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | connected`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "connected should return rows")
 
@@ -572,7 +572,7 @@ func TestExecute_EdgeAnnotations_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "Pet") | refs-out | pick name, via, key, from`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | refs-out | pick name, via, key, from`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "refs-out from Pet should have results")
 
@@ -589,7 +589,7 @@ func TestExecute_BlastRadius_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "Pet") | blast-radius`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | blast-radius`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "blast-radius should return rows")
 
@@ -612,7 +612,7 @@ func TestExecute_Neighbors_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "Pet") | neighbors 1`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | neighbors 1`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "neighbors should return rows")
 
@@ -629,7 +629,7 @@ func TestExecute_Orphans_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | orphans | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | orphans | pick name`, g)
 	require.NoError(t, err)
 	// Result may be empty if all schemas are referenced, that's fine
 	assert.NotNil(t, result, "result should not be nil")
@@ -639,7 +639,7 @@ func TestExecute_Leaves_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | leaves | pick name, out_degree`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | leaves | pick name, out_degree`, g)
 	require.NoError(t, err)
 	// All returned rows should have out_degree == 0
 	for _, row := range result.Rows {
@@ -662,7 +662,7 @@ func TestExecute_Clusters_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | clusters`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | clusters`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Groups, "should have clusters")
 
@@ -672,7 +672,7 @@ func TestExecute_Clusters_Success(t *testing.T) {
 		total += grp.Count
 	}
 	// Count component schemas
-	compCount, err := oq.Execute(`schemas.components | length`, g)
+	compCount, err := oq.Execute(`schemas | select(is_component) | length`, g)
 	require.NoError(t, err)
 	assert.Equal(t, compCount.Count, total, "cluster totals should equal component count")
 }
@@ -704,7 +704,7 @@ func TestExecute_OpCount_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | sort_by(op_count; desc) | first(3) | pick name, op_count`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | sort_by(op_count; desc) | first(3) | pick name, op_count`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "should have schemas sorted by op_count")
 }
@@ -713,7 +713,7 @@ func TestFormatTable_Groups_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | group_by(type)", g)
+	result, err := oq.Execute("schemas | select(is_component) | group_by(type)", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Groups, "should have groups")
 
@@ -725,7 +725,7 @@ func TestFormatJSON_Groups_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | group_by(type)", g)
+	result, err := oq.Execute("schemas | select(is_component) | group_by(type)", g)
 	require.NoError(t, err)
 
 	json := oq.FormatJSON(result, g)
@@ -737,7 +737,7 @@ func TestFormatMarkdown_Groups_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | group_by(type)", g)
+	result, err := oq.Execute("schemas | select(is_component) | group_by(type)", g)
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
@@ -748,7 +748,7 @@ func TestExecute_InlineSource_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.inline | length", g)
+	result, err := oq.Execute("schemas | select(is_inline) | length", g)
 	require.NoError(t, err)
 	assert.True(t, result.IsCount, "should be a count result")
 }
@@ -758,7 +758,7 @@ func TestExecute_SchemaFields_Coverage(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Select all schema fields to cover fieldValue branches
-	result, err := oq.Execute("schemas.components | first(1) | pick name, type, depth, in_degree, out_degree, union_width, property_count, is_component, is_inline, is_circular, has_ref, hash, path", g)
+	result, err := oq.Execute("schemas | select(is_component) | first(1) | pick name, type, depth, in_degree, out_degree, union_width, property_count, is_component, is_inline, is_circular, has_ref, hash, path", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "should have schema rows")
 
@@ -783,7 +783,7 @@ func TestFormatJSON_Empty_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "NonExistent")`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "NonExistent")`, g)
 	require.NoError(t, err)
 
 	json := oq.FormatJSON(result, g)
@@ -794,7 +794,7 @@ func TestFormatMarkdown_Empty_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "NonExistent")`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "NonExistent")`, g)
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
@@ -816,7 +816,7 @@ func TestFormatToon_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | first(3) | pick name, type", g)
+	result, err := oq.Execute("schemas | select(is_component) | first(3) | pick name, type", g)
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
@@ -839,7 +839,7 @@ func TestFormatToon_Groups_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | group_by(type)", g)
+	result, err := oq.Execute("schemas | select(is_component) | group_by(type)", g)
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
@@ -851,7 +851,7 @@ func TestFormatToon_Empty_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "NonExistent")`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "NonExistent")`, g)
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
@@ -864,7 +864,7 @@ func TestFormatToon_Escaping_Success(t *testing.T) {
 
 	// Paths contain special chars like / that don't need escaping,
 	// but hash values and paths are good coverage
-	result, err := oq.Execute("schemas.components | first(1) | pick name, hash, path", g)
+	result, err := oq.Execute("schemas | select(is_component) | first(1) | pick name, hash, path", g)
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
@@ -894,42 +894,42 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 	}{
 		{
 			"explain with unique and count",
-			"schemas.components | unique | length | explain",
+			"schemas | select(is_component) | unique | length | explain",
 			[]string{"Unique:", "Count:"},
 		},
 		{
 			"explain with group_by",
-			"schemas.components | group_by(type) | explain",
+			"schemas | select(is_component) | group_by(type) | explain",
 			[]string{"Group: group_by("},
 		},
 		{
 			"explain with traversals",
-			"schemas.components | select(name == \"Pet\") | refs-out | explain",
+			"schemas | select(is_component) | select(name == \"Pet\") | refs-out | explain",
 			[]string{"Traverse: outgoing references"},
 		},
 		{
 			"explain with refs-in",
-			"schemas.components | select(name == \"Owner\") | refs-in | explain",
+			"schemas | select(is_component) | select(name == \"Owner\") | refs-in | explain",
 			[]string{"Traverse: incoming references"},
 		},
 		{
 			"explain with reachable",
-			"schemas.components | select(name == \"Pet\") | reachable | explain",
+			"schemas | select(is_component) | select(name == \"Pet\") | reachable | explain",
 			[]string{"Traverse: all reachable"},
 		},
 		{
 			"explain with ancestors",
-			"schemas.components | select(name == \"Address\") | ancestors | explain",
+			"schemas | select(is_component) | select(name == \"Address\") | ancestors | explain",
 			[]string{"Traverse: all ancestor"},
 		},
 		{
 			"explain with properties",
-			"schemas.components | select(name == \"Pet\") | properties | explain",
+			"schemas | select(is_component) | select(name == \"Pet\") | properties | explain",
 			[]string{"Traverse: property children"},
 		},
 		{
 			"explain with union-members",
-			"schemas.components | select(name == \"Shape\") | union-members | explain",
+			"schemas | select(is_component) | select(name == \"Shape\") | union-members | explain",
 			[]string{"Traverse: union members"},
 		},
 		{
@@ -939,7 +939,7 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 		},
 		{
 			"explain with ops",
-			"schemas.components | select(name == \"Pet\") | ops | explain",
+			"schemas | select(is_component) | select(name == \"Pet\") | ops | explain",
 			[]string{"Navigate: schemas to operations"},
 		},
 		{
@@ -949,7 +949,7 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 		},
 		{
 			"explain with sample",
-			"schemas.components | sample 3 | explain",
+			"schemas | select(is_component) | sample 3 | explain",
 			[]string{"Sample: random 3"},
 		},
 		{
@@ -959,42 +959,42 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 		},
 		{
 			"explain with top",
-			"schemas.components | top 3 depth | explain",
+			"schemas | select(is_component) | top 3 depth | explain",
 			[]string{"Top: 3 by depth"},
 		},
 		{
 			"explain with bottom",
-			"schemas.components | bottom 3 depth | explain",
+			"schemas | select(is_component) | bottom 3 depth | explain",
 			[]string{"Bottom: 3 by depth"},
 		},
 		{
 			"explain with format",
-			"schemas.components | format json | explain",
+			"schemas | select(is_component) | format json | explain",
 			[]string{"Format: json"},
 		},
 		{
 			"explain with connected",
-			"schemas.components | select(name == \"Pet\") | connected | explain",
+			"schemas | select(is_component) | select(name == \"Pet\") | connected | explain",
 			[]string{"Traverse: full connected"},
 		},
 		{
 			"explain with blast-radius",
-			"schemas.components | select(name == \"Pet\") | blast-radius | explain",
+			"schemas | select(is_component) | select(name == \"Pet\") | blast-radius | explain",
 			[]string{"Traverse: blast radius"},
 		},
 		{
 			"explain with neighbors",
-			"schemas.components | select(name == \"Pet\") | neighbors 2 | explain",
+			"schemas | select(is_component) | select(name == \"Pet\") | neighbors 2 | explain",
 			[]string{"Traverse: bidirectional neighbors within 2"},
 		},
 		{
 			"explain with orphans",
-			"schemas.components | orphans | explain",
+			"schemas | select(is_component) | orphans | explain",
 			[]string{"Filter: schemas with no incoming"},
 		},
 		{
 			"explain with leaves",
-			"schemas.components | leaves | explain",
+			"schemas | select(is_component) | leaves | explain",
 			[]string{"Filter: schemas with no outgoing"},
 		},
 		{
@@ -1004,7 +1004,7 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 		},
 		{
 			"explain with clusters",
-			"schemas.components | clusters | explain",
+			"schemas | select(is_component) | clusters | explain",
 			[]string{"Analyze: weakly connected"},
 		},
 		{
@@ -1041,19 +1041,19 @@ func TestExecute_FieldValue_EdgeCases(t *testing.T) {
 	assert.NotEmpty(t, result.Rows, "should have operation rows")
 
 	// Test edge fields on non-traversal rows (should be empty strings)
-	result, err = oq.Execute("schemas.components | first(1) | pick name, via, key, from", g)
+	result, err = oq.Execute("schemas | select(is_component) | first(1) | pick name, via, key, from", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "should have schema rows")
 	viaVal := oq.FieldValuePublic(result.Rows[0], "via", g)
 	assert.Empty(t, viaVal.Str, "via should be empty for non-traversal rows")
 
 	// Test tag_count field
-	result, err = oq.Execute("schemas.components | first(1) | pick name, tag_count", g)
+	result, err = oq.Execute("schemas | select(is_component) | first(1) | pick name, tag_count", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "should have rows for tag_count test")
 
 	// Test op_count field
-	result, err = oq.Execute("schemas.components | first(1) | pick name, op_count", g)
+	result, err = oq.Execute("schemas | select(is_component) | first(1) | pick name, op_count", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "should have rows for op_count test")
 
@@ -1087,7 +1087,7 @@ func TestFormatToon_SpecialChars(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Test TOON format with bool and int fields to cover toonValue branches
-	result, err := oq.Execute("schemas.components | first(1) | pick name, depth, is_component", g)
+	result, err := oq.Execute("schemas | select(is_component) | first(1) | pick name, depth, is_component", g)
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
@@ -1184,11 +1184,11 @@ func TestExecute_WhereAndOr_Success(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Test compound where expressions
-	result, err := oq.Execute(`schemas.components | select(depth > 0 and is_component)`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(depth > 0 and is_component)`, g)
 	require.NoError(t, err)
 	assert.NotNil(t, result, "result should not be nil")
 
-	result, err = oq.Execute(`schemas.components | select(depth > 100 or is_component)`, g)
+	result, err = oq.Execute(`schemas | select(is_component) | select(depth > 100 or is_component)`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "or should match is_component=true schemas")
 }
@@ -1198,7 +1198,7 @@ func TestExecute_SortStringField_Success(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Sort by string field
-	result, err := oq.Execute("schemas.components | sort_by(type) | pick name, type", g)
+	result, err := oq.Execute("schemas | select(is_component) | sort_by(type) | pick name, type", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "should have schemas sorted by type")
 }
@@ -1207,7 +1207,7 @@ func TestExecute_GroupBy_Type_Details(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | group_by(type)", g)
+	result, err := oq.Execute("schemas | select(is_component) | group_by(type)", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Groups, "should have groups")
 
@@ -1222,7 +1222,7 @@ func TestFormatMarkdown_Groups_Details(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | group_by(type)", g)
+	result, err := oq.Execute("schemas | select(is_component) | group_by(type)", g)
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
@@ -1255,7 +1255,7 @@ func TestExecute_Leaves_AllZeroOutDegree(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | leaves | pick name, out_degree", g)
+	result, err := oq.Execute("schemas | select(is_component) | leaves | pick name, out_degree", g)
 	require.NoError(t, err)
 
 	// Verify leaves are leaf nodes
@@ -1275,7 +1275,7 @@ func TestExecute_OperationsTraversals(t *testing.T) {
 	assert.NotEmpty(t, result.Rows, "operation schemas should have results")
 
 	// Schema to operations roundtrip
-	result, err = oq.Execute("schemas.components | select(name == \"Pet\") | ops | pick name", g)
+	result, err = oq.Execute("schemas | select(is_component) | select(name == \"Pet\") | ops | pick name", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "Pet should be used by operations")
 }
@@ -1323,7 +1323,7 @@ func TestExecute_CyclicSpec_EdgeAnnotations(t *testing.T) {
 	g := loadCyclicGraph(t)
 
 	// Test refs-out to cover edgeKindString branches
-	result, err := oq.Execute(`schemas.components | select(name == "NodeA") | refs-out | pick name, via, key`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "NodeA") | refs-out | pick name, via, key`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "NodeA should have outgoing refs")
 
@@ -1341,7 +1341,7 @@ func TestExecute_CyclicSpec_IsCircular(t *testing.T) {
 	t.Parallel()
 	g := loadCyclicGraph(t)
 
-	result, err := oq.Execute("schemas.components | select(is_circular) | pick name", g)
+	result, err := oq.Execute("schemas | select(is_component) | select(is_circular) | pick name", g)
 	require.NoError(t, err)
 	names := collectNames(result, g)
 	assert.Contains(t, names, "NodeA", "NodeA is in the A↔B cycle")
@@ -1378,7 +1378,7 @@ func TestExecute_ToonFormat_WithBoolAndInt(t *testing.T) {
 	g := loadCyclicGraph(t)
 
 	// Select fields that cover all toonValue branches (string, int, bool)
-	result, err := oq.Execute("schemas.components | first(1) | pick name, depth, is_circular", g)
+	result, err := oq.Execute("schemas | select(is_component) | first(1) | pick name, depth, is_circular", g)
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
@@ -1443,9 +1443,9 @@ func TestParse_NewSyntax_Success(t *testing.T) {
 		{"bottom call", "schemas | bottom(3; depth)"},
 		{"format call", "schemas | format(json)"},
 		{"let binding", `schemas | select(name == "Pet") | let $pet = name`},
-		{"full new pipeline", `schemas.components | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth`},
-		{"def inline", `def hot: select(in_degree > 0); schemas.components | hot`},
-		{"def with params", `def impact($name): select(name == $name); schemas.components | impact("Pet")`},
+		{"full new pipeline", `schemas | select(is_component) | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth`},
+		{"def inline", `def hot: select(in_degree > 0); schemas | select(is_component) | hot`},
+		{"def with params", `def impact($name): select(name == $name); schemas | select(is_component) | impact("Pet")`},
 	}
 
 	for _, tt := range tests {
@@ -1462,7 +1462,7 @@ func TestExecute_SelectFilter_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(type == "object") | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(type == "object") | pick name`, g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
@@ -1474,7 +1474,7 @@ func TestExecute_SortBy_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | sort_by(property_count; desc) | first(3) | pick name, property_count", g)
+	result, err := oq.Execute("schemas | select(is_component) | sort_by(property_count; desc) | first(3) | pick name, property_count", g)
 	require.NoError(t, err)
 	assert.LessOrEqual(t, len(result.Rows), 3, "should return at most 3 rows")
 }
@@ -1483,7 +1483,7 @@ func TestExecute_First_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | first(3)", g)
+	result, err := oq.Execute("schemas | select(is_component) | first(3)", g)
 	require.NoError(t, err)
 	assert.Len(t, result.Rows, 3, "first should return exactly 3 rows")
 }
@@ -1492,7 +1492,7 @@ func TestExecute_Last_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | last(2)", g)
+	result, err := oq.Execute("schemas | select(is_component) | last(2)", g)
 	require.NoError(t, err)
 	assert.Len(t, result.Rows, 2, "last should return exactly 2 rows")
 }
@@ -1501,7 +1501,7 @@ func TestExecute_Length_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | length", g)
+	result, err := oq.Execute("schemas | select(is_component) | length", g)
 	require.NoError(t, err)
 	assert.True(t, result.IsCount, "length should be a count result")
 	assert.Positive(t, result.Count, "count should be positive")
@@ -1511,7 +1511,7 @@ func TestExecute_GroupBy_NewSyntax_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | group_by(type)", g)
+	result, err := oq.Execute("schemas | select(is_component) | group_by(type)", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Groups, "should have groups")
 }
@@ -1521,7 +1521,7 @@ func TestExecute_LetBinding_Success(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// let $pet = name, then use $pet in subsequent filter
-	result, err := oq.Execute(`schemas.components | select(name == "Pet") | let $pet = name | reachable | select(name != $pet) | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | let $pet = name | reachable | select(name != $pet) | pick name`, g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
@@ -1533,7 +1533,7 @@ func TestExecute_DefExpansion_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`def hot: select(in_degree > 0); schemas.components | hot | pick name`, g)
+	result, err := oq.Execute(`def hot: select(in_degree > 0); schemas | select(is_component) | hot | pick name`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "def expansion should produce results")
 
@@ -1548,7 +1548,7 @@ func TestExecute_DefWithParams_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`def impact($name): select(name == $name) | blast-radius; schemas.components | impact("Pet")`, g)
+	result, err := oq.Execute(`def impact($name): select(name == $name) | blast-radius; schemas | select(is_component) | impact("Pet")`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "parameterized def should produce results")
 }
@@ -1558,7 +1558,7 @@ func TestExecute_AlternativeOperator_Success(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// name // "none" — name is always set, so should not be "none"
-	result, err := oq.Execute(`schemas.components | select(name // "none" != "none") | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name // "none" != "none") | pick name`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "alternative operator should work")
 }
@@ -1567,7 +1567,7 @@ func TestExecute_IfThenElse_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(if is_component then depth >= 0 else true end) | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(if is_component then depth >= 0 else true end) | pick name`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "if-then-else should work in select")
 }
@@ -1576,7 +1576,7 @@ func TestExecute_ExplainNewSyntax_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth | explain`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth | explain`, g)
 	require.NoError(t, err)
 	assert.Contains(t, result.Explain, "Filter: select(depth > 5)", "explain should show select filter")
 	assert.Contains(t, result.Explain, "Sort: sort_by(depth; desc)", "explain should show sort_by")
@@ -1588,7 +1588,7 @@ func TestExecute_ExplainLast_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas.components | last(3) | explain", g)
+	result, err := oq.Execute("schemas | select(is_component) | last(3) | explain", g)
 	require.NoError(t, err)
 	assert.Contains(t, result.Explain, "Limit: last(3)", "explain should show last")
 }
@@ -1597,7 +1597,7 @@ func TestExecute_ExplainLet_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas.components | select(name == "Pet") | let $pet = name | explain`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | let $pet = name | explain`, g)
 	require.NoError(t, err)
 	assert.Contains(t, result.Explain, "Bind: let $pet = name", "explain should show let binding")
 }

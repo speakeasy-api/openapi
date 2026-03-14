@@ -354,6 +354,28 @@ func parseStage(s string) (Stage, error) {
 	case "let":
 		return parseLet(args)
 
+	// Navigation stages
+	case "parameters":
+		return Stage{Kind: StageParameters}, nil
+
+	case "responses":
+		return Stage{Kind: StageResponses}, nil
+
+	case "request-body":
+		return Stage{Kind: StageRequestBody}, nil
+
+	case "content-types":
+		return Stage{Kind: StageContentTypes}, nil
+
+	case "headers":
+		return Stage{Kind: StageHeaders}, nil
+
+	case "schema":
+		return Stage{Kind: StageSchema}, nil
+
+	case "operation":
+		return Stage{Kind: StageOperation}, nil
+
 	default:
 		return Stage{}, fmt.Errorf("unknown stage: %q", keyword)
 	}

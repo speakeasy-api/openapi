@@ -146,8 +146,126 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		case "names":
 			return expr.StringVal(strings.Join(row.GroupNames, ", "))
 		}
+	case ParameterResult:
+		p := row.Parameter
+		if p == nil {
+			return expr.NullVal()
+		}
+		switch name {
+		case "name":
+			return expr.StringVal(row.ParamName)
+		case "in":
+			return expr.StringVal(string(p.In))
+		case "required":
+			return expr.BoolVal(p.Required != nil && *p.Required)
+		case "deprecated":
+			return expr.BoolVal(p.Deprecated != nil && *p.Deprecated)
+		case "description":
+			return expr.StringVal(p.GetDescription())
+		case "style":
+			if p.Style != nil {
+				return expr.StringVal(string(*p.Style))
+			}
+			return expr.StringVal("")
+		case "explode":
+			return expr.BoolVal(p.Explode != nil && *p.Explode)
+		case "has_schema":
+			return expr.BoolVal(p.Schema != nil)
+		case "allow_empty_value":
+			return expr.BoolVal(p.AllowEmptyValue != nil && *p.AllowEmptyValue)
+		case "allow_reserved":
+			return expr.BoolVal(p.AllowReserved != nil && *p.AllowReserved)
+		case "operation":
+			return expr.StringVal(operationName(row.SourceOpIdx, g))
+		}
+	case ResponseResult:
+		r := row.Response
+		if r == nil {
+			return expr.NullVal()
+		}
+		switch name {
+		case "status_code", "name":
+			return expr.StringVal(row.StatusCode)
+		case "description":
+			return expr.StringVal(r.Description)
+		case "content_type_count":
+			return expr.IntVal(r.Content.Len())
+		case "header_count":
+			return expr.IntVal(r.Headers.Len())
+		case "link_count":
+			return expr.IntVal(r.Links.Len())
+		case "has_content":
+			return expr.BoolVal(r.Content != nil && r.Content.Len() > 0)
+		case "operation":
+			return expr.StringVal(operationName(row.SourceOpIdx, g))
+		}
+	case RequestBodyResult:
+		rb := row.RequestBody
+		if rb == nil {
+			return expr.NullVal()
+		}
+		switch name {
+		case "name":
+			return expr.StringVal("request-body")
+		case "description":
+			return expr.StringVal(rb.GetDescription())
+		case "required":
+			return expr.BoolVal(rb.Required != nil && *rb.Required)
+		case "content_type_count":
+			return expr.IntVal(rb.Content.Len())
+		case "operation":
+			return expr.StringVal(operationName(row.SourceOpIdx, g))
+		}
+	case ContentTypeResult:
+		mt := row.ContentType
+		if mt == nil {
+			return expr.NullVal()
+		}
+		switch name {
+		case "media_type", "name":
+			return expr.StringVal(row.MediaTypeName)
+		case "has_schema":
+			return expr.BoolVal(mt.Schema != nil)
+		case "has_encoding":
+			return expr.BoolVal(mt.Encoding != nil && mt.Encoding.Len() > 0)
+		case "has_example":
+			return expr.BoolVal(mt.Example != nil || (mt.Examples != nil && mt.Examples.Len() > 0))
+		case "status_code":
+			return expr.StringVal(row.StatusCode)
+		case "operation":
+			return expr.StringVal(operationName(row.SourceOpIdx, g))
+		}
+	case HeaderResult:
+		h := row.Header
+		if h == nil {
+			return expr.NullVal()
+		}
+		switch name {
+		case "name":
+			return expr.StringVal(row.HeaderName)
+		case "description":
+			return expr.StringVal(h.GetDescription())
+		case "required":
+			return expr.BoolVal(h.Required != nil && *h.Required)
+		case "deprecated":
+			return expr.BoolVal(h.Deprecated != nil && *h.Deprecated)
+		case "has_schema":
+			return expr.BoolVal(h.Schema != nil)
+		case "status_code":
+			return expr.StringVal(row.StatusCode)
+		case "operation":
+			return expr.StringVal(operationName(row.SourceOpIdx, g))
+		}
 	}
 	return expr.NullVal()
+}
+
+// operationName returns the operation name for the given index, or empty string if out of range.
+func operationName(opIdx int, g *graph.SchemaGraph) string {
+	if opIdx >= 0 && opIdx < len(g.Operations) {
+		return g.Operations[opIdx].Name
+	}
+	return ""
 }
 
 // schemaContentField resolves fields by reading the underlying schema object.
@@ -398,9 +516,21 @@ func rowKey(row Row) string {
 	switch row.Kind {
 	case SchemaResult:
 		return "s:" + strconv.Itoa(row.SchemaIdx)
+	case OperationResult:
+		return "o:" + strconv.Itoa(row.OpIdx)
 	case GroupRowResult:
 		return "g:" + row.GroupKey
+	case ParameterResult:
+		return "p:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.ParamName
+	case ResponseResult:
+		return "r:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.StatusCode
+	case RequestBodyResult:
+		return "rb:" + strconv.Itoa(row.SourceOpIdx)
+	case ContentTypeResult:
+		return "ct:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.StatusCode + ":" + row.MediaTypeName
+	case HeaderResult:
+		return "h:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.StatusCode + ":" + row.HeaderName
 	default:
-		return "o:" + strconv.Itoa(row.OpIdx)
+		return "?:" + strconv.Itoa(row.OpIdx)
 	}
 }

@@ -144,6 +144,12 @@ func (g *SchemaGraph) SchemaByName(name string) (SchemaNode, bool) {
 	return SchemaNode{}, false
 }
 
+// SchemaByPtr returns the NodeID for a schema identified by its pointer.
+func (g *SchemaGraph) SchemaByPtr(ptr *oas3.JSONSchemaReferenceable) (NodeID, bool) {
+	id, ok := g.ptrToNode[ptr]
+	return id, ok
+}
+
 // OperationSchemas returns the schema NodeIDs reachable from the given operation.
 // Results are sorted by NodeID for deterministic output.
 func (g *SchemaGraph) OperationSchemas(opID NodeID) []NodeID {

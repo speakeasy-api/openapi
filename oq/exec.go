@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/speakeasy-api/openapi/graph"
+	oas3 "github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/oq/expr"
 )
 
@@ -60,18 +61,6 @@ func execSource(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 	case "schemas":
 		for i := range g.Schemas {
 			result.Rows = append(result.Rows, Row{Kind: SchemaResult, SchemaIdx: i})
-		}
-	case "schemas.components":
-		for i, s := range g.Schemas {
-			if s.IsComponent {
-				result.Rows = append(result.Rows, Row{Kind: SchemaResult, SchemaIdx: i})
-			}
-		}
-	case "schemas.inline":
-		for i, s := range g.Schemas {
-			if s.IsInline {
-				result.Rows = append(result.Rows, Row{Kind: SchemaResult, SchemaIdx: i})
-			}
 		}
 	case "operations":
 		for i := range g.Operations {
@@ -177,6 +166,20 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 	case StageEmit:
 		result.EmitYAML = true
 		return result, nil
+	case StageParameters:
+		return execParameters(result, g)
+	case StageResponses:
+		return execResponses(result, g)
+	case StageRequestBody:
+		return execRequestBody(result, g)
+	case StageContentTypes:
+		return execContentTypes(result, g)
+	case StageHeaders:
+		return execHeaders(result, g)
+	case StageSchema:
+		return execSchema(result, g)
+	case StageOperation:
+		return execOperation(result, g)
 	default:
 		return nil, fmt.Errorf("unimplemented stage kind: %d", stage.Kind)
 	}
@@ -518,8 +521,8 @@ func execConnected(result *Result, g *graph.SchemaGraph) (*Result, error) {
 			schemaSeeds = append(schemaSeeds, graph.NodeID(row.SchemaIdx))
 		case OperationResult:
 			opSeeds = append(opSeeds, graph.NodeID(row.OpIdx))
-		case GroupRowResult:
-			// Group rows don't participate in connectivity analysis
+		default:
+			// Non-schema/operation rows don't participate in connectivity analysis
 		}
 	}
 
@@ -981,6 +984,20 @@ func describeStage(stage Stage) string {
 		return "Traverse: navigate back to source schema of edge annotations"
 	case StageEmit:
 		return "Emit: output raw YAML nodes from underlying spec objects"
+	case StageParameters:
+		return "Navigate: operation parameters"
+	case StageResponses:
+		return "Navigate: operation responses"
+	case StageRequestBody:
+		return "Navigate: operation request body"
+	case StageContentTypes:
+		return "Navigate: content types from responses or request body"
+	case StageHeaders:
+		return "Navigate: response headers"
+	case StageSchema:
+		return "Navigate: extract schema from parameter, content-type, or header"
+	case StageOperation:
+		return "Navigate: back to source operation"
 	default:
 		return "Unknown stage"
 	}
@@ -1009,10 +1026,14 @@ func execFields(result *Result) (*Result, error) {
 		return &Result{Explain: sb.String()}, nil
 	}
 
-	if kind == SchemaResult {
-		sb.WriteString("Field                          Type\n")
-		sb.WriteString("-----------------------------  ------\n")
-		fields := []struct{ name, typ string }{
+	sb.WriteString("Field                          Type\n")
+	sb.WriteString("-----------------------------  ------\n")
+
+	var fields []struct{ name, typ string }
+
+	switch kind {
+	case SchemaResult:
+		fields = []struct{ name, typ string }{
 			// Graph-level (pre-computed)
 			{"name", "string"},
 			{"type", "string"},
@@ -1063,13 +1084,8 @@ func execFields(result *Result) (*Result, error) {
 			{"content_encoding", "string"},
 			{"content_media_type", "string"},
 		}
-		for _, f := range fields {
-			fmt.Fprintf(&sb, "%-30s %s\n", f.name, f.typ)
-		}
-	} else {
-		sb.WriteString("Field                          Type\n")
-		sb.WriteString("-----------------------------  ------\n")
-		fields := []struct{ name, typ string }{
+	case OperationResult:
+		fields = []struct{ name, typ string }{
 			{"name", "string"},
 			{"method", "string"},
 			{"path", "string"},
@@ -1090,9 +1106,65 @@ func execFields(result *Result) (*Result, error) {
 			{"key", "string"},
 			{"from", "string"},
 		}
-		for _, f := range fields {
-			fmt.Fprintf(&sb, "%-30s %s\n", f.name, f.typ)
+	case ParameterResult:
+		fields = []struct{ name, typ string }{
+			{"name", "string"},
+			{"in", "string"},
+			{"required", "bool"},
+			{"deprecated", "bool"},
+			{"description", "string"},
+			{"style", "string"},
+			{"explode", "bool"},
+			{"has_schema", "bool"},
+			{"allow_empty_value", "bool"},
+			{"allow_reserved", "bool"},
+			{"operation", "string"},
 		}
+	case ResponseResult:
+		fields = []struct{ name, typ string }{
+			{"status_code", "string"},
+			{"name", "string"},
+			{"description", "string"},
+			{"content_type_count", "int"},
+			{"header_count", "int"},
+			{"link_count", "int"},
+			{"has_content", "bool"},
+			{"operation", "string"},
+		}
+	case RequestBodyResult:
+		fields = []struct{ name, typ string }{
+			{"name", "string"},
+			{"description", "string"},
+			{"required", "bool"},
+			{"content_type_count", "int"},
+			{"operation", "string"},
+		}
+	case ContentTypeResult:
+		fields = []struct{ name, typ string }{
+			{"media_type", "string"},
+			{"name", "string"},
+			{"has_schema", "bool"},
+			{"has_encoding", "bool"},
+			{"has_example", "bool"},
+			{"status_code", "string"},
+			{"operation", "string"},
+		}
+	case HeaderResult:
+		fields = []struct{ name, typ string }{
+			{"name", "string"},
+			{"description", "string"},
+			{"required", "bool"},
+			{"deprecated", "bool"},
+			{"has_schema", "bool"},
+			{"status_code", "string"},
+			{"operation", "string"},
+		}
+	default:
+		// GroupRowResult handled above; unknown kinds produce empty fields list
+	}
+
+	for _, f := range fields {
+		fmt.Fprintf(&sb, "%-30s %s\n", f.name, f.typ)
 	}
 
 	return &Result{Explain: sb.String()}, nil
@@ -1169,6 +1241,239 @@ func execPath(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 	out := &Result{}
 	for _, id := range path {
 		out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: int(id)})
+	}
+	return out, nil
+}
+
+// --- Navigation stages ---
+
+func execParameters(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	for _, row := range result.Rows {
+		if row.Kind != OperationResult {
+			continue
+		}
+		op := &g.Operations[row.OpIdx]
+		if op.Operation == nil {
+			continue
+		}
+		for _, paramRef := range op.Operation.Parameters {
+			if paramRef == nil {
+				continue
+			}
+			p := paramRef.GetObject()
+			if p == nil {
+				continue
+			}
+			out.Rows = append(out.Rows, Row{
+				Kind:        ParameterResult,
+				Parameter:   p,
+				ParamName:   p.Name,
+				SourceOpIdx: row.OpIdx,
+				OpIdx:       row.OpIdx,
+			})
+		}
+	}
+	return out, nil
+}
+
+func execResponses(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	for _, row := range result.Rows {
+		if row.Kind != OperationResult {
+			continue
+		}
+		op := &g.Operations[row.OpIdx]
+		if op.Operation == nil || op.Operation.Responses.Map == nil {
+			continue
+		}
+		for code, respRef := range op.Operation.Responses.All() {
+			if respRef == nil {
+				continue
+			}
+			r := respRef.GetObject()
+			if r == nil {
+				continue
+			}
+			out.Rows = append(out.Rows, Row{
+				Kind:        ResponseResult,
+				Response:    r,
+				StatusCode:  code,
+				SourceOpIdx: row.OpIdx,
+				OpIdx:       row.OpIdx,
+			})
+		}
+		// Default response
+		if op.Operation.Responses.Default != nil {
+			r := op.Operation.Responses.Default.GetObject()
+			if r != nil {
+				out.Rows = append(out.Rows, Row{
+					Kind:        ResponseResult,
+					Response:    r,
+					StatusCode:  "default",
+					SourceOpIdx: row.OpIdx,
+					OpIdx:       row.OpIdx,
+				})
+			}
+		}
+	}
+	return out, nil
+}
+
+func execRequestBody(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	for _, row := range result.Rows {
+		if row.Kind != OperationResult {
+			continue
+		}
+		op := &g.Operations[row.OpIdx]
+		if op.Operation == nil || op.Operation.RequestBody == nil {
+			continue
+		}
+		rb := op.Operation.RequestBody.GetObject()
+		if rb == nil {
+			continue
+		}
+		out.Rows = append(out.Rows, Row{
+			Kind:        RequestBodyResult,
+			RequestBody: rb,
+			SourceOpIdx: row.OpIdx,
+			OpIdx:       row.OpIdx,
+		})
+	}
+	return out, nil
+}
+
+func execContentTypes(result *Result, _ *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	for _, row := range result.Rows {
+		switch row.Kind {
+		case ResponseResult:
+			if row.Response == nil || row.Response.Content == nil {
+				continue
+			}
+			for mediaType, mt := range row.Response.Content.All() {
+				if mt == nil {
+					continue
+				}
+				out.Rows = append(out.Rows, Row{
+					Kind:          ContentTypeResult,
+					ContentType:   mt,
+					MediaTypeName: mediaType,
+					StatusCode:    row.StatusCode,
+					SourceOpIdx:   row.SourceOpIdx,
+					OpIdx:         row.OpIdx,
+				})
+			}
+		case RequestBodyResult:
+			if row.RequestBody == nil || row.RequestBody.Content == nil {
+				continue
+			}
+			for mediaType, mt := range row.RequestBody.Content.All() {
+				if mt == nil {
+					continue
+				}
+				out.Rows = append(out.Rows, Row{
+					Kind:          ContentTypeResult,
+					ContentType:   mt,
+					MediaTypeName: mediaType,
+					SourceOpIdx:   row.SourceOpIdx,
+					OpIdx:         row.OpIdx,
+				})
+			}
+		default:
+			// content-types only works on response and request-body rows
+		}
+	}
+	return out, nil
+}
+
+func execHeaders(result *Result, _ *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	for _, row := range result.Rows {
+		if row.Kind != ResponseResult || row.Response == nil || row.Response.Headers == nil {
+			continue
+		}
+		for name, hdrRef := range row.Response.Headers.All() {
+			if hdrRef == nil {
+				continue
+			}
+			h := hdrRef.GetObject()
+			if h == nil {
+				continue
+			}
+			out.Rows = append(out.Rows, Row{
+				Kind:        HeaderResult,
+				Header:      h,
+				HeaderName:  name,
+				StatusCode:  row.StatusCode,
+				SourceOpIdx: row.SourceOpIdx,
+				OpIdx:       row.OpIdx,
+			})
+		}
+	}
+	return out, nil
+}
+
+func execSchema(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	seen := make(map[int]bool)
+
+	resolveAndAdd := func(js *oas3.JSONSchemaReferenceable, _ int) {
+		if js == nil {
+			return
+		}
+		id, ok := g.SchemaByPtr(js)
+		if !ok {
+			return
+		}
+		idx := int(id)
+		if seen[idx] {
+			return
+		}
+		seen[idx] = true
+		out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: idx})
+	}
+
+	for _, row := range result.Rows {
+		switch row.Kind {
+		case ParameterResult:
+			if row.Parameter != nil && row.Parameter.Schema != nil {
+				resolveAndAdd(row.Parameter.Schema, row.OpIdx)
+			}
+		case ContentTypeResult:
+			if row.ContentType != nil && row.ContentType.Schema != nil {
+				resolveAndAdd(row.ContentType.Schema, row.OpIdx)
+			}
+		case HeaderResult:
+			if row.Header != nil && row.Header.Schema != nil {
+				resolveAndAdd(row.Header.Schema, row.OpIdx)
+			}
+		default:
+			// schema only works on parameter, content-type, and header rows
+		}
+	}
+	return out, nil
+}
+
+func execOperation(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	seen := make(map[int]bool)
+	for _, row := range result.Rows {
+		var opIdx int
+		switch row.Kind {
+		case OperationResult:
+			opIdx = row.OpIdx
+		case ParameterResult, ResponseResult, RequestBodyResult, ContentTypeResult, HeaderResult:
+			opIdx = row.SourceOpIdx
+		default:
+			continue
+		}
+		if opIdx < 0 || opIdx >= len(g.Operations) || seen[opIdx] {
+			continue
+		}
+		seen[opIdx] = true
+		out.Rows = append(out.Rows, Row{Kind: OperationResult, OpIdx: opIdx})
 	}
 	return out, nil
 }
