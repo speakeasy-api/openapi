@@ -29,9 +29,12 @@ The first element of every pipeline is a source that selects the initial
 result set.
 
   schemas              All schemas (component + inline)
-  schemas.components   Only component schemas (in #/components/schemas)
-  schemas.inline       Only inline schemas
   operations           All operations
+
+Note: the old sub-sources schemas | select(is_component) and schemas | select(is_inline) are removed.
+Use select(is_component) or select(is_inline) to filter instead:
+  schemas | select(is_component)
+  schemas | select(is_inline)
 
 TRAVERSAL STAGES
 ----------------
@@ -52,6 +55,19 @@ in the schema reference graph.
   connected         Full connected component (schemas + operations)
   blast-radius      Ancestors + all affected operations (change impact)
   neighbors(N)      Bidirectional neighborhood within N hops
+
+NAVIGATION STAGES
+-----------------
+Navigate between operations and their sub-components. These stages produce
+typed rows that can be filtered, projected, and navigated back to the source.
+
+  parameters            Operation parameters (yields ParameterRow)
+  responses             Operation responses (yields ResponseRow)
+  request-body          Operation request body (yields RequestBodyRow)
+  content-types         Content types from responses or request body (yields ContentTypeRow)
+  headers               Response headers (yields HeaderRow)
+  schema                Extract schema from parameter, content-type, or header (bridges to graph)
+  operation             Back-navigate to source operation
 
 ANALYSIS STAGES
 ---------------
@@ -195,6 +211,74 @@ source schema.
   key               string   Edge key: property name, array index, etc.
   from              string   Source node name
 
+PARAMETER FIELDS
+----------------
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  name                string   Parameter name
+  in                  string   Location: query, header, path, cookie
+  required            bool     Whether the parameter is required
+  deprecated          bool     Whether the parameter is deprecated
+  description         string   Parameter description
+  style               string   Serialization style
+  explode             bool     Whether arrays/objects generate separate params
+  has_schema          bool     Whether the parameter has a schema
+  allow_empty_value   bool     Whether empty values are allowed
+  allow_reserved      bool     Whether reserved characters are allowed
+  operation           string   Source operation (operationId or METHOD /path)
+
+RESPONSE FIELDS
+---------------
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  status_code         string   HTTP status code (200, 404, default, ...)
+  name                string   Response name
+  description         string   Response description
+  content_type_count  int      Number of content types
+  header_count        int      Number of response headers
+  link_count          int      Number of links
+  has_content         bool     Whether response has content
+  operation           string   Source operation
+
+REQUEST BODY FIELDS
+-------------------
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  name                string   Request body name
+  description         string   Request body description
+  required            bool     Whether the request body is required
+  content_type_count  int      Number of content types
+  operation           string   Source operation
+
+CONTENT-TYPE FIELDS
+-------------------
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  media_type          string   Media type (application/json, text/event-stream, ...)
+  name                string   Content type name
+  has_schema          bool     Whether it has a schema
+  has_encoding        bool     Whether it has encoding info
+  has_example         bool     Whether it has an example
+  status_code         string   Source response status code (if from response)
+  operation           string   Source operation
+
+HEADER FIELDS
+-------------
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  name                string   Header name
+  description         string   Header description
+  required            bool     Whether the header is required
+  deprecated          bool     Whether the header is deprecated
+  has_schema          bool     Whether the header has a schema
+  status_code         string   Source response status code
+  operation           string   Source operation
+
 EXPRESSIONS
 -----------
 The expression language is used in select(), let, and if-then-else:
@@ -227,6 +311,7 @@ RAW YAML EXTRACTION
 -------------------
 
 Use the emit stage to extract raw YAML nodes from the underlying spec objects.
+Each emitted node is wrapped under its full JSON pointer (path) as the YAML key.
 This is useful for piping into yq for content-level queries:
   openapi spec query 'schemas | select(name == "Pet") | emit' spec.yaml | yq '.properties | keys'
 
@@ -234,16 +319,16 @@ EXAMPLES
 --------
 
   # Deeply nested components (jq-style)
-  schemas.components | sort_by(depth; desc) | first(10) | pick name, depth
+  schemas | select(is_component) | sort_by(depth; desc) | first(10) | pick name, depth
 
   # Wide union trees
   schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)
 
   # Most referenced schemas
-  schemas.components | sort_by(in_degree; desc) | first(10) | pick name, in_degree
+  schemas | select(is_component) | sort_by(in_degree; desc) | first(10) | pick name, in_degree
 
   # Dead components (no incoming references)
-  schemas.components | select(in_degree == 0) | pick name
+  schemas | select(is_component) | select(in_degree == 0) | pick name
 
   # Operation sprawl
   operations | sort_by(schema_count; desc) | first(10) | pick name, schema_count
@@ -258,13 +343,13 @@ EXAMPLES
   schemas | path(Pet; Address) | pick name
 
   # Top 5 by in-degree
-  schemas.components | top(5; in_degree) | pick name, in_degree
+  schemas | select(is_component) | top(5; in_degree) | pick name, in_degree
 
   # Walk an operation to find all connected schemas
   operations | select(name == "GET /users") | schemas | pick name, type
 
   # Explain a query plan
-  schemas.components | select(depth > 5) | sort_by(depth; desc) | explain
+  schemas | select(is_component) | select(depth > 5) | sort_by(depth; desc) | explain
 
   # List available fields
   schemas | fields
@@ -276,28 +361,28 @@ EXAMPLES
   schemas | select(property_count > 3 and not is_component) | pick name, property_count, path
 
   # Edge annotations — see how Pet references other schemas
-  schemas.components | select(name == "Pet") | refs-out | pick name, via, key, from
+  schemas | select(is_component) | select(name == "Pet") | refs-out | pick name, via, key, from
 
   # Parent — find schemas containing a property matching a pattern
   schemas | properties | select(key matches "(?i)date.?time") | parent | unique | emit
 
   # Blast radius — what breaks if I change the Error schema?
-  schemas.components | select(name == "Error") | blast-radius | length
+  schemas | select(is_component) | select(name == "Error") | blast-radius | length
 
   # Neighborhood — schemas within 2 hops of Pet
-  schemas.components | select(name == "Pet") | neighbors(2) | pick name
+  schemas | select(is_component) | select(name == "Pet") | neighbors(2) | pick name
 
   # Orphaned schemas — unreferenced by anything
-  schemas.components | orphans | pick name
+  schemas | select(is_component) | orphans | pick name
 
   # Leaf schemas — terminal nodes with no outgoing refs
-  schemas.components | leaves | pick name, in_degree
+  schemas | select(is_component) | leaves | pick name, in_degree
 
   # Detect reference cycles
   schemas | cycles
 
   # Discover schema clusters
-  schemas.components | clusters
+  schemas | select(is_component) | clusters
 
   # Cross-tag schemas — shared across team boundaries
   schemas | tag-boundary | pick name, tag_count
@@ -317,29 +402,44 @@ EXAMPLES
   # User-defined functions
   def hot: select(in_degree > 10);
   def impact($name): select(name == $name) | blast-radius;
-  schemas.components | hot | pick name, in_degree
+  schemas | select(is_component) | hot | pick name, in_degree
 
   # Load functions from a module file
   include "stdlib.oq";
-  schemas.components | hot | pick name, in_degree
+  schemas | select(is_component) | hot | pick name, in_degree
 
   # Schema content queries —
 
   # OneOf unions missing discriminator
-  schemas.components | select(union_width > 0 and not has_discriminator) | pick name, union_width
+  schemas | select(is_component) | select(union_width > 0 and not has_discriminator) | pick name, union_width
 
   # Schemas missing descriptions
-  schemas.components | select(not has_description) | pick name, type
+  schemas | select(is_component) | select(not has_description) | pick name, type
 
   # Schemas with enums
-  schemas.components | select(enum_count > 0) | pick name, enum_count
+  schemas | select(is_component) | select(enum_count > 0) | pick name, enum_count
 
   # Operations missing error responses
   operations | select(not has_error_response) | pick name, method, path
 
   # Duplicate inline schemas
-  schemas.inline | group_by(hash) | select(count > 1)
+  schemas | select(is_inline) | group_by(hash) | select(count > 1)
 
   # Operations with request bodies but no error handling
   operations | select(has_request_body and not has_error_response) | pick name, method, path
+
+  # Navigation — find operations that stream events
+  operations | responses | content-types | select(media_type == "text/event-stream") | operation | unique
+
+  # Navigation — find operations with deprecated parameters
+  operations | parameters | select(deprecated) | operation | unique
+
+  # Navigation — list all cookie parameters
+  operations | parameters | select(in == "cookie") | pick name, in, operation
+
+  # Navigation — responses with no content (e.g., 204 No Content)
+  operations | responses | select(not has_content) | pick status_code, operation
+
+  # Navigation — operations accepting multipart uploads
+  operations | request-body | content-types | select(media_type matches "multipart/") | operation | unique
 `

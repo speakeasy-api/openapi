@@ -17,29 +17,32 @@ var queryCmd = &cobra.Command{
 	Use:   "query <query> [input-file]",
 	Short: "Query an OpenAPI specification using the oq pipeline language",
 	Long: `Query an OpenAPI specification using the oq pipeline language to answer
-structural and semantic questions about schemas and operations.`,
+structural and semantic questions about schemas, operations, parameters,
+responses, content types, and headers.`,
 	Example: `Queries are pipelines: source | stage | stage | ...
 
 Pipeline stages:
-  Source:     schemas, schemas.components, schemas.inline, operations
-  Traversal:  refs-out, refs-in, reachable, ancestors, properties, union-members, items,
-              parent, ops, schemas, path(A; B), connected, blast-radius, neighbors(N)
-  Analysis:   orphans, leaves, cycles, clusters, tag-boundary, shared-refs
-  Filter:     select(expr), pick <fields>, sort_by(field; desc), first(N), last(N),
-              sample(N), top(N; field), bottom(N; field), unique, group_by(field), length
-  Variables:  let $var = expr
-  Functions:  def name: body;  def name($p): body;  include "file.oq";
-  Output:     emit, format(table|json|markdown|toon)
-  Meta:       explain, fields
+  Source:      schemas, operations
+  Navigation:  parameters, responses, request-body, content-types, headers,
+               schema, operation
+  Traversal:   refs-out, refs-in, reachable, ancestors, properties, union-members, items,
+               parent, ops, schemas, path(A; B), connected, blast-radius, neighbors(N)
+  Analysis:    orphans, leaves, cycles, clusters, tag-boundary, shared-refs
+  Filter:      select(expr), pick <fields>, sort_by(field; desc), first(N), last(N),
+               sample(N), top(N; field), bottom(N; field), unique, group_by(field), length
+  Variables:   let $var = expr
+  Functions:   def name: body;  def name($p): body;  include "file.oq";
+  Output:      emit, format(table|json|markdown|toon)
+  Meta:        explain, fields
 
 Operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches,
            if-then-else-end, string interpolation \(expr)
 
-  openapi spec query 'schemas.components | sort_by(depth; desc) | first(10) | pick name, depth' petstore.yaml
+  openapi spec query 'schemas | select(is_component) | sort_by(depth; desc) | first(10) | pick name, depth' petstore.yaml
   openapi spec query 'schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)' petstore.yaml
-  openapi spec query 'schemas.components | select(in_degree == 0) | pick name' petstore.yaml
-  openapi spec query 'schemas.components | select(name == "Error") | blast-radius | length' petstore.yaml
-  openapi spec query 'schemas.components | select(depth > 5) | sort_by(depth; desc) | explain' petstore.yaml
+  openapi spec query 'operations | responses | content-types | pick media_type | unique' petstore.yaml
+  openapi spec query 'operations | parameters | select(in == "cookie") | pick name, operation' petstore.yaml
+  openapi spec query 'schemas | select(name == "Error") | blast-radius | length' petstore.yaml
   cat spec.yaml | openapi spec query 'schemas | length'
 
 For the full query language reference, run: openapi spec query-reference`,

@@ -183,7 +183,7 @@ openapi swagger validate ./api.swagger.yaml
 openapi swagger upgrade ./api.swagger.yaml ./openapi.yaml
 
 # Query schema graph — find deeply nested components
-openapi spec query 'schemas.components | sort_by(depth; desc) | first(10) | pick name, depth' ./spec.yaml
+openapi spec query 'schemas | select(is_component) | sort_by(depth; desc) | first(10) | pick name, depth' ./spec.yaml
 
 # Query schema graph — blast radius of a schema change
 openapi spec query 'schemas | select(name == "Error") | blast-radius | length' ./spec.yaml
