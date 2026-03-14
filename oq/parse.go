@@ -486,22 +486,25 @@ func parseFuncSig(sig string) (FuncDef, error) {
 }
 
 func findUnquotedSemicolon(s string) int {
-	inQuote := false
+	var quoteChar byte
 	depth := 0
 	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case '"':
-			inQuote = !inQuote
+		ch := s[i]
+		if quoteChar != 0 {
+			if ch == quoteChar {
+				quoteChar = 0
+			}
+			continue
+		}
+		switch ch {
+		case '"', '\'':
+			quoteChar = ch
 		case '(':
-			if !inQuote {
-				depth++
-			}
+			depth++
 		case ')':
-			if !inQuote {
-				depth--
-			}
+			depth--
 		case ';':
-			if !inQuote && depth == 0 {
+			if depth == 0 {
 				return i
 			}
 		}
@@ -529,22 +532,25 @@ func splitKeywordCall(s string) (string, string, bool) {
 	// Find matching closing paren (not just the last one — handle nested parens)
 	rest := s[parenIdx+1:]
 	depth := 1
-	inQuote := false
+	var quoteChar byte
 	end := -1
 	for i := 0; i < len(rest); i++ {
-		switch rest[i] {
-		case '"':
-			inQuote = !inQuote
-		case '(':
-			if !inQuote {
-				depth++
+		ch := rest[i]
+		if quoteChar != 0 {
+			if ch == quoteChar {
+				quoteChar = 0
 			}
+			continue
+		}
+		switch ch {
+		case '"', '\'':
+			quoteChar = ch
+		case '(':
+			depth++
 		case ')':
-			if !inQuote {
-				depth--
-				if depth == 0 {
-					end = i
-				}
+			depth--
+			if depth == 0 {
+				end = i
 			}
 		}
 		if end >= 0 {

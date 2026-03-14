@@ -340,7 +340,7 @@ func (p *parser) parseComparison() (Expr, error) {
 	case "matches":
 		p.next()
 		patternTok := p.next()
-		pattern := strings.Trim(patternTok, "\"")
+		pattern := stripQuotes(patternTok)
 		re, compileErr := regexp.Compile(pattern)
 		if compileErr != nil {
 			return nil, fmt.Errorf("invalid regex %q: %w", pattern, compileErr)
@@ -427,7 +427,7 @@ func (p *parser) parsePrimary() (Expr, error) {
 			return nil, err
 		}
 		patternTok := p.next()
-		pattern := strings.Trim(patternTok, "\"")
+		pattern := stripQuotes(patternTok)
 		re, err := regexp.Compile(pattern)
 		if err != nil {
 			return nil, fmt.Errorf("invalid regex %q: %w", pattern, err)
@@ -560,6 +560,15 @@ func parseInterpolation(s string) (Expr, error) {
 		return parts[0], nil
 	}
 	return &interpExpr{parts: parts}, nil
+}
+
+// stripQuotes removes surrounding quotes from a token, handling both the \x00
+// sentinel prefix (from single-quoted strings) and regular double-quoted strings.
+func stripQuotes(tok string) string {
+	if strings.HasPrefix(tok, "\x00\"") {
+		return tok[2 : len(tok)-1]
+	}
+	return strings.Trim(tok, "\"")
 }
 
 // tokenize splits an expression into tokens.
