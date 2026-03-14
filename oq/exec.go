@@ -602,7 +602,64 @@ func execAncestorsDepth(maxDepth int, result *Result, g *graph.SchemaGraph) (*Re
 }
 
 func traverseProperties(row Row, g *graph.SchemaGraph) []Row {
-	return traverseOutEdges(row, g, graph.EdgeProperty)
+	if row.Kind != SchemaResult {
+		return nil
+	}
+	fromName := schemaName(row.SchemaIdx, g)
+
+	// Collect direct property edges
+	var result []Row
+	for _, edge := range g.OutEdges(graph.NodeID(row.SchemaIdx)) {
+		if edge.Kind == graph.EdgeProperty {
+			result = append(result, Row{
+				Kind:      SchemaResult,
+				SchemaIdx: int(edge.To),
+				Via:       edgeKindString(edge.Kind),
+				Key:       edge.Label,
+				From:      fromName,
+			})
+		}
+	}
+
+	// If schema has allOf members, flatten their properties too.
+	// allOf semantically merges properties, so users expect to see them.
+	if len(result) == 0 || g.Schemas[row.SchemaIdx].AllOfCount > 0 {
+		seen := make(map[string]bool)
+		for _, r := range result {
+			seen[r.Key] = true
+		}
+		collectAllOfProperties(row.SchemaIdx, fromName, g, seen, &result)
+	}
+
+	return result
+}
+
+// collectAllOfProperties recursively collects properties from allOf members.
+func collectAllOfProperties(idx int, fromName string, g *graph.SchemaGraph, seen map[string]bool, result *[]Row) {
+	for _, edge := range g.OutEdges(graph.NodeID(idx)) {
+		if edge.Kind != graph.EdgeAllOf {
+			continue
+		}
+		// Resolve through $ref
+		memberIdx := resolveRefTarget(int(edge.To), g)
+		// Collect properties from this allOf member
+		for _, propEdge := range g.OutEdges(graph.NodeID(memberIdx)) {
+			if propEdge.Kind == graph.EdgeProperty && !seen[propEdge.Label] {
+				seen[propEdge.Label] = true
+				*result = append(*result, Row{
+					Kind:      SchemaResult,
+					SchemaIdx: int(propEdge.To),
+					Via:       edgeKindString(propEdge.Kind),
+					Key:       propEdge.Label,
+					From:      fromName,
+				})
+			}
+		}
+		// Recurse into nested allOf
+		if g.Schemas[memberIdx].AllOfCount > 0 {
+			collectAllOfProperties(memberIdx, fromName, g, seen, result)
+		}
+	}
 }
 
 func traverseUnionMembers(row Row, g *graph.SchemaGraph) []Row {
@@ -628,7 +685,34 @@ func traverseUnionMembers(row Row, g *graph.SchemaGraph) []Row {
 }
 
 func traverseItems(row Row, g *graph.SchemaGraph) []Row {
-	return traverseOutEdges(row, g, graph.EdgeItems)
+	if row.Kind != SchemaResult {
+		return nil
+	}
+	// Direct items edges
+	result := traverseOutEdges(row, g, graph.EdgeItems)
+	if len(result) > 0 {
+		return result
+	}
+	// If no direct items, check allOf members (composition may contain the array items)
+	fromName := schemaName(row.SchemaIdx, g)
+	for _, edge := range g.OutEdges(graph.NodeID(row.SchemaIdx)) {
+		if edge.Kind != graph.EdgeAllOf {
+			continue
+		}
+		memberIdx := resolveRefTarget(int(edge.To), g)
+		for _, itemEdge := range g.OutEdges(graph.NodeID(memberIdx)) {
+			if itemEdge.Kind == graph.EdgeItems {
+				result = append(result, Row{
+					Kind:      SchemaResult,
+					SchemaIdx: int(itemEdge.To),
+					Via:       edgeKindString(itemEdge.Kind),
+					Key:       itemEdge.Label,
+					From:      fromName,
+				})
+			}
+		}
+	}
+	return result
 }
 
 // resolveRefTarget follows EdgeRef edges to get the actual target node.
@@ -840,11 +924,27 @@ func execLeaves(result *Result, g *graph.SchemaGraph) (*Result, error) {
 		if row.Kind != SchemaResult {
 			continue
 		}
-		if g.Schemas[row.SchemaIdx].OutDegree == 0 {
+		// A leaf schema has no outgoing $ref edges to other component schemas.
+		// Property children (inline type: string, type: integer, etc.) don't count.
+		if !hasComponentRef(row.SchemaIdx, g) {
 			out.Rows = append(out.Rows, row)
 		}
 	}
 	return out, nil
+}
+
+// hasComponentRef returns true if the schema at idx has any outgoing edge
+// that leads (possibly through a $ref) to a component schema.
+func hasComponentRef(idx int, g *graph.SchemaGraph) bool {
+	for _, edge := range g.OutEdges(graph.NodeID(idx)) {
+		targetIdx := int(edge.To)
+		// Follow $ref to see if it resolves to a component
+		resolved := resolveRefTarget(targetIdx, g)
+		if resolved < len(g.Schemas) && g.Schemas[resolved].IsComponent {
+			return true
+		}
+	}
+	return false
 }
 
 func execCycles(result *Result, g *graph.SchemaGraph) (*Result, error) {
@@ -1189,7 +1289,7 @@ func describeStage(stage Stage) string {
 	case StageOrphans:
 		return "Filter: schemas with no incoming refs and no operation usage"
 	case StageLeaves:
-		return "Filter: schemas with no outgoing refs (leaf nodes)"
+		return "Filter: schemas with no $ref to component schemas (leaf nodes)"
 	case StageCycles:
 		return "Analyze: strongly connected components (actual cycles)"
 	case StageClusters:
@@ -1261,6 +1361,9 @@ func execFields(result *Result) (*Result, error) {
 			{"in_degree", "int"},
 			{"out_degree", "int"},
 			{"union_width", "int"},
+			{"allof_count", "int"},
+			{"oneof_count", "int"},
+			{"anyof_count", "int"},
 			{"property_count", "int"},
 			{"properties", "array"},
 			{"is_component", "bool"},

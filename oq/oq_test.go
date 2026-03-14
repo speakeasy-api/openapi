@@ -1,6 +1,7 @@
 package oq_test
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -640,13 +641,15 @@ func TestExecute_Leaves_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | select(is_component) | leaves | pick name, out_degree`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | leaves | pick name`, g)
 	require.NoError(t, err)
-	// All returned rows should have out_degree == 0
-	for _, row := range result.Rows {
-		od := oq.FieldValuePublic(row, "out_degree", g)
-		assert.Equal(t, 0, od.Int, "leaf nodes should have out_degree 0")
-	}
+	// Leaves are schemas with no outgoing $ref to other component schemas.
+	// Schemas like Address, Circle, Square, Error, Unused should be leaves
+	// (they only have primitive property children, no $ref edges).
+	names := collectNames(result, g)
+	assert.Contains(t, names, "Address", "Address should be a leaf")
+	assert.Contains(t, names, "Circle", "Circle should be a leaf")
+	assert.NotContains(t, names, "Pet", "Pet should NOT be a leaf (refs Owner)")
 }
 
 func TestExecute_Cycles_Success(t *testing.T) {
@@ -998,7 +1001,7 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 		{
 			"explain with leaves",
 			"schemas | select(is_component) | leaves | explain",
-			[]string{"Filter: schemas with no outgoing"},
+			[]string{"Filter: schemas with no $ref to component"},
 		},
 		{
 			"explain with cycles",
@@ -1269,17 +1272,22 @@ func TestFormatJSON_Explain(t *testing.T) {
 	assert.Contains(t, toon, "Source: schemas", "toon should render explain output")
 }
 
-func TestExecute_Leaves_AllZeroOutDegree(t *testing.T) {
+func TestExecute_Leaves_NoComponentRefs(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("schemas | select(is_component) | leaves | pick name, out_degree", g)
+	result, err := oq.Execute("schemas | select(is_component) | leaves | pick name", g)
 	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "should have leaf schemas")
 
-	// Verify leaves are leaf nodes
+	// Leaf schemas should not reference any component schemas
 	for _, row := range result.Rows {
-		od := oq.FieldValuePublic(row, "out_degree", g)
-		assert.Equal(t, 0, od.Int, "leaves should have 0 out_degree")
+		refs, err := oq.Execute(
+			fmt.Sprintf(`schemas | select(name == "%s") | references | select(is_component)`,
+				oq.FieldValuePublic(row, "name", g).Str), g)
+		require.NoError(t, err)
+		assert.Empty(t, refs.Rows, "leaf %s should not reference any component schemas",
+			oq.FieldValuePublic(row, "name", g).Str)
 	}
 }
 

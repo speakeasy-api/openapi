@@ -52,9 +52,9 @@ in the schema reference graph.
   descendants(N)      Depth-limited descendants: only follow N hops
   ancestors           Transitive closure of incoming references
   ancestors(N)        Depth-limited ancestors: only follow N hops
-  properties        Expand to property sub-schemas (with edge annotations)
+  properties        Expand to property sub-schemas (flattens allOf; with edge annotations)
   union-members     Expand allOf/oneOf/anyOf children (with edge annotations)
-  items             Expand to array items schema (with edge annotations)
+  items             Expand to array items schema (checks allOf; with edge annotations)
   parent            Navigate to structural parent schema (via graph in-edges)
   ops               Schemas → operations that use them
   schemas           Operations → schemas they touch
@@ -142,6 +142,9 @@ Graph-level (pre-computed):
   in_degree         int      Number of schemas referencing this one
   out_degree        int      Number of schemas this references
   union_width       int      oneOf + anyOf + allOf member count
+  allof_count       int      Number of allOf members
+  oneof_count       int      Number of oneOf members
+  anyof_count       int      Number of anyOf members
   property_count    int      Number of properties
   properties        array    Property names (for 'contains' filtering)
   is_component      bool     In #/components/schemas

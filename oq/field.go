@@ -60,6 +60,12 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.IntVal(s.OutDegree)
 		case "union_width":
 			return expr.IntVal(s.UnionWidth)
+		case "allof_count":
+			return expr.IntVal(s.AllOfCount)
+		case "oneof_count":
+			return expr.IntVal(s.OneOfCount)
+		case "anyof_count":
+			return expr.IntVal(s.AnyOfCount)
 		case "property_count":
 			return expr.IntVal(s.PropertyCount)
 		case "is_component":

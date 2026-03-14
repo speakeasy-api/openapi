@@ -66,6 +66,9 @@ type SchemaNode struct {
 	InDegree      int
 	OutDegree     int
 	UnionWidth    int
+	AllOfCount    int
+	OneOfCount    int
+	AnyOfCount    int
 	PropertyCount int
 	Hash          string
 }
@@ -596,7 +599,10 @@ func (g *SchemaGraph) computeMetrics() {
 
 		schema := sn.Schema.GetSchema()
 		if schema != nil {
-			sn.UnionWidth = len(schema.AllOf) + len(schema.OneOf) + len(schema.AnyOf)
+			sn.AllOfCount = len(schema.AllOf)
+			sn.OneOfCount = len(schema.OneOf)
+			sn.AnyOfCount = len(schema.AnyOf)
+			sn.UnionWidth = sn.AllOfCount + sn.OneOfCount + sn.AnyOfCount
 			if schema.Properties != nil {
 				sn.PropertyCount = schema.Properties.Len()
 			}

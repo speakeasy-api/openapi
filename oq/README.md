@@ -44,7 +44,7 @@ source | stage | stage | ... | terminal
 | `referenced-by` | Direct incoming references (with edge annotations) |
 | `descendants` / `descendants(N)` | Transitive (or depth-limited) outgoing refs |
 | `ancestors` / `ancestors(N)` | Transitive (or depth-limited) incoming refs |
-| `properties` | Property sub-schemas (with edge annotations) |
+| `properties` | Property sub-schemas, flattens through allOf (with edge annotations) |
 | `union-members` | allOf/oneOf/anyOf children (with edge annotations) |
 | `items` | Array items schema (with edge annotations) |
 | `parent` | Navigate to structural parent schema (via graph in-edges) |
