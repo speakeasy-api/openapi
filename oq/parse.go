@@ -206,6 +206,9 @@ func parseStage(s string) (Stage, error) {
 			}
 			// Support group_by(field; name_field) with semicolon separator
 			parts := splitSemicolonArgs(args)
+			if len(parts) == 0 || parts[0] == "" {
+				return Stage{}, errors.New("group_by requires a field name")
+			}
 			fields := parseCSV(parts[0])
 			if len(parts) >= 2 {
 				fields = append(fields, strings.TrimSpace(parts[1]))
