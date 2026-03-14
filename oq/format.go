@@ -23,7 +23,8 @@ func FormatTable(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	if len(result.Groups) > 0 {
+	// Use group-specific formatting only when no explicit field projection
+	if len(result.Groups) > 0 && len(result.Fields) == 0 {
 		return formatGroups(result)
 	}
 
@@ -100,7 +101,7 @@ func FormatJSON(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	if len(result.Groups) > 0 {
+	if len(result.Groups) > 0 && len(result.Fields) == 0 {
 		return formatGroupsJSON(result)
 	}
 
@@ -145,7 +146,7 @@ func FormatMarkdown(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	if len(result.Groups) > 0 {
+	if len(result.Groups) > 0 && len(result.Fields) == 0 {
 		var sb strings.Builder
 		sb.WriteString("| Key | Count |\n")
 		sb.WriteString("| --- | --- |\n")
@@ -205,7 +206,7 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	if len(result.Groups) > 0 {
+	if len(result.Groups) > 0 && len(result.Fields) == 0 {
 		return formatGroupsToon(result)
 	}
 
@@ -253,7 +254,7 @@ func FormatYAML(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	if len(result.Groups) > 0 {
+	if len(result.Groups) > 0 && len(result.Fields) == 0 {
 		return formatGroupsJSON(result)
 	}
 
