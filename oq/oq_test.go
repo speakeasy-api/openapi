@@ -2266,6 +2266,168 @@ func TestExecute_ArrayEndswith(t *testing.T) {
 	assert.Contains(t, names, "Address", "Address has 'street' property")
 }
 
+func TestExecute_EmitParameterKey(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | parameters | first(1) | emit`, g)
+	require.NoError(t, err)
+	yaml := oq.FormatYAML(result, g)
+	assert.Contains(t, yaml, "/parameters/", "emit key should include /parameters/ path")
+}
+
+func TestExecute_EmitContentTypeKey(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | first(1) | responses | first(1) | content-types | emit`, g)
+	require.NoError(t, err)
+	yaml := oq.FormatYAML(result, g)
+	assert.Contains(t, yaml, "application/json", "emit key should include media type")
+}
+
+func TestExecute_EmitSecuritySchemeKey(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`components.security-schemes | emit`, g)
+	require.NoError(t, err)
+	yaml := oq.FormatYAML(result, g)
+	assert.Contains(t, yaml, "bearerAuth", "emit key should be scheme name")
+}
+
+func TestExecute_EmitRequestBodyKey(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | select(name == "createPet") | request-body | emit`, g)
+	require.NoError(t, err)
+	yaml := oq.FormatYAML(result, g)
+	assert.Contains(t, yaml, "createPet/request-body", "emit key should include operation name")
+}
+
+func TestExecute_GroupByTable_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// group_by should now render as a standard table, not summary format
+	result, err := oq.Execute("schemas | select(is_component) | group_by(type)", g)
+	require.NoError(t, err)
+
+	table := oq.FormatTable(result, g)
+	// Should have table headers
+	assert.Contains(t, table, "key")
+	assert.Contains(t, table, "count")
+	assert.Contains(t, table, "---")
+
+	// JSON format should also work as regular table
+	json := oq.FormatJSON(result, g)
+	assert.Contains(t, json, "\"key\"")
+	assert.Contains(t, json, "\"count\"")
+	assert.Contains(t, json, "\"names\"")
+
+	// Toon format
+	toon := oq.FormatToon(result, g)
+	assert.Contains(t, toon, "results[")
+	assert.Contains(t, toon, "{key,count,names}")
+}
+
+func TestExecute_CyclesTable_Success(t *testing.T) {
+	t.Parallel()
+	g := loadCyclicGraph(t)
+
+	result, err := oq.Execute("schemas | cycles", g)
+	require.NoError(t, err)
+
+	table := oq.FormatTable(result, g)
+	assert.Contains(t, table, "key")
+	assert.Contains(t, table, "count")
+}
+
+func TestExecute_KindFieldAllTypes(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test kind field for various row types
+	tests := []struct {
+		query    string
+		expected string
+	}{
+		{"schemas | first(1)", "schema"},
+		{"operations | first(1)", "operation"},
+		{"operations | parameters | first(1)", "parameter"},
+		{"operations | first(1) | responses | first(1)", "response"},
+		{"operations | select(name == \"createPet\") | request-body", "request-body"},
+		{"operations | first(1) | responses | first(1) | content-types | first(1)", "content-type"},
+		{"components.security-schemes | first(1)", "security-scheme"},
+	}
+
+	for _, tt := range tests {
+		result, err := oq.Execute(tt.query, g)
+		require.NoError(t, err, "query: %s", tt.query)
+		if len(result.Rows) > 0 {
+			kind := oq.FieldValuePublic(result.Rows[0], "kind", g)
+			assert.Equal(t, tt.expected, kind.Str, "query: %s", tt.query)
+		}
+	}
+}
+
+func TestExecute_DefaultFieldsForAllTypes(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Verify each row type renders without error in all formats
+	queries := []string{
+		"schemas | first(1)",
+		"operations | first(1)",
+		"operations | parameters | first(1)",
+		"operations | first(1) | responses | first(1)",
+		"operations | select(name == \"createPet\") | request-body",
+		"operations | first(1) | responses | first(1) | content-types | first(1)",
+		"components.security-schemes",
+		"operations | first(1) | security",
+	}
+
+	for _, q := range queries {
+		result, err := oq.Execute(q, g)
+		require.NoError(t, err, "query: %s", q)
+		if len(result.Rows) > 0 {
+			table := oq.FormatTable(result, g)
+			assert.NotEmpty(t, table, "table should not be empty for: %s", q)
+			json := oq.FormatJSON(result, g)
+			assert.NotEmpty(t, json, "json should not be empty for: %s", q)
+		}
+	}
+}
+
+func TestExecute_ResolveThinWrapper(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// The listPets response is {type: array, items: {$ref: Pet}}
+	// schema stage should resolve through the array wrapper to Pet
+	result, err := oq.Execute(`operations | select(name == "listPets") | responses | select(status_code == "200") | content-types | schema | pick name, is_component`, g)
+	require.NoError(t, err)
+	if assert.NotEmpty(t, result.Rows) {
+		name := oq.FieldValuePublic(result.Rows[0], "name", g)
+		isComp := oq.FieldValuePublic(result.Rows[0], "is_component", g)
+		assert.Equal(t, "Pet", name.Str, "should resolve through array wrapper to Pet component")
+		assert.True(t, isComp.Bool, "resolved schema should be a component")
+	}
+}
+
+func TestExecute_HeadersEmitKey(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | select(name == "createPet") | responses | select(status_code == "201") | headers | emit`, g)
+	require.NoError(t, err)
+	if len(result.Rows) > 0 {
+		yaml := oq.FormatYAML(result, g)
+		assert.Contains(t, yaml, "createPet/201/headers/X-Request-Id", "emit key should include full path")
+	}
+}
+
 // collectNames extracts the "name" field from all rows in the result.
 func collectNames(result *oq.Result, g *graph.SchemaGraph) []string {
 	var names []string
