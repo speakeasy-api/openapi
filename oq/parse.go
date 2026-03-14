@@ -102,7 +102,7 @@ func ParseQuery(query string) (*Query, error) {
 	return q, nil
 }
 
-// Parse splits a pipeline query string into stages (backward compat).
+// Parse splits a pipeline query string into stages.
 func Parse(query string) ([]Stage, error) {
 	q, err := ParseQuery(query)
 	if err != nil {
@@ -149,22 +149,14 @@ func parseStage(s string) (Stage, error) {
 	keyword = strings.ToLower(keyword)
 
 	switch keyword {
-	// New jq-style: select(expr) replaces where
 	case "select":
-		if isCall {
-			// select(expr) → filter
-			if args == "" {
-				return Stage{}, errors.New("select() requires an expression")
-			}
-			return Stage{Kind: StageWhere, Expr: args}, nil
+		if !isCall {
+			return Stage{}, errors.New("select requires parentheses: select(expr)")
 		}
-		// select f1, f2 → old-style field projection — use pick instead
-		// But keep for backward compat during migration
 		if args == "" {
-			return Stage{}, errors.New("select requires field names")
+			return Stage{}, errors.New("select() requires an expression")
 		}
-		fields := parseCSV(args)
-		return Stage{Kind: StageSelect, Fields: fields}, nil
+		return Stage{Kind: StageWhere, Expr: args}, nil
 
 	case "pick":
 		if args == "" {
@@ -172,13 +164,6 @@ func parseStage(s string) (Stage, error) {
 		}
 		fields := parseCSV(args)
 		return Stage{Kind: StageSelect, Fields: fields}, nil
-
-	// where (legacy, still supported)
-	case "where":
-		if args == "" {
-			return Stage{}, errors.New("where requires an expression")
-		}
-		return Stage{Kind: StageWhere, Expr: args}, nil
 
 	case "sort_by":
 		if isCall {
@@ -194,27 +179,7 @@ func parseStage(s string) (Stage, error) {
 		}
 		return Stage{}, errors.New("sort_by requires parentheses: sort_by(field) or sort_by(field; desc)")
 
-	// Legacy sort
-	case "sort":
-		parts := strings.Fields(args)
-		if len(parts) == 0 {
-			return Stage{}, errors.New("sort requires a field name")
-		}
-		desc := false
-		if len(parts) >= 2 && strings.ToLower(parts[1]) == "desc" {
-			desc = true
-		}
-		return Stage{Kind: StageSort, SortField: parts[0], SortDesc: desc}, nil
-
 	case "first":
-		if isCall {
-			n, err := strconv.Atoi(strings.TrimSpace(args))
-			if err != nil {
-				return Stage{}, fmt.Errorf("first requires a number: %w", err)
-			}
-			return Stage{Kind: StageTake, Limit: n}, nil
-		}
-		// bare "first" with space arg
 		n, err := strconv.Atoi(strings.TrimSpace(args))
 		if err != nil {
 			return Stage{}, fmt.Errorf("first requires a number: %w", err)
@@ -222,26 +187,11 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageTake, Limit: n}, nil
 
 	case "last":
-		if isCall {
-			n, err := strconv.Atoi(strings.TrimSpace(args))
-			if err != nil {
-				return Stage{}, fmt.Errorf("last requires a number: %w", err)
-			}
-			return Stage{Kind: StageLast, Limit: n}, nil
-		}
 		n, err := strconv.Atoi(strings.TrimSpace(args))
 		if err != nil {
 			return Stage{}, fmt.Errorf("last requires a number: %w", err)
 		}
 		return Stage{Kind: StageLast, Limit: n}, nil
-
-	// Legacy take/head
-	case "take", "head":
-		n, err := strconv.Atoi(strings.TrimSpace(args))
-		if err != nil {
-			return Stage{}, fmt.Errorf("take requires a number: %w", err)
-		}
-		return Stage{Kind: StageTake, Limit: n}, nil
 
 	case "length":
 		return Stage{Kind: StageCount}, nil
@@ -254,21 +204,18 @@ func parseStage(s string) (Stage, error) {
 			if args == "" {
 				return Stage{}, errors.New("group_by requires a field name")
 			}
-			fields := parseCSV(args)
+			// Support group_by(field; name_field) with semicolon separator
+			parts := splitSemicolonArgs(args)
+			if len(parts) == 0 || parts[0] == "" {
+				return Stage{}, errors.New("group_by requires a field name")
+			}
+			fields := parseCSV(parts[0])
+			if len(parts) >= 2 {
+				fields = append(fields, strings.TrimSpace(parts[1]))
+			}
 			return Stage{Kind: StageGroupBy, Fields: fields}, nil
 		}
 		return Stage{}, errors.New("group_by requires parentheses: group_by(field)")
-
-	// Legacy group-by
-	case "group-by":
-		if args == "" {
-			return Stage{}, errors.New("group-by requires a field name")
-		}
-		fields := parseCSV(args)
-		return Stage{Kind: StageGroupBy, Fields: fields}, nil
-
-	case "count":
-		return Stage{Kind: StageCount}, nil
 
 	case "refs-out":
 		return Stage{Kind: StageRefsOut}, nil
@@ -277,6 +224,14 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageRefsIn}, nil
 
 	case "reachable":
+		if isCall && args != "" {
+			n, err := strconv.Atoi(strings.TrimSpace(args))
+			if err != nil {
+				return Stage{}, fmt.Errorf("reachable requires a depth number: %w", err)
+			}
+			return Stage{Kind: StageReachable, Limit: n}, nil
+		}
+		// bare reachable = unlimited depth (-1 sentinel not needed; Limit 0 = unlimited)
 		return Stage{Kind: StageReachable}, nil
 
 	case "ancestors":
@@ -291,6 +246,9 @@ func parseStage(s string) (Stage, error) {
 	case "items":
 		return Stage{Kind: StageItems}, nil
 
+	case "parent":
+		return Stage{Kind: StageParent}, nil
+
 	case "ops":
 		return Stage{Kind: StageOps}, nil
 
@@ -304,13 +262,6 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageFields}, nil
 
 	case "sample":
-		if isCall {
-			n, err := strconv.Atoi(strings.TrimSpace(args))
-			if err != nil {
-				return Stage{}, fmt.Errorf("sample requires a number: %w", err)
-			}
-			return Stage{Kind: StageSample, Limit: n}, nil
-		}
 		n, err := strconv.Atoi(strings.TrimSpace(args))
 		if err != nil {
 			return Stage{}, fmt.Errorf("sample requires a number: %w", err)
@@ -318,13 +269,6 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageSample, Limit: n}, nil
 
 	case "neighbors":
-		if isCall {
-			n, err := strconv.Atoi(strings.TrimSpace(args))
-			if err != nil {
-				return Stage{}, fmt.Errorf("neighbors requires a depth number: %w", err)
-			}
-			return Stage{Kind: StageNeighbors, Limit: n}, nil
-		}
 		n, err := strconv.Atoi(strings.TrimSpace(args))
 		if err != nil {
 			return Stage{}, fmt.Errorf("neighbors requires a depth number: %w", err)
@@ -391,13 +335,13 @@ func parseStage(s string) (Stage, error) {
 
 	case "format":
 		f := strings.TrimSpace(args)
-		if isCall {
-			f = strings.TrimSpace(args)
-		}
 		if f != "table" && f != "json" && f != "markdown" && f != "toon" {
 			return Stage{}, fmt.Errorf("format must be table, json, markdown, or toon, got %q", f)
 		}
 		return Stage{Kind: StageFormat, Format: f}, nil
+
+	case "emit":
+		return Stage{Kind: StageEmit}, nil
 
 	case "connected":
 		return Stage{Kind: StageConnected}, nil
@@ -425,6 +369,31 @@ func parseStage(s string) (Stage, error) {
 
 	case "let":
 		return parseLet(args)
+
+	// Navigation stages
+	case "parameters":
+		return Stage{Kind: StageParameters}, nil
+
+	case "responses":
+		return Stage{Kind: StageResponses}, nil
+
+	case "request-body":
+		return Stage{Kind: StageRequestBody}, nil
+
+	case "content-types":
+		return Stage{Kind: StageContentTypes}, nil
+
+	case "headers":
+		return Stage{Kind: StageHeaders}, nil
+
+	case "schema":
+		return Stage{Kind: StageSchema}, nil
+
+	case "operation":
+		return Stage{Kind: StageOperation}, nil
+
+	case "security":
+		return Stage{Kind: StageSecurity}, nil
 
 	default:
 		return Stage{}, fmt.Errorf("unknown stage: %q", keyword)
@@ -483,22 +452,27 @@ func parseFuncSig(sig string) (FuncDef, error) {
 }
 
 func findUnquotedSemicolon(s string) int {
-	inQuote := false
+	var quoteChar byte
 	depth := 0
 	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case '"':
-			inQuote = !inQuote
+		ch := s[i]
+		if quoteChar != 0 {
+			if ch == '\\' && i+1 < len(s) {
+				i++ // skip escaped character
+			} else if ch == quoteChar {
+				quoteChar = 0
+			}
+			continue
+		}
+		switch ch {
+		case '"', '\'':
+			quoteChar = ch
 		case '(':
-			if !inQuote {
-				depth++
-			}
+			depth++
 		case ')':
-			if !inQuote {
-				depth--
-			}
+			depth--
 		case ';':
-			if !inQuote && depth == 0 {
+			if depth == 0 {
 				return i
 			}
 		}
@@ -526,22 +500,27 @@ func splitKeywordCall(s string) (string, string, bool) {
 	// Find matching closing paren (not just the last one — handle nested parens)
 	rest := s[parenIdx+1:]
 	depth := 1
-	inQuote := false
+	var quoteChar byte
 	end := -1
 	for i := 0; i < len(rest); i++ {
-		switch rest[i] {
-		case '"':
-			inQuote = !inQuote
-		case '(':
-			if !inQuote {
-				depth++
+		ch := rest[i]
+		if quoteChar != 0 {
+			if ch == '\\' && i+1 < len(rest) {
+				i++ // skip escaped character
+			} else if ch == quoteChar {
+				quoteChar = 0
 			}
+			continue
+		}
+		switch ch {
+		case '"', '\'':
+			quoteChar = ch
+		case '(':
+			depth++
 		case ')':
-			if !inQuote {
-				depth--
-				if depth == 0 {
-					end = i
-				}
+			depth--
+			if depth == 0 {
+				end = i
 			}
 		}
 		if end >= 0 {
@@ -561,34 +540,7 @@ func splitKeywordCall(s string) (string, string, bool) {
 }
 
 func splitSemicolonArgs(s string) []string {
-	var parts []string
-	var current strings.Builder
-	depth := 0
-	inQuote := false
-
-	for i := 0; i < len(s); i++ {
-		ch := s[i]
-		switch {
-		case ch == '"':
-			inQuote = !inQuote
-			current.WriteByte(ch)
-		case ch == '(' && !inQuote:
-			depth++
-			current.WriteByte(ch)
-		case ch == ')' && !inQuote:
-			depth--
-			current.WriteByte(ch)
-		case ch == ';' && !inQuote && depth == 0:
-			parts = append(parts, current.String())
-			current.Reset()
-		default:
-			current.WriteByte(ch)
-		}
-	}
-	if current.Len() > 0 {
-		parts = append(parts, current.String())
-	}
-	return parts
+	return splitAtDelim(s, ';')
 }
 
 func parseTwoArgs(s string) (string, string) {
@@ -629,24 +581,38 @@ func parseTwoArgs(s string) (string, string) {
 // --- Pipeline splitting ---
 
 func splitPipeline(input string) []string {
+	return splitAtDelim(input, '|')
+}
+
+// splitAtDelim splits a string at unquoted, depth-0 occurrences of delim,
+// respecting single/double quotes and parenthesis nesting.
+func splitAtDelim(input string, delim byte) []string {
 	var parts []string
 	var current strings.Builder
-	inQuote := false
-	depth := 0 // paren depth — don't split | inside parens
+	var quoteChar byte
+	depth := 0
 
 	for i := 0; i < len(input); i++ {
 		ch := input[i]
 		switch {
-		case ch == '"':
-			inQuote = !inQuote
+		case quoteChar != 0:
 			current.WriteByte(ch)
-		case ch == '(' && !inQuote:
+			if ch == '\\' && i+1 < len(input) {
+				i++
+				current.WriteByte(input[i])
+			} else if ch == quoteChar {
+				quoteChar = 0
+			}
+		case ch == '"' || ch == '\'':
+			quoteChar = ch
+			current.WriteByte(ch)
+		case ch == '(':
 			depth++
 			current.WriteByte(ch)
-		case ch == ')' && !inQuote:
+		case ch == ')':
 			depth--
 			current.WriteByte(ch)
-		case ch == '|' && !inQuote && depth == 0:
+		case ch == delim && depth == 0:
 			parts = append(parts, current.String())
 			current.Reset()
 		default:

@@ -134,6 +134,8 @@ The CLI provides four main command groups:
   - `snip` - Remove selected operations from an OpenAPI specification (interactive or CLI)
   - `upgrade` - Upgrade an OpenAPI specification to the latest supported version
   - `validate` - Validate an OpenAPI specification document
+  - `query` - Query an OpenAPI specification using the [oq pipeline language](./oq/README.md) to answer structural and semantic questions about schemas and operations
+  - `query-reference` - Print the complete oq query language reference
 
 - **`openapi swagger`** - Commands for working with Swagger 2.0 documents ([documentation](./cmd/openapi/commands/swagger/README.md))
   - `validate` - Validate a Swagger 2.0 specification document
@@ -179,6 +181,12 @@ openapi swagger validate ./api.swagger.yaml
 
 # Upgrade Swagger 2.0 to OpenAPI 3.0
 openapi swagger upgrade ./api.swagger.yaml ./openapi.yaml
+
+# Query schema graph — find deeply nested components
+openapi spec query 'schemas | select(is_component) | sort_by(depth; desc) | first(10) | pick name, depth' ./spec.yaml
+
+# Query schema graph — blast radius of a schema change
+openapi spec query 'schemas | select(name == "Error") | blast-radius | length' ./spec.yaml
 ```
 
 For detailed usage instructions for each command group, see the individual documentation linked above.

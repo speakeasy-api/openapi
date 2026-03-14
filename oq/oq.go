@@ -2,15 +2,14 @@
 //
 // Queries are written as pipeline expressions with jq-inspired syntax:
 //
-//	schemas.components | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth
-//
-// Legacy syntax (where, sort, take, select fields) is also supported.
+//	schemas | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth
 package oq
 
 import (
 	"fmt"
 
 	"github.com/speakeasy-api/openapi/graph"
+	"github.com/speakeasy-api/openapi/openapi"
 )
 
 // ResultKind distinguishes between schema and operation result rows.
@@ -19,6 +18,14 @@ type ResultKind int
 const (
 	SchemaResult ResultKind = iota
 	OperationResult
+	GroupRowResult
+	ParameterResult
+	ResponseResult
+	RequestBodyResult
+	ContentTypeResult
+	HeaderResult
+	SecuritySchemeResult
+	SecurityRequirementResult
 )
 
 // Row represents a single result in the pipeline.
@@ -28,9 +35,31 @@ type Row struct {
 	OpIdx     int // index into SchemaGraph.Operations
 
 	// Edge annotations (populated by 1-hop traversal stages)
-	EdgeKind  string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
-	EdgeLabel string // edge label: property name, array index, etc.
-	EdgeFrom  string // source node name
+	Via  string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
+	Key  string // edge key: property name, array index, etc.
+	From string // source node name
+
+	// Group annotations (populated by group-by stages)
+	GroupKey   string   // group key value
+	GroupCount int      // number of members in the group
+	GroupNames []string // member names
+
+	// Navigation objects (populated by navigation stages)
+	Parameter      *openapi.Parameter
+	Response       *openapi.Response
+	RequestBody    *openapi.RequestBody
+	ContentType    *openapi.MediaType
+	Header         *openapi.Header
+	SecurityScheme *openapi.SecurityScheme
+
+	// Propagated context from parent navigation stages
+	StatusCode    string   // propagated from response rows to content-types/headers
+	MediaTypeName string   // media type key (e.g., "application/json")
+	HeaderName    string   // header name
+	ComponentKey  string   // component key name or parameter name
+	SchemeName    string   // security scheme name
+	Scopes        []string // security requirement scopes
+	SourceOpIdx   int      // operation this row originated from (-1 if N/A)
 }
 
 // Result is the output of a query execution.
@@ -41,7 +70,8 @@ type Result struct {
 	Count      int
 	Groups     []GroupResult
 	Explain    string // human-readable pipeline explanation
-	FormatHint string // format preference from format stage (table, json, markdown)
+	FormatHint string // format preference from format stage (table, json, markdown, toon)
+	EmitYAML   bool   // emit raw YAML nodes instead of formatted output
 }
 
 // GroupResult represents a group-by aggregation result.
@@ -131,6 +161,16 @@ const (
 	StageSharedRefs
 	StageLast
 	StageLet
+	StageParent
+	StageEmit
+	StageParameters
+	StageResponses
+	StageRequestBody
+	StageContentTypes
+	StageHeaders
+	StageSchema    // singular: extract schema from nav row
+	StageOperation // back-navigate to source operation
+	StageSecurity  // operation security requirements
 )
 
 // Stage represents a single stage in the query pipeline.

@@ -8,6 +8,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/graph"
 	"github.com/speakeasy-api/openapi/oq/expr"
+	"gopkg.in/yaml.v3"
 )
 
 // FormatTable formats a result as a simple table string.
@@ -20,7 +21,10 @@ func FormatTable(result *Result, g *graph.SchemaGraph) string {
 		return strconv.Itoa(result.Count)
 	}
 
-	if len(result.Groups) > 0 {
+	syncGroupsFromRows(result)
+
+	// Use group-specific formatting only when no explicit field projection
+	if len(result.Groups) > 0 && len(result.Fields) == 0 {
 		return formatGroups(result)
 	}
 
@@ -30,11 +34,7 @@ func FormatTable(result *Result, g *graph.SchemaGraph) string {
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		if result.Rows[0].Kind == SchemaResult {
-			fields = []string{"name", "type", "depth", "in_degree", "out_degree"}
-		} else {
-			fields = []string{"name", "method", "path", "schema_count"}
-		}
+		fields = defaultFieldsForKind(result.Rows[0].Kind)
 	}
 
 	// Build header
@@ -99,7 +99,9 @@ func FormatJSON(result *Result, g *graph.SchemaGraph) string {
 		return strconv.Itoa(result.Count)
 	}
 
-	if len(result.Groups) > 0 {
+	syncGroupsFromRows(result)
+
+	if len(result.Groups) > 0 && len(result.Fields) == 0 {
 		return formatGroupsJSON(result)
 	}
 
@@ -109,11 +111,7 @@ func FormatJSON(result *Result, g *graph.SchemaGraph) string {
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		if result.Rows[0].Kind == SchemaResult {
-			fields = []string{"name", "type", "depth", "in_degree", "out_degree"}
-		} else {
-			fields = []string{"name", "method", "path", "schema_count"}
-		}
+		fields = defaultFieldsForKind(result.Rows[0].Kind)
 	}
 
 	var sb strings.Builder
@@ -146,7 +144,9 @@ func FormatMarkdown(result *Result, g *graph.SchemaGraph) string {
 		return strconv.Itoa(result.Count)
 	}
 
-	if len(result.Groups) > 0 {
+	syncGroupsFromRows(result)
+
+	if len(result.Groups) > 0 && len(result.Fields) == 0 {
 		var sb strings.Builder
 		sb.WriteString("| Key | Count |\n")
 		sb.WriteString("| --- | --- |\n")
@@ -162,11 +162,7 @@ func FormatMarkdown(result *Result, g *graph.SchemaGraph) string {
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		if result.Rows[0].Kind == SchemaResult {
-			fields = []string{"name", "type", "depth", "in_degree", "out_degree"}
-		} else {
-			fields = []string{"name", "method", "path", "schema_count"}
-		}
+		fields = defaultFieldsForKind(result.Rows[0].Kind)
 	}
 
 	var sb strings.Builder
@@ -208,7 +204,9 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 		return "count: " + strconv.Itoa(result.Count)
 	}
 
-	if len(result.Groups) > 0 {
+	syncGroupsFromRows(result)
+
+	if len(result.Groups) > 0 && len(result.Fields) == 0 {
 		return formatGroupsToon(result)
 	}
 
@@ -218,11 +216,7 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		if result.Rows[0].Kind == SchemaResult {
-			fields = []string{"name", "type", "depth", "in_degree", "out_degree"}
-		} else {
-			fields = []string{"name", "method", "path", "schema_count"}
-		}
+		fields = defaultFieldsForKind(result.Rows[0].Kind)
 	}
 
 	var sb strings.Builder
@@ -244,6 +238,117 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 	}
 
 	return sb.String()
+}
+
+// FormatYAML formats results as raw YAML from the underlying schema/operation objects.
+// For multiple results, outputs a YAML stream with --- separators.
+// This enables piping into yq for content-level queries.
+func FormatYAML(result *Result, g *graph.SchemaGraph) string {
+	if result.Explain != "" {
+		return result.Explain
+	}
+
+	if result.IsCount {
+		return strconv.Itoa(result.Count)
+	}
+
+	syncGroupsFromRows(result)
+
+	if len(result.Groups) > 0 && len(result.Fields) == 0 {
+		return formatGroupsJSON(result)
+	}
+
+	if len(result.Rows) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	for i, row := range result.Rows {
+		if i > 0 {
+			sb.WriteString("---\n")
+		}
+
+		node := getRootNode(row, g)
+		key := emitKey(row, g)
+
+		if node == nil {
+			sb.WriteString("# ")
+			sb.WriteString(key)
+			sb.WriteString(" (no YAML node available)\n")
+			continue
+		}
+
+		wrapper := &yaml.Node{
+			Kind: yaml.MappingNode,
+			Content: []*yaml.Node{
+				{Kind: yaml.ScalarNode, Value: key},
+				node,
+			},
+		}
+		data, err := yaml.Marshal(wrapper)
+		if err != nil {
+			sb.WriteString("# error marshalling: " + err.Error() + "\n")
+			continue
+		}
+		sb.Write(data)
+	}
+
+	return sb.String()
+}
+
+// getRootNode extracts the underlying yaml.Node from a result row.
+func getRootNode(row Row, g *graph.SchemaGraph) *yaml.Node {
+	switch row.Kind {
+	case SchemaResult:
+		if row.SchemaIdx < 0 || row.SchemaIdx >= len(g.Schemas) {
+			return nil
+		}
+		s := &g.Schemas[row.SchemaIdx]
+		if s.Schema == nil {
+			return nil
+		}
+		schema := s.Schema.GetSchema()
+		if schema == nil {
+			return nil
+		}
+		return schema.GetRootNode()
+	case OperationResult:
+		if row.OpIdx < 0 || row.OpIdx >= len(g.Operations) {
+			return nil
+		}
+		o := &g.Operations[row.OpIdx]
+		if o.Operation == nil {
+			return nil
+		}
+		return o.Operation.GetRootNode()
+	case ParameterResult:
+		if row.Parameter != nil {
+			return row.Parameter.GetRootNode()
+		}
+	case ResponseResult:
+		if row.Response != nil {
+			return row.Response.GetRootNode()
+		}
+	case RequestBodyResult:
+		if row.RequestBody != nil {
+			return row.RequestBody.GetRootNode()
+		}
+	case ContentTypeResult:
+		if row.ContentType != nil {
+			return row.ContentType.GetRootNode()
+		}
+	case HeaderResult:
+		if row.Header != nil {
+			return row.Header.GetRootNode()
+		}
+	case SecuritySchemeResult:
+		if row.SecurityScheme != nil {
+			return row.SecurityScheme.GetRootNode()
+		}
+	default:
+		return nil
+	}
+	return nil
 }
 
 func formatGroupsToon(result *Result) string {
@@ -374,6 +479,113 @@ func formatGroupsJSON(result *Result) string {
 	}
 	sb.WriteString("\n]")
 	return sb.String()
+}
+
+func defaultFieldsForKind(kind ResultKind) []string {
+	switch kind {
+	case SchemaResult:
+		return []string{"name", "type", "depth", "in_degree", "out_degree"}
+	case OperationResult:
+		return []string{"name", "method", "path", "schema_count"}
+	case GroupRowResult:
+		return []string{"key", "count", "names"}
+	case ParameterResult:
+		return []string{"name", "in", "required", "deprecated", "operation"}
+	case ResponseResult:
+		return []string{"status_code", "description", "content_type_count", "operation"}
+	case RequestBodyResult:
+		return []string{"description", "required", "content_type_count", "operation"}
+	case ContentTypeResult:
+		return []string{"media_type", "has_schema", "status_code", "operation"}
+	case HeaderResult:
+		return []string{"name", "required", "status_code", "operation"}
+	case SecuritySchemeResult:
+		return []string{"name", "type", "in", "scheme"}
+	case SecurityRequirementResult:
+		return []string{"scheme_name", "scheme_type", "scopes", "operation"}
+	default:
+		return []string{"name"}
+	}
+}
+
+// syncGroupsFromRows rebuilds result.Groups from GroupRowResult rows.
+// This ensures Groups stays in sync after filtering/sorting/limiting.
+func syncGroupsFromRows(result *Result) {
+	hasGroupRows := false
+	for _, row := range result.Rows {
+		if row.Kind == GroupRowResult {
+			hasGroupRows = true
+			break
+		}
+	}
+	if !hasGroupRows {
+		return
+	}
+	result.Groups = nil
+	for _, row := range result.Rows {
+		if row.Kind == GroupRowResult {
+			result.Groups = append(result.Groups, GroupResult{
+				Key:   row.GroupKey,
+				Count: row.GroupCount,
+				Names: row.GroupNames,
+			})
+		}
+	}
+}
+
+// emitKey returns the YAML wrapper key for a result row.
+// Uses path for schemas (full JSON pointer attribution), and contextual
+// compound keys for navigation rows (e.g., "listEntities/200" for responses).
+func emitKey(row Row, g *graph.SchemaGraph) string {
+	switch row.Kind {
+	case SchemaResult:
+		// Use path for full attribution; fall back to name
+		if path := valueToString(fieldValue(row, "path", g)); path != "" {
+			return path
+		}
+		return valueToString(fieldValue(row, "name", g))
+	case OperationResult:
+		return valueToString(fieldValue(row, "name", g))
+	case ResponseResult:
+		op := operationName(row.SourceOpIdx, g)
+		if op != "" {
+			return op + "/" + row.StatusCode
+		}
+		return row.StatusCode
+	case RequestBodyResult:
+		op := operationName(row.SourceOpIdx, g)
+		if op != "" {
+			return op + "/request-body"
+		}
+		return "request-body"
+	case ContentTypeResult:
+		op := operationName(row.SourceOpIdx, g)
+		parts := []string{}
+		if op != "" {
+			parts = append(parts, op)
+		}
+		if row.StatusCode != "" {
+			parts = append(parts, row.StatusCode)
+		}
+		parts = append(parts, row.MediaTypeName)
+		return strings.Join(parts, "/")
+	case ParameterResult:
+		op := operationName(row.SourceOpIdx, g)
+		if op != "" {
+			return op + "/parameters/" + row.ComponentKey
+		}
+		return row.ComponentKey
+	case HeaderResult:
+		op := operationName(row.SourceOpIdx, g)
+		if op != "" {
+			return op + "/" + row.StatusCode + "/headers/" + row.HeaderName
+		}
+		return row.HeaderName
+	case SecuritySchemeResult:
+		return row.SchemeName
+	default:
+		return valueToString(fieldValue(row, "name", g))
+	}
 }
 
 func padRight(s string, width int) string {

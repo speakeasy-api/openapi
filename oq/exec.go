@@ -10,8 +10,19 @@ import (
 	"strings"
 
 	"github.com/speakeasy-api/openapi/graph"
+	oas3 "github.com/speakeasy-api/openapi/jsonschema/oas3"
+	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/oq/expr"
 )
+
+// deriveResult creates a new Result that inherits metadata (Fields, FormatHint, EmitYAML) from a parent.
+func deriveResult(parent *Result) *Result {
+	return &Result{
+		Fields:     parent.Fields,
+		FormatHint: parent.FormatHint,
+		EmitYAML:   parent.EmitYAML,
+	}
+}
 
 func run(stages []Stage, g *graph.SchemaGraph) (*Result, error) {
 	if len(stages) == 0 {
@@ -52,22 +63,26 @@ func execSource(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 		for i := range g.Schemas {
 			result.Rows = append(result.Rows, Row{Kind: SchemaResult, SchemaIdx: i})
 		}
-	case "schemas.components":
+	case "operations":
+		for i := range g.Operations {
+			result.Rows = append(result.Rows, Row{Kind: OperationResult, OpIdx: i})
+		}
+	case "components.schemas":
 		for i, s := range g.Schemas {
 			if s.IsComponent {
 				result.Rows = append(result.Rows, Row{Kind: SchemaResult, SchemaIdx: i})
 			}
 		}
-	case "schemas.inline":
-		for i, s := range g.Schemas {
-			if s.IsInline {
-				result.Rows = append(result.Rows, Row{Kind: SchemaResult, SchemaIdx: i})
-			}
-		}
-	case "operations":
-		for i := range g.Operations {
-			result.Rows = append(result.Rows, Row{Kind: OperationResult, OpIdx: i})
-		}
+	case "components.parameters":
+		result.Rows = append(result.Rows, componentRows(g, componentParameters)...)
+	case "components.responses":
+		result.Rows = append(result.Rows, componentRows(g, componentResponses)...)
+	case "components.request-bodies":
+		result.Rows = append(result.Rows, componentRows(g, componentRequestBodies)...)
+	case "components.headers":
+		result.Rows = append(result.Rows, componentRows(g, componentHeaders)...)
+	case "components.security-schemes":
+		result.Rows = append(result.Rows, componentRows(g, componentSecuritySchemes)...)
 	default:
 		return nil, fmt.Errorf("unknown source: %q", stage.Source)
 	}
@@ -77,8 +92,7 @@ func execSource(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 func execStageWithEnv(stage Stage, result *Result, g *graph.SchemaGraph, env map[string]expr.Value) (*Result, map[string]expr.Value, error) {
 	switch stage.Kind {
 	case StageLet:
-		r, newEnv, err := execLet(stage, result, g, env)
-		return r, newEnv, err
+		return execLet(stage, result, g, env)
 	case StageWhere:
 		r, err := execWhere(stage, result, g, env)
 		return r, env, err
@@ -90,8 +104,6 @@ func execStageWithEnv(stage Stage, result *Result, g *graph.SchemaGraph, env map
 
 func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
 	switch stage.Kind {
-	case StageWhere:
-		return execWhere(stage, result, g, nil)
 	case StageLast:
 		return execLast(stage, result)
 	case StageSelect:
@@ -102,7 +114,7 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 	case StageTake:
 		return execTake(stage, result)
 	case StageUnique:
-		return execUnique(result)
+		return execUnique(result, g)
 	case StageGroupBy:
 		return execGroupBy(stage, result, g)
 	case StageCount:
@@ -112,6 +124,9 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 	case StageRefsIn:
 		return execTraversal(result, g, traverseRefsIn)
 	case StageReachable:
+		if stage.Limit > 0 {
+			return execReachableDepth(stage.Limit, result, g)
+		}
 		return execTraversal(result, g, traverseReachable)
 	case StageAncestors:
 		return execTraversal(result, g, traverseAncestors)
@@ -166,6 +181,27 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		return execTagBoundary(result, g)
 	case StageSharedRefs:
 		return execSharedRefs(result, g)
+	case StageParent:
+		return execParent(result, g)
+	case StageEmit:
+		result.EmitYAML = true
+		return result, nil
+	case StageParameters:
+		return execParameters(result, g)
+	case StageResponses:
+		return execResponses(result, g)
+	case StageRequestBody:
+		return execRequestBody(result, g)
+	case StageContentTypes:
+		return execContentTypes(result, g)
+	case StageHeaders:
+		return execHeaders(result, g)
+	case StageSchema:
+		return execSchema(result, g)
+	case StageOperation:
+		return execOperation(result, g)
+	case StageSecurity:
+		return execSecurity(result, g)
 	default:
 		return nil, fmt.Errorf("unimplemented stage kind: %d", stage.Kind)
 	}
@@ -177,7 +213,7 @@ func execWhere(stage Stage, result *Result, g *graph.SchemaGraph, env map[string
 		return nil, fmt.Errorf("where expression error: %w", err)
 	}
 
-	filtered := &Result{Fields: result.Fields}
+	filtered := deriveResult(result)
 	for _, row := range result.Rows {
 		r := rowAdapter{row: row, g: g, env: env}
 		val := predicate.Eval(r)
@@ -193,11 +229,9 @@ func execLast(stage Stage, result *Result) (*Result, error) {
 	if stage.Limit < len(rows) {
 		rows = rows[len(rows)-stage.Limit:]
 	}
-	return &Result{
-		Fields:     result.Fields,
-		FormatHint: result.FormatHint,
-		Rows:       slices.Clone(rows),
-	}, nil
+	out := deriveResult(result)
+	out.Rows = slices.Clone(rows)
+	return out, nil
 }
 
 func execLet(stage Stage, result *Result, g *graph.SchemaGraph, env map[string]expr.Value) (*Result, map[string]expr.Value, error) {
@@ -224,11 +258,8 @@ func execLet(stage Stage, result *Result, g *graph.SchemaGraph, env map[string]e
 }
 
 func execSort(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
-	sorted := &Result{
-		Fields:     result.Fields,
-		FormatHint: result.FormatHint,
-		Rows:       slices.Clone(result.Rows),
-	}
+	sorted := deriveResult(result)
+	sorted.Rows = slices.Clone(result.Rows)
 	sort.SliceStable(sorted.Rows, func(i, j int) bool {
 		vi := fieldValue(sorted.Rows[i], stage.SortField, g)
 		vj := fieldValue(sorted.Rows[j], stage.SortField, g)
@@ -247,18 +278,29 @@ func execTake(stage Stage, result *Result) (*Result, error) {
 	if stage.Limit < len(rows) {
 		rows = rows[:stage.Limit]
 	}
-	return &Result{
-		Fields:     result.Fields,
-		FormatHint: result.FormatHint,
-		Rows:       slices.Clone(rows),
-	}, nil
+	out := deriveResult(result)
+	out.Rows = slices.Clone(rows)
+	return out, nil
 }
 
-func execUnique(result *Result) (*Result, error) {
+func execUnique(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	seen := make(map[string]bool)
-	filtered := &Result{Fields: result.Fields}
+	filtered := deriveResult(result)
 	for _, row := range result.Rows {
-		key := rowKey(row)
+		var key string
+		if len(result.Fields) > 0 {
+			// When pick is active, deduplicate by projected field values
+			var sb strings.Builder
+			for i, f := range result.Fields {
+				if i > 0 {
+					sb.WriteByte('\x00')
+				}
+				sb.WriteString(valueToString(fieldValue(row, f, g)))
+			}
+			key = sb.String()
+		} else {
+			key = rowKey(row)
+		}
 		if !seen[key] {
 			seen[key] = true
 			filtered.Rows = append(filtered.Rows, row)
@@ -272,6 +314,11 @@ func execGroupBy(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, er
 		return nil, errors.New("group-by requires at least one field")
 	}
 	field := stage.Fields[0]
+	// Optional second field specifies which field to collect as group names (default: "name")
+	nameField := "name"
+	if len(stage.Fields) >= 2 {
+		nameField = stage.Fields[1]
+	}
 
 	type group struct {
 		count int
@@ -290,11 +337,11 @@ func execGroupBy(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, er
 			order = append(order, key)
 		}
 		grp.count++
-		nameV := fieldValue(row, "name", g)
+		nameV := fieldValue(row, nameField, g)
 		grp.names = append(grp.names, valueToString(nameV))
 	}
 
-	grouped := &Result{Fields: result.Fields}
+	grouped := deriveResult(result)
 	for _, key := range order {
 		grp, ok := groups[key]
 		if !ok {
@@ -305,6 +352,12 @@ func execGroupBy(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, er
 			Count: grp.count,
 			Names: grp.names,
 		})
+		grouped.Rows = append(grouped.Rows, Row{
+			Kind:       GroupRowResult,
+			GroupKey:   key,
+			GroupCount: grp.count,
+			GroupNames: grp.names,
+		})
 	}
 	return grouped, nil
 }
@@ -314,7 +367,7 @@ func execGroupBy(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, er
 type traversalFunc func(row Row, g *graph.SchemaGraph) []Row
 
 func execTraversal(result *Result, g *graph.SchemaGraph, fn traversalFunc) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	seen := make(map[string]bool)
 	for _, row := range result.Rows {
 		for _, newRow := range fn(row, g) {
@@ -330,28 +383,46 @@ func execTraversal(result *Result, g *graph.SchemaGraph, fn traversalFunc) (*Res
 
 func edgeRowKey(row Row) string {
 	base := rowKey(row)
-	if row.EdgeKind == "" {
+	if row.Via == "" {
 		return base
 	}
-	return base + "|" + row.EdgeFrom + "|" + row.EdgeKind + "|" + row.EdgeLabel
+	return base + "|" + row.From + "|" + row.Via + "|" + row.Key
 }
 
-func traverseRefsOut(row Row, g *graph.SchemaGraph) []Row {
+// traverseOutEdges returns outgoing edge rows, optionally filtered by edge kind.
+// If no kinds are given, all outgoing edges are included.
+func traverseOutEdges(row Row, g *graph.SchemaGraph, kinds ...graph.EdgeKind) []Row {
 	if row.Kind != SchemaResult {
 		return nil
 	}
 	fromName := schemaName(row.SchemaIdx, g)
 	var result []Row
 	for _, edge := range g.OutEdges(graph.NodeID(row.SchemaIdx)) {
+		if len(kinds) > 0 && !edgeKindMatch(edge.Kind, kinds) {
+			continue
+		}
 		result = append(result, Row{
 			Kind:      SchemaResult,
 			SchemaIdx: int(edge.To),
-			EdgeKind:  edgeKindString(edge.Kind),
-			EdgeLabel: edge.Label,
-			EdgeFrom:  fromName,
+			Via:       edgeKindString(edge.Kind),
+			Key:       edge.Label,
+			From:      fromName,
 		})
 	}
 	return result
+}
+
+func edgeKindMatch(k graph.EdgeKind, kinds []graph.EdgeKind) bool {
+	for _, want := range kinds {
+		if k == want {
+			return true
+		}
+	}
+	return false
+}
+
+func traverseRefsOut(row Row, g *graph.SchemaGraph) []Row {
+	return traverseOutEdges(row, g)
 }
 
 func traverseRefsIn(row Row, g *graph.SchemaGraph) []Row {
@@ -364,10 +435,18 @@ func traverseRefsIn(row Row, g *graph.SchemaGraph) []Row {
 		result = append(result, Row{
 			Kind:      SchemaResult,
 			SchemaIdx: int(edge.From),
-			EdgeKind:  edgeKindString(edge.Kind),
-			EdgeLabel: edge.Label,
-			EdgeFrom:  toName,
+			Via:       edgeKindString(edge.Kind),
+			Key:       edge.Label,
+			From:      toName,
 		})
+	}
+	return result
+}
+
+func nodeIDsToRows(ids []graph.NodeID) []Row {
+	result := make([]Row, len(ids))
+	for i, id := range ids {
+		result[i] = Row{Kind: SchemaResult, SchemaIdx: int(id)}
 	}
 	return result
 }
@@ -376,44 +455,58 @@ func traverseReachable(row Row, g *graph.SchemaGraph) []Row {
 	if row.Kind != SchemaResult {
 		return nil
 	}
-	ids := g.Reachable(graph.NodeID(row.SchemaIdx))
-	result := make([]Row, len(ids))
-	for i, id := range ids {
-		result[i] = Row{Kind: SchemaResult, SchemaIdx: int(id)}
+	return nodeIDsToRows(g.Reachable(graph.NodeID(row.SchemaIdx)))
+}
+
+// execReachableDepth performs depth-limited outgoing BFS from each seed row.
+func execReachableDepth(maxDepth int, result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	seen := make(map[int]bool)
+
+	for _, row := range result.Rows {
+		if row.Kind != SchemaResult {
+			continue
+		}
+		type entry struct {
+			id    graph.NodeID
+			depth int
+		}
+		queue := []entry{{id: graph.NodeID(row.SchemaIdx), depth: 0}}
+		visited := map[graph.NodeID]bool{graph.NodeID(row.SchemaIdx): true}
+
+		for len(queue) > 0 {
+			cur := queue[0]
+			queue = queue[1:]
+
+			// Add to output (skip the seed itself)
+			if cur.id != graph.NodeID(row.SchemaIdx) && !seen[int(cur.id)] {
+				seen[int(cur.id)] = true
+				out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: int(cur.id)})
+			}
+
+			if cur.depth >= maxDepth {
+				continue
+			}
+			for _, edge := range g.OutEdges(cur.id) {
+				if !visited[edge.To] {
+					visited[edge.To] = true
+					queue = append(queue, entry{id: edge.To, depth: cur.depth + 1})
+				}
+			}
+		}
 	}
-	return result
+	return out, nil
 }
 
 func traverseAncestors(row Row, g *graph.SchemaGraph) []Row {
 	if row.Kind != SchemaResult {
 		return nil
 	}
-	ids := g.Ancestors(graph.NodeID(row.SchemaIdx))
-	result := make([]Row, len(ids))
-	for i, id := range ids {
-		result[i] = Row{Kind: SchemaResult, SchemaIdx: int(id)}
-	}
-	return result
+	return nodeIDsToRows(g.Ancestors(graph.NodeID(row.SchemaIdx)))
 }
 
 func traverseProperties(row Row, g *graph.SchemaGraph) []Row {
-	if row.Kind != SchemaResult {
-		return nil
-	}
-	fromName := schemaName(row.SchemaIdx, g)
-	var result []Row
-	for _, edge := range g.OutEdges(graph.NodeID(row.SchemaIdx)) {
-		if edge.Kind == graph.EdgeProperty {
-			result = append(result, Row{
-				Kind:      SchemaResult,
-				SchemaIdx: int(edge.To),
-				EdgeKind:  edgeKindString(edge.Kind),
-				EdgeLabel: edge.Label,
-				EdgeFrom:  fromName,
-			})
-		}
-	}
-	return result
+	return traverseOutEdges(row, g, graph.EdgeProperty)
 }
 
 func traverseUnionMembers(row Row, g *graph.SchemaGraph) []Row {
@@ -429,9 +522,9 @@ func traverseUnionMembers(row Row, g *graph.SchemaGraph) []Row {
 			result = append(result, Row{
 				Kind:      SchemaResult,
 				SchemaIdx: target,
-				EdgeKind:  edgeKindString(edge.Kind),
-				EdgeLabel: edge.Label,
-				EdgeFrom:  fromName,
+				Via:       edgeKindString(edge.Kind),
+				Key:       edge.Label,
+				From:      fromName,
 			})
 		}
 	}
@@ -439,23 +532,7 @@ func traverseUnionMembers(row Row, g *graph.SchemaGraph) []Row {
 }
 
 func traverseItems(row Row, g *graph.SchemaGraph) []Row {
-	if row.Kind != SchemaResult {
-		return nil
-	}
-	fromName := schemaName(row.SchemaIdx, g)
-	var result []Row
-	for _, edge := range g.OutEdges(graph.NodeID(row.SchemaIdx)) {
-		if edge.Kind == graph.EdgeItems {
-			result = append(result, Row{
-				Kind:      SchemaResult,
-				SchemaIdx: int(edge.To),
-				EdgeKind:  edgeKindString(edge.Kind),
-				EdgeLabel: edge.Label,
-				EdgeFrom:  fromName,
-			})
-		}
-	}
-	return result
+	return traverseOutEdges(row, g, graph.EdgeItems)
 }
 
 // resolveRefTarget follows EdgeRef edges to get the actual target node.
@@ -479,7 +556,7 @@ func resolveRefTarget(idx int, g *graph.SchemaGraph) int {
 }
 
 func execSchemasToOps(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	seen := make(map[int]bool)
 	for _, row := range result.Rows {
 		if row.Kind != SchemaResult {
@@ -498,7 +575,7 @@ func execSchemasToOps(result *Result, g *graph.SchemaGraph) (*Result, error) {
 }
 
 func execOpsToSchemas(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	seen := make(map[int]bool)
 	for _, row := range result.Rows {
 		if row.Kind != OperationResult {
@@ -524,12 +601,14 @@ func execConnected(result *Result, g *graph.SchemaGraph) (*Result, error) {
 			schemaSeeds = append(schemaSeeds, graph.NodeID(row.SchemaIdx))
 		case OperationResult:
 			opSeeds = append(opSeeds, graph.NodeID(row.OpIdx))
+		default:
+			// Non-schema/operation rows don't participate in connectivity analysis
 		}
 	}
 
 	schemas, ops := g.ConnectedComponent(schemaSeeds, opSeeds)
 
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	for _, id := range schemas {
 		out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: int(id)})
 	}
@@ -540,7 +619,7 @@ func execConnected(result *Result, g *graph.SchemaGraph) (*Result, error) {
 }
 
 func execBlastRadius(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	seenSchemas := make(map[int]bool)
 	seenOps := make(map[int]bool)
 
@@ -586,7 +665,7 @@ func execBlastRadius(result *Result, g *graph.SchemaGraph) (*Result, error) {
 }
 
 func execNeighbors(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	seen := make(map[int]bool)
 
 	for _, row := range result.Rows {
@@ -610,7 +689,7 @@ func execNeighbors(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, 
 }
 
 func execOrphans(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	for _, row := range result.Rows {
 		if row.Kind != SchemaResult {
 			continue
@@ -624,7 +703,7 @@ func execOrphans(result *Result, g *graph.SchemaGraph) (*Result, error) {
 }
 
 func execLeaves(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	for _, row := range result.Rows {
 		if row.Kind != SchemaResult {
 			continue
@@ -647,7 +726,7 @@ func execCycles(result *Result, g *graph.SchemaGraph) (*Result, error) {
 		}
 	}
 
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	for i, scc := range sccs {
 		hasMatch := false
 		for _, id := range scc {
@@ -665,10 +744,17 @@ func execCycles(result *Result, g *graph.SchemaGraph) (*Result, error) {
 				names = append(names, g.Schemas[id].Name)
 			}
 		}
+		key := "cycle-" + strconv.Itoa(i+1)
 		out.Groups = append(out.Groups, GroupResult{
-			Key:   "cycle-" + strconv.Itoa(i+1),
+			Key:   key,
 			Count: len(scc),
 			Names: names,
+		})
+		out.Rows = append(out.Rows, Row{
+			Kind:       GroupRowResult,
+			GroupKey:   key,
+			GroupCount: len(scc),
+			GroupNames: names,
 		})
 	}
 
@@ -694,7 +780,7 @@ func execClusters(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	// through intermediary nodes like $ref wrappers) but only collect
 	// nodes that are in the result set.
 	assigned := make(map[int]bool) // result nodes already assigned to a cluster
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	clusterNum := 0
 
 	for _, idx := range sortedNodes {
@@ -741,10 +827,17 @@ func execClusters(result *Result, g *graph.SchemaGraph) (*Result, error) {
 			}
 		}
 		if len(component) > 0 {
+			key := "cluster-" + strconv.Itoa(clusterNum)
 			out.Groups = append(out.Groups, GroupResult{
-				Key:   "cluster-" + strconv.Itoa(clusterNum),
+				Key:   key,
 				Count: len(component),
 				Names: names,
+			})
+			out.Rows = append(out.Rows, Row{
+				Kind:       GroupRowResult,
+				GroupKey:   key,
+				GroupCount: len(component),
+				GroupNames: names,
 			})
 		}
 	}
@@ -753,7 +846,7 @@ func execClusters(result *Result, g *graph.SchemaGraph) (*Result, error) {
 }
 
 func execTagBoundary(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	for _, row := range result.Rows {
 		if row.Kind != SchemaResult {
 			continue
@@ -789,7 +882,7 @@ func execSharedRefs(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	}
 
 	if len(ops) == 0 {
-		return &Result{Fields: result.Fields}, nil
+		return deriveResult(result), nil
 	}
 
 	// Start with first operation's schemas
@@ -818,7 +911,7 @@ func execSharedRefs(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	}
 	sort.Ints(sortedIDs)
 
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	for _, sid := range sortedIDs {
 		out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: sid})
 	}
@@ -916,7 +1009,7 @@ func describeStage(stage Stage) string {
 	case StageUnique:
 		return "Unique: deduplicate rows"
 	case StageGroupBy:
-		return "Group: group-by " + strings.Join(stage.Fields, ", ")
+		return "Group: group_by(" + strings.Join(stage.Fields, ", ") + ")"
 	case StageCount:
 		return "Count: count rows"
 	case StageRefsOut:
@@ -924,6 +1017,9 @@ func describeStage(stage Stage) string {
 	case StageRefsIn:
 		return "Traverse: incoming references"
 	case StageReachable:
+		if stage.Limit > 0 {
+			return "Traverse: reachable nodes within " + strconv.Itoa(stage.Limit) + " hops"
+		}
 		return "Traverse: all reachable nodes"
 	case StageAncestors:
 		return "Traverse: all ancestor nodes"
@@ -967,6 +1063,26 @@ func describeStage(stage Stage) string {
 		return "Filter: schemas used by operations across multiple tags"
 	case StageSharedRefs:
 		return "Analyze: schemas shared by all operations in result"
+	case StageParent:
+		return "Traverse: navigate back to source schema of edge annotations"
+	case StageEmit:
+		return "Emit: output raw YAML nodes from underlying spec objects"
+	case StageParameters:
+		return "Navigate: operation parameters"
+	case StageResponses:
+		return "Navigate: operation responses"
+	case StageRequestBody:
+		return "Navigate: operation request body"
+	case StageContentTypes:
+		return "Navigate: content types from responses or request body"
+	case StageHeaders:
+		return "Navigate: response headers"
+	case StageSchema:
+		return "Navigate: extract schema from parameter, content-type, or header"
+	case StageOperation:
+		return "Navigate: back to source operation"
+	case StageSecurity:
+		return "Navigate: operation security requirements"
 	default:
 		return "Unknown stage"
 	}
@@ -981,10 +1097,29 @@ func execFields(result *Result) (*Result, error) {
 		kind = result.Rows[0].Kind
 	}
 
-	if kind == SchemaResult {
-		sb.WriteString("Field             Type\n")
-		sb.WriteString("-----------       ------\n")
+	if kind == GroupRowResult {
+		sb.WriteString("Field                          Type\n")
+		sb.WriteString("-----------------------------  ------\n")
 		fields := []struct{ name, typ string }{
+			{"key", "string"},
+			{"count", "int"},
+			{"names", "string"},
+		}
+		for _, f := range fields {
+			fmt.Fprintf(&sb, "%-30s %s\n", f.name, f.typ)
+		}
+		return &Result{Explain: sb.String()}, nil
+	}
+
+	sb.WriteString("Field                          Type\n")
+	sb.WriteString("-----------------------------  ------\n")
+
+	var fields []struct{ name, typ string }
+
+	switch kind {
+	case SchemaResult:
+		fields = []struct{ name, typ string }{
+			// Graph-level (pre-computed)
 			{"name", "string"},
 			{"type", "string"},
 			{"depth", "int"},
@@ -1000,17 +1135,42 @@ func execFields(result *Result) (*Result, error) {
 			{"path", "string"},
 			{"op_count", "int"},
 			{"tag_count", "int"},
-			{"edge_kind", "string"},
-			{"edge_label", "string"},
-			{"edge_from", "string"},
+			{"via", "string"},
+			{"key", "string"},
+			{"from", "string"},
+			// Schema content
+			{"description", "string"},
+			{"has_description", "bool"},
+			{"title", "string"},
+			{"has_title", "bool"},
+			{"format", "string"},
+			{"pattern", "string"},
+			{"nullable", "bool"},
+			{"read_only", "bool"},
+			{"write_only", "bool"},
+			{"deprecated", "bool"},
+			{"unique_items", "bool"},
+			{"has_discriminator", "bool"},
+			{"discriminator_property", "string"},
+			{"discriminator_mapping_count", "int"},
+			{"required_count", "int"},
+			{"enum_count", "int"},
+			{"has_default", "bool"},
+			{"has_example", "bool"},
+			{"minimum", "int?"},
+			{"maximum", "int?"},
+			{"min_length", "int?"},
+			{"max_length", "int?"},
+			{"min_items", "int?"},
+			{"max_items", "int?"},
+			{"min_properties", "int?"},
+			{"max_properties", "int?"},
+			{"extension_count", "int"},
+			{"content_encoding", "string"},
+			{"content_media_type", "string"},
 		}
-		for _, f := range fields {
-			fmt.Fprintf(&sb, "%-17s %s\n", f.name, f.typ)
-		}
-	} else {
-		sb.WriteString("Field             Type\n")
-		sb.WriteString("-----------       ------\n")
-		fields := []struct{ name, typ string }{
+	case OperationResult:
+		fields = []struct{ name, typ string }{
 			{"name", "string"},
 			{"method", "string"},
 			{"path", "string"},
@@ -1018,20 +1178,136 @@ func execFields(result *Result) (*Result, error) {
 			{"schema_count", "int"},
 			{"component_count", "int"},
 			{"tag", "string"},
+			{"tags", "string"},
 			{"parameter_count", "int"},
 			{"deprecated", "bool"},
 			{"description", "string"},
 			{"summary", "string"},
-			{"edge_kind", "string"},
-			{"edge_label", "string"},
-			{"edge_from", "string"},
+			{"response_count", "int"},
+			{"has_error_response", "bool"},
+			{"has_request_body", "bool"},
+			{"security_count", "int"},
+			{"via", "string"},
+			{"key", "string"},
+			{"from", "string"},
 		}
-		for _, f := range fields {
-			fmt.Fprintf(&sb, "%-17s %s\n", f.name, f.typ)
+	case ParameterResult:
+		fields = []struct{ name, typ string }{
+			{"name", "string"},
+			{"in", "string"},
+			{"required", "bool"},
+			{"deprecated", "bool"},
+			{"description", "string"},
+			{"style", "string"},
+			{"explode", "bool"},
+			{"has_schema", "bool"},
+			{"allow_empty_value", "bool"},
+			{"allow_reserved", "bool"},
+			{"operation", "string"},
 		}
+	case ResponseResult:
+		fields = []struct{ name, typ string }{
+			{"status_code", "string"},
+			{"name", "string"},
+			{"description", "string"},
+			{"content_type_count", "int"},
+			{"header_count", "int"},
+			{"link_count", "int"},
+			{"has_content", "bool"},
+			{"operation", "string"},
+		}
+	case RequestBodyResult:
+		fields = []struct{ name, typ string }{
+			{"name", "string"},
+			{"description", "string"},
+			{"required", "bool"},
+			{"content_type_count", "int"},
+			{"operation", "string"},
+		}
+	case ContentTypeResult:
+		fields = []struct{ name, typ string }{
+			{"media_type", "string"},
+			{"name", "string"},
+			{"has_schema", "bool"},
+			{"has_encoding", "bool"},
+			{"has_example", "bool"},
+			{"status_code", "string"},
+			{"operation", "string"},
+		}
+	case HeaderResult:
+		fields = []struct{ name, typ string }{
+			{"name", "string"},
+			{"description", "string"},
+			{"required", "bool"},
+			{"deprecated", "bool"},
+			{"has_schema", "bool"},
+			{"status_code", "string"},
+			{"operation", "string"},
+		}
+	case SecuritySchemeResult:
+		fields = []struct{ name, typ string }{
+			{"name", "string"},
+			{"type", "string"},
+			{"in", "string"},
+			{"scheme", "string"},
+			{"bearer_format", "string"},
+			{"description", "string"},
+			{"has_flows", "bool"},
+			{"deprecated", "bool"},
+		}
+	case SecurityRequirementResult:
+		fields = []struct{ name, typ string }{
+			{"scheme_name", "string"},
+			{"scheme_type", "string"},
+			{"scopes", "array"},
+			{"scope_count", "int"},
+			{"operation", "string"},
+		}
+	default:
+		// GroupRowResult handled above; unknown kinds produce empty fields list
+	}
+
+	for _, f := range fields {
+		fmt.Fprintf(&sb, "%-30s %s\n", f.name, f.typ)
 	}
 
 	return &Result{Explain: sb.String()}, nil
+}
+
+// --- Parent ---
+
+// execParent navigates back to the source schema of 1-hop edge annotations.
+// After properties, union-members, items, refs-out, or refs-in, each row has
+// a From field naming the source node. This stage looks up those source schemas
+// by name, replacing the result set with the parent schemas.
+func execParent(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	seen := make(map[int]bool)
+
+	// Build name→index lookup
+	nameIdx := make(map[string]int, len(g.Schemas))
+	for i := range g.Schemas {
+		nameIdx[schemaName(i, g)] = i
+	}
+
+	for _, row := range result.Rows {
+		if row.From == "" {
+			continue
+		}
+		idx, ok := nameIdx[row.From]
+		if !ok {
+			continue
+		}
+		if seen[idx] {
+			continue
+		}
+		seen[idx] = true
+		out.Rows = append(out.Rows, Row{
+			Kind:      SchemaResult,
+			SchemaIdx: idx,
+		})
+	}
+	return out, nil
 }
 
 // --- Sample ---
@@ -1048,7 +1324,7 @@ func execSample(stage Stage, result *Result) (*Result, error) {
 		rows[i], rows[j] = rows[j], rows[i]
 	})
 
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	out.Rows = rows[:stage.Limit]
 	return out, nil
 }
@@ -1071,4 +1347,425 @@ func execPath(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 		out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: int(id)})
 	}
 	return out, nil
+}
+
+// --- Navigation stages ---
+
+func execParameters(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	for _, row := range result.Rows {
+		if row.Kind != OperationResult {
+			continue
+		}
+		op := &g.Operations[row.OpIdx]
+		if op.Operation == nil {
+			continue
+		}
+		for _, paramRef := range op.Operation.Parameters {
+			if paramRef == nil {
+				continue
+			}
+			p := paramRef.GetObject()
+			if p == nil {
+				continue
+			}
+			out.Rows = append(out.Rows, Row{
+				Kind:         ParameterResult,
+				Parameter:    p,
+				ComponentKey: p.Name,
+				SourceOpIdx:  row.OpIdx,
+				OpIdx:        row.OpIdx,
+			})
+		}
+	}
+	return out, nil
+}
+
+func execResponses(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	for _, row := range result.Rows {
+		if row.Kind != OperationResult {
+			continue
+		}
+		op := &g.Operations[row.OpIdx]
+		if op.Operation == nil || op.Operation.Responses.Map == nil {
+			continue
+		}
+		for code, respRef := range op.Operation.Responses.All() {
+			if respRef == nil {
+				continue
+			}
+			r := respRef.GetObject()
+			if r == nil {
+				continue
+			}
+			out.Rows = append(out.Rows, Row{
+				Kind:        ResponseResult,
+				Response:    r,
+				StatusCode:  code,
+				SourceOpIdx: row.OpIdx,
+				OpIdx:       row.OpIdx,
+			})
+		}
+		// Default response
+		if op.Operation.Responses.Default != nil {
+			r := op.Operation.Responses.Default.GetObject()
+			if r != nil {
+				out.Rows = append(out.Rows, Row{
+					Kind:        ResponseResult,
+					Response:    r,
+					StatusCode:  "default",
+					SourceOpIdx: row.OpIdx,
+					OpIdx:       row.OpIdx,
+				})
+			}
+		}
+	}
+	return out, nil
+}
+
+func execRequestBody(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	for _, row := range result.Rows {
+		if row.Kind != OperationResult {
+			continue
+		}
+		op := &g.Operations[row.OpIdx]
+		if op.Operation == nil || op.Operation.RequestBody == nil {
+			continue
+		}
+		rb := op.Operation.RequestBody.GetObject()
+		if rb == nil {
+			continue
+		}
+		out.Rows = append(out.Rows, Row{
+			Kind:        RequestBodyResult,
+			RequestBody: rb,
+			SourceOpIdx: row.OpIdx,
+			OpIdx:       row.OpIdx,
+		})
+	}
+	return out, nil
+}
+
+func execContentTypes(result *Result, _ *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	for _, row := range result.Rows {
+		switch row.Kind {
+		case ResponseResult:
+			if row.Response == nil || row.Response.Content == nil {
+				continue
+			}
+			for mediaType, mt := range row.Response.Content.All() {
+				if mt == nil {
+					continue
+				}
+				out.Rows = append(out.Rows, Row{
+					Kind:          ContentTypeResult,
+					ContentType:   mt,
+					MediaTypeName: mediaType,
+					StatusCode:    row.StatusCode,
+					SourceOpIdx:   row.SourceOpIdx,
+					OpIdx:         row.OpIdx,
+				})
+			}
+		case RequestBodyResult:
+			if row.RequestBody == nil || row.RequestBody.Content == nil {
+				continue
+			}
+			for mediaType, mt := range row.RequestBody.Content.All() {
+				if mt == nil {
+					continue
+				}
+				out.Rows = append(out.Rows, Row{
+					Kind:          ContentTypeResult,
+					ContentType:   mt,
+					MediaTypeName: mediaType,
+					SourceOpIdx:   row.SourceOpIdx,
+					OpIdx:         row.OpIdx,
+				})
+			}
+		default:
+			// content-types only works on response and request-body rows
+		}
+	}
+	return out, nil
+}
+
+func execHeaders(result *Result, _ *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	for _, row := range result.Rows {
+		if row.Kind != ResponseResult || row.Response == nil || row.Response.Headers == nil {
+			continue
+		}
+		for name, hdrRef := range row.Response.Headers.All() {
+			if hdrRef == nil {
+				continue
+			}
+			h := hdrRef.GetObject()
+			if h == nil {
+				continue
+			}
+			out.Rows = append(out.Rows, Row{
+				Kind:        HeaderResult,
+				Header:      h,
+				HeaderName:  name,
+				StatusCode:  row.StatusCode,
+				SourceOpIdx: row.SourceOpIdx,
+				OpIdx:       row.OpIdx,
+			})
+		}
+	}
+	return out, nil
+}
+
+func execSchema(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	seen := make(map[int]bool)
+
+	resolveAndAdd := func(js *oas3.JSONSchemaReferenceable) {
+		if js == nil {
+			return
+		}
+		id, ok := g.SchemaByPtr(js)
+		if !ok {
+			return
+		}
+		idx := int(id)
+		// Follow $ref edges to get the actual component schema
+		idx = resolveRefTarget(idx, g)
+		if seen[idx] {
+			return
+		}
+		seen[idx] = true
+		out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: idx})
+	}
+
+	for _, row := range result.Rows {
+		switch row.Kind {
+		case ParameterResult:
+			if row.Parameter != nil && row.Parameter.Schema != nil {
+				resolveAndAdd(row.Parameter.Schema)
+			}
+		case ContentTypeResult:
+			if row.ContentType != nil && row.ContentType.Schema != nil {
+				resolveAndAdd(row.ContentType.Schema)
+			}
+		case HeaderResult:
+			if row.Header != nil && row.Header.Schema != nil {
+				resolveAndAdd(row.Header.Schema)
+			}
+		default:
+			// schema only works on parameter, content-type, and header rows
+		}
+	}
+	return out, nil
+}
+
+func execOperation(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	seen := make(map[int]bool)
+	for _, row := range result.Rows {
+		var opIdx int
+		switch row.Kind {
+		case OperationResult:
+			opIdx = row.OpIdx
+		case ParameterResult, ResponseResult, RequestBodyResult, ContentTypeResult, HeaderResult,
+			SecurityRequirementResult:
+			opIdx = row.SourceOpIdx
+		default:
+			continue
+		}
+		if opIdx < 0 || opIdx >= len(g.Operations) || seen[opIdx] {
+			continue
+		}
+		seen[opIdx] = true
+		out.Rows = append(out.Rows, Row{Kind: OperationResult, OpIdx: opIdx})
+	}
+	return out, nil
+}
+
+// --- Component sources ---
+
+type componentKind int
+
+const (
+	componentParameters componentKind = iota
+	componentResponses
+	componentRequestBodies
+	componentHeaders
+	componentSecuritySchemes
+)
+
+func componentRows(g *graph.SchemaGraph, kind componentKind) []Row {
+	if g.Index == nil || g.Index.Doc == nil {
+		return nil
+	}
+	components := g.Index.Doc.GetComponents()
+	if components == nil {
+		return nil
+	}
+
+	var rows []Row
+	switch kind {
+	case componentParameters:
+		if components.Parameters == nil {
+			return nil
+		}
+		for name, ref := range components.Parameters.All() {
+			if ref == nil {
+				continue
+			}
+			p := ref.GetObject()
+			if p == nil {
+				continue
+			}
+			rows = append(rows, Row{
+				Kind:         ParameterResult,
+				Parameter:    p,
+				ComponentKey: name,
+				SourceOpIdx:  -1,
+			})
+		}
+	case componentResponses:
+		if components.Responses == nil {
+			return nil
+		}
+		for name, ref := range components.Responses.All() {
+			if ref == nil {
+				continue
+			}
+			r := ref.GetObject()
+			if r == nil {
+				continue
+			}
+			rows = append(rows, Row{
+				Kind:         ResponseResult,
+				Response:     r,
+				ComponentKey: name,
+				SourceOpIdx:  -1,
+			})
+		}
+	case componentRequestBodies:
+		if components.RequestBodies == nil {
+			return nil
+		}
+		for name, ref := range components.RequestBodies.All() {
+			if ref == nil {
+				continue
+			}
+			rb := ref.GetObject()
+			if rb == nil {
+				continue
+			}
+			rows = append(rows, Row{
+				Kind:         RequestBodyResult,
+				RequestBody:  rb,
+				ComponentKey: name,
+				SourceOpIdx:  -1,
+			})
+		}
+	case componentHeaders:
+		if components.Headers == nil {
+			return nil
+		}
+		for name, ref := range components.Headers.All() {
+			if ref == nil {
+				continue
+			}
+			h := ref.GetObject()
+			if h == nil {
+				continue
+			}
+			rows = append(rows, Row{
+				Kind:        HeaderResult,
+				Header:      h,
+				HeaderName:  name,
+				SourceOpIdx: -1,
+			})
+		}
+	case componentSecuritySchemes:
+		if components.SecuritySchemes == nil {
+			return nil
+		}
+		for name, ref := range components.SecuritySchemes.All() {
+			if ref == nil {
+				continue
+			}
+			ss := ref.GetObject()
+			if ss == nil {
+				continue
+			}
+			rows = append(rows, Row{
+				Kind:           SecuritySchemeResult,
+				SecurityScheme: ss,
+				SchemeName:     name,
+				SourceOpIdx:    -1,
+			})
+		}
+	}
+	return rows
+}
+
+// --- Security ---
+
+func execSecurity(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	// Build scheme name → SecurityScheme lookup
+	schemeMap := buildSecuritySchemeMap(g)
+
+	for _, row := range result.Rows {
+		if row.Kind != OperationResult {
+			continue
+		}
+		op := &g.Operations[row.OpIdx]
+		if op.Operation == nil {
+			continue
+		}
+		// Use per-operation security if explicitly set, otherwise inherit global
+		secReqs := op.Operation.Security
+		if secReqs == nil && g.Index != nil && g.Index.Doc != nil {
+			secReqs = g.Index.Doc.GetSecurity()
+		}
+		for _, req := range secReqs {
+			if req == nil {
+				continue
+			}
+			for schemeName, scopes := range req.All() {
+				r := Row{
+					Kind:        SecurityRequirementResult,
+					SchemeName:  schemeName,
+					Scopes:      scopes,
+					SourceOpIdx: row.OpIdx,
+					OpIdx:       row.OpIdx,
+				}
+				if ss, ok := schemeMap[schemeName]; ok {
+					r.SecurityScheme = ss
+				}
+				out.Rows = append(out.Rows, r)
+			}
+		}
+	}
+	return out, nil
+}
+
+func buildSecuritySchemeMap(g *graph.SchemaGraph) map[string]*openapi.SecurityScheme {
+	m := make(map[string]*openapi.SecurityScheme)
+	if g.Index == nil || g.Index.Doc == nil {
+		return m
+	}
+	components := g.Index.Doc.GetComponents()
+	if components == nil || components.SecuritySchemes == nil {
+		return m
+	}
+	for name, ref := range components.SecuritySchemes.All() {
+		if ref == nil {
+			continue
+		}
+		ss := ref.GetObject()
+		if ss != nil {
+			m[name] = ss
+		}
+	}
+	return m
 }

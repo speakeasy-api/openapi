@@ -17,60 +17,39 @@ var queryCmd = &cobra.Command{
 	Use:   "query <query> [input-file]",
 	Short: "Query an OpenAPI specification using the oq pipeline language",
 	Long: `Query an OpenAPI specification using the oq pipeline language to answer
-structural and semantic questions about schemas and operations.
+structural and semantic questions about schemas, operations, parameters,
+responses, content types, and headers.`,
+	Example: `Queries are pipelines: source | stage | stage | ...
 
-The query argument comes first, followed by an optional input file. If no file
-is given, reads from stdin.
+Pipeline stages:
+  Source:      schemas, operations, components.schemas, components.parameters,
+               components.responses, components.request-bodies, components.headers,
+               components.security-schemes
+  Navigation:  parameters, responses, request-body, content-types, headers,
+               schema, operation, security
+  Traversal:   refs-out, refs-in, reachable, reachable(N), ancestors, properties,
+               union-members, items, parent, ops, schemas, path(A; B), connected,
+               blast-radius, neighbors(N)
+  Analysis:    orphans, leaves, cycles, clusters, tag-boundary, shared-refs
+  Filter:      select(expr), pick <fields>, sort_by(field; desc), first(N), last(N),
+               sample(N), top(N; field), bottom(N; field), unique,
+               group_by(field), group_by(field; name_field), length
+  Variables:   let $var = expr
+  Functions:   def name: body;  def name($p): body;  include "file.oq";
+  Output:      emit, format(table|json|markdown|toon)
+  Meta:        explain, fields
 
-Examples:
-  # Deeply nested components (jq-style syntax)
-  openapi spec query 'schemas.components | sort_by(depth; desc) | first(10) | pick name, depth' petstore.yaml
+Operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches, contains,
+           if-then-else-end, \(interpolation), lower(), upper(), len(), split()
 
-  # Pipe from stdin
-  cat spec.yaml | openapi spec query 'schemas | count'
+  openapi spec query 'operations | responses | content-types | select(media_type == "text/event-stream") | operation | unique' spec.yaml
+  openapi spec query 'operations | security | group_by(scheme_type; operation)' spec.yaml
+  openapi spec query 'schemas | select(is_component) | sort_by(depth; desc) | first(10) | pick name, depth' spec.yaml
+  openapi spec query 'operations | select(name == "createUser") | request-body | content-types | schema | reachable(2) | emit' spec.yaml
+  openapi spec query 'components.security-schemes | pick name, type, scheme' spec.yaml
+  cat spec.yaml | openapi spec query 'schemas | length'
 
-  # Explicit stdin
-  openapi spec query 'schemas | count' -
-
-  # Filter with select()
-  openapi spec query 'schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)' petstore.yaml
-
-  # Dead components (no incoming references)
-  openapi spec query 'schemas.components | select(in_degree == 0) | pick name' petstore.yaml
-
-  # Variable binding — exclude seed from reachable results
-  openapi spec query 'schemas | select(name == "Pet") | let $pet = name | reachable | select(name != $pet)' petstore.yaml
-
-  # User-defined functions
-  openapi spec query 'def hot: select(in_degree > 5); schemas.components | hot | pick name' petstore.yaml
-
-  # Alternative operator — fallback for null/falsy values
-  openapi spec query 'schemas | select(name // "none" != "none")' petstore.yaml
-
-  # If-then-else conditional
-  openapi spec query 'schemas | select(if is_component then depth > 3 else true end)' petstore.yaml
-
-  # Blast radius
-  openapi spec query 'schemas.components | select(name == "Error") | blast-radius | length' petstore.yaml
-
-  # Explain a query plan
-  openapi spec query 'schemas.components | select(depth > 5) | sort_by(depth; desc) | explain' petstore.yaml
-
-Pipeline stages (jq-style):
-  Source:     schemas, schemas.components, schemas.inline, operations
-  Traversal:  refs-out, refs-in, reachable, ancestors, properties, union-members, items,
-              ops, schemas, path(A; B), connected, blast-radius, neighbors(N)
-  Analysis:   orphans, leaves, cycles, clusters, tag-boundary, shared-refs
-  Filter:     select(expr), pick <fields>, sort_by(field; desc), first(N), last(N),
-              sample(N), top(N; field), bottom(N; field), unique, group_by(field), length
-  Variables:  let $var = expr
-  Functions:  def name: body;  def name($p): body;  include "file.oq";
-  Meta:       explain, fields, format(table|json|markdown|toon)
-
-  Legacy syntax (where, sort, take, head, select fields, group-by, count) is still supported.
-
-Expression operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches,
-                      if-then-else-end, string interpolation \(expr)`,
+For the full query language reference, run: openapi spec query-reference`,
 	Args: queryArgs(),
 	Run:  runQuery,
 }
@@ -81,6 +60,25 @@ var queryFromFile string
 func init() {
 	queryCmd.Flags().StringVar(&queryOutputFormat, "format", "table", "output format: table, json, markdown, or toon")
 	queryCmd.Flags().StringVarP(&queryFromFile, "file", "f", "", "read query from file instead of argument")
+
+	// Custom help template: Usage + Flags together, then Examples last
+	queryCmd.SetUsageTemplate(`Usage:{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
+
+Aliases:
+  {{.NameAndAliases}}{{end}}{{if .HasAvailableLocalFlags}}
+
+Flags:
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
+
+Global Flags:
+{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasExample}}
+
+{{.Example}}{{end}}{{if .HasAvailableSubCommands}}
+
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`)
 }
 
 func runQuery(cmd *cobra.Command, args []string) {
@@ -144,6 +142,13 @@ func queryOpenAPI(ctx context.Context, processor *OpenAPIProcessor, queryStr str
 	result, err := oq.Execute(queryStr, g)
 	if err != nil {
 		return fmt.Errorf("query error: %w", err)
+	}
+
+	// Emit stage outputs raw YAML nodes, bypassing format selection
+	if result.EmitYAML {
+		output := oq.FormatYAML(result, g)
+		fmt.Fprint(processor.stdout(), output)
+		return nil
 	}
 
 	// Format and output — inline format stage overrides CLI flag
