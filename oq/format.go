@@ -497,10 +497,10 @@ func resolveDefaultFields(rows []Row) []string {
 			break
 		}
 	}
-	fields := defaultFieldsForKind(firstKind)
 	if mixed {
-		fields = append([]string{"kind"}, fields...)
+		return []string{"kind", "name"}
 	}
+	fields := defaultFieldsForKind(firstKind)
 	return fields
 }
 
