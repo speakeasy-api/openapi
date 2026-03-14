@@ -34,7 +34,7 @@ func FormatTable(result *Result, g *graph.SchemaGraph) string {
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		fields = defaultFieldsForKind(result.Rows[0].Kind)
+		fields = resolveDefaultFields(result.Rows)
 	}
 
 	// Build header
@@ -111,7 +111,7 @@ func FormatJSON(result *Result, g *graph.SchemaGraph) string {
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		fields = defaultFieldsForKind(result.Rows[0].Kind)
+		fields = resolveDefaultFields(result.Rows)
 	}
 
 	var sb strings.Builder
@@ -162,7 +162,7 @@ func FormatMarkdown(result *Result, g *graph.SchemaGraph) string {
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		fields = defaultFieldsForKind(result.Rows[0].Kind)
+		fields = resolveDefaultFields(result.Rows)
 	}
 
 	var sb strings.Builder
@@ -216,7 +216,7 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		fields = defaultFieldsForKind(result.Rows[0].Kind)
+		fields = resolveDefaultFields(result.Rows)
 	}
 
 	var sb strings.Builder
@@ -479,6 +479,29 @@ func formatGroupsJSON(result *Result) string {
 	}
 	sb.WriteString("\n]")
 	return sb.String()
+}
+
+// resolveDefaultFields returns default fields for the result set.
+// For homogeneous results, uses the kind-specific defaults.
+// For mixed results (e.g., blast-radius returning schemas + operations),
+// prepends "kind" so the row type is visible.
+func resolveDefaultFields(rows []Row) []string {
+	if len(rows) == 0 {
+		return []string{"name"}
+	}
+	firstKind := rows[0].Kind
+	mixed := false
+	for _, row := range rows[1:] {
+		if row.Kind != firstKind {
+			mixed = true
+			break
+		}
+	}
+	fields := defaultFieldsForKind(firstKind)
+	if mixed {
+		fields = append([]string{"kind"}, fields...)
+	}
+	return fields
 }
 
 func defaultFieldsForKind(kind ResultKind) []string {

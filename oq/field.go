@@ -35,6 +35,11 @@ func FieldValuePublic(row Row, name string, g *graph.SchemaGraph) expr.Value {
 }
 
 func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
+	// Universal field: kind returns the row type as a string
+	if name == "kind" {
+		return expr.StringVal(resultKindName(row.Kind))
+	}
+
 	switch row.Kind {
 	case SchemaResult:
 		if row.SchemaIdx < 0 || row.SchemaIdx >= len(g.Schemas) {
@@ -307,6 +312,33 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		}
 	}
 	return expr.NullVal()
+}
+
+func resultKindName(k ResultKind) string {
+	switch k {
+	case SchemaResult:
+		return "schema"
+	case OperationResult:
+		return "operation"
+	case GroupRowResult:
+		return "group"
+	case ParameterResult:
+		return "parameter"
+	case ResponseResult:
+		return "response"
+	case RequestBodyResult:
+		return "request-body"
+	case ContentTypeResult:
+		return "content-type"
+	case HeaderResult:
+		return "header"
+	case SecuritySchemeResult:
+		return "security-scheme"
+	case SecurityRequirementResult:
+		return "security-requirement"
+	default:
+		return "unknown"
+	}
 }
 
 // schemaPropertyNames returns the property names of a schema as an array value.
