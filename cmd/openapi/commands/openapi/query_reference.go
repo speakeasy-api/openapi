@@ -50,11 +50,12 @@ in the schema reference graph.
   referenced-by           Direct incoming references (1 hop, with edge annotations)
   descendants         Transitive closure of outgoing references (all hops)
   descendants(N)      Depth-limited descendants: only follow N hops
-  ancestors         Transitive closure of incoming references
+  ancestors           Transitive closure of incoming references
+  ancestors(N)        Depth-limited ancestors: only follow N hops
   properties        Expand to property sub-schemas (with edge annotations)
   union-members     Expand allOf/oneOf/anyOf children (with edge annotations)
   items             Expand to array items schema (with edge annotations)
-  parent            Navigate back to source schema of edge annotations
+  parent            Navigate to structural parent schema (via graph in-edges)
   ops               Schemas → operations that use them
   schemas           Operations → schemas they touch
   path(A; B)        Shortest path between two named schemas
@@ -216,9 +217,11 @@ source schema.
 
   Field             Type     Description
   ─────             ────     ───────────
-  via               string   Edge type: property, items, allOf, oneOf, ref, ...
-  key               string   Edge key: property name, array index, etc.
-  from              string   Source node name
+  via               string   Structural edge kind: property, items, allOf, oneOf, ...
+  key               string   Structural edge label: property name, array index, etc.
+  from              string   Source schema name (the schema containing the relationship)
+  target            string   Seed schema name (the schema that initiated the traversal)
+  bfs_depth         int      BFS depth from seed (populated by descendants(N), ancestors(N))
 
 PARAMETER FIELDS
 ----------------

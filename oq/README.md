@@ -42,12 +42,12 @@ source | stage | stage | ... | terminal
 |-------|-------------|
 | `references` | Direct outgoing references (with edge annotations) |
 | `referenced-by` | Direct incoming references (with edge annotations) |
-| `descendants` | Transitive closure of outgoing refs |
-| `ancestors` | Transitive closure of incoming refs |
+| `descendants` / `descendants(N)` | Transitive (or depth-limited) outgoing refs |
+| `ancestors` / `ancestors(N)` | Transitive (or depth-limited) incoming refs |
 | `properties` | Property sub-schemas (with edge annotations) |
 | `union-members` | allOf/oneOf/anyOf children (with edge annotations) |
 | `items` | Array items schema (with edge annotations) |
-| `parent` | Navigate back to source schema of edge annotations |
+| `parent` | Navigate to structural parent schema (via graph in-edges) |
 | `ops` | Schemas → operations |
 | `schemas` | Operations → schemas |
 | `path(A; B)` | Shortest path between two schemas |
@@ -166,13 +166,15 @@ Module search paths: current directory, then `~/.config/oq/`
 
 ### Edge Annotation Fields
 
-Available on rows produced by 1-hop traversal stages (`references`, `referenced-by`, `properties`, `union-members`, `items`). Use `parent` to navigate back to the source schema.
+Available on rows produced by traversal stages (`references`, `referenced-by`, `properties`, `union-members`, `items`, `descendants(N)`, `ancestors(N)`).
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `via` | string | Edge type: property, items, allOf, oneOf, ref, ... |
-| `key` | string | Edge key: property name, array index, etc. |
-| `from` | string | Source node name |
+| `via` | string | Structural edge kind: property, items, allOf, oneOf, ... |
+| `key` | string | Structural edge label: property name, array index, etc. |
+| `from` | string | Source schema name (the schema containing the relationship) |
+| `target` | string | Seed schema name (the schema that initiated the traversal) |
+| `bfs_depth` | int | BFS depth from seed (populated by `descendants(N)`, `ancestors(N)`) |
 
 ### Parameter Fields
 

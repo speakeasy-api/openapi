@@ -28,8 +28,8 @@ Pipeline stages:
   Navigation:  parameters, responses, request-body, content-types, headers,
                schema, operation, security
   Traversal:   references, referenced-by, descendants, descendants(N), ancestors,
-               properties, union-members, items, parent, ops, schemas, path(A; B),
-               connected, blast-radius, neighbors(N)
+               ancestors(N), properties, union-members, items, parent, ops, schemas,
+               path(A; B), connected, blast-radius, neighbors(N)
   Analysis:    orphans, leaves, cycles, clusters, tag-boundary, shared-refs
   Filter:      select(expr), pick <fields>, sort_by(field; desc), first(N), last(N),
                sample(N), top(N; field), bottom(N; field), unique,
