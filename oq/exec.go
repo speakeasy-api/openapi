@@ -86,8 +86,7 @@ func execSource(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 func execStageWithEnv(stage Stage, result *Result, g *graph.SchemaGraph, env map[string]expr.Value) (*Result, map[string]expr.Value, error) {
 	switch stage.Kind {
 	case StageLet:
-		r, newEnv, err := execLet(stage, result, g, env)
-		return r, newEnv, err
+		return execLet(stage, result, g, env)
 	case StageWhere:
 		r, err := execWhere(stage, result, g, env)
 		return r, env, err
@@ -99,8 +98,6 @@ func execStageWithEnv(stage Stage, result *Result, g *graph.SchemaGraph, env map
 
 func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
 	switch stage.Kind {
-	case StageWhere:
-		return execWhere(stage, result, g, nil)
 	case StageLast:
 		return execLast(stage, result)
 	case StageSelect:
@@ -349,13 +346,18 @@ func edgeRowKey(row Row) string {
 	return base + "|" + row.From + "|" + row.Via + "|" + row.Key
 }
 
-func traverseRefsOut(row Row, g *graph.SchemaGraph) []Row {
+// traverseOutEdges returns outgoing edge rows, optionally filtered by edge kind.
+// If no kinds are given, all outgoing edges are included.
+func traverseOutEdges(row Row, g *graph.SchemaGraph, kinds ...graph.EdgeKind) []Row {
 	if row.Kind != SchemaResult {
 		return nil
 	}
 	fromName := schemaName(row.SchemaIdx, g)
 	var result []Row
 	for _, edge := range g.OutEdges(graph.NodeID(row.SchemaIdx)) {
+		if len(kinds) > 0 && !edgeKindMatch(edge.Kind, kinds) {
+			continue
+		}
 		result = append(result, Row{
 			Kind:      SchemaResult,
 			SchemaIdx: int(edge.To),
@@ -365,6 +367,19 @@ func traverseRefsOut(row Row, g *graph.SchemaGraph) []Row {
 		})
 	}
 	return result
+}
+
+func edgeKindMatch(k graph.EdgeKind, kinds []graph.EdgeKind) bool {
+	for _, want := range kinds {
+		if k == want {
+			return true
+		}
+	}
+	return false
+}
+
+func traverseRefsOut(row Row, g *graph.SchemaGraph) []Row {
+	return traverseOutEdges(row, g)
 }
 
 func traverseRefsIn(row Row, g *graph.SchemaGraph) []Row {
@@ -385,48 +400,30 @@ func traverseRefsIn(row Row, g *graph.SchemaGraph) []Row {
 	return result
 }
 
-func traverseReachable(row Row, g *graph.SchemaGraph) []Row {
-	if row.Kind != SchemaResult {
-		return nil
-	}
-	ids := g.Reachable(graph.NodeID(row.SchemaIdx))
+func nodeIDsToRows(ids []graph.NodeID) []Row {
 	result := make([]Row, len(ids))
 	for i, id := range ids {
 		result[i] = Row{Kind: SchemaResult, SchemaIdx: int(id)}
 	}
 	return result
+}
+
+func traverseReachable(row Row, g *graph.SchemaGraph) []Row {
+	if row.Kind != SchemaResult {
+		return nil
+	}
+	return nodeIDsToRows(g.Reachable(graph.NodeID(row.SchemaIdx)))
 }
 
 func traverseAncestors(row Row, g *graph.SchemaGraph) []Row {
 	if row.Kind != SchemaResult {
 		return nil
 	}
-	ids := g.Ancestors(graph.NodeID(row.SchemaIdx))
-	result := make([]Row, len(ids))
-	for i, id := range ids {
-		result[i] = Row{Kind: SchemaResult, SchemaIdx: int(id)}
-	}
-	return result
+	return nodeIDsToRows(g.Ancestors(graph.NodeID(row.SchemaIdx)))
 }
 
 func traverseProperties(row Row, g *graph.SchemaGraph) []Row {
-	if row.Kind != SchemaResult {
-		return nil
-	}
-	fromName := schemaName(row.SchemaIdx, g)
-	var result []Row
-	for _, edge := range g.OutEdges(graph.NodeID(row.SchemaIdx)) {
-		if edge.Kind == graph.EdgeProperty {
-			result = append(result, Row{
-				Kind:      SchemaResult,
-				SchemaIdx: int(edge.To),
-				Via:       edgeKindString(edge.Kind),
-				Key:       edge.Label,
-				From:      fromName,
-			})
-		}
-	}
-	return result
+	return traverseOutEdges(row, g, graph.EdgeProperty)
 }
 
 func traverseUnionMembers(row Row, g *graph.SchemaGraph) []Row {
@@ -452,23 +449,7 @@ func traverseUnionMembers(row Row, g *graph.SchemaGraph) []Row {
 }
 
 func traverseItems(row Row, g *graph.SchemaGraph) []Row {
-	if row.Kind != SchemaResult {
-		return nil
-	}
-	fromName := schemaName(row.SchemaIdx, g)
-	var result []Row
-	for _, edge := range g.OutEdges(graph.NodeID(row.SchemaIdx)) {
-		if edge.Kind == graph.EdgeItems {
-			result = append(result, Row{
-				Kind:      SchemaResult,
-				SchemaIdx: int(edge.To),
-				Via:       edgeKindString(edge.Kind),
-				Key:       edge.Label,
-				From:      fromName,
-			})
-		}
-	}
-	return result
+	return traverseOutEdges(row, g, graph.EdgeItems)
 }
 
 // resolveRefTarget follows EdgeRef edges to get the actual target node.

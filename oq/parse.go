@@ -180,14 +180,6 @@ func parseStage(s string) (Stage, error) {
 		return Stage{}, errors.New("sort_by requires parentheses: sort_by(field) or sort_by(field; desc)")
 
 	case "first":
-		if isCall {
-			n, err := strconv.Atoi(strings.TrimSpace(args))
-			if err != nil {
-				return Stage{}, fmt.Errorf("first requires a number: %w", err)
-			}
-			return Stage{Kind: StageTake, Limit: n}, nil
-		}
-		// bare "first" with space arg
 		n, err := strconv.Atoi(strings.TrimSpace(args))
 		if err != nil {
 			return Stage{}, fmt.Errorf("first requires a number: %w", err)
@@ -195,13 +187,6 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageTake, Limit: n}, nil
 
 	case "last":
-		if isCall {
-			n, err := strconv.Atoi(strings.TrimSpace(args))
-			if err != nil {
-				return Stage{}, fmt.Errorf("last requires a number: %w", err)
-			}
-			return Stage{Kind: StageLast, Limit: n}, nil
-		}
 		n, err := strconv.Atoi(strings.TrimSpace(args))
 		if err != nil {
 			return Stage{}, fmt.Errorf("last requires a number: %w", err)
@@ -261,13 +246,6 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageFields}, nil
 
 	case "sample":
-		if isCall {
-			n, err := strconv.Atoi(strings.TrimSpace(args))
-			if err != nil {
-				return Stage{}, fmt.Errorf("sample requires a number: %w", err)
-			}
-			return Stage{Kind: StageSample, Limit: n}, nil
-		}
 		n, err := strconv.Atoi(strings.TrimSpace(args))
 		if err != nil {
 			return Stage{}, fmt.Errorf("sample requires a number: %w", err)
@@ -275,13 +253,6 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageSample, Limit: n}, nil
 
 	case "neighbors":
-		if isCall {
-			n, err := strconv.Atoi(strings.TrimSpace(args))
-			if err != nil {
-				return Stage{}, fmt.Errorf("neighbors requires a depth number: %w", err)
-			}
-			return Stage{Kind: StageNeighbors, Limit: n}, nil
-		}
 		n, err := strconv.Atoi(strings.TrimSpace(args))
 		if err != nil {
 			return Stage{}, fmt.Errorf("neighbors requires a depth number: %w", err)
@@ -348,9 +319,6 @@ func parseStage(s string) (Stage, error) {
 
 	case "format":
 		f := strings.TrimSpace(args)
-		if isCall {
-			f = strings.TrimSpace(args)
-		}
 		if f != "table" && f != "json" && f != "markdown" && f != "toon" {
 			return Stage{}, fmt.Errorf("format must be table, json, markdown, or toon, got %q", f)
 		}
@@ -531,42 +499,7 @@ func splitKeywordCall(s string) (string, string, bool) {
 }
 
 func splitSemicolonArgs(s string) []string {
-	var parts []string
-	var current strings.Builder
-	depth := 0
-	var quoteChar byte
-
-	for i := 0; i < len(s); i++ {
-		ch := s[i]
-		switch {
-		case quoteChar != 0:
-			current.WriteByte(ch)
-			if ch == '\\' && i+1 < len(s) {
-				i++
-				current.WriteByte(s[i])
-			} else if ch == quoteChar {
-				quoteChar = 0
-			}
-		case ch == '"' || ch == '\'':
-			quoteChar = ch
-			current.WriteByte(ch)
-		case ch == '(':
-			depth++
-			current.WriteByte(ch)
-		case ch == ')':
-			depth--
-			current.WriteByte(ch)
-		case ch == ';' && depth == 0:
-			parts = append(parts, current.String())
-			current.Reset()
-		default:
-			current.WriteByte(ch)
-		}
-	}
-	if current.Len() > 0 {
-		parts = append(parts, current.String())
-	}
-	return parts
+	return splitAtDelim(s, ';')
 }
 
 func parseTwoArgs(s string) (string, string) {
@@ -607,10 +540,16 @@ func parseTwoArgs(s string) (string, string) {
 // --- Pipeline splitting ---
 
 func splitPipeline(input string) []string {
+	return splitAtDelim(input, '|')
+}
+
+// splitAtDelim splits a string at unquoted, depth-0 occurrences of delim,
+// respecting single/double quotes and parenthesis nesting.
+func splitAtDelim(input string, delim byte) []string {
 	var parts []string
 	var current strings.Builder
-	var quoteChar byte // 0 = not in quote, '"' or '\'' = in that quote
-	depth := 0         // paren depth — don't split | inside parens
+	var quoteChar byte
+	depth := 0
 
 	for i := 0; i < len(input); i++ {
 		ch := input[i]
@@ -632,7 +571,7 @@ func splitPipeline(input string) []string {
 		case ch == ')':
 			depth--
 			current.WriteByte(ch)
-		case ch == '|' && depth == 0:
+		case ch == delim && depth == 0:
 			parts = append(parts, current.String())
 			current.Reset()
 		default:

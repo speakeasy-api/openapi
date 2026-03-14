@@ -1,7 +1,6 @@
 package oq
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -226,7 +225,7 @@ func schemaContentField(s *graph.SchemaNode, name string) expr.Value {
 			vals := make([]string, len(schema.Enum))
 			for i, e := range schema.Enum {
 				if e != nil {
-					vals[i] = fmt.Sprintf("%v", e.Value)
+					vals[i] = e.Value
 				}
 			}
 			return expr.ArrayVal(vals)

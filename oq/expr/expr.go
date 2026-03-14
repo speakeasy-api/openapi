@@ -202,7 +202,7 @@ func evalFunc(name string, args []Value) Value {
 			return NullVal()
 		}
 		return StringVal(strings.ToUpper(toString(args[0])))
-	case "len":
+	case "len", "count":
 		if len(args) != 1 {
 			return NullVal()
 		}
@@ -267,19 +267,6 @@ func evalFunc(name string, args []Value) Value {
 		}
 		// split(str, sep) → return array
 		return ArrayVal(parts)
-	case "count":
-		if len(args) != 1 {
-			return NullVal()
-		}
-		v := args[0]
-		switch v.Kind {
-		case KindArray:
-			return IntVal(len(v.Arr))
-		case KindString:
-			return IntVal(len(v.Str))
-		default:
-			return IntVal(0)
-		}
 	default:
 		return NullVal()
 	}
