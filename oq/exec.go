@@ -646,8 +646,11 @@ func execBlastRadius(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	}
 	sort.Ints(schemaIndices)
 
-	// Add schema rows
+	// Add schema rows, skipping $ref wrapper nodes (pure plumbing)
 	for _, idx := range schemaIndices {
+		if idx < len(g.Schemas) && g.Schemas[idx].HasRef && !g.Schemas[idx].IsComponent {
+			continue
+		}
 		out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: idx})
 	}
 
@@ -1127,6 +1130,7 @@ func execFields(result *Result) (*Result, error) {
 			{"out_degree", "int"},
 			{"union_width", "int"},
 			{"property_count", "int"},
+			{"properties", "array"},
 			{"is_component", "bool"},
 			{"is_inline", "bool"},
 			{"is_circular", "bool"},
