@@ -544,3 +544,123 @@ func TestParse_ComplexPrecedence(t *testing.T) {
 	})
 	assert.True(t, result.Bool)
 }
+
+func TestEval_StringFunctions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		exprStr  string
+		row      testRow
+		expected expr.Value
+	}{
+		{"lower", `lower("Hello")`, testRow{}, expr.StringVal("hello")},
+		{"upper", `upper("Hello")`, testRow{}, expr.StringVal("HELLO")},
+		{"lower field", `lower(name)`, testRow{"name": expr.StringVal("Pet")}, expr.StringVal("pet")},
+		{"trim", `trim("  hello  ")`, testRow{}, expr.StringVal("hello")},
+		{"len string", `len("hello")`, testRow{}, expr.IntVal(5)},
+		{"len field", `len(name)`, testRow{"name": expr.StringVal("Pet")}, expr.IntVal(3)},
+		{"len array", `len(tags)`, testRow{"tags": expr.ArrayVal([]string{"a", "b", "c"})}, expr.IntVal(3)},
+		{"startswith true", `startswith(name, "Pe")`, testRow{"name": expr.StringVal("Pet")}, expr.BoolVal(true)},
+		{"startswith false", `startswith(name, "Ow")`, testRow{"name": expr.StringVal("Pet")}, expr.BoolVal(false)},
+		{"endswith true", `endswith(name, "et")`, testRow{"name": expr.StringVal("Pet")}, expr.BoolVal(true)},
+		{"contains string true", `contains(name, "et")`, testRow{"name": expr.StringVal("Pet")}, expr.BoolVal(true)},
+		{"contains string false", `contains(name, "xx")`, testRow{"name": expr.StringVal("Pet")}, expr.BoolVal(false)},
+		{"replace", `replace(name, "Pet", "Cat")`, testRow{"name": expr.StringVal("Pet")}, expr.StringVal("Cat")},
+		{"split with index", `split(path, "/", 1)`, testRow{"path": expr.StringVal("/users/123")}, expr.StringVal("users")},
+		{"split out of range", `split(path, "/", 99)`, testRow{"path": expr.StringVal("/users")}, expr.NullVal()},
+		{"composition lower+startswith", `startswith(lower(name), "pe")`, testRow{"name": expr.StringVal("Pet")}, expr.BoolVal(true)},
+		{"count array", `count(tags)`, testRow{"tags": expr.ArrayVal([]string{"a", "b"})}, expr.IntVal(2)},
+		{"count string", `count(name)`, testRow{"name": expr.StringVal("Pet")}, expr.IntVal(3)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parsed, err := expr.Parse(tt.exprStr)
+			require.NoError(t, err)
+			result := parsed.Eval(tt.row)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestEval_Arithmetic(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		exprStr  string
+		row      testRow
+		expected expr.Value
+	}{
+		{"add", `depth + 1`, testRow{"depth": expr.IntVal(5)}, expr.IntVal(6)},
+		{"subtract", `depth - 3`, testRow{"depth": expr.IntVal(5)}, expr.IntVal(2)},
+		{"multiply", `depth * 2`, testRow{"depth": expr.IntVal(5)}, expr.IntVal(10)},
+		{"divide", `depth / 2`, testRow{"depth": expr.IntVal(10)}, expr.IntVal(5)},
+		{"divide by zero", `depth / 0`, testRow{"depth": expr.IntVal(10)}, expr.NullVal()},
+		{"precedence mul before add", `2 + 3 * 4`, testRow{}, expr.IntVal(14)},
+		{"field arithmetic", `in_degree + out_degree`, testRow{"in_degree": expr.IntVal(3), "out_degree": expr.IntVal(5)}, expr.IntVal(8)},
+		{"arithmetic in comparison", `in_degree + out_degree > 5`, testRow{"in_degree": expr.IntVal(3), "out_degree": expr.IntVal(5)}, expr.BoolVal(true)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parsed, err := expr.Parse(tt.exprStr)
+			require.NoError(t, err)
+			result := parsed.Eval(tt.row)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestEval_Contains(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		exprStr  string
+		row      testRow
+		expected bool
+	}{
+		{"string contains", `name contains "et"`, testRow{"name": expr.StringVal("Pet")}, true},
+		{"string not contains", `name contains "xx"`, testRow{"name": expr.StringVal("Pet")}, false},
+		{"array contains", `tags contains "billing"`, testRow{"tags": expr.ArrayVal([]string{"api", "billing"})}, true},
+		{"array not contains", `tags contains "admin"`, testRow{"tags": expr.ArrayVal([]string{"api", "billing"})}, false},
+		{"null contains", `missing contains "x"`, testRow{}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			parsed, err := expr.Parse(tt.exprStr)
+			require.NoError(t, err)
+			result := parsed.Eval(tt.row)
+			assert.Equal(t, expr.KindBool, result.Kind)
+			assert.Equal(t, tt.expected, result.Bool)
+		})
+	}
+}
+
+func TestEval_ArrayVal(t *testing.T) {
+	t.Parallel()
+
+	// Array toBool
+	e, err := expr.Parse(`tags`)
+	require.NoError(t, err)
+
+	result := e.Eval(testRow{"tags": expr.ArrayVal([]string{"a"})})
+	assert.Equal(t, expr.KindArray, result.Kind)
+
+	result = e.Eval(testRow{"tags": expr.ArrayVal(nil)})
+	assert.Equal(t, expr.KindArray, result.Kind)
+
+	// has() with array
+	e, err = expr.Parse(`has(tags)`)
+	require.NoError(t, err)
+	result = e.Eval(testRow{"tags": expr.ArrayVal([]string{"a"})})
+	assert.True(t, result.Bool)
+	result = e.Eval(testRow{"tags": expr.ArrayVal(nil)})
+	assert.False(t, result.Bool)
+}
