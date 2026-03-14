@@ -3292,6 +3292,62 @@ func TestFormatTable_NavigationRows_Success(t *testing.T) {
 	assert.Contains(t, output5, "bearer")
 }
 
+func TestExecute_MembersDrillDown_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// clusters | members should expand cluster groups into individual schema rows
+	result, err := oq.Execute(`schemas | select(is_component) | clusters | members | pick name`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "members should expand cluster groups into schema rows")
+
+	// All rows should be schema rows
+	for _, row := range result.Rows {
+		assert.Equal(t, oq.SchemaResult, row.Kind, "all member rows should be schemas")
+	}
+
+	// Total members should equal component schema count
+	compResult, err := oq.Execute(`schemas | select(is_component) | length`, g)
+	require.NoError(t, err)
+	assert.Len(t, result.Rows, compResult.Count,
+		"expanding all clusters should yield all component schemas")
+}
+
+func TestExecute_MembersSelect_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Select a single cluster and drill into its members
+	result, err := oq.Execute(`schemas | select(is_component) | clusters | first(1) | members | pick name`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "single cluster members should have rows")
+
+	// Verify we can further filter members
+	result2, err := oq.Execute(`schemas | select(is_component) | clusters | first(1) | members | select(type == "object") | pick name`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result2.Rows, "should be able to filter cluster members")
+}
+
+func TestExecute_GroupByMembers_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// group_by | select a group | members should expand to schemas
+	result, err := oq.Execute(`schemas | select(is_component) | group_by(type) | first(1) | members | pick name`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "group_by members should expand to schema rows")
+}
+
+func TestExecute_MembersNonGroup_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// members on non-group rows should return empty
+	result, err := oq.Execute(`schemas | select(is_component) | first(1) | members`, g)
+	require.NoError(t, err)
+	assert.Empty(t, result.Rows, "members on non-group rows should be empty")
+}
+
 // collectNames extracts the "name" field from all rows in the result.
 func collectNames(result *oq.Result, g *graph.SchemaGraph) []string {
 	var names []string

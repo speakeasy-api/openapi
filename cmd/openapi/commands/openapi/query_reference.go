@@ -62,6 +62,7 @@ in the schema reference graph.
   connected         Full connected component (schemas + operations)
   blast-radius      Ancestors + all affected operations (change impact)
   neighbors(N)      Bidirectional neighborhood within N hops
+  members           Expand group rows into member schema rows
 
 NAVIGATION STAGES
 -----------------

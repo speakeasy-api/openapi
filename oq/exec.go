@@ -205,6 +205,8 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		return execOperation(result, g)
 	case StageSecurity:
 		return execSecurity(result, g)
+	case StageMembers:
+		return execMembers(result, g)
 	default:
 		return nil, fmt.Errorf("unimplemented stage kind: %d", stage.Kind)
 	}
@@ -1318,6 +1320,8 @@ func describeStage(stage Stage) string {
 		return "Navigate: back to source operation"
 	case StageSecurity:
 		return "Navigate: operation security requirements"
+	case StageMembers:
+		return "Expand: group rows into member schema rows"
 	default:
 		return "Unknown stage"
 	}
@@ -1943,6 +1947,42 @@ func componentRows(g *graph.SchemaGraph, kind componentKind) []Row {
 		}
 	}
 	return rows
+}
+
+// --- Members ---
+
+// execMembers expands group rows (from cycles, clusters, group_by) into their
+// member schema rows. Each group's GroupNames are resolved to schema nodes.
+func execMembers(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	// Build name→index lookup
+	nameIdx := make(map[string]int, len(g.Schemas))
+	for i := range g.Schemas {
+		nameIdx[schemaName(i, g)] = i
+	}
+
+	out := deriveResult(result)
+	seen := make(map[int]bool)
+
+	for _, row := range result.Rows {
+		if row.Kind != GroupRowResult {
+			continue
+		}
+		for _, name := range row.GroupNames {
+			idx, ok := nameIdx[name]
+			if !ok {
+				continue
+			}
+			if seen[idx] {
+				continue
+			}
+			seen[idx] = true
+			out.Rows = append(out.Rows, Row{
+				Kind:      SchemaResult,
+				SchemaIdx: idx,
+			})
+		}
+	}
+	return out, nil
 }
 
 // --- Security ---

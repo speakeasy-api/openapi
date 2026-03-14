@@ -401,6 +401,9 @@ func parseStage(s string) (Stage, error) {
 	case "security":
 		return Stage{Kind: StageSecurity}, nil
 
+	case "members":
+		return Stage{Kind: StageMembers}, nil
+
 	default:
 		return Stage{}, fmt.Errorf("unknown stage: %q", keyword)
 	}

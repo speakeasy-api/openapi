@@ -175,6 +175,7 @@ const (
 	StageSchema    // singular: extract schema from nav row
 	StageOperation // back-navigate to source operation
 	StageSecurity  // operation security requirements
+	StageMembers   // expand group rows into member schema rows
 )
 
 // Stage represents a single stage in the query pipeline.

@@ -48,6 +48,7 @@ source | stage | stage | ... | terminal
 | `union-members` | allOf/oneOf/anyOf children (with edge annotations) |
 | `items` | Array items schema (with edge annotations) |
 | `parent` | Navigate to structural parent schema (via graph in-edges) |
+| `members` | Expand group rows (from `cycles`, `clusters`, `group_by`) into member schema rows |
 | `ops` | Schemas → operations |
 | `schemas` | Operations → schemas |
 | `path(A; B)` | Shortest path between two schemas |
