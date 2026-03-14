@@ -27,10 +27,10 @@ Examples:
   openapi spec query 'schemas.components | sort_by(depth; desc) | first(10) | pick name, depth' petstore.yaml
 
   # Pipe from stdin
-  cat spec.yaml | openapi spec query 'schemas | count'
+  cat spec.yaml | openapi spec query 'schemas | length'
 
   # Explicit stdin
-  openapi spec query 'schemas | count' -
+  openapi spec query 'schemas | length' -
 
   # Filter with select()
   openapi spec query 'schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)' petstore.yaml
@@ -69,8 +69,9 @@ Pipeline stages (jq-style):
   Meta:       explain, fields
 
 Expression operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches,
-                      if-then-else-end, string interpolation \(expr)`,
-	// TODO: add reference to 'openapi spec query-reference' for the full query language reference
+                      if-then-else-end, string interpolation \(expr)
+
+For the full query language reference, run: openapi spec query-reference`,
 	Args: queryArgs(),
 	Run:  runQuery,
 }
