@@ -522,6 +522,20 @@ func (p *parser) parseComparison() (Expr, error) {
 			return nil, err
 		}
 		return &containsExpr{left: left, right: right}, nil
+	case "startswith":
+		p.next()
+		right, err := p.parseAlternative()
+		if err != nil {
+			return nil, err
+		}
+		return &funcCallExpr{name: "startswith", args: []Expr{left, right}}, nil
+	case "endswith":
+		p.next()
+		right, err := p.parseAlternative()
+		if err != nil {
+			return nil, err
+		}
+		return &funcCallExpr{name: "endswith", args: []Expr{left, right}}, nil
 	}
 	return left, nil
 }

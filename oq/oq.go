@@ -134,9 +134,9 @@ const (
 	StageUnique
 	StageGroupBy
 	StageCount
-	StageRefsOut
-	StageRefsIn
-	StageReachable
+	StageReferences
+	StageReferencedBy
+	StageDescendants
 	StageAncestors
 	StageProperties
 	StageUnionMembers

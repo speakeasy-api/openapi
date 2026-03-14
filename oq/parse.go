@@ -217,22 +217,21 @@ func parseStage(s string) (Stage, error) {
 		}
 		return Stage{}, errors.New("group_by requires parentheses: group_by(field)")
 
-	case "refs-out":
-		return Stage{Kind: StageRefsOut}, nil
+	case "references":
+		return Stage{Kind: StageReferences}, nil
 
-	case "refs-in":
-		return Stage{Kind: StageRefsIn}, nil
+	case "referenced-by":
+		return Stage{Kind: StageReferencedBy}, nil
 
-	case "reachable":
+	case "descendants":
 		if isCall && args != "" {
 			n, err := strconv.Atoi(strings.TrimSpace(args))
 			if err != nil {
-				return Stage{}, fmt.Errorf("reachable requires a depth number: %w", err)
+				return Stage{}, fmt.Errorf("descendants requires a depth number: %w", err)
 			}
-			return Stage{Kind: StageReachable, Limit: n}, nil
+			return Stage{Kind: StageDescendants, Limit: n}, nil
 		}
-		// bare reachable = unlimited depth (-1 sentinel not needed; Limit 0 = unlimited)
-		return Stage{Kind: StageReachable}, nil
+		return Stage{Kind: StageDescendants}, nil
 
 	case "ancestors":
 		return Stage{Kind: StageAncestors}, nil

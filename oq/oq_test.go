@@ -53,9 +53,9 @@ func TestParse_Success(t *testing.T) {
 		{"length", "schemas | length"},
 		{"unique", "schemas | unique"},
 		{"group_by", "schemas | group_by(hash)"},
-		{"refs-out", "schemas | refs-out"},
-		{"refs-in", "schemas | refs-in"},
-		{"reachable", "schemas | reachable"},
+		{"references", "schemas | references"},
+		{"referenced-by", "schemas | referenced-by"},
+		{"descendants", "schemas | descendants"},
 		{"ancestors", "schemas | ancestors"},
 		{"properties", "schemas | properties"},
 		{"union-members", "schemas | union-members"},
@@ -163,7 +163,7 @@ func TestExecute_Reachable_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | reachable | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | descendants | pick name`, g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
@@ -501,7 +501,7 @@ func TestExecute_RefsOut_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | refs-out | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | references | pick name`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "Pet should have outgoing refs")
 }
@@ -510,7 +510,7 @@ func TestExecute_RefsIn_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Owner") | refs-in | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Owner") | referenced-by | pick name`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "Owner should have incoming refs")
 }
@@ -572,9 +572,9 @@ func TestExecute_EdgeAnnotations_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | refs-out | pick name, via, key, from`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | references | pick name, via, key, from`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows, "refs-out from Pet should have results")
+	assert.NotEmpty(t, result.Rows, "references from Pet should have results")
 
 	// Every row should have edge annotations
 	for _, row := range result.Rows {
@@ -904,18 +904,18 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 		},
 		{
 			"explain with traversals",
-			"schemas | select(is_component) | select(name == \"Pet\") | refs-out | explain",
-			[]string{"Traverse: outgoing references"},
+			"schemas | select(is_component) | select(name == \"Pet\") | references | explain",
+			[]string{"Traverse: direct outgoing references"},
 		},
 		{
-			"explain with refs-in",
-			"schemas | select(is_component) | select(name == \"Owner\") | refs-in | explain",
-			[]string{"Traverse: incoming references"},
+			"explain with referenced-by",
+			"schemas | select(is_component) | select(name == \"Owner\") | referenced-by | explain",
+			[]string{"Traverse: schemas that reference this one"},
 		},
 		{
-			"explain with reachable",
-			"schemas | select(is_component) | select(name == \"Pet\") | reachable | explain",
-			[]string{"Traverse: all reachable"},
+			"explain with descendants",
+			"schemas | select(is_component) | select(name == \"Pet\") | descendants | explain",
+			[]string{"Traverse: all descendants"},
 		},
 		{
 			"explain with ancestors",
@@ -1322,8 +1322,8 @@ func TestExecute_CyclicSpec_EdgeAnnotations(t *testing.T) {
 	t.Parallel()
 	g := loadCyclicGraph(t)
 
-	// Test refs-out to cover edgeKindString branches
-	result, err := oq.Execute(`schemas | select(is_component) | select(name == "NodeA") | refs-out | pick name, via, key`, g)
+	// Test references to cover edgeKindString branches
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "NodeA") | references | pick name, via, key`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "NodeA should have outgoing refs")
 
@@ -1521,12 +1521,12 @@ func TestExecute_LetBinding_Success(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// let $pet = name, then use $pet in subsequent filter
-	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | let $pet = name | reachable | select(name != $pet) | pick name`, g)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | let $pet = name | descendants | select(name != $pet) | pick name`, g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
 	assert.NotContains(t, names, "Pet", "should not include the $pet variable value")
-	assert.Contains(t, names, "Owner", "should include reachable schemas")
+	assert.Contains(t, names, "Owner", "should include descendants schemas")
 }
 
 func TestExecute_DefExpansion_Success(t *testing.T) {
@@ -1815,7 +1815,7 @@ func TestExecute_NavigationFullChain(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Full navigation chain: operation → responses → content-types → schema → graph traversal
-	result, err := oq.Execute("operations | first(1) | responses | content-types | schema | refs-out | first(3)", g)
+	result, err := oq.Execute("operations | first(1) | responses | content-types | schema | references | first(3)", g)
 	require.NoError(t, err)
 	// May be empty depending on whether the schema has refs, but should not error
 	for _, row := range result.Rows {

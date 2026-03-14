@@ -119,11 +119,11 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		return execGroupBy(stage, result, g)
 	case StageCount:
 		return &Result{IsCount: true, Count: len(result.Rows)}, nil
-	case StageRefsOut:
+	case StageReferences:
 		return execTraversal(result, g, traverseRefsOut)
-	case StageRefsIn:
+	case StageReferencedBy:
 		return execTraversal(result, g, traverseRefsIn)
-	case StageReachable:
+	case StageDescendants:
 		if stage.Limit > 0 {
 			return execReachableDepth(stage.Limit, result, g)
 		}
@@ -1012,15 +1012,15 @@ func describeStage(stage Stage) string {
 		return "Group: group_by(" + strings.Join(stage.Fields, ", ") + ")"
 	case StageCount:
 		return "Count: count rows"
-	case StageRefsOut:
-		return "Traverse: outgoing references"
-	case StageRefsIn:
-		return "Traverse: incoming references"
-	case StageReachable:
+	case StageReferences:
+		return "Traverse: direct outgoing references"
+	case StageReferencedBy:
+		return "Traverse: schemas that reference this one"
+	case StageDescendants:
 		if stage.Limit > 0 {
-			return "Traverse: reachable nodes within " + strconv.Itoa(stage.Limit) + " hops"
+			return "Traverse: descendants within " + strconv.Itoa(stage.Limit) + " hops"
 		}
-		return "Traverse: all reachable nodes"
+		return "Traverse: all descendants (transitive closure)"
 	case StageAncestors:
 		return "Traverse: all ancestor nodes"
 	case StageProperties:

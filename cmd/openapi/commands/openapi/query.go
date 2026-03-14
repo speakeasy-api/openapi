@@ -27,9 +27,9 @@ Pipeline stages:
                components.security-schemes
   Navigation:  parameters, responses, request-body, content-types, headers,
                schema, operation, security
-  Traversal:   refs-out, refs-in, reachable, reachable(N), ancestors, properties,
-               union-members, items, parent, ops, schemas, path(A; B), connected,
-               blast-radius, neighbors(N)
+  Traversal:   references, referenced-by, descendants, descendants(N), ancestors,
+               properties, union-members, items, parent, ops, schemas, path(A; B),
+               connected, blast-radius, neighbors(N)
   Analysis:    orphans, leaves, cycles, clusters, tag-boundary, shared-refs
   Filter:      select(expr), pick <fields>, sort_by(field; desc), first(N), last(N),
                sample(N), top(N; field), bottom(N; field), unique,
@@ -39,13 +39,15 @@ Pipeline stages:
   Output:      emit, format(table|json|markdown|toon)
   Meta:        explain, fields
 
-Operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches, contains,
+Operators: ==, !=, >, <, >=, <=, and, or, not, //, has(),
+           matches, contains, startswith, endswith (all infix),
            if-then-else-end, \(interpolation), lower(), upper(), len(), split()
 
   openapi spec query 'operations | responses | content-types | select(media_type == "text/event-stream") | operation | unique' spec.yaml
   openapi spec query 'operations | security | group_by(scheme_type; operation)' spec.yaml
   openapi spec query 'schemas | select(is_component) | sort_by(depth; desc) | first(10) | pick name, depth' spec.yaml
-  openapi spec query 'operations | select(name == "createUser") | request-body | content-types | schema | reachable(2) | emit' spec.yaml
+  openapi spec query 'schemas | select(properties contains "email") | pick name' spec.yaml
+  openapi spec query 'operations | select(name == "createUser") | request-body | content-types | schema | descendants(2) | emit' spec.yaml
   openapi spec query 'components.security-schemes | pick name, type, scheme' spec.yaml
   cat spec.yaml | openapi spec query 'schemas | length'
 

@@ -79,6 +79,8 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal(row.Key)
 		case "from":
 			return expr.StringVal(row.From)
+		case "properties":
+			return schemaPropertyNames(row.SchemaIdx, g)
 		default:
 			// Schema-content fields require the underlying schema object
 			return schemaContentField(s, name)
@@ -305,6 +307,17 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		}
 	}
 	return expr.NullVal()
+}
+
+// schemaPropertyNames returns the property names of a schema as an array value.
+func schemaPropertyNames(schemaIdx int, g *graph.SchemaGraph) expr.Value {
+	var names []string
+	for _, edge := range g.OutEdges(graph.NodeID(schemaIdx)) {
+		if edge.Kind == graph.EdgeProperty {
+			names = append(names, edge.Label)
+		}
+	}
+	return expr.ArrayVal(names)
 }
 
 // operationName returns the operation name for the given index, or empty string if out of range.

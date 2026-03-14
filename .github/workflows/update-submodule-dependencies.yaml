@@ -19,7 +19,7 @@ jobs:
     name: Update submodule dependencies
     runs-on: ubuntu-latest
     env:
-      GOPROXY: direct
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v6
 
@@ -33,8 +33,8 @@ jobs:
         run: |
           cd openapi/linter/customrules
 
-          # Update to latest main commit
-          go get github.com/speakeasy-api/openapi@main
+          # Update to latest main commit (GOPROXY=direct needed to resolve @main before proxy indexes it)
+          GOPROXY=direct go get github.com/speakeasy-api/openapi@main
           go mod tidy
 
       - name: Update openapi/linter/converter/tests go.mod
@@ -42,8 +42,8 @@ jobs:
           cd openapi/linter/converter/tests
 
           # Update to latest main commit (both main module and customrules)
-          go get github.com/speakeasy-api/openapi@main
-          go get github.com/speakeasy-api/openapi/openapi/linter/customrules@main
+          GOPROXY=direct go get github.com/speakeasy-api/openapi@main
+          GOPROXY=direct go get github.com/speakeasy-api/openapi/openapi/linter/customrules@main
           go mod tidy
 
       - name: Update cmd/openapi go.mod
@@ -51,8 +51,8 @@ jobs:
           cd cmd/openapi
 
           # Update to latest main commit (both main module and customrules)
-          go get github.com/speakeasy-api/openapi@main
-          go get github.com/speakeasy-api/openapi/openapi/linter/customrules@main
+          GOPROXY=direct go get github.com/speakeasy-api/openapi@main
+          GOPROXY=direct go get github.com/speakeasy-api/openapi/openapi/linter/customrules@main
           go mod tidy
 
       - name: Check for changes

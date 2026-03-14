@@ -46,10 +46,10 @@ TRAVERSAL STAGES
 Graph navigation stages replace the current result set by following edges
 in the schema reference graph.
 
-  refs-out          Direct outgoing references (1 hop, with edge annotations)
-  refs-in           Direct incoming references (1 hop, with edge annotations)
-  reachable         Transitive closure of outgoing references (all hops)
-  reachable(N)      Depth-limited reachable: only follow N hops
+  references          Direct outgoing references (1 hop, with edge annotations)
+  referenced-by           Direct incoming references (1 hop, with edge annotations)
+  descendants         Transitive closure of outgoing references (all hops)
+  descendants(N)      Depth-limited descendants: only follow N hops
   ancestors         Transitive closure of incoming references
   properties        Expand to property sub-schemas (with edge annotations)
   union-members     Expand allOf/oneOf/anyOf children (with edge annotations)
@@ -142,6 +142,7 @@ Graph-level (pre-computed):
   out_degree        int      Number of schemas this references
   union_width       int      oneOf + anyOf + allOf member count
   property_count    int      Number of properties
+  properties        array    Property names (for 'contains' filtering)
   is_component      bool     In #/components/schemas
   is_inline         bool     Defined inline
   is_circular       bool     Part of a circular reference chain
@@ -209,7 +210,7 @@ OPERATION FIELDS
 
 EDGE ANNOTATION FIELDS
 ----------------------
-Available on rows produced by 1-hop traversal stages (refs-out, refs-in,
+Available on rows produced by 1-hop traversal stages (references, referenced-by,
 properties, union-members, items). Use 'parent' to navigate back to the
 source schema.
 
@@ -324,10 +325,12 @@ The expression language is used in select(), let, and if-then-else:
   Logical:        and  or  not
   Alternative:    //  (returns left if truthy, else right)
   Predicates:     has(<field>)  — true if field is non-null/non-zero
-                  <field> matches "<regex>"  — regex match
+  Infix:          <expr> matches "<regex>"  — regex match
                   <expr> contains "<str>"  — substring/array membership
+                  <expr> startswith "<str>"  — prefix match
+                  <expr> endswith "<str>"  — suffix match
   String funcs:   lower(), upper(), trim(), len(), count()
-                  startswith(), endswith(), replace(), split()
+                  replace(), split()
   Arithmetic:     +  -  *  /
   Conditional:    if <cond> then <expr> else <expr> end
                   if <cond> then <expr> elif <cond> then <expr> else <expr> end
@@ -378,13 +381,19 @@ Schema analysis:
   schemas | select(name == "Error") | blast-radius | length
 
   # Depth-limited traversal — see 2 hops from a schema
-  schemas | select(name == "User") | reachable(2) | pick name, type
+  schemas | select(name == "User") | descendants(2) | pick name, type
 
   # Edge annotations — how a schema references others
-  schemas | select(name == "Pet") | refs-out | pick name, via, key, from
+  schemas | select(name == "Pet") | references | pick name, via, key, from
 
-  # Schemas with properties matching a pattern
+  # Schemas containing a property named "email"
+  schemas | select(properties contains "email") | pick name
+
+  # Schemas with properties matching a pattern (via traversal)
   schemas | properties | select(key matches "(?i)date") | parent | unique | pick name
+
+  # Schemas with names starting with "Error"
+  components.schemas | select(name startswith "Error") | pick name, type
 
 Operations & navigation:
 
@@ -407,7 +416,7 @@ Operations & navigation:
   operations | responses | headers | pick name, required, status_code, operation
 
   # Drill into a response schema
-  operations | select(name == "createUser") | request-body | content-types | schema | reachable(2) | emit
+  operations | select(name == "createUser") | request-body | content-types | schema | descendants(2) | emit
 
   # Group responses by status code (showing operation names)
   operations | responses | group_by(status_code; operation)
@@ -440,7 +449,7 @@ Content auditing:
 Advanced:
 
   # Variable binding
-  schemas | select(name == "Pet") | let $pet = name | reachable | select(name != $pet) | pick name
+  schemas | select(name == "Pet") | let $pet = name | descendants | select(name != $pet) | pick name
 
   # User-defined functions
   def hot: select(in_degree > 10);
