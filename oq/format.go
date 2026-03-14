@@ -372,6 +372,8 @@ func toonValue(v expr.Value) string {
 		return strconv.Itoa(v.Int)
 	case expr.KindBool:
 		return strconv.FormatBool(v.Bool)
+	case expr.KindArray:
+		return toonEscape(strings.Join(v.Arr, ";"))
 	default:
 		return "null"
 	}
@@ -439,6 +441,17 @@ func jsonValue(v expr.Value) string {
 		return strconv.Itoa(v.Int)
 	case expr.KindBool:
 		return strconv.FormatBool(v.Bool)
+	case expr.KindArray:
+		var sb strings.Builder
+		sb.WriteByte('[')
+		for i, s := range v.Arr {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			fmt.Fprintf(&sb, "%q", s)
+		}
+		sb.WriteByte(']')
+		return sb.String()
 	default:
 		return "null"
 	}

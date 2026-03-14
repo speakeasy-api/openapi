@@ -40,9 +40,9 @@ source | stage | stage | ... | terminal
 
 | Stage | Description |
 |-------|-------------|
-| `refs-out` | Direct outgoing references (with edge annotations) |
-| `refs-in` | Direct incoming references (with edge annotations) |
-| `reachable` | Transitive closure of outgoing refs |
+| `references` | Direct outgoing references (with edge annotations) |
+| `referenced-by` | Direct incoming references (with edge annotations) |
+| `descendants` | Transitive closure of outgoing refs |
 | `ancestors` | Transitive closure of incoming refs |
 | `properties` | Property sub-schemas (with edge annotations) |
 | `union-members` | allOf/oneOf/anyOf children (with edge annotations) |
@@ -166,7 +166,7 @@ Module search paths: current directory, then `~/.config/oq/`
 
 ### Edge Annotation Fields
 
-Available on rows produced by 1-hop traversal stages (`refs-out`, `refs-in`, `properties`, `union-members`, `items`). Use `parent` to navigate back to the source schema.
+Available on rows produced by 1-hop traversal stages (`references`, `referenced-by`, `properties`, `union-members`, `items`). Use `parent` to navigate back to the source schema.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -280,7 +280,7 @@ if is_component then depth > 3 else true end   # conditional
 Use `let` to bind values for use in later stages:
 
 ```
-schemas | select(name == "Pet") | let $pet = name | reachable | select(name != $pet)
+schemas | select(name == "Pet") | let $pet = name | descendants | select(name != $pet)
 ```
 
 ## Output Formats
@@ -330,7 +330,7 @@ schemas | select(name matches "Error.*") | pick name, path
 schemas | group_by(type)
 
 # Edge annotations — how does Pet reference other schemas?
-schemas | select(is_component) | select(name == "Pet") | refs-out | pick name, via, key, from
+schemas | select(is_component) | select(name == "Pet") | references | pick name, via, key, from
 
 # Blast radius — what breaks if Error changes?
 schemas | select(is_component) | select(name == "Error") | blast-radius | length
@@ -356,8 +356,8 @@ schemas | tag-boundary | pick name, tag_count
 # Schemas shared across all operations
 operations | shared-refs | pick name, op_count
 
-# Variable binding — find Pet's reachable schemas (excluding Pet itself)
-schemas | select(name == "Pet") | let $pet = name | reachable | select(name != $pet) | pick name
+# Variable binding — find Pet's descendant schemas (excluding Pet itself)
+schemas | select(name == "Pet") | let $pet = name | descendants | select(name != $pet) | pick name
 
 # User-defined functions
 def hot: select(in_degree > 10);

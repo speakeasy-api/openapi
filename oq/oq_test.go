@@ -2064,6 +2064,83 @@ func TestExecute_UniqueContentTypes(t *testing.T) {
 	assert.True(t, seen["text/event-stream"])
 }
 
+func TestEval_InfixStartswith(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas | select(is_component) | select(name startswith "S") | pick name`, g)
+	require.NoError(t, err)
+
+	names := collectNames(result, g)
+	for _, n := range names {
+		assert.True(t, len(n) > 0 && n[0] == 'S', "name %q should start with S", n)
+	}
+	assert.Contains(t, names, "Shape")
+	assert.Contains(t, names, "Square")
+}
+
+func TestEval_InfixEndswith(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas | select(is_component) | select(name endswith "er") | pick name`, g)
+	require.NoError(t, err)
+
+	names := collectNames(result, g)
+	assert.Contains(t, names, "Owner")
+	for _, n := range names {
+		assert.True(t, len(n) >= 2 && n[len(n)-2:] == "er", "name %q should end with er", n)
+	}
+}
+
+func TestExecute_PropertiesContains(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Pet and Owner both have a "name" property
+	result, err := oq.Execute(`schemas | select(properties contains "name") | select(is_component) | pick name`, g)
+	require.NoError(t, err)
+
+	names := collectNames(result, g)
+	assert.Contains(t, names, "Pet")
+	assert.Contains(t, names, "Owner")
+	assert.NotContains(t, names, "Error", "Error has code and message, not name")
+}
+
+func TestExecute_PropertiesField(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas | select(name == "Pet") | pick name, properties`, g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+
+	props := oq.FieldValuePublic(result.Rows[0], "properties", g)
+	assert.Equal(t, expr.KindArray, props.Kind)
+	assert.Contains(t, props.Arr, "id")
+	assert.Contains(t, props.Arr, "name")
+	assert.Contains(t, props.Arr, "owner")
+}
+
+func TestExecute_KindField(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas | first(1) | pick kind, name`, g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+
+	kind := oq.FieldValuePublic(result.Rows[0], "kind", g)
+	assert.Equal(t, "schema", kind.Str)
+
+	result, err = oq.Execute(`operations | first(1) | pick kind, name`, g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+
+	kind = oq.FieldValuePublic(result.Rows[0], "kind", g)
+	assert.Equal(t, "operation", kind.Str)
+}
+
 // collectNames extracts the "name" field from all rows in the result.
 func collectNames(result *oq.Result, g *graph.SchemaGraph) []string {
 	var names []string
