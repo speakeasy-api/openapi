@@ -35,9 +35,13 @@ type Row struct {
 	OpIdx     int // index into SchemaGraph.Operations
 
 	// Edge annotations (populated by 1-hop traversal stages)
-	Via  string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
-	Key  string // edge key: property name, array index, etc.
-	From string // source node name
+	Via    string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
+	Key    string // edge key: property name, array index, etc.
+	From   string // source node name (the node that contains the reference)
+	Target string // target/seed node name (the node traversal originated from)
+
+	// BFS depth (populated by depth-limited traversals: descendants(N), ancestors(N))
+	BFSDepth int
 
 	// Group annotations (populated by group-by stages)
 	GroupKey   string   // group key value

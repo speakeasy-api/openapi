@@ -57,6 +57,7 @@ func TestParse_Success(t *testing.T) {
 		{"referenced-by", "schemas | referenced-by"},
 		{"descendants", "schemas | descendants"},
 		{"ancestors", "schemas | ancestors"},
+		{"ancestors depth", "schemas | ancestors(2)"},
 		{"properties", "schemas | properties"},
 		{"union-members", "schemas | union-members"},
 		{"items", "schemas | items"},
@@ -1018,6 +1019,21 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 			"explain with shared-refs",
 			"operations | shared-refs | explain",
 			[]string{"Analyze: schemas shared"},
+		},
+		{
+			"explain with ancestors depth",
+			"schemas | select(is_component) | select(name == \"Address\") | ancestors(2) | explain",
+			[]string{"Traverse: ancestors within 2 hops"},
+		},
+		{
+			"explain with descendants depth",
+			"schemas | select(is_component) | select(name == \"Pet\") | descendants(1) | explain",
+			[]string{"Traverse: descendants within 1 hops"},
+		},
+		{
+			"explain with parent",
+			"schemas | select(is_component) | select(name == \"Pet\") | properties | parent | explain",
+			[]string{"Traverse: structural parent"},
 		},
 	}
 
@@ -2426,6 +2442,846 @@ func TestExecute_HeadersEmitKey(t *testing.T) {
 		yaml := oq.FormatYAML(result, g)
 		assert.Contains(t, yaml, "createPet/201/headers/X-Request-Id", "emit key should include full path")
 	}
+}
+
+func TestExecute_ReferencedByResolvesWrappers_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Owner is referenced via Pet.owner (which goes through an inline $ref wrapper).
+	// After the fix, referenced-by should resolve through the wrapper to return Pet.
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Owner") | referenced-by`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	names := collectNames(result, g)
+	assert.Contains(t, names, "Pet", "referenced-by should resolve through $ref wrapper to Pet")
+
+	// Via should be the structural edge kind (property, items, etc.), not 'ref'
+	// Key should be the structural label (e.g. 'owner'), not the $ref URI
+	for _, row := range result.Rows {
+		from := oq.FieldValuePublic(row, "from", g)
+		name := oq.FieldValuePublic(row, "name", g)
+		assert.Equal(t, name.Str, from.Str, "from should match the resolved node name")
+
+		via := oq.FieldValuePublic(row, "via", g)
+		assert.NotEqual(t, "ref", via.Str, "via should be structural (property/items/allOf), not 'ref'")
+
+		key := oq.FieldValuePublic(row, "key", g)
+		assert.NotContains(t, key.Str, "#/components", "key should be structural label, not $ref URI")
+	}
+}
+
+func TestExecute_ParentStructural_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Get properties of Pet, then navigate to parent — should return Pet
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | properties | parent`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "parent of Pet's properties should return results")
+
+	names := collectNames(result, g)
+	assert.Contains(t, names, "Pet", "parent of Pet's properties should be Pet")
+}
+
+func TestExecute_AncestorsDepthLimited_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Address is referenced by Owner (1 hop), and Owner is referenced by Pet (2 hops).
+	// ancestors(1) should include only the immediate referrers.
+	result1, err := oq.Execute(`schemas | select(is_component) | select(name == "Address") | ancestors(1)`, g)
+	require.NoError(t, err)
+
+	// Full ancestors (unlimited) should include more.
+	resultAll, err := oq.Execute(`schemas | select(is_component) | select(name == "Address") | ancestors`, g)
+	require.NoError(t, err)
+
+	// Depth-limited result should have fewer or equal rows
+	assert.LessOrEqual(t, len(result1.Rows), len(resultAll.Rows),
+		"ancestors(1) should return <= ancestors")
+	assert.NotEmpty(t, result1.Rows, "Address should have at least one ancestor at depth 1")
+}
+
+func TestExecute_BFSDepthField_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// descendants(2) should populate bfs_depth on result rows
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | descendants(2)`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	for _, row := range result.Rows {
+		d := oq.FieldValuePublic(row, "bfs_depth", g)
+		assert.Equal(t, expr.KindInt, d.Kind, "bfs_depth should be an int")
+		assert.True(t, d.Int >= 1 && d.Int <= 2, "bfs_depth should be between 1 and 2")
+	}
+}
+
+func TestExecute_TargetField_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// references from Pet should have target == "Pet" (the seed)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | references`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	for _, row := range result.Rows {
+		target := oq.FieldValuePublic(row, "target", g)
+		assert.Equal(t, "Pet", target.Str, "target should be the seed schema name")
+	}
+}
+
+func TestExecute_AncestorsDepthBFSDepth_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// ancestors(2) on Address should populate bfs_depth
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Address") | ancestors(2)`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	for _, row := range result.Rows {
+		d := oq.FieldValuePublic(row, "bfs_depth", g)
+		assert.Equal(t, expr.KindInt, d.Kind, "bfs_depth should be an int")
+		assert.True(t, d.Int >= 1 && d.Int <= 2, "bfs_depth should be between 1 and 2")
+		target := oq.FieldValuePublic(row, "target", g)
+		assert.Equal(t, "Address", target.Str, "target should be Address")
+	}
+}
+
+func TestParse_AncestorsDepth_Success(t *testing.T) {
+	t.Parallel()
+	stages, err := oq.Parse("schemas | ancestors(3)")
+	require.NoError(t, err)
+	assert.Len(t, stages, 2)
+	assert.Equal(t, 3, stages[1].Limit)
+}
+
+// --- Coverage boost tests ---
+
+func TestExecute_SchemaContentFields_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test all schema content fields against Pet (has required, properties, type=object)
+	fields := []struct {
+		field   string
+		notNull bool
+	}{
+		{"description", false},
+		{"has_description", true},
+		{"title", false},
+		{"has_title", true},
+		{"format", false},
+		{"pattern", false},
+		{"nullable", true},
+		{"read_only", true},
+		{"write_only", true},
+		{"deprecated", true},
+		{"unique_items", true},
+		{"has_discriminator", true},
+		{"discriminator_property", false},
+		{"discriminator_mapping_count", true},
+		{"required", true},
+		{"required_count", true},
+		{"enum", true},
+		{"enum_count", true},
+		{"has_default", true},
+		{"has_example", true},
+		{"minimum", false},
+		{"maximum", false},
+		{"min_length", false},
+		{"max_length", false},
+		{"min_items", false},
+		{"max_items", false},
+		{"min_properties", false},
+		{"max_properties", false},
+		{"extension_count", true},
+		{"content_encoding", false},
+		{"content_media_type", false},
+	}
+
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet")`, g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 1)
+
+	for _, f := range fields {
+		v := oq.FieldValuePublic(result.Rows[0], f.field, g)
+		if f.notNull {
+			assert.NotEqual(t, expr.KindNull, v.Kind, "field %q should not be null", f.field)
+		}
+	}
+
+	// Pet has required: [id, name]
+	reqCount := oq.FieldValuePublic(result.Rows[0], "required_count", g)
+	assert.Equal(t, 2, reqCount.Int)
+
+	reqArr := oq.FieldValuePublic(result.Rows[0], "required", g)
+	assert.Equal(t, expr.KindArray, reqArr.Kind)
+	assert.Contains(t, reqArr.Arr, "id")
+	assert.Contains(t, reqArr.Arr, "name")
+}
+
+func TestExecute_OperationContentFields_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test operation content fields
+	result, err := oq.Execute(`operations | select(operation_id == "showPetById")`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+
+	row := result.Rows[0]
+	// showPetById has a default error response
+	hasErr := oq.FieldValuePublic(row, "has_error_response", g)
+	assert.True(t, hasErr.Bool, "showPetById should have error response")
+
+	respCount := oq.FieldValuePublic(row, "response_count", g)
+	assert.Positive(t, respCount.Int, "should have responses")
+
+	hasBody := oq.FieldValuePublic(row, "has_request_body", g)
+	assert.False(t, hasBody.Bool, "GET should not have request body")
+
+	secCount := oq.FieldValuePublic(row, "security_count", g)
+	assert.Equal(t, expr.KindInt, secCount.Kind)
+
+	tags := oq.FieldValuePublic(row, "tags", g)
+	assert.Equal(t, expr.KindArray, tags.Kind)
+
+	// createPet has a request body
+	result2, err := oq.Execute(`operations | select(operation_id == "createPet")`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result2.Rows)
+	hasBody2 := oq.FieldValuePublic(result2.Rows[0], "has_request_body", g)
+	assert.True(t, hasBody2.Bool, "createPet should have request body")
+}
+
+func TestExecute_ComponentSources_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test all component source stages
+	sources := []struct {
+		query    string
+		hasRows  bool
+		rowField string
+	}{
+		{`components.parameters | pick name`, true, "name"},
+		{`components.responses | pick name`, true, "name"},
+		{`components.security-schemes | pick name`, true, "name"},
+		// No request-bodies or headers in components in our fixture
+		{`components.request-bodies`, false, ""},
+		{`components.headers`, false, ""},
+	}
+
+	for _, s := range sources {
+		t.Run(s.query, func(t *testing.T) {
+			t.Parallel()
+			result, err := oq.Execute(s.query, g)
+			require.NoError(t, err)
+			if s.hasRows {
+				assert.NotEmpty(t, result.Rows, "should have rows for %s", s.query)
+			}
+		})
+	}
+}
+
+func TestExecute_ComponentParameterFields_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`components.parameters | pick name`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+
+	row := result.Rows[0]
+	// LimitParam: name=limit, in=query
+	name := oq.FieldValuePublic(row, "name", g)
+	assert.Equal(t, "LimitParam", name.Str)
+
+	in := oq.FieldValuePublic(row, "in", g)
+	assert.Equal(t, "query", in.Str)
+
+	hasSch := oq.FieldValuePublic(row, "has_schema", g)
+	assert.True(t, hasSch.Bool)
+
+	op := oq.FieldValuePublic(row, "operation", g)
+	assert.Empty(t, op.Str, "component param has no operation")
+}
+
+func TestExecute_ComponentResponseFields_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`components.responses`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+
+	row := result.Rows[0]
+	name := oq.FieldValuePublic(row, "name", g)
+	assert.Equal(t, "NotFound", name.Str)
+
+	desc := oq.FieldValuePublic(row, "description", g)
+	assert.Equal(t, "Resource not found", desc.Str)
+
+	ctCount := oq.FieldValuePublic(row, "content_type_count", g)
+	assert.Equal(t, 1, ctCount.Int)
+
+	hasCt := oq.FieldValuePublic(row, "has_content", g)
+	assert.True(t, hasCt.Bool)
+}
+
+func TestExecute_SecuritySchemeFields_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`components.security-schemes`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+
+	row := result.Rows[0]
+	name := oq.FieldValuePublic(row, "name", g)
+	assert.Equal(t, "bearerAuth", name.Str)
+
+	typ := oq.FieldValuePublic(row, "type", g)
+	assert.Equal(t, "http", typ.Str)
+
+	scheme := oq.FieldValuePublic(row, "scheme", g)
+	assert.Equal(t, "bearer", scheme.Str)
+
+	bf := oq.FieldValuePublic(row, "bearer_format", g)
+	assert.Equal(t, "JWT", bf.Str)
+
+	hasFlows := oq.FieldValuePublic(row, "has_flows", g)
+	assert.False(t, hasFlows.Bool)
+}
+
+func TestExecute_NavigationPipeline_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test full navigation: operation -> responses -> content-types -> schema
+	result, err := oq.Execute(`operations | select(operation_id == "listPets") | responses | content-types | schema`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "should resolve schema through navigation")
+
+	// Test request-body -> content-types
+	result2, err := oq.Execute(`operations | select(operation_id == "createPet") | request-body | content-types`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result2.Rows, "should have content types from request body")
+
+	// Content type fields
+	for _, row := range result2.Rows {
+		mt := oq.FieldValuePublic(row, "media_type", g)
+		assert.NotEmpty(t, mt.Str, "media_type should be set")
+		hasSch := oq.FieldValuePublic(row, "has_schema", g)
+		assert.Equal(t, expr.KindBool, hasSch.Kind)
+	}
+
+	// Test headers from response
+	result3, err := oq.Execute(`operations | select(operation_id == "createPet") | responses | select(status_code == "201") | headers`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result3.Rows, "201 response should have headers")
+
+	for _, row := range result3.Rows {
+		name := oq.FieldValuePublic(row, "name", g)
+		assert.NotEmpty(t, name.Str)
+	}
+
+	// Test security navigation
+	result4, err := oq.Execute(`operations | select(operation_id == "createPet") | security`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result4.Rows, "createPet should have security requirements")
+
+	for _, row := range result4.Rows {
+		sn := oq.FieldValuePublic(row, "scheme_name", g)
+		assert.NotEmpty(t, sn.Str)
+		st := oq.FieldValuePublic(row, "scheme_type", g)
+		assert.NotEmpty(t, st.Str)
+	}
+}
+
+func TestExecute_OperationBackNav_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Navigate parameters -> operation
+	result, err := oq.Execute(`operations | select(operation_id == "listPets") | parameters | operation`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "should navigate back to operation")
+
+	names := collectNames(result, g)
+	assert.Contains(t, names, "listPets")
+}
+
+func TestExecute_FieldsIntrospection_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test fields for different row types
+	queries := []struct {
+		query  string
+		expect string
+	}{
+		{"operations | fields", "method"},
+		{"schemas | select(is_component) | fields", "bfs_depth"},
+		{"schemas | select(is_component) | fields", "target"},
+		{"operations | select(operation_id == \"listPets\") | parameters | fields", "in"},
+		{"operations | select(operation_id == \"listPets\") | responses | fields", "status_code"},
+		{"operations | select(operation_id == \"createPet\") | request-body | fields", "required"},
+		{"operations | select(operation_id == \"listPets\") | responses | content-types | fields", "media_type"},
+		{"operations | select(operation_id == \"createPet\") | responses | select(status_code == \"201\") | headers | fields", "name"},
+		{"components.security-schemes | fields", "bearer_format"},
+		{"operations | select(operation_id == \"createPet\") | security | fields", "scopes"},
+	}
+
+	for _, q := range queries {
+		t.Run(q.query, func(t *testing.T) {
+			t.Parallel()
+			result, err := oq.Execute(q.query, g)
+			require.NoError(t, err)
+			assert.Contains(t, result.Explain, q.expect, "fields should include %s", q.expect)
+		})
+	}
+
+	// Group row fields
+	result, err := oq.Execute(`schemas | select(is_component) | group_by(type) | fields`, g)
+	require.NoError(t, err)
+	assert.Contains(t, result.Explain, "count")
+}
+
+func TestExecute_EdgeKinds_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Pet has property edges and Shape has oneOf edges — verify edge kind strings
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | references | pick via`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+
+	vias := make(map[string]bool)
+	for _, row := range result.Rows {
+		v := oq.FieldValuePublic(row, "via", g)
+		vias[v.Str] = true
+	}
+	assert.True(t, vias["property"], "Pet should have property edges")
+
+	// Shape has oneOf edges
+	result2, err := oq.Execute(`schemas | select(is_component) | select(name == "Shape") | references | pick via`, g)
+	require.NoError(t, err)
+	for _, row := range result2.Rows {
+		v := oq.FieldValuePublic(row, "via", g)
+		assert.Equal(t, "oneOf", v.Str)
+	}
+}
+
+func TestExecute_RowKeyDedup_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Ensure unique deduplicates across different row types
+	result, err := oq.Execute(`schemas | select(is_component) | unique | pick name`, g)
+	require.NoError(t, err)
+	names := collectNames(result, g)
+	// No duplicates
+	seen := make(map[string]bool)
+	for _, n := range names {
+		assert.False(t, seen[n], "duplicate name: %s", n)
+		seen[n] = true
+	}
+
+	// Operations unique
+	result2, err := oq.Execute(`operations | unique`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result2.Rows)
+
+	// Parameters unique
+	result3, err := oq.Execute(`operations | select(operation_id == "listPets") | parameters | unique`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result3.Rows)
+
+	// Responses unique
+	result4, err := oq.Execute(`operations | select(operation_id == "showPetById") | responses | unique`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result4.Rows)
+
+	// Content-types unique
+	result5, err := oq.Execute(`operations | select(operation_id == "createPet") | request-body | content-types | unique`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result5.Rows)
+
+	// Headers unique
+	result6, err := oq.Execute(`operations | select(operation_id == "createPet") | responses | select(status_code == "201") | headers | unique`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result6.Rows)
+
+	// Security schemes unique
+	result7, err := oq.Execute(`components.security-schemes | unique`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result7.Rows)
+
+	// Security requirements unique
+	result8, err := oq.Execute(`operations | select(operation_id == "createPet") | security | unique`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result8.Rows)
+}
+
+func TestExecute_RequestBodyFields_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | select(operation_id == "createPet") | request-body`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+
+	row := result.Rows[0]
+	req := oq.FieldValuePublic(row, "required", g)
+	assert.True(t, req.Bool, "createPet request body should be required")
+
+	desc := oq.FieldValuePublic(row, "description", g)
+	assert.Equal(t, expr.KindString, desc.Kind)
+
+	ctCount := oq.FieldValuePublic(row, "content_type_count", g)
+	assert.Equal(t, 2, ctCount.Int) // application/json + multipart/form-data
+
+	op := oq.FieldValuePublic(row, "operation", g)
+	assert.Equal(t, "createPet", op.Str)
+}
+
+func TestExecute_ResponseFields_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | select(operation_id == "showPetById") | responses`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+
+	// Should have 200 and default responses
+	codes := make(map[string]bool)
+	for _, row := range result.Rows {
+		sc := oq.FieldValuePublic(row, "status_code", g)
+		codes[sc.Str] = true
+		desc := oq.FieldValuePublic(row, "description", g)
+		assert.NotEmpty(t, desc.Str)
+		lc := oq.FieldValuePublic(row, "link_count", g)
+		assert.Equal(t, expr.KindInt, lc.Kind)
+		hc := oq.FieldValuePublic(row, "header_count", g)
+		assert.Equal(t, expr.KindInt, hc.Kind)
+	}
+	assert.True(t, codes["200"])
+	assert.True(t, codes["default"])
+}
+
+func TestExecute_HeaderFields_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | select(operation_id == "createPet") | responses | select(status_code == "201") | headers`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+
+	row := result.Rows[0]
+	name := oq.FieldValuePublic(row, "name", g)
+	assert.Equal(t, "X-Request-Id", name.Str)
+
+	req := oq.FieldValuePublic(row, "required", g)
+	assert.True(t, req.Bool)
+
+	hasSch := oq.FieldValuePublic(row, "has_schema", g)
+	assert.True(t, hasSch.Bool)
+
+	sc := oq.FieldValuePublic(row, "status_code", g)
+	assert.Equal(t, "201", sc.Str)
+
+	op := oq.FieldValuePublic(row, "operation", g)
+	assert.Equal(t, "createPet", op.Str)
+}
+
+func TestExecute_ContentTypeFields_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | select(operation_id == "createPet") | responses | select(status_code == "201") | content-types`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+
+	row := result.Rows[0]
+	mt := oq.FieldValuePublic(row, "media_type", g)
+	assert.Equal(t, "application/json", mt.Str)
+
+	hasSch := oq.FieldValuePublic(row, "has_schema", g)
+	assert.True(t, hasSch.Bool)
+
+	hasEnc := oq.FieldValuePublic(row, "has_encoding", g)
+	assert.Equal(t, expr.KindBool, hasEnc.Kind)
+
+	hasEx := oq.FieldValuePublic(row, "has_example", g)
+	assert.Equal(t, expr.KindBool, hasEx.Kind)
+
+	sc := oq.FieldValuePublic(row, "status_code", g)
+	assert.Equal(t, "201", sc.Str)
+
+	op := oq.FieldValuePublic(row, "operation", g)
+	assert.Equal(t, "createPet", op.Str)
+}
+
+func TestExecute_SecurityRequirementFields_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | select(operation_id == "createPet") | security`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+
+	row := result.Rows[0]
+	sn := oq.FieldValuePublic(row, "scheme_name", g)
+	assert.Equal(t, "bearerAuth", sn.Str)
+
+	st := oq.FieldValuePublic(row, "scheme_type", g)
+	assert.Equal(t, "http", st.Str)
+
+	scopes := oq.FieldValuePublic(row, "scopes", g)
+	assert.Equal(t, expr.KindArray, scopes.Kind)
+
+	scopeCount := oq.FieldValuePublic(row, "scope_count", g)
+	assert.Equal(t, expr.KindInt, scopeCount.Kind)
+
+	op := oq.FieldValuePublic(row, "operation", g)
+	assert.Equal(t, "createPet", op.Str)
+}
+
+func TestExecute_ParameterFields_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | select(operation_id == "listPets") | parameters`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+
+	// Find the deprecated "format" parameter
+	for _, row := range result.Rows {
+		name := oq.FieldValuePublic(row, "name", g)
+		if name.Str == "format" {
+			dep := oq.FieldValuePublic(row, "deprecated", g)
+			assert.True(t, dep.Bool, "format param should be deprecated")
+		}
+		in := oq.FieldValuePublic(row, "in", g)
+		assert.Equal(t, "query", in.Str)
+
+		req := oq.FieldValuePublic(row, "required", g)
+		assert.Equal(t, expr.KindBool, req.Kind)
+
+		style := oq.FieldValuePublic(row, "style", g)
+		assert.Equal(t, expr.KindString, style.Kind)
+
+		explode := oq.FieldValuePublic(row, "explode", g)
+		assert.Equal(t, expr.KindBool, explode.Kind)
+
+		aev := oq.FieldValuePublic(row, "allow_empty_value", g)
+		assert.Equal(t, expr.KindBool, aev.Kind)
+
+		ar := oq.FieldValuePublic(row, "allow_reserved", g)
+		assert.Equal(t, expr.KindBool, ar.Kind)
+
+		op := oq.FieldValuePublic(row, "operation", g)
+		assert.Equal(t, "listPets", op.Str)
+	}
+}
+
+func TestExecute_SchemaFromNavRows_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Extract schema from parameter
+	result, err := oq.Execute(`operations | select(operation_id == "listPets") | parameters | select(name == "limit") | schema`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "should extract schema from parameter")
+
+	// Extract schema from header
+	result2, err := oq.Execute(`operations | select(operation_id == "createPet") | responses | select(status_code == "201") | headers | schema`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result2.Rows, "should extract schema from header")
+}
+
+func TestExecute_KindField_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test kind field for different row types
+	result, err := oq.Execute(`schemas | select(is_component) | first(1)`, g)
+	require.NoError(t, err)
+	kind := oq.FieldValuePublic(result.Rows[0], "kind", g)
+	assert.Equal(t, "schema", kind.Str)
+
+	result2, err := oq.Execute(`operations | first(1)`, g)
+	require.NoError(t, err)
+	kind2 := oq.FieldValuePublic(result2.Rows[0], "kind", g)
+	assert.Equal(t, "operation", kind2.Str)
+
+	result3, err := oq.Execute(`operations | select(operation_id == "listPets") | parameters | first(1)`, g)
+	require.NoError(t, err)
+	kind3 := oq.FieldValuePublic(result3.Rows[0], "kind", g)
+	assert.Equal(t, "parameter", kind3.Str)
+
+	result4, err := oq.Execute(`operations | select(operation_id == "listPets") | responses | first(1)`, g)
+	require.NoError(t, err)
+	kind4 := oq.FieldValuePublic(result4.Rows[0], "kind", g)
+	assert.Equal(t, "response", kind4.Str)
+
+	result5, err := oq.Execute(`operations | select(operation_id == "createPet") | request-body`, g)
+	require.NoError(t, err)
+	kind5 := oq.FieldValuePublic(result5.Rows[0], "kind", g)
+	assert.Equal(t, "request-body", kind5.Str)
+
+	result6, err := oq.Execute(`operations | select(operation_id == "listPets") | responses | content-types | first(1)`, g)
+	require.NoError(t, err)
+	kind6 := oq.FieldValuePublic(result6.Rows[0], "kind", g)
+	assert.Equal(t, "content-type", kind6.Str)
+
+	result7, err := oq.Execute(`operations | select(operation_id == "createPet") | responses | select(status_code == "201") | headers | first(1)`, g)
+	require.NoError(t, err)
+	kind7 := oq.FieldValuePublic(result7.Rows[0], "kind", g)
+	assert.Equal(t, "header", kind7.Str)
+
+	result8, err := oq.Execute(`components.security-schemes | first(1)`, g)
+	require.NoError(t, err)
+	kind8 := oq.FieldValuePublic(result8.Rows[0], "kind", g)
+	assert.Equal(t, "security-scheme", kind8.Str)
+
+	result9, err := oq.Execute(`operations | select(operation_id == "createPet") | security | first(1)`, g)
+	require.NoError(t, err)
+	kind9 := oq.FieldValuePublic(result9.Rows[0], "kind", g)
+	assert.Equal(t, "security-requirement", kind9.Str)
+}
+
+func TestExecute_IncludeAndDef_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test include with nonexistent file (covers include error path)
+	_, err := oq.Execute(`include "nonexistent.oq"; schemas`, g)
+	require.Error(t, err, "include of nonexistent file should fail")
+
+	// Test def expansion in non-source position
+	result, err := oq.Execute(`def top3: sort_by(depth; desc) | first(3); schemas | select(is_component) | top3`, g)
+	require.NoError(t, err)
+	assert.Len(t, result.Rows, 3)
+}
+
+func TestExecute_EmitYAML_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test emit on schemas
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | emit`, g)
+	require.NoError(t, err)
+	assert.True(t, result.EmitYAML, "emit should set EmitYAML flag")
+
+	// FormatYAML should produce output
+	output := oq.FormatYAML(result, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, output, "YAML output should not be empty")
+	assert.Contains(t, output, "type", "YAML should contain schema content")
+
+	// Test emit on operations
+	result2, err := oq.Execute(`operations | select(operation_id == "listPets") | emit`, g)
+	require.NoError(t, err)
+	output2 := oq.FormatYAML(result2, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, output2)
+
+	// Test emit on navigation rows (parameters, responses, etc.)
+	result3, err := oq.Execute(`operations | select(operation_id == "listPets") | parameters | emit`, g)
+	require.NoError(t, err)
+	output3 := oq.FormatYAML(result3, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, output3)
+
+	result4, err := oq.Execute(`operations | select(operation_id == "listPets") | responses | emit`, g)
+	require.NoError(t, err)
+	output4 := oq.FormatYAML(result4, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, output4)
+
+	result5, err := oq.Execute(`operations | select(operation_id == "createPet") | request-body | emit`, g)
+	require.NoError(t, err)
+	output5 := oq.FormatYAML(result5, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, output5)
+
+	result6, err := oq.Execute(`operations | select(operation_id == "listPets") | responses | content-types | emit`, g)
+	require.NoError(t, err)
+	output6 := oq.FormatYAML(result6, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, output6)
+
+	result7, err := oq.Execute(`operations | select(operation_id == "createPet") | responses | select(status_code == "201") | headers | emit`, g)
+	require.NoError(t, err)
+	output7 := oq.FormatYAML(result7, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, output7)
+
+	result8, err := oq.Execute(`components.security-schemes | emit`, g)
+	require.NoError(t, err)
+	output8 := oq.FormatYAML(result8, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, output8)
+}
+
+func TestExecute_EmitKeys_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Test emit with pick (emit keys)
+	result, err := oq.Execute(`schemas | select(is_component) | select(name == "Pet") | pick name | emit`, g)
+	require.NoError(t, err)
+	output := oq.FormatYAML(result, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, output)
+}
+
+func TestFormatTable_NavigationRows_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Parameters
+	result, err := oq.Execute(`operations | select(operation_id == "listPets") | parameters`, g)
+	require.NoError(t, err)
+	output := oq.FormatTable(result, g)
+	require.NoError(t, err)
+	assert.Contains(t, output, "limit")
+
+	// Content types
+	result2, err := oq.Execute(`operations | select(operation_id == "createPet") | request-body | content-types`, g)
+	require.NoError(t, err)
+	output2 := oq.FormatTable(result2, g)
+	require.NoError(t, err)
+	assert.Contains(t, output2, "application/json")
+
+	// Headers
+	result3, err := oq.Execute(`operations | select(operation_id == "createPet") | responses | select(status_code == "201") | headers`, g)
+	require.NoError(t, err)
+	output3 := oq.FormatTable(result3, g)
+	require.NoError(t, err)
+	assert.Contains(t, output3, "X-Request-Id")
+
+	// Security requirements
+	result4, err := oq.Execute(`operations | select(operation_id == "createPet") | security`, g)
+	require.NoError(t, err)
+	output4 := oq.FormatTable(result4, g)
+	require.NoError(t, err)
+	assert.Contains(t, output4, "bearerAuth")
+
+	// Security schemes
+	result5, err := oq.Execute(`components.security-schemes`, g)
+	require.NoError(t, err)
+	output5 := oq.FormatTable(result5, g)
+	require.NoError(t, err)
+	assert.Contains(t, output5, "bearer")
 }
 
 // collectNames extracts the "name" field from all rows in the result.

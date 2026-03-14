@@ -129,6 +129,9 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		}
 		return execTraversal(result, g, traverseReachable)
 	case StageAncestors:
+		if stage.Limit > 0 {
+			return execAncestorsDepth(stage.Limit, result, g)
+		}
 		return execTraversal(result, g, traverseAncestors)
 	case StageProperties:
 		return execTraversal(result, g, traverseProperties)
@@ -370,7 +373,11 @@ func execTraversal(result *Result, g *graph.SchemaGraph, fn traversalFunc) (*Res
 	out := deriveResult(result)
 	seen := make(map[string]bool)
 	for _, row := range result.Rows {
+		seedName := schemaName(row.SchemaIdx, g)
 		for _, newRow := range fn(row, g) {
+			if newRow.Target == "" {
+				newRow.Target = seedName
+			}
 			key := edgeRowKey(newRow)
 			if !seen[key] {
 				seen[key] = true
@@ -429,18 +436,55 @@ func traverseRefsIn(row Row, g *graph.SchemaGraph) []Row {
 	if row.Kind != SchemaResult {
 		return nil
 	}
-	toName := schemaName(row.SchemaIdx, g)
 	var result []Row
 	for _, edge := range g.InEdges(graph.NodeID(row.SchemaIdx)) {
+		idx := int(edge.From)
+		// Resolve through inline wrapper nodes to reach the owning component schema.
+		// Also capture the structural edge (the edge from the owner to the first
+		// intermediate node) so via/key reflect how the owner includes this reference
+		// (e.g., via=property key=owner) rather than the raw $ref edge.
+		idx, structEdge := resolveToOwner(idx, g)
+		via := edgeKindString(edge.Kind)
+		key := edge.Label
+		if structEdge != nil {
+			via = edgeKindString(structEdge.Kind)
+			key = structEdge.Label
+		}
 		result = append(result, Row{
 			Kind:      SchemaResult,
-			SchemaIdx: int(edge.From),
-			Via:       edgeKindString(edge.Kind),
-			Key:       edge.Label,
-			From:      toName,
+			SchemaIdx: idx,
+			Via:       via,
+			Key:       key,
+			From:      schemaName(idx, g),
 		})
 	}
 	return result
+}
+
+// resolveToOwner walks up through inline schema nodes via in-edges
+// until it reaches a component schema or a node with no in-edges.
+// Returns the resolved owner index and the structural edge from the owner
+// to the first intermediate node (or nil if no resolution was needed).
+func resolveToOwner(idx int, g *graph.SchemaGraph) (int, *graph.Edge) {
+	visited := make(map[int]bool)
+	var lastEdge *graph.Edge
+	for {
+		if idx < 0 || idx >= len(g.Schemas) || visited[idx] {
+			return idx, lastEdge
+		}
+		s := &g.Schemas[idx]
+		if s.IsComponent {
+			return idx, lastEdge
+		}
+		visited[idx] = true
+		inEdges := g.InEdges(graph.NodeID(idx))
+		if len(inEdges) == 0 {
+			return idx, lastEdge
+		}
+		e := inEdges[0]
+		lastEdge = &e
+		idx = int(e.From)
+	}
 }
 
 func nodeIDsToRows(ids []graph.NodeID) []Row {
@@ -467,6 +511,7 @@ func execReachableDepth(maxDepth int, result *Result, g *graph.SchemaGraph) (*Re
 		if row.Kind != SchemaResult {
 			continue
 		}
+		seedName := schemaName(row.SchemaIdx, g)
 		type entry struct {
 			id    graph.NodeID
 			depth int
@@ -481,7 +526,12 @@ func execReachableDepth(maxDepth int, result *Result, g *graph.SchemaGraph) (*Re
 			// Add to output (skip the seed itself)
 			if cur.id != graph.NodeID(row.SchemaIdx) && !seen[int(cur.id)] {
 				seen[int(cur.id)] = true
-				out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: int(cur.id)})
+				out.Rows = append(out.Rows, Row{
+					Kind:      SchemaResult,
+					SchemaIdx: int(cur.id),
+					BFSDepth:  cur.depth,
+					Target:    seedName,
+				})
 			}
 
 			if cur.depth >= maxDepth {
@@ -503,6 +553,52 @@ func traverseAncestors(row Row, g *graph.SchemaGraph) []Row {
 		return nil
 	}
 	return nodeIDsToRows(g.Ancestors(graph.NodeID(row.SchemaIdx)))
+}
+
+// execAncestorsDepth performs depth-limited incoming BFS from each seed row.
+func execAncestorsDepth(maxDepth int, result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	seen := make(map[int]bool)
+
+	for _, row := range result.Rows {
+		if row.Kind != SchemaResult {
+			continue
+		}
+		seedName := schemaName(row.SchemaIdx, g)
+		type entry struct {
+			id    graph.NodeID
+			depth int
+		}
+		queue := []entry{{id: graph.NodeID(row.SchemaIdx), depth: 0}}
+		visited := map[graph.NodeID]bool{graph.NodeID(row.SchemaIdx): true}
+
+		for len(queue) > 0 {
+			cur := queue[0]
+			queue = queue[1:]
+
+			// Add to output (skip the seed itself)
+			if cur.id != graph.NodeID(row.SchemaIdx) && !seen[int(cur.id)] {
+				seen[int(cur.id)] = true
+				out.Rows = append(out.Rows, Row{
+					Kind:      SchemaResult,
+					SchemaIdx: int(cur.id),
+					BFSDepth:  cur.depth,
+					Target:    seedName,
+				})
+			}
+
+			if cur.depth >= maxDepth {
+				continue
+			}
+			for _, edge := range g.InEdges(cur.id) {
+				if !visited[edge.From] {
+					visited[edge.From] = true
+					queue = append(queue, entry{id: edge.From, depth: cur.depth + 1})
+				}
+			}
+		}
+	}
+	return out, nil
 }
 
 func traverseProperties(row Row, g *graph.SchemaGraph) []Row {
@@ -1058,6 +1154,9 @@ func describeStage(stage Stage) string {
 		}
 		return "Traverse: all descendants (transitive closure)"
 	case StageAncestors:
+		if stage.Limit > 0 {
+			return "Traverse: ancestors within " + strconv.Itoa(stage.Limit) + " hops"
+		}
 		return "Traverse: all ancestor nodes"
 	case StageProperties:
 		return "Traverse: property children"
@@ -1100,7 +1199,7 @@ func describeStage(stage Stage) string {
 	case StageSharedRefs:
 		return "Analyze: schemas shared by all operations in result"
 	case StageParent:
-		return "Traverse: navigate back to source schema of edge annotations"
+		return "Traverse: structural parent schema (walk up JSON pointer)"
 	case StageEmit:
 		return "Emit: output raw YAML nodes from underlying spec objects"
 	case StageParameters:
@@ -1175,6 +1274,8 @@ func execFields(result *Result) (*Result, error) {
 			{"via", "string"},
 			{"key", "string"},
 			{"from", "string"},
+			{"target", "string"},
+			{"bfs_depth", "int"},
 			// Schema content
 			{"description", "string"},
 			{"has_description", "bool"},
@@ -1321,28 +1422,21 @@ func execParent(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	out := deriveResult(result)
 	seen := make(map[int]bool)
 
-	// Build name→index lookup
-	nameIdx := make(map[string]int, len(g.Schemas))
-	for i := range g.Schemas {
-		nameIdx[schemaName(i, g)] = i
-	}
-
 	for _, row := range result.Rows {
-		if row.From == "" {
+		if row.Kind != SchemaResult {
 			continue
 		}
-		idx, ok := nameIdx[row.From]
-		if !ok {
-			continue
+		// Follow in-edges to find the structural parent(s) of this schema.
+		for _, edge := range g.InEdges(graph.NodeID(row.SchemaIdx)) {
+			idx := int(edge.From)
+			if !seen[idx] {
+				seen[idx] = true
+				out.Rows = append(out.Rows, Row{
+					Kind:      SchemaResult,
+					SchemaIdx: idx,
+				})
+			}
 		}
-		if seen[idx] {
-			continue
-		}
-		seen[idx] = true
-		out.Rows = append(out.Rows, Row{
-			Kind:      SchemaResult,
-			SchemaIdx: idx,
-		})
 	}
 	return out, nil
 }

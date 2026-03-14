@@ -234,6 +234,13 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageDescendants}, nil
 
 	case "ancestors":
+		if isCall && args != "" {
+			n, err := strconv.Atoi(strings.TrimSpace(args))
+			if err != nil {
+				return Stage{}, fmt.Errorf("ancestors requires a depth number: %w", err)
+			}
+			return Stage{Kind: StageAncestors, Limit: n}, nil
+		}
 		return Stage{Kind: StageAncestors}, nil
 
 	case "properties":
