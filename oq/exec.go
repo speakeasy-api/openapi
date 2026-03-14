@@ -124,6 +124,9 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 	case StageRefsIn:
 		return execTraversal(result, g, traverseRefsIn)
 	case StageReachable:
+		if stage.Limit > 0 {
+			return execReachableDepth(stage.Limit, result, g)
+		}
 		return execTraversal(result, g, traverseReachable)
 	case StageAncestors:
 		return execTraversal(result, g, traverseAncestors)
@@ -453,6 +456,46 @@ func traverseReachable(row Row, g *graph.SchemaGraph) []Row {
 		return nil
 	}
 	return nodeIDsToRows(g.Reachable(graph.NodeID(row.SchemaIdx)))
+}
+
+// execReachableDepth performs depth-limited outgoing BFS from each seed row.
+func execReachableDepth(maxDepth int, result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	seen := make(map[int]bool)
+
+	for _, row := range result.Rows {
+		if row.Kind != SchemaResult {
+			continue
+		}
+		type entry struct {
+			id    graph.NodeID
+			depth int
+		}
+		queue := []entry{{id: graph.NodeID(row.SchemaIdx), depth: 0}}
+		visited := map[graph.NodeID]bool{graph.NodeID(row.SchemaIdx): true}
+
+		for len(queue) > 0 {
+			cur := queue[0]
+			queue = queue[1:]
+
+			// Add to output (skip the seed itself)
+			if cur.id != graph.NodeID(row.SchemaIdx) && !seen[int(cur.id)] {
+				seen[int(cur.id)] = true
+				out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: int(cur.id)})
+			}
+
+			if cur.depth >= maxDepth {
+				continue
+			}
+			for _, edge := range g.OutEdges(cur.id) {
+				if !visited[edge.To] {
+					visited[edge.To] = true
+					queue = append(queue, entry{id: edge.To, depth: cur.depth + 1})
+				}
+			}
+		}
+	}
+	return out, nil
 }
 
 func traverseAncestors(row Row, g *graph.SchemaGraph) []Row {
@@ -974,6 +1017,9 @@ func describeStage(stage Stage) string {
 	case StageRefsIn:
 		return "Traverse: incoming references"
 	case StageReachable:
+		if stage.Limit > 0 {
+			return "Traverse: reachable nodes within " + strconv.Itoa(stage.Limit) + " hops"
+		}
 		return "Traverse: all reachable nodes"
 	case StageAncestors:
 		return "Traverse: all ancestor nodes"

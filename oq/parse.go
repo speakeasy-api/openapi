@@ -224,6 +224,14 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageRefsIn}, nil
 
 	case "reachable":
+		if isCall && args != "" {
+			n, err := strconv.Atoi(strings.TrimSpace(args))
+			if err != nil {
+				return Stage{}, fmt.Errorf("reachable requires a depth number: %w", err)
+			}
+			return Stage{Kind: StageReachable, Limit: n}, nil
+		}
+		// bare reachable = unlimited depth (-1 sentinel not needed; Limit 0 = unlimited)
 		return Stage{Kind: StageReachable}, nil
 
 	case "ancestors":
