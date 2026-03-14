@@ -572,9 +572,9 @@ func emitKey(row Row, g *graph.SchemaGraph) string {
 	case ParameterResult:
 		op := operationName(row.SourceOpIdx, g)
 		if op != "" {
-			return op + "/parameters/" + row.ParamName
+			return op + "/parameters/" + row.ComponentKey
 		}
-		return row.ParamName
+		return row.ComponentKey
 	case HeaderResult:
 		op := operationName(row.SourceOpIdx, g)
 		if op != "" {

@@ -204,7 +204,12 @@ func parseStage(s string) (Stage, error) {
 			if args == "" {
 				return Stage{}, errors.New("group_by requires a field name")
 			}
-			fields := parseCSV(args)
+			// Support group_by(field; name_field) with semicolon separator
+			parts := splitSemicolonArgs(args)
+			fields := parseCSV(parts[0])
+			if len(parts) >= 2 {
+				fields = append(fields, strings.TrimSpace(parts[1]))
+			}
 			return Stage{Kind: StageGroupBy, Fields: fields}, nil
 		}
 		return Stage{}, errors.New("group_by requires parentheses: group_by(field)")

@@ -56,7 +56,7 @@ type Row struct {
 	StatusCode    string   // propagated from response rows to content-types/headers
 	MediaTypeName string   // media type key (e.g., "application/json")
 	HeaderName    string   // header name
-	ParamName     string   // parameter name
+	ComponentKey  string   // component key name or parameter name
 	SchemeName    string   // security scheme name
 	Scopes        []string // security requirement scopes
 	SourceOpIdx   int      // operation this row originated from (-1 if N/A)

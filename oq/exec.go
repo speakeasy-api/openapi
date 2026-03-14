@@ -311,6 +311,11 @@ func execGroupBy(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, er
 		return nil, errors.New("group-by requires at least one field")
 	}
 	field := stage.Fields[0]
+	// Optional second field specifies which field to collect as group names (default: "name")
+	nameField := "name"
+	if len(stage.Fields) >= 2 {
+		nameField = stage.Fields[1]
+	}
 
 	type group struct {
 		count int
@@ -329,7 +334,7 @@ func execGroupBy(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, er
 			order = append(order, key)
 		}
 		grp.count++
-		nameV := fieldValue(row, "name", g)
+		nameV := fieldValue(row, nameField, g)
 		grp.names = append(grp.names, valueToString(nameV))
 	}
 
@@ -1319,11 +1324,11 @@ func execParameters(result *Result, g *graph.SchemaGraph) (*Result, error) {
 				continue
 			}
 			out.Rows = append(out.Rows, Row{
-				Kind:        ParameterResult,
-				Parameter:   p,
-				ParamName:   p.Name,
-				SourceOpIdx: row.OpIdx,
-				OpIdx:       row.OpIdx,
+				Kind:         ParameterResult,
+				Parameter:    p,
+				ComponentKey: p.Name,
+				SourceOpIdx:  row.OpIdx,
+				OpIdx:        row.OpIdx,
 			})
 		}
 	}
@@ -1570,10 +1575,10 @@ func componentRows(g *graph.SchemaGraph, kind componentKind) []Row {
 				continue
 			}
 			rows = append(rows, Row{
-				Kind:        ParameterResult,
-				Parameter:   p,
-				ParamName:   name,
-				SourceOpIdx: -1,
+				Kind:         ParameterResult,
+				Parameter:    p,
+				ComponentKey: name,
+				SourceOpIdx:  -1,
 			})
 		}
 	case componentResponses:
@@ -1589,10 +1594,10 @@ func componentRows(g *graph.SchemaGraph, kind componentKind) []Row {
 				continue
 			}
 			rows = append(rows, Row{
-				Kind:        ResponseResult,
-				Response:    r,
-				StatusCode:  name,
-				SourceOpIdx: -1,
+				Kind:         ResponseResult,
+				Response:     r,
+				ComponentKey: name,
+				SourceOpIdx:  -1,
 			})
 		}
 	case componentRequestBodies:
@@ -1608,10 +1613,10 @@ func componentRows(g *graph.SchemaGraph, kind componentKind) []Row {
 				continue
 			}
 			rows = append(rows, Row{
-				Kind:        RequestBodyResult,
-				RequestBody: rb,
-				ParamName:   name, // reuse ParamName for component key
-				SourceOpIdx: -1,
+				Kind:         RequestBodyResult,
+				RequestBody:  rb,
+				ComponentKey: name,
+				SourceOpIdx:  -1,
 			})
 		}
 	case componentHeaders:

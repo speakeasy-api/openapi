@@ -1966,6 +1966,26 @@ func TestExecute_ComponentsResponses(t *testing.T) {
 
 	name := oq.FieldValuePublic(result.Rows[0], "name", g)
 	assert.Equal(t, "NotFound", name.Str)
+
+	// status_code should be empty for component responses (not leaked from key)
+	sc := oq.FieldValuePublic(result.Rows[0], "status_code", g)
+	assert.Empty(t, sc.Str)
+}
+
+func TestExecute_GroupByWithNameField(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// group_by(status_code; operation) collects operation names instead of status codes
+	result, err := oq.Execute("operations | responses | group_by(status_code; operation)", g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Groups)
+
+	for _, grp := range result.Groups {
+		for _, n := range grp.Names {
+			assert.NotEqual(t, grp.Key, n, "group names should be operation names, not status codes")
+		}
+	}
 }
 
 func TestExecute_DeprecatedParameters(t *testing.T) {

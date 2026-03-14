@@ -9,7 +9,7 @@ Tested against:
 
 ### B1: `unique` doesn't work after `pick` on navigation rows
 
-**Severity:** High — fundamental usability issue
+**Severity:** High — fundamental usability issue — **FIXED**
 
 `unique` deduplicates by `rowKey()`, which includes the full context (OpIdx,
 StatusCode, MediaTypeName). After `pick media_type`, the user expects dedup by
@@ -31,7 +31,7 @@ falling back to `rowKey` when no projection is active.
 
 ### B2: `schema` stage returns `$ref` wrapper nodes, not resolved components
 
-**Severity:** High — the bridge between navigation and graph is broken for `$ref` schemas
+**Severity:** High — the bridge between navigation and graph is broken for `$ref` schemas — **FIXED**
 
 When a content-type's schema is `{"$ref": "#/components/schemas/Foo"}`, the
 `schema` stage returns the inline `$ref` wrapper node, not the `Foo` component.
@@ -53,7 +53,7 @@ exec.go) to follow `$ref` edges to the actual component schema.
 
 ### B3: `security` stage ignores global security
 
-**Severity:** Medium — misses the primary security model for many APIs
+**Severity:** Medium — misses the primary security model for many APIs — **FIXED**
 
 The `security` stage only reads `op.Operation.Security` (per-operation).
 Many APIs (GitHub, Stripe, etc.) define security at the root level:
@@ -77,7 +77,7 @@ means "no security" and should correctly return 0.
 
 ### B4: `components.responses` uses `StatusCode` field for component key name
 
-**Severity:** Low — semantically misleading field name
+**Severity:** Low — semantically misleading field name — **FIXED**
 
 Component responses are keyed by name (e.g., "NotFound", "ValidationError"),
 not by status code. The `StatusCode` field is repurposed to store the component
@@ -117,7 +117,7 @@ type-incompatible stage chains.
 
 ### D2: `group_by` on nav rows produces unhelpful `names` values
 
-**Severity:** Low — cosmetic
+**Severity:** Low — cosmetic — **FIXED**
 
 ```
 operations | responses | group_by(status_code)
@@ -135,7 +135,7 @@ group names, or making the grouped field configurable.
 
 ### D3: `emit` key for response rows is just the status code
 
-**Severity:** Low — limited usefulness
+**Severity:** Low — limited usefulness — **FIXED**
 
 ```
 operations | first(1) | responses | first(1) | emit

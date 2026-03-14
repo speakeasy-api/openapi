@@ -153,7 +153,7 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		}
 		switch name {
 		case "name":
-			return expr.StringVal(row.ParamName)
+			return expr.StringVal(row.ComponentKey)
 		case "in":
 			return expr.StringVal(string(p.In))
 		case "required":
@@ -184,7 +184,12 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.NullVal()
 		}
 		switch name {
-		case "status_code", "name":
+		case "status_code":
+			return expr.StringVal(row.StatusCode)
+		case "name":
+			if row.ComponentKey != "" {
+				return expr.StringVal(row.ComponentKey)
+			}
 			return expr.StringVal(row.StatusCode)
 		case "description":
 			return expr.StringVal(r.Description)
@@ -206,6 +211,9 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		}
 		switch name {
 		case "name":
+			if row.ComponentKey != "" {
+				return expr.StringVal(row.ComponentKey)
+			}
 			return expr.StringVal("request-body")
 		case "description":
 			return expr.StringVal(rb.GetDescription())
@@ -560,7 +568,7 @@ func rowKey(row Row) string {
 	case GroupRowResult:
 		return "g:" + row.GroupKey
 	case ParameterResult:
-		return "p:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.ParamName
+		return "p:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.ComponentKey
 	case ResponseResult:
 		return "r:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.StatusCode
 	case RequestBodyResult:
