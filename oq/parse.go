@@ -448,7 +448,9 @@ func findUnquotedSemicolon(s string) int {
 	for i := 0; i < len(s); i++ {
 		ch := s[i]
 		if quoteChar != 0 {
-			if ch == quoteChar {
+			if ch == '\\' && i+1 < len(s) {
+				i++ // skip escaped character
+			} else if ch == quoteChar {
 				quoteChar = 0
 			}
 			continue
@@ -494,7 +496,9 @@ func splitKeywordCall(s string) (string, string, bool) {
 	for i := 0; i < len(rest); i++ {
 		ch := rest[i]
 		if quoteChar != 0 {
-			if ch == quoteChar {
+			if ch == '\\' && i+1 < len(rest) {
+				i++ // skip escaped character
+			} else if ch == quoteChar {
 				quoteChar = 0
 			}
 			continue

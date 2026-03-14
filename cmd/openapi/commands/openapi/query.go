@@ -19,43 +19,6 @@ var queryCmd = &cobra.Command{
 	Long: `Query an OpenAPI specification using the oq pipeline language to answer
 structural and semantic questions about schemas and operations.
 
-The query argument comes first, followed by an optional input file. If no file
-is given, reads from stdin.
-
-Examples:
-  # Deeply nested components (jq-style syntax)
-  openapi spec query 'schemas.components | sort_by(depth; desc) | first(10) | pick name, depth' petstore.yaml
-
-  # Pipe from stdin
-  cat spec.yaml | openapi spec query 'schemas | length'
-
-  # Explicit stdin
-  openapi spec query 'schemas | length' -
-
-  # Filter with select()
-  openapi spec query 'schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)' petstore.yaml
-
-  # Dead components (no incoming references)
-  openapi spec query 'schemas.components | select(in_degree == 0) | pick name' petstore.yaml
-
-  # Variable binding — exclude seed from reachable results
-  openapi spec query 'schemas | select(name == "Pet") | let $pet = name | reachable | select(name != $pet)' petstore.yaml
-
-  # User-defined functions
-  openapi spec query 'def hot: select(in_degree > 5); schemas.components | hot | pick name' petstore.yaml
-
-  # Alternative operator — fallback for null/falsy values
-  openapi spec query 'schemas | select(name // "none" != "none")' petstore.yaml
-
-  # If-then-else conditional
-  openapi spec query 'schemas | select(if is_component then depth > 3 else true end)' petstore.yaml
-
-  # Blast radius
-  openapi spec query 'schemas.components | select(name == "Error") | blast-radius | length' petstore.yaml
-
-  # Explain a query plan
-  openapi spec query 'schemas.components | select(depth > 5) | sort_by(depth; desc) | explain' petstore.yaml
-
 Pipeline stages (jq-style):
   Source:     schemas, schemas.components, schemas.inline, operations
   Traversal:  refs-out, refs-in, reachable, ancestors, properties, union-members, items,
@@ -72,6 +35,23 @@ Expression operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches,
                       if-then-else-end, string interpolation \(expr)
 
 For the full query language reference, run: openapi spec query-reference`,
+	Example: `  # Deeply nested components
+  openapi spec query 'schemas.components | sort_by(depth; desc) | first(10) | pick name, depth' petstore.yaml
+
+  # Pipe from stdin
+  cat spec.yaml | openapi spec query 'schemas | length'
+
+  # Filter with select()
+  openapi spec query 'schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)' petstore.yaml
+
+  # Dead components (no incoming references)
+  openapi spec query 'schemas.components | select(in_degree == 0) | pick name' petstore.yaml
+
+  # Blast radius
+  openapi spec query 'schemas.components | select(name == "Error") | blast-radius | length' petstore.yaml
+
+  # Explain a query plan
+  openapi spec query 'schemas.components | select(depth > 5) | sort_by(depth; desc) | explain' petstore.yaml`,
 	Args: queryArgs(),
 	Run:  runQuery,
 }

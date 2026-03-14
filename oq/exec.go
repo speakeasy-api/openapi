@@ -13,6 +13,15 @@ import (
 	"github.com/speakeasy-api/openapi/oq/expr"
 )
 
+// deriveResult creates a new Result that inherits metadata (Fields, FormatHint, EmitYAML) from a parent.
+func deriveResult(parent *Result) *Result {
+	return &Result{
+		Fields:     parent.Fields,
+		FormatHint: parent.FormatHint,
+		EmitYAML:   parent.EmitYAML,
+	}
+}
+
 func run(stages []Stage, g *graph.SchemaGraph) (*Result, error) {
 	if len(stages) == 0 {
 		return &Result{}, nil
@@ -182,11 +191,7 @@ func execWhere(stage Stage, result *Result, g *graph.SchemaGraph, env map[string
 		return nil, fmt.Errorf("where expression error: %w", err)
 	}
 
-	filtered := &Result{
-		Fields:     result.Fields,
-		FormatHint: result.FormatHint,
-		EmitYAML:   result.EmitYAML,
-	}
+	filtered := deriveResult(result)
 	for _, row := range result.Rows {
 		r := rowAdapter{row: row, g: g, env: env}
 		val := predicate.Eval(r)
@@ -202,12 +207,9 @@ func execLast(stage Stage, result *Result) (*Result, error) {
 	if stage.Limit < len(rows) {
 		rows = rows[len(rows)-stage.Limit:]
 	}
-	return &Result{
-		Fields:     result.Fields,
-		FormatHint: result.FormatHint,
-		EmitYAML:   result.EmitYAML,
-		Rows:       slices.Clone(rows),
-	}, nil
+	out := deriveResult(result)
+	out.Rows = slices.Clone(rows)
+	return out, nil
 }
 
 func execLet(stage Stage, result *Result, g *graph.SchemaGraph, env map[string]expr.Value) (*Result, map[string]expr.Value, error) {
@@ -234,12 +236,8 @@ func execLet(stage Stage, result *Result, g *graph.SchemaGraph, env map[string]e
 }
 
 func execSort(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
-	sorted := &Result{
-		Fields:     result.Fields,
-		FormatHint: result.FormatHint,
-		EmitYAML:   result.EmitYAML,
-		Rows:       slices.Clone(result.Rows),
-	}
+	sorted := deriveResult(result)
+	sorted.Rows = slices.Clone(result.Rows)
 	sort.SliceStable(sorted.Rows, func(i, j int) bool {
 		vi := fieldValue(sorted.Rows[i], stage.SortField, g)
 		vj := fieldValue(sorted.Rows[j], stage.SortField, g)
@@ -258,21 +256,14 @@ func execTake(stage Stage, result *Result) (*Result, error) {
 	if stage.Limit < len(rows) {
 		rows = rows[:stage.Limit]
 	}
-	return &Result{
-		Fields:     result.Fields,
-		FormatHint: result.FormatHint,
-		EmitYAML:   result.EmitYAML,
-		Rows:       slices.Clone(rows),
-	}, nil
+	out := deriveResult(result)
+	out.Rows = slices.Clone(rows)
+	return out, nil
 }
 
 func execUnique(result *Result) (*Result, error) {
 	seen := make(map[string]bool)
-	filtered := &Result{
-		Fields:     result.Fields,
-		FormatHint: result.FormatHint,
-		EmitYAML:   result.EmitYAML,
-	}
+	filtered := deriveResult(result)
 	for _, row := range result.Rows {
 		key := rowKey(row)
 		if !seen[key] {
@@ -310,7 +301,7 @@ func execGroupBy(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, er
 		grp.names = append(grp.names, valueToString(nameV))
 	}
 
-	grouped := &Result{Fields: result.Fields}
+	grouped := deriveResult(result)
 	for _, key := range order {
 		grp, ok := groups[key]
 		if !ok {
@@ -336,7 +327,7 @@ func execGroupBy(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, er
 type traversalFunc func(row Row, g *graph.SchemaGraph) []Row
 
 func execTraversal(result *Result, g *graph.SchemaGraph, fn traversalFunc) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	seen := make(map[string]bool)
 	for _, row := range result.Rows {
 		for _, newRow := range fn(row, g) {
@@ -501,7 +492,7 @@ func resolveRefTarget(idx int, g *graph.SchemaGraph) int {
 }
 
 func execSchemasToOps(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	seen := make(map[int]bool)
 	for _, row := range result.Rows {
 		if row.Kind != SchemaResult {
@@ -520,7 +511,7 @@ func execSchemasToOps(result *Result, g *graph.SchemaGraph) (*Result, error) {
 }
 
 func execOpsToSchemas(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	seen := make(map[int]bool)
 	for _, row := range result.Rows {
 		if row.Kind != OperationResult {
@@ -553,7 +544,7 @@ func execConnected(result *Result, g *graph.SchemaGraph) (*Result, error) {
 
 	schemas, ops := g.ConnectedComponent(schemaSeeds, opSeeds)
 
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	for _, id := range schemas {
 		out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: int(id)})
 	}
@@ -564,7 +555,7 @@ func execConnected(result *Result, g *graph.SchemaGraph) (*Result, error) {
 }
 
 func execBlastRadius(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	seenSchemas := make(map[int]bool)
 	seenOps := make(map[int]bool)
 
@@ -610,7 +601,7 @@ func execBlastRadius(result *Result, g *graph.SchemaGraph) (*Result, error) {
 }
 
 func execNeighbors(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	seen := make(map[int]bool)
 
 	for _, row := range result.Rows {
@@ -634,7 +625,7 @@ func execNeighbors(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, 
 }
 
 func execOrphans(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	for _, row := range result.Rows {
 		if row.Kind != SchemaResult {
 			continue
@@ -648,7 +639,7 @@ func execOrphans(result *Result, g *graph.SchemaGraph) (*Result, error) {
 }
 
 func execLeaves(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	for _, row := range result.Rows {
 		if row.Kind != SchemaResult {
 			continue
@@ -671,7 +662,7 @@ func execCycles(result *Result, g *graph.SchemaGraph) (*Result, error) {
 		}
 	}
 
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	for i, scc := range sccs {
 		hasMatch := false
 		for _, id := range scc {
@@ -725,7 +716,7 @@ func execClusters(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	// through intermediary nodes like $ref wrappers) but only collect
 	// nodes that are in the result set.
 	assigned := make(map[int]bool) // result nodes already assigned to a cluster
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	clusterNum := 0
 
 	for _, idx := range sortedNodes {
@@ -791,7 +782,7 @@ func execClusters(result *Result, g *graph.SchemaGraph) (*Result, error) {
 }
 
 func execTagBoundary(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	for _, row := range result.Rows {
 		if row.Kind != SchemaResult {
 			continue
@@ -827,7 +818,7 @@ func execSharedRefs(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	}
 
 	if len(ops) == 0 {
-		return &Result{Fields: result.Fields}, nil
+		return deriveResult(result), nil
 	}
 
 	// Start with first operation's schemas
@@ -856,7 +847,7 @@ func execSharedRefs(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	}
 	sort.Ints(sortedIDs)
 
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	for _, sid := range sortedIDs {
 		out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: sid})
 	}
@@ -1133,7 +1124,7 @@ func execFields(result *Result) (*Result, error) {
 // a From field naming the source node. This stage looks up those source schemas
 // by name, replacing the result set with the parent schemas.
 func execParent(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	seen := make(map[int]bool)
 
 	// Build name→index lookup
@@ -1176,7 +1167,7 @@ func execSample(stage Stage, result *Result) (*Result, error) {
 		rows[i], rows[j] = rows[j], rows[i]
 	})
 
-	out := &Result{Fields: result.Fields}
+	out := deriveResult(result)
 	out.Rows = rows[:stage.Limit]
 	return out, nil
 }
