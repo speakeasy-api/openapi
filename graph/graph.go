@@ -87,6 +87,7 @@ type OperationNode struct {
 type SchemaGraph struct {
 	Schemas    []SchemaNode
 	Operations []OperationNode
+	Index      *openapi.Index // the source index, for component/security access
 
 	outEdges map[NodeID][]Edge
 	inEdges  map[NodeID][]Edge
@@ -103,6 +104,7 @@ type SchemaGraph struct {
 // Build constructs a SchemaGraph from an openapi.Index.
 func Build(_ context.Context, idx *openapi.Index) *SchemaGraph {
 	g := &SchemaGraph{
+		Index:      idx,
 		outEdges:   make(map[NodeID][]Edge),
 		inEdges:    make(map[NodeID][]Edge),
 		ptrToNode:  make(map[*oas3.JSONSchemaReferenceable]NodeID),

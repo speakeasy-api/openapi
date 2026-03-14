@@ -256,6 +256,45 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		case "operation":
 			return expr.StringVal(operationName(row.SourceOpIdx, g))
 		}
+	case SecuritySchemeResult:
+		ss := row.SecurityScheme
+		if ss == nil {
+			return expr.NullVal()
+		}
+		switch name {
+		case "name":
+			return expr.StringVal(row.SchemeName)
+		case "type":
+			return expr.StringVal(string(ss.GetType()))
+		case "in":
+			return expr.StringVal(string(ss.GetIn()))
+		case "scheme":
+			return expr.StringVal(ss.GetScheme())
+		case "bearer_format":
+			return expr.StringVal(ss.GetBearerFormat())
+		case "description":
+			return expr.StringVal(ss.GetDescription())
+		case "has_flows":
+			return expr.BoolVal(ss.GetFlows() != nil)
+		case "deprecated":
+			return expr.BoolVal(ss.Deprecated != nil && *ss.Deprecated)
+		}
+	case SecurityRequirementResult:
+		switch name {
+		case "name", "scheme_name":
+			return expr.StringVal(row.SchemeName)
+		case "scheme_type":
+			if row.SecurityScheme != nil {
+				return expr.StringVal(string(row.SecurityScheme.GetType()))
+			}
+			return expr.StringVal("")
+		case "scopes":
+			return expr.ArrayVal(row.Scopes)
+		case "scope_count":
+			return expr.IntVal(len(row.Scopes))
+		case "operation":
+			return expr.StringVal(operationName(row.SourceOpIdx, g))
+		}
 	}
 	return expr.NullVal()
 }
@@ -530,6 +569,10 @@ func rowKey(row Row) string {
 		return "ct:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.StatusCode + ":" + row.MediaTypeName
 	case HeaderResult:
 		return "h:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.StatusCode + ":" + row.HeaderName
+	case SecuritySchemeResult:
+		return "ss:" + row.SchemeName
+	case SecurityRequirementResult:
+		return "sr:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.SchemeName
 	default:
 		return "?:" + strconv.Itoa(row.OpIdx)
 	}

@@ -24,6 +24,8 @@ const (
 	RequestBodyResult
 	ContentTypeResult
 	HeaderResult
+	SecuritySchemeResult
+	SecurityRequirementResult
 )
 
 // Row represents a single result in the pipeline.
@@ -43,18 +45,21 @@ type Row struct {
 	GroupNames []string // member names
 
 	// Navigation objects (populated by navigation stages)
-	Parameter   *openapi.Parameter
-	Response    *openapi.Response
-	RequestBody *openapi.RequestBody
-	ContentType *openapi.MediaType
-	Header      *openapi.Header
+	Parameter      *openapi.Parameter
+	Response       *openapi.Response
+	RequestBody    *openapi.RequestBody
+	ContentType    *openapi.MediaType
+	Header         *openapi.Header
+	SecurityScheme *openapi.SecurityScheme
 
 	// Propagated context from parent navigation stages
-	StatusCode    string // propagated from response rows to content-types/headers
-	MediaTypeName string // media type key (e.g., "application/json")
-	HeaderName    string // header name
-	ParamName     string // parameter name
-	SourceOpIdx   int    // operation this row originated from (-1 if N/A)
+	StatusCode    string   // propagated from response rows to content-types/headers
+	MediaTypeName string   // media type key (e.g., "application/json")
+	HeaderName    string   // header name
+	ParamName     string   // parameter name
+	SchemeName    string   // security scheme name
+	Scopes        []string // security requirement scopes
+	SourceOpIdx   int      // operation this row originated from (-1 if N/A)
 }
 
 // Result is the output of a query execution.
@@ -165,6 +170,7 @@ const (
 	StageHeaders
 	StageSchema    // singular: extract schema from nav row
 	StageOperation // back-navigate to source operation
+	StageSecurity  // operation security requirements
 )
 
 // Stage represents a single stage in the query pipeline.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/graph"
 	oas3 "github.com/speakeasy-api/openapi/jsonschema/oas3"
+	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/oq/expr"
 )
 
@@ -66,6 +67,22 @@ func execSource(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 		for i := range g.Operations {
 			result.Rows = append(result.Rows, Row{Kind: OperationResult, OpIdx: i})
 		}
+	case "components.schemas":
+		for i, s := range g.Schemas {
+			if s.IsComponent {
+				result.Rows = append(result.Rows, Row{Kind: SchemaResult, SchemaIdx: i})
+			}
+		}
+	case "components.parameters":
+		result.Rows = append(result.Rows, componentRows(g, componentParameters)...)
+	case "components.responses":
+		result.Rows = append(result.Rows, componentRows(g, componentResponses)...)
+	case "components.request-bodies":
+		result.Rows = append(result.Rows, componentRows(g, componentRequestBodies)...)
+	case "components.headers":
+		result.Rows = append(result.Rows, componentRows(g, componentHeaders)...)
+	case "components.security-schemes":
+		result.Rows = append(result.Rows, componentRows(g, componentSecuritySchemes)...)
 	default:
 		return nil, fmt.Errorf("unknown source: %q", stage.Source)
 	}
@@ -180,6 +197,8 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		return execSchema(result, g)
 	case StageOperation:
 		return execOperation(result, g)
+	case StageSecurity:
+		return execSecurity(result, g)
 	default:
 		return nil, fmt.Errorf("unimplemented stage kind: %d", stage.Kind)
 	}
@@ -998,6 +1017,8 @@ func describeStage(stage Stage) string {
 		return "Navigate: extract schema from parameter, content-type, or header"
 	case StageOperation:
 		return "Navigate: back to source operation"
+	case StageSecurity:
+		return "Navigate: operation security requirements"
 	default:
 		return "Unknown stage"
 	}
@@ -1157,6 +1178,25 @@ func execFields(result *Result) (*Result, error) {
 			{"deprecated", "bool"},
 			{"has_schema", "bool"},
 			{"status_code", "string"},
+			{"operation", "string"},
+		}
+	case SecuritySchemeResult:
+		fields = []struct{ name, typ string }{
+			{"name", "string"},
+			{"type", "string"},
+			{"in", "string"},
+			{"scheme", "string"},
+			{"bearer_format", "string"},
+			{"description", "string"},
+			{"has_flows", "bool"},
+			{"deprecated", "bool"},
+		}
+	case SecurityRequirementResult:
+		fields = []struct{ name, typ string }{
+			{"scheme_name", "string"},
+			{"scheme_type", "string"},
+			{"scopes", "array"},
+			{"scope_count", "int"},
 			{"operation", "string"},
 		}
 	default:
@@ -1464,7 +1504,8 @@ func execOperation(result *Result, g *graph.SchemaGraph) (*Result, error) {
 		switch row.Kind {
 		case OperationResult:
 			opIdx = row.OpIdx
-		case ParameterResult, ResponseResult, RequestBodyResult, ContentTypeResult, HeaderResult:
+		case ParameterResult, ResponseResult, RequestBodyResult, ContentTypeResult, HeaderResult,
+			SecurityRequirementResult:
 			opIdx = row.SourceOpIdx
 		default:
 			continue
@@ -1476,4 +1517,184 @@ func execOperation(result *Result, g *graph.SchemaGraph) (*Result, error) {
 		out.Rows = append(out.Rows, Row{Kind: OperationResult, OpIdx: opIdx})
 	}
 	return out, nil
+}
+
+// --- Component sources ---
+
+type componentKind int
+
+const (
+	componentParameters componentKind = iota
+	componentResponses
+	componentRequestBodies
+	componentHeaders
+	componentSecuritySchemes
+)
+
+func componentRows(g *graph.SchemaGraph, kind componentKind) []Row {
+	if g.Index == nil || g.Index.Doc == nil {
+		return nil
+	}
+	components := g.Index.Doc.GetComponents()
+	if components == nil {
+		return nil
+	}
+
+	var rows []Row
+	switch kind {
+	case componentParameters:
+		if components.Parameters == nil {
+			return nil
+		}
+		for name, ref := range components.Parameters.All() {
+			if ref == nil {
+				continue
+			}
+			p := ref.GetObject()
+			if p == nil {
+				continue
+			}
+			rows = append(rows, Row{
+				Kind:        ParameterResult,
+				Parameter:   p,
+				ParamName:   name,
+				SourceOpIdx: -1,
+			})
+		}
+	case componentResponses:
+		if components.Responses == nil {
+			return nil
+		}
+		for name, ref := range components.Responses.All() {
+			if ref == nil {
+				continue
+			}
+			r := ref.GetObject()
+			if r == nil {
+				continue
+			}
+			rows = append(rows, Row{
+				Kind:        ResponseResult,
+				Response:    r,
+				StatusCode:  name,
+				SourceOpIdx: -1,
+			})
+		}
+	case componentRequestBodies:
+		if components.RequestBodies == nil {
+			return nil
+		}
+		for name, ref := range components.RequestBodies.All() {
+			if ref == nil {
+				continue
+			}
+			rb := ref.GetObject()
+			if rb == nil {
+				continue
+			}
+			rows = append(rows, Row{
+				Kind:        RequestBodyResult,
+				RequestBody: rb,
+				ParamName:   name, // reuse ParamName for component key
+				SourceOpIdx: -1,
+			})
+		}
+	case componentHeaders:
+		if components.Headers == nil {
+			return nil
+		}
+		for name, ref := range components.Headers.All() {
+			if ref == nil {
+				continue
+			}
+			h := ref.GetObject()
+			if h == nil {
+				continue
+			}
+			rows = append(rows, Row{
+				Kind:        HeaderResult,
+				Header:      h,
+				HeaderName:  name,
+				SourceOpIdx: -1,
+			})
+		}
+	case componentSecuritySchemes:
+		if components.SecuritySchemes == nil {
+			return nil
+		}
+		for name, ref := range components.SecuritySchemes.All() {
+			if ref == nil {
+				continue
+			}
+			ss := ref.GetObject()
+			if ss == nil {
+				continue
+			}
+			rows = append(rows, Row{
+				Kind:           SecuritySchemeResult,
+				SecurityScheme: ss,
+				SchemeName:     name,
+				SourceOpIdx:    -1,
+			})
+		}
+	}
+	return rows
+}
+
+// --- Security ---
+
+func execSecurity(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	// Build scheme name → SecurityScheme lookup
+	schemeMap := buildSecuritySchemeMap(g)
+
+	for _, row := range result.Rows {
+		if row.Kind != OperationResult {
+			continue
+		}
+		op := &g.Operations[row.OpIdx]
+		if op.Operation == nil {
+			continue
+		}
+		for _, req := range op.Operation.Security {
+			if req == nil {
+				continue
+			}
+			for schemeName, scopes := range req.All() {
+				r := Row{
+					Kind:        SecurityRequirementResult,
+					SchemeName:  schemeName,
+					Scopes:      scopes,
+					SourceOpIdx: row.OpIdx,
+					OpIdx:       row.OpIdx,
+				}
+				if ss, ok := schemeMap[schemeName]; ok {
+					r.SecurityScheme = ss
+				}
+				out.Rows = append(out.Rows, r)
+			}
+		}
+	}
+	return out, nil
+}
+
+func buildSecuritySchemeMap(g *graph.SchemaGraph) map[string]*openapi.SecurityScheme {
+	m := make(map[string]*openapi.SecurityScheme)
+	if g.Index == nil || g.Index.Doc == nil {
+		return m
+	}
+	components := g.Index.Doc.GetComponents()
+	if components == nil || components.SecuritySchemes == nil {
+		return m
+	}
+	for name, ref := range components.SecuritySchemes.All() {
+		if ref == nil {
+			continue
+		}
+		ss := ref.GetObject()
+		if ss != nil {
+			m[name] = ss
+		}
+	}
+	return m
 }

@@ -376,6 +376,9 @@ func parseStage(s string) (Stage, error) {
 	case "operation":
 		return Stage{Kind: StageOperation}, nil
 
+	case "security":
+		return Stage{Kind: StageSecurity}, nil
+
 	default:
 		return Stage{}, fmt.Errorf("unknown stage: %q", keyword)
 	}

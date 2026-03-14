@@ -325,9 +325,34 @@ func getRootNode(row Row, g *graph.SchemaGraph) *yaml.Node {
 			return nil
 		}
 		return o.Operation.GetRootNode()
+	case ParameterResult:
+		if row.Parameter != nil {
+			return row.Parameter.GetRootNode()
+		}
+	case ResponseResult:
+		if row.Response != nil {
+			return row.Response.GetRootNode()
+		}
+	case RequestBodyResult:
+		if row.RequestBody != nil {
+			return row.RequestBody.GetRootNode()
+		}
+	case ContentTypeResult:
+		if row.ContentType != nil {
+			return row.ContentType.GetRootNode()
+		}
+	case HeaderResult:
+		if row.Header != nil {
+			return row.Header.GetRootNode()
+		}
+	case SecuritySchemeResult:
+		if row.SecurityScheme != nil {
+			return row.SecurityScheme.GetRootNode()
+		}
 	default:
 		return nil
 	}
+	return nil
 }
 
 func formatGroupsToon(result *Result) string {
@@ -478,6 +503,10 @@ func defaultFieldsForKind(kind ResultKind) []string {
 		return []string{"media_type", "has_schema", "status_code", "operation"}
 	case HeaderResult:
 		return []string{"name", "required", "status_code", "operation"}
+	case SecuritySchemeResult:
+		return []string{"name", "type", "in", "scheme"}
+	case SecurityRequirementResult:
+		return []string{"scheme_name", "scheme_type", "scopes", "operation"}
 	default:
 		return []string{"name"}
 	}
