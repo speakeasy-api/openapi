@@ -102,7 +102,7 @@ func ParseQuery(query string) (*Query, error) {
 	return q, nil
 }
 
-// Parse splits a pipeline query string into stages (backward compat).
+// Parse splits a pipeline query string into stages.
 func Parse(query string) ([]Stage, error) {
 	q, err := ParseQuery(query)
 	if err != nil {
@@ -149,22 +149,14 @@ func parseStage(s string) (Stage, error) {
 	keyword = strings.ToLower(keyword)
 
 	switch keyword {
-	// New jq-style: select(expr) replaces where
 	case "select":
-		if isCall {
-			// select(expr) → filter
-			if args == "" {
-				return Stage{}, errors.New("select() requires an expression")
-			}
-			return Stage{Kind: StageWhere, Expr: args}, nil
+		if !isCall {
+			return Stage{}, errors.New("select requires parentheses: select(expr)")
 		}
-		// select f1, f2 → old-style field projection — use pick instead
-		// But keep for backward compat during migration
 		if args == "" {
-			return Stage{}, errors.New("select requires field names")
+			return Stage{}, errors.New("select() requires an expression")
 		}
-		fields := parseCSV(args)
-		return Stage{Kind: StageSelect, Fields: fields}, nil
+		return Stage{Kind: StageWhere, Expr: args}, nil
 
 	case "pick":
 		if args == "" {
@@ -172,13 +164,6 @@ func parseStage(s string) (Stage, error) {
 		}
 		fields := parseCSV(args)
 		return Stage{Kind: StageSelect, Fields: fields}, nil
-
-	// where (legacy, still supported)
-	case "where":
-		if args == "" {
-			return Stage{}, errors.New("where requires an expression")
-		}
-		return Stage{Kind: StageWhere, Expr: args}, nil
 
 	case "sort_by":
 		if isCall {
@@ -193,18 +178,6 @@ func parseStage(s string) (Stage, error) {
 			return Stage{Kind: StageSort, SortField: strings.TrimSpace(parts[0]), SortDesc: desc}, nil
 		}
 		return Stage{}, errors.New("sort_by requires parentheses: sort_by(field) or sort_by(field; desc)")
-
-	// Legacy sort
-	case "sort":
-		parts := strings.Fields(args)
-		if len(parts) == 0 {
-			return Stage{}, errors.New("sort requires a field name")
-		}
-		desc := false
-		if len(parts) >= 2 && strings.ToLower(parts[1]) == "desc" {
-			desc = true
-		}
-		return Stage{Kind: StageSort, SortField: parts[0], SortDesc: desc}, nil
 
 	case "first":
 		if isCall {
@@ -235,14 +208,6 @@ func parseStage(s string) (Stage, error) {
 		}
 		return Stage{Kind: StageLast, Limit: n}, nil
 
-	// Legacy take/head
-	case "take", "head":
-		n, err := strconv.Atoi(strings.TrimSpace(args))
-		if err != nil {
-			return Stage{}, fmt.Errorf("take requires a number: %w", err)
-		}
-		return Stage{Kind: StageTake, Limit: n}, nil
-
 	case "length":
 		return Stage{Kind: StageCount}, nil
 
@@ -258,17 +223,6 @@ func parseStage(s string) (Stage, error) {
 			return Stage{Kind: StageGroupBy, Fields: fields}, nil
 		}
 		return Stage{}, errors.New("group_by requires parentheses: group_by(field)")
-
-	// Legacy group-by
-	case "group-by":
-		if args == "" {
-			return Stage{}, errors.New("group-by requires a field name")
-		}
-		fields := parseCSV(args)
-		return Stage{Kind: StageGroupBy, Fields: fields}, nil
-
-	case "count":
-		return Stage{Kind: StageCount}, nil
 
 	case "refs-out":
 		return Stage{Kind: StageRefsOut}, nil
@@ -397,10 +351,13 @@ func parseStage(s string) (Stage, error) {
 		if isCall {
 			f = strings.TrimSpace(args)
 		}
-		if f != "table" && f != "json" && f != "markdown" && f != "toon" && f != "yaml" {
-			return Stage{}, fmt.Errorf("format must be table, json, markdown, toon, or yaml, got %q", f)
+		if f != "table" && f != "json" && f != "markdown" && f != "toon" {
+			return Stage{}, fmt.Errorf("format must be table, json, markdown, or toon, got %q", f)
 		}
 		return Stage{Kind: StageFormat, Format: f}, nil
+
+	case "emit":
+		return Stage{Kind: StageEmit}, nil
 
 	case "connected":
 		return Stage{Kind: StageConnected}, nil

@@ -65,12 +65,12 @@ Pipeline stages (jq-style):
               sample(N), top(N; field), bottom(N; field), unique, group_by(field), length
   Variables:  let $var = expr
   Functions:  def name: body;  def name($p): body;  include "file.oq";
-  Meta:       explain, fields, format(table|json|markdown|toon|yaml)
-
-  Legacy syntax (where, sort, take, head, select fields, group-by, count) is still supported.
+  Output:     emit, format(table|json|markdown|toon)
+  Meta:       explain, fields
 
 Expression operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches,
                       if-then-else-end, string interpolation \(expr)`,
+	// TODO: add reference to 'openapi spec query-reference' for the full query language reference
 	Args: queryArgs(),
 	Run:  runQuery,
 }
@@ -79,7 +79,7 @@ var queryOutputFormat string
 var queryFromFile string
 
 func init() {
-	queryCmd.Flags().StringVar(&queryOutputFormat, "format", "table", "output format: table, json, markdown, toon, or yaml")
+	queryCmd.Flags().StringVar(&queryOutputFormat, "format", "table", "output format: table, json, markdown, or toon")
 	queryCmd.Flags().StringVarP(&queryFromFile, "file", "f", "", "read query from file instead of argument")
 }
 
@@ -146,6 +146,13 @@ func queryOpenAPI(ctx context.Context, processor *OpenAPIProcessor, queryStr str
 		return fmt.Errorf("query error: %w", err)
 	}
 
+	// Emit stage outputs raw YAML nodes, bypassing format selection
+	if result.EmitYAML {
+		output := oq.FormatYAML(result, g)
+		fmt.Fprint(processor.stdout(), output)
+		return nil
+	}
+
 	// Format and output — inline format stage overrides CLI flag
 	format := queryOutputFormat
 	if result.FormatHint != "" {
@@ -160,8 +167,6 @@ func queryOpenAPI(ctx context.Context, processor *OpenAPIProcessor, queryStr str
 		output = oq.FormatMarkdown(result, g)
 	case "toon":
 		output = oq.FormatToon(result, g)
-	case "yaml":
-		output = oq.FormatYAML(result, g)
 	default:
 		output = oq.FormatTable(result, g)
 	}

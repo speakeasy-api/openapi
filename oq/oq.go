@@ -4,7 +4,6 @@
 //
 //	schemas.components | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth
 //
-// Legacy syntax (where, sort, take, select fields) is also supported.
 package oq
 
 import (
@@ -47,7 +46,8 @@ type Result struct {
 	Count      int
 	Groups     []GroupResult
 	Explain    string // human-readable pipeline explanation
-	FormatHint string // format preference from format stage (table, json, markdown)
+	FormatHint string // format preference from format stage (table, json, markdown, toon)
+	EmitYAML   bool   // emit raw YAML nodes instead of formatted output
 }
 
 // GroupResult represents a group-by aggregation result.
@@ -138,6 +138,7 @@ const (
 	StageLast
 	StageLet
 	StageParent
+	StageEmit
 )
 
 // Stage represents a single stage in the query pipeline.

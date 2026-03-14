@@ -80,10 +80,6 @@ FILTER & TRANSFORM STAGES
   length               Count rows (terminal — returns a single number)
   let $var = expr      Bind expression result to a variable for later stages
 
-  Legacy syntax is still supported:
-    where <expr>, select <fields>, sort <field> [desc], take/head <n>,
-    group-by <field>, count
-
 FUNCTION DEFINITIONS & MODULES
 -------------------------------
 Define reusable pipeline fragments:
@@ -105,7 +101,8 @@ META STAGES
 
   explain              Print the query execution plan instead of running it
   fields               List available fields for the current result kind
-  format(fmt)          Set output format: table, json, markdown, toon, or yaml
+  emit                 Output raw YAML nodes from underlying spec objects (pipe into yq)
+  format(fmt)          Set output format: table, json, markdown, or toon
 
 SCHEMA FIELDS
 -------------
@@ -222,13 +219,16 @@ OUTPUT FORMATS
   json       JSON array of objects
   markdown   Markdown table
   toon       TOON (Token-Oriented Object Notation) tabular format
-  yaml       Raw YAML from underlying schema/operation objects (pipe into yq)
 
 Set via --format flag or inline format stage:
   schemas | length | format(json)
 
-The yaml format is especially useful for piping into yq for content queries:
-  openapi spec query 'schemas | select(name == "Pet") | format(yaml)' spec.yaml | yq '.properties | keys'
+RAW YAML EXTRACTION
+-------------------
+
+Use the emit stage to extract raw YAML nodes from the underlying spec objects.
+This is useful for piping into yq for content-level queries:
+  openapi spec query 'schemas | select(name == "Pet") | emit' spec.yaml | yq '.properties | keys'
 
 EXAMPLES
 --------
@@ -279,7 +279,7 @@ EXAMPLES
   schemas.components | select(name == "Pet") | refs-out | pick name, via, key, from
 
   # Parent — find schemas containing a property matching a pattern
-  schemas | properties | select(key matches "(?i)date.?time") | parent | unique | format(yaml)
+  schemas | properties | select(key matches "(?i)date.?time") | parent | unique | emit
 
   # Blast radius — what breaks if I change the Error schema?
   schemas.components | select(name == "Error") | blast-radius | length

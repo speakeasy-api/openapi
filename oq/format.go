@@ -268,16 +268,25 @@ func FormatYAML(result *Result, g *graph.SchemaGraph) string {
 		}
 
 		node := getRootNode(row, g)
+		name := valueToString(fieldValue(row, "name", g))
+
 		if node == nil {
 			// Fallback: emit as comment with the name
 			sb.WriteString("# ")
-			name := valueToString(fieldValue(row, "name", g))
 			sb.WriteString(name)
 			sb.WriteString(" (no YAML node available)\n")
 			continue
 		}
 
-		data, err := yaml.Marshal(node)
+		// Wrap the node under its key name for context
+		wrapper := &yaml.Node{
+			Kind: yaml.MappingNode,
+			Content: []*yaml.Node{
+				{Kind: yaml.ScalarNode, Value: name},
+				node,
+			},
+		}
+		data, err := yaml.Marshal(wrapper)
 		if err != nil {
 			sb.WriteString("# error marshalling: " + err.Error() + "\n")
 			continue

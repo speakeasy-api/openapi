@@ -168,6 +168,9 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		return execSharedRefs(result, g)
 	case StageParent:
 		return execParent(result, g)
+	case StageEmit:
+		result.EmitYAML = true
+		return result, nil
 	default:
 		return nil, fmt.Errorf("unimplemented stage kind: %d", stage.Kind)
 	}
@@ -198,6 +201,7 @@ func execLast(stage Stage, result *Result) (*Result, error) {
 	return &Result{
 		Fields:     result.Fields,
 		FormatHint: result.FormatHint,
+		EmitYAML:   result.EmitYAML,
 		Rows:       slices.Clone(rows),
 	}, nil
 }
@@ -229,6 +233,7 @@ func execSort(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error
 	sorted := &Result{
 		Fields:     result.Fields,
 		FormatHint: result.FormatHint,
+		EmitYAML:   result.EmitYAML,
 		Rows:       slices.Clone(result.Rows),
 	}
 	sort.SliceStable(sorted.Rows, func(i, j int) bool {
@@ -252,6 +257,7 @@ func execTake(stage Stage, result *Result) (*Result, error) {
 	return &Result{
 		Fields:     result.Fields,
 		FormatHint: result.FormatHint,
+		EmitYAML:   result.EmitYAML,
 		Rows:       slices.Clone(rows),
 	}, nil
 }
@@ -940,7 +946,7 @@ func describeStage(stage Stage) string {
 	case StageUnique:
 		return "Unique: deduplicate rows"
 	case StageGroupBy:
-		return "Group: group-by " + strings.Join(stage.Fields, ", ")
+		return "Group: group_by(" + strings.Join(stage.Fields, ", ") + ")"
 	case StageCount:
 		return "Count: count rows"
 	case StageRefsOut:
@@ -993,6 +999,8 @@ func describeStage(stage Stage) string {
 		return "Analyze: schemas shared by all operations in result"
 	case StageParent:
 		return "Traverse: navigate back to source schema of edge annotations"
+	case StageEmit:
+		return "Emit: output raw YAML nodes from underlying spec objects"
 	default:
 		return "Unknown stage"
 	}

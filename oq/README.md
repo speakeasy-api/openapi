@@ -85,8 +85,6 @@ source | stage | stage | ... | terminal
 | `length` | Count rows |
 | `let $var = expr` | Bind expression result to a variable |
 
-**Legacy syntax** (`where`, `sort`, `take`, `head`, `select fields`, `group-by`, `count`) is still supported.
-
 ### Meta Stages
 
 | Stage | Description |
