@@ -2227,6 +2227,43 @@ func TestFormatJSON_ArrayValues(t *testing.T) {
 	assert.Contains(t, json, `"id"`)
 }
 
+func TestExecute_ArrayMatchesRegex(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// properties matches regex — any property name matching pattern
+	result, err := oq.Execute(`schemas | select(properties matches "^ow") | select(is_component) | pick name`, g)
+	require.NoError(t, err)
+
+	names := collectNames(result, g)
+	assert.Contains(t, names, "Pet", "Pet has 'owner' property starting with 'ow'")
+}
+
+func TestExecute_ArrayStartswith(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// properties startswith — any property name with prefix
+	result, err := oq.Execute(`schemas | select(properties startswith "na") | select(is_component) | pick name`, g)
+	require.NoError(t, err)
+
+	names := collectNames(result, g)
+	assert.Contains(t, names, "Pet", "Pet has 'name' property")
+	assert.Contains(t, names, "Owner", "Owner has 'name' property")
+}
+
+func TestExecute_ArrayEndswith(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// properties endswith — any property name with suffix
+	result, err := oq.Execute(`schemas | select(properties endswith "eet") | select(is_component) | pick name`, g)
+	require.NoError(t, err)
+
+	names := collectNames(result, g)
+	assert.Contains(t, names, "Address", "Address has 'street' property")
+}
+
 // collectNames extracts the "name" field from all rows in the result.
 func collectNames(result *oq.Result, g *graph.SchemaGraph) []string {
 	var names []string
