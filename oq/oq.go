@@ -3,7 +3,6 @@
 // Queries are written as pipeline expressions with jq-inspired syntax:
 //
 //	schemas.components | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth
-//
 package oq
 
 import (
