@@ -18,7 +18,9 @@ var queryCmd = &cobra.Command{
 	Short: "Query an OpenAPI specification using the oq pipeline language",
 	Long: `Query an OpenAPI specification using the oq pipeline language to answer
 structural and semantic questions about schemas and operations.`,
-	Example: `Pipeline stages:
+	Example: `Queries are pipelines: source | stage | stage | ...
+
+Pipeline stages:
   Source:     schemas, schemas.components, schemas.inline, operations
   Traversal:  refs-out, refs-in, reachable, ancestors, properties, union-members, items,
               parent, ops, schemas, path(A; B), connected, blast-radius, neighbors(N)
