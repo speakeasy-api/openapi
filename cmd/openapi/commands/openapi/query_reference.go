@@ -28,11 +28,16 @@ SOURCES
 The first element of every pipeline is a source that selects the initial
 result set.
 
-  schemas              All schemas (component + inline)
-  operations           All operations
+  schemas                      All schemas (component + inline)
+  operations                   All operations
+  components.schemas           Component schemas only
+  components.parameters        Reusable parameter definitions
+  components.responses         Reusable response definitions
+  components.request-bodies    Reusable request body definitions
+  components.headers           Reusable header definitions
+  components.security-schemes  Security scheme definitions
 
-Note: the old sub-sources schemas | select(is_component) and schemas | select(is_inline) are removed.
-Use select(is_component) or select(is_inline) to filter instead:
+Tip: use select(is_component) or select(is_inline) to filter the schemas source:
   schemas | select(is_component)
   schemas | select(is_inline)
 
@@ -43,7 +48,8 @@ in the schema reference graph.
 
   refs-out          Direct outgoing references (1 hop, with edge annotations)
   refs-in           Direct incoming references (1 hop, with edge annotations)
-  reachable         Transitive closure of outgoing references
+  reachable         Transitive closure of outgoing references (all hops)
+  reachable(N)      Depth-limited reachable: only follow N hops
   ancestors         Transitive closure of incoming references
   properties        Expand to property sub-schemas (with edge annotations)
   union-members     Expand allOf/oneOf/anyOf children (with edge annotations)
@@ -68,6 +74,7 @@ typed rows that can be filtered, projected, and navigated back to the source.
   headers               Response headers (yields HeaderRow)
   schema                Extract schema from parameter, content-type, or header (bridges to graph)
   operation             Back-navigate to source operation
+  security              Operation security requirements (inherits global when not overridden)
 
 ANALYSIS STAGES
 ---------------
@@ -91,8 +98,9 @@ FILTER & TRANSFORM STAGES
   sample(N)            Deterministic pseudo-random sample of N rows
   top(N; field)        Sort descending by field and take N (shorthand)
   bottom(N; field)     Sort ascending by field and take N (shorthand)
-  unique               Deduplicate rows by identity
+  unique               Deduplicate rows (by projected fields when pick is active)
   group_by(field)      Group rows and aggregate counts
+  group_by(field; name_field)  Group with custom name field for aggregation
   length               Count rows (terminal — returns a single number)
   let $var = expr      Bind expression result to a variable for later stages
 
@@ -279,6 +287,35 @@ HEADER FIELDS
   status_code         string   Source response status code
   operation           string   Source operation
 
+SECURITY SCHEME FIELDS
+----------------------
+Available from components.security-schemes source.
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  name                string   Security scheme name (component key)
+  type                string   Scheme type: apiKey, http, oauth2, openIdConnect, mutualTLS
+  in                  string   API key location: header, query, cookie (apiKey only)
+  scheme              string   HTTP auth scheme: bearer, basic, etc. (http only)
+  bearer_format       string   Bearer token format hint, e.g. JWT (http only)
+  description         string   Scheme description
+  has_flows           bool     Whether OAuth2 flows are defined (oauth2 only)
+  deprecated          bool     Whether the scheme is deprecated
+
+SECURITY REQUIREMENT FIELDS
+----------------------------
+Available from operations | security stage. Inherits global security when
+the operation has no per-operation override. An explicit empty security: []
+on an operation means "no security" (yields zero rows).
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  scheme_name         string   Security scheme name
+  scheme_type         string   Resolved scheme type (apiKey, http, oauth2, ...)
+  scopes              array    Required OAuth2 scopes
+  scope_count         int      Number of required scopes
+  operation           string   Source operation
+
 EXPRESSIONS
 -----------
 The expression language is used in select(), let, and if-then-else:
@@ -286,14 +323,17 @@ The expression language is used in select(), let, and if-then-else:
   Comparison:     ==  !=  >  <  >=  <=
   Logical:        and  or  not
   Alternative:    //  (returns left if truthy, else right)
-  Functions:      has(<field>)  — true if field is non-null/non-zero
-                  matches(<field>, "<regex>")  — regex match
-  Infix:          <field> matches "<regex>"
+  Predicates:     has(<field>)  — true if field is non-null/non-zero
+                  <field> matches "<regex>"  — regex match
+                  <expr> contains "<str>"  — substring/array membership
+  String funcs:   lower(), upper(), trim(), len(), count()
+                  startswith(), endswith(), replace(), split()
+  Arithmetic:     +  -  *  /
   Conditional:    if <cond> then <expr> else <expr> end
                   if <cond> then <expr> elif <cond> then <expr> else <expr> end
-  Interpolation:  "\(<expr>)" inside string literals
+  Interpolation:  "\(<expr>)" inside double-quoted strings
   Grouping:       ( ... )
-  Literals:       "string"  42  true  false
+  Literals:       "string"  'literal'  42  true  false
   Variables:      $var (bound by let)
 
 OUTPUT FORMATS
@@ -311,135 +351,102 @@ RAW YAML EXTRACTION
 -------------------
 
 Use the emit stage to extract raw YAML nodes from the underlying spec objects.
-Each emitted node is wrapped under its full JSON pointer (path) as the YAML key.
-This is useful for piping into yq for content-level queries:
+Schema rows use full JSON pointer paths as keys. Navigation rows use contextual
+compound keys (e.g., "listUsers/200" for responses, "createUser/parameters/limit"
+for parameters). Pipe into yq for content-level queries:
   openapi spec query 'schemas | select(name == "Pet") | emit' spec.yaml | yq '.properties | keys'
+  openapi spec query 'operations | first(1) | responses | emit' spec.yaml
 
 EXAMPLES
 --------
 
-  # Deeply nested components (jq-style)
-  schemas | select(is_component) | sort_by(depth; desc) | first(10) | pick name, depth
+Schema analysis:
 
-  # Wide union trees
-  schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)
+  # Deeply nested component schemas
+  components.schemas | sort_by(depth; desc) | first(10) | pick name, depth
 
   # Most referenced schemas
-  schemas | select(is_component) | sort_by(in_degree; desc) | first(10) | pick name, in_degree
+  components.schemas | sort_by(in_degree; desc) | first(10) | pick name, in_degree
 
-  # Dead components (no incoming references)
-  schemas | select(is_component) | select(in_degree == 0) | pick name
-
-  # Operation sprawl
-  operations | sort_by(schema_count; desc) | first(10) | pick name, schema_count
+  # Dead components — defined but never referenced
+  components.schemas | orphans | pick name
 
   # Circular references
   schemas | select(is_circular) | pick name, path
 
-  # Schema count
-  schemas | length
+  # Blast radius — what breaks if I change this schema?
+  schemas | select(name == "Error") | blast-radius | length
 
-  # Shortest path between schemas
-  schemas | path(Pet; Address) | pick name
+  # Depth-limited traversal — see 2 hops from a schema
+  schemas | select(name == "User") | reachable(2) | pick name, type
 
-  # Top 5 by in-degree
-  schemas | select(is_component) | top(5; in_degree) | pick name, in_degree
+  # Edge annotations — how a schema references others
+  schemas | select(name == "Pet") | refs-out | pick name, via, key, from
 
-  # Walk an operation to find all connected schemas
-  operations | select(name == "GET /users") | schemas | pick name, type
+  # Schemas with properties matching a pattern
+  schemas | properties | select(key matches "(?i)date") | parent | unique | pick name
 
-  # Explain a query plan
-  schemas | select(is_component) | select(depth > 5) | sort_by(depth; desc) | explain
+Operations & navigation:
 
-  # List available fields
-  schemas | fields
+  # Operation sprawl — most complex endpoints
+  operations | sort_by(schema_count; desc) | first(10) | pick name, schema_count
 
-  # Regex filter
-  schemas | select(name matches "Error.*") | pick name, path
+  # Find SSE/streaming endpoints
+  operations | responses | content-types | select(media_type == "text/event-stream") | operation | unique
 
-  # Complex filter
-  schemas | select(property_count > 3 and not is_component) | pick name, property_count, path
+  # All content types across the API
+  operations | responses | content-types | pick media_type | unique | sort_by(media_type)
 
-  # Edge annotations — see how Pet references other schemas
-  schemas | select(is_component) | select(name == "Pet") | refs-out | pick name, via, key, from
+  # Deprecated parameters
+  operations | parameters | select(deprecated) | pick name, in, operation
 
-  # Parent — find schemas containing a property matching a pattern
-  schemas | properties | select(key matches "(?i)date.?time") | parent | unique | emit
+  # Operations accepting multipart uploads
+  operations | request-body | content-types | select(media_type matches "multipart/") | operation | unique
 
-  # Blast radius — what breaks if I change the Error schema?
-  schemas | select(is_component) | select(name == "Error") | blast-radius | length
+  # Response headers
+  operations | responses | headers | pick name, required, status_code, operation
 
-  # Neighborhood — schemas within 2 hops of Pet
-  schemas | select(is_component) | select(name == "Pet") | neighbors(2) | pick name
+  # Drill into a response schema
+  operations | select(name == "createUser") | request-body | content-types | schema | reachable(2) | emit
 
-  # Orphaned schemas — unreferenced by anything
-  schemas | select(is_component) | orphans | pick name
+  # Group responses by status code (showing operation names)
+  operations | responses | group_by(status_code; operation)
 
-  # Leaf schemas — terminal nodes with no outgoing refs
-  schemas | select(is_component) | leaves | pick name, in_degree
+Security:
 
-  # Detect reference cycles
-  schemas | cycles
+  # List all security schemes
+  components.security-schemes | pick name, type, scheme
 
-  # Discover schema clusters
-  schemas | select(is_component) | clusters
+  # Operations using OAuth2
+  operations | security | select(scheme_type == "oauth2") | pick scheme_name, scopes, operation
 
-  # Cross-tag schemas — shared across team boundaries
-  schemas | tag-boundary | pick name, tag_count
+  # Operations with no security
+  operations | security | length  # compare with: operations | length
 
-  # Schemas shared by all operations
-  operations | shared-refs | pick name, op_count
-
-  # Variable binding — find Pet's reachable schemas (excluding Pet itself)
-  schemas | select(name == "Pet") | let $pet = name | reachable | select(name != $pet) | pick name
-
-  # Alternative operator — fallback for missing values
-  schemas | select(name // "unnamed" != "unnamed")
-
-  # If-then-else — conditional filtering
-  schemas | select(if is_component then depth > 3 else true end)
-
-  # User-defined functions
-  def hot: select(in_degree > 10);
-  def impact($name): select(name == $name) | blast-radius;
-  schemas | select(is_component) | hot | pick name, in_degree
-
-  # Load functions from a module file
-  include "stdlib.oq";
-  schemas | select(is_component) | hot | pick name, in_degree
-
-  # Schema content queries —
+Content auditing:
 
   # OneOf unions missing discriminator
-  schemas | select(is_component) | select(union_width > 0 and not has_discriminator) | pick name, union_width
+  components.schemas | select(union_width > 0 and not has_discriminator) | pick name, union_width
 
   # Schemas missing descriptions
-  schemas | select(is_component) | select(not has_description) | pick name, type
-
-  # Schemas with enums
-  schemas | select(is_component) | select(enum_count > 0) | pick name, enum_count
+  components.schemas | select(not has_description) | pick name, type
 
   # Operations missing error responses
   operations | select(not has_error_response) | pick name, method, path
 
-  # Duplicate inline schemas
+  # Duplicate inline schemas (same hash)
   schemas | select(is_inline) | group_by(hash) | select(count > 1)
 
-  # Operations with request bodies but no error handling
-  operations | select(has_request_body and not has_error_response) | pick name, method, path
+Advanced:
 
-  # Navigation — find operations that stream events
-  operations | responses | content-types | select(media_type == "text/event-stream") | operation | unique
+  # Variable binding
+  schemas | select(name == "Pet") | let $pet = name | reachable | select(name != $pet) | pick name
 
-  # Navigation — find operations with deprecated parameters
-  operations | parameters | select(deprecated) | operation | unique
+  # User-defined functions
+  def hot: select(in_degree > 10);
+  schemas | select(is_component) | hot | pick name, in_degree
 
-  # Navigation — list all cookie parameters
-  operations | parameters | select(in == "cookie") | pick name, in, operation
-
-  # Navigation — responses with no content (e.g., 204 No Content)
-  operations | responses | select(not has_content) | pick status_code, operation
-
-  # Navigation — operations accepting multipart uploads
-  operations | request-body | content-types | select(media_type matches "multipart/") | operation | unique
+  # Raw YAML extraction (pipe into yq)
+  operations | first(1) | responses | emit
+  schemas | select(name == "Pet") | emit | yq '.Pet.properties | keys'
 `

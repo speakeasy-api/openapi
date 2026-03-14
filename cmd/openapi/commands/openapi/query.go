@@ -22,27 +22,31 @@ responses, content types, and headers.`,
 	Example: `Queries are pipelines: source | stage | stage | ...
 
 Pipeline stages:
-  Source:      schemas, operations
+  Source:      schemas, operations, components.schemas, components.parameters,
+               components.responses, components.request-bodies, components.headers,
+               components.security-schemes
   Navigation:  parameters, responses, request-body, content-types, headers,
-               schema, operation
-  Traversal:   refs-out, refs-in, reachable, ancestors, properties, union-members, items,
-               parent, ops, schemas, path(A; B), connected, blast-radius, neighbors(N)
+               schema, operation, security
+  Traversal:   refs-out, refs-in, reachable, reachable(N), ancestors, properties,
+               union-members, items, parent, ops, schemas, path(A; B), connected,
+               blast-radius, neighbors(N)
   Analysis:    orphans, leaves, cycles, clusters, tag-boundary, shared-refs
   Filter:      select(expr), pick <fields>, sort_by(field; desc), first(N), last(N),
-               sample(N), top(N; field), bottom(N; field), unique, group_by(field), length
+               sample(N), top(N; field), bottom(N; field), unique,
+               group_by(field), group_by(field; name_field), length
   Variables:   let $var = expr
   Functions:   def name: body;  def name($p): body;  include "file.oq";
   Output:      emit, format(table|json|markdown|toon)
   Meta:        explain, fields
 
-Operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches,
-           if-then-else-end, string interpolation \(expr)
+Operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches, contains,
+           if-then-else-end, \(interpolation), lower(), upper(), len(), split()
 
-  openapi spec query 'schemas | select(is_component) | sort_by(depth; desc) | first(10) | pick name, depth' petstore.yaml
-  openapi spec query 'schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)' petstore.yaml
-  openapi spec query 'operations | responses | content-types | pick media_type | unique' petstore.yaml
-  openapi spec query 'operations | parameters | select(in == "cookie") | pick name, operation' petstore.yaml
-  openapi spec query 'schemas | select(name == "Error") | blast-radius | length' petstore.yaml
+  openapi spec query 'operations | responses | content-types | select(media_type == "text/event-stream") | operation | unique' spec.yaml
+  openapi spec query 'operations | security | group_by(scheme_type; operation)' spec.yaml
+  openapi spec query 'schemas | select(is_component) | sort_by(depth; desc) | first(10) | pick name, depth' spec.yaml
+  openapi spec query 'operations | select(name == "createUser") | request-body | content-types | schema | reachable(2) | emit' spec.yaml
+  openapi spec query 'components.security-schemes | pick name, type, scheme' spec.yaml
   cat spec.yaml | openapi spec query 'schemas | length'
 
 For the full query language reference, run: openapi spec query-reference`,
