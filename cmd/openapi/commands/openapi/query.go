@@ -17,9 +17,7 @@ var queryCmd = &cobra.Command{
 	Use:   "query <query> [input-file]",
 	Short: "Query an OpenAPI specification using the oq pipeline language",
 	Long: `Query an OpenAPI specification using the oq pipeline language to answer
-structural and semantic questions about schemas and operations.
-
-For the full query language reference, run: openapi spec query-reference`,
+structural and semantic questions about schemas and operations.`,
 	Example: `Pipeline stages:
   Source:     schemas, schemas.components, schemas.inline, operations
   Traversal:  refs-out, refs-in, reachable, ancestors, properties, union-members, items,
@@ -32,26 +30,17 @@ For the full query language reference, run: openapi spec query-reference`,
   Output:     emit, format(table|json|markdown|toon)
   Meta:       explain, fields
 
-Expression operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches,
-                      if-then-else-end, string interpolation \(expr)
+Operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches,
+           if-then-else-end, string interpolation \(expr)
 
-  # Deeply nested components
   openapi spec query 'schemas.components | sort_by(depth; desc) | first(10) | pick name, depth' petstore.yaml
-
-  # Pipe from stdin
+  openapi spec query 'schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)' petstore.yaml
+  openapi spec query 'schemas.components | select(in_degree == 0) | pick name' petstore.yaml
+  openapi spec query 'schemas.components | select(name == "Error") | blast-radius | length' petstore.yaml
+  openapi spec query 'schemas.components | select(depth > 5) | sort_by(depth; desc) | explain' petstore.yaml
   cat spec.yaml | openapi spec query 'schemas | length'
 
-  # Filter with select()
-  openapi spec query 'schemas | select(union_width > 0) | sort_by(union_width; desc) | first(10)' petstore.yaml
-
-  # Dead components (no incoming references)
-  openapi spec query 'schemas.components | select(in_degree == 0) | pick name' petstore.yaml
-
-  # Blast radius
-  openapi spec query 'schemas.components | select(name == "Error") | blast-radius | length' petstore.yaml
-
-  # Explain a query plan
-  openapi spec query 'schemas.components | select(depth > 5) | sort_by(depth; desc) | explain' petstore.yaml`,
+For the full query language reference, run: openapi spec query-reference`,
 	Args: queryArgs(),
 	Run:  runQuery,
 }
@@ -62,6 +51,25 @@ var queryFromFile string
 func init() {
 	queryCmd.Flags().StringVar(&queryOutputFormat, "format", "table", "output format: table, json, markdown, or toon")
 	queryCmd.Flags().StringVarP(&queryFromFile, "file", "f", "", "read query from file instead of argument")
+
+	// Custom help template: Usage + Flags together, then Examples last
+	queryCmd.SetUsageTemplate(`Usage:{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
+
+Aliases:
+  {{.NameAndAliases}}{{end}}{{if .HasAvailableLocalFlags}}
+
+Flags:
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
+
+Global Flags:
+{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasExample}}
+
+{{.Example}}{{end}}{{if .HasAvailableSubCommands}}
+
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`)
 }
 
 func runQuery(cmd *cobra.Command, args []string) {
