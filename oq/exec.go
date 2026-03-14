@@ -555,6 +555,39 @@ func resolveRefTarget(idx int, g *graph.SchemaGraph) int {
 	return idx
 }
 
+// resolveThinWrapper follows through non-component inline schemas that are thin
+// wrappers around a single child. Handles:
+//   - {type: array, items: {$ref: ...}} → returns the items target
+//   - {allOf: [{$ref: ...}]} → returns the single allOf target
+//   - {oneOf: [{$ref: ...}]} → returns the single oneOf target
+//
+// If the schema is a component, has multiple children, or has its own properties,
+// it's returned as-is.
+func resolveThinWrapper(idx int, g *graph.SchemaGraph) int {
+	if idx < 0 || idx >= len(g.Schemas) {
+		return idx
+	}
+	s := &g.Schemas[idx]
+	// Only unwrap non-component inline schemas
+	if s.IsComponent {
+		return idx
+	}
+	// Check for single-child pattern: exactly one outgoing edge
+	edges := g.OutEdges(graph.NodeID(idx))
+	if len(edges) != 1 {
+		return idx
+	}
+	edge := edges[0]
+	// Only follow items, allOf, oneOf, anyOf edges
+	switch edge.Kind {
+	case graph.EdgeItems, graph.EdgeAllOf, graph.EdgeOneOf, graph.EdgeAnyOf:
+		target := resolveRefTarget(int(edge.To), g)
+		return target
+	default:
+		return idx
+	}
+}
+
 func execSchemasToOps(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	out := deriveResult(result)
 	seen := make(map[int]bool)
@@ -1538,6 +1571,10 @@ func execSchema(result *Result, g *graph.SchemaGraph) (*Result, error) {
 		idx := int(id)
 		// Follow $ref edges to get the actual component schema
 		idx = resolveRefTarget(idx, g)
+		// Follow thin wrappers: if the schema is a non-component inline node
+		// whose only purpose is to wrap a single child (items, single allOf/oneOf),
+		// resolve to the meaningful target.
+		idx = resolveThinWrapper(idx, g)
 		if seen[idx] {
 			return
 		}

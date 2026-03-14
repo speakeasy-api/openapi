@@ -2,7 +2,6 @@ package oq
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -23,13 +22,8 @@ func FormatTable(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	// Use group-specific formatting only when no explicit field projection
-	if len(result.Groups) > 0 && len(result.Fields) == 0 {
-		return formatGroups(result)
-	}
-
 	if len(result.Rows) == 0 {
-		return "(empty)"
+		return "(empty)\n"
 	}
 
 	fields := result.Fields
@@ -101,10 +95,6 @@ func FormatJSON(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	if len(result.Groups) > 0 && len(result.Fields) == 0 {
-		return formatGroupsJSON(result)
-	}
-
 	if len(result.Rows) == 0 {
 		return "[]"
 	}
@@ -146,18 +136,8 @@ func FormatMarkdown(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	if len(result.Groups) > 0 && len(result.Fields) == 0 {
-		var sb strings.Builder
-		sb.WriteString("| Key | Count |\n")
-		sb.WriteString("| --- | --- |\n")
-		for _, grp := range result.Groups {
-			fmt.Fprintf(&sb, "| %s | %d |\n", grp.Key, grp.Count)
-		}
-		return sb.String()
-	}
-
 	if len(result.Rows) == 0 {
-		return "(empty)"
+		return "(empty)\n"
 	}
 
 	fields := result.Fields
@@ -206,10 +186,6 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	if len(result.Groups) > 0 && len(result.Fields) == 0 {
-		return formatGroupsToon(result)
-	}
-
 	if len(result.Rows) == 0 {
 		return "results[0]:\n"
 	}
@@ -253,10 +229,6 @@ func FormatYAML(result *Result, g *graph.SchemaGraph) string {
 	}
 
 	syncGroupsFromRows(result)
-
-	if len(result.Groups) > 0 && len(result.Fields) == 0 {
-		return formatGroupsJSON(result)
-	}
 
 	if len(result.Rows) == 0 {
 		return ""
@@ -351,18 +323,6 @@ func getRootNode(row Row, g *graph.SchemaGraph) *yaml.Node {
 	return nil
 }
 
-func formatGroupsToon(result *Result) string {
-	var sb strings.Builder
-
-	// Groups as tabular array
-	fmt.Fprintf(&sb, "groups[%d]{key,count,names}:\n", len(result.Groups))
-	for _, grp := range result.Groups {
-		names := strings.Join(grp.Names, ";")
-		fmt.Fprintf(&sb, " %s,%d,%s\n", toonEscape(grp.Key), grp.Count, toonEscape(names))
-	}
-	return sb.String()
-}
-
 // toonValue encodes an expr.Value for TOON format.
 func toonValue(v expr.Value) string {
 	switch v.Kind {
@@ -455,43 +415,6 @@ func jsonValue(v expr.Value) string {
 	default:
 		return "null"
 	}
-}
-
-func formatGroups(result *Result) string {
-	var sb strings.Builder
-	for _, g := range result.Groups {
-		fmt.Fprintf(&sb, "%s: count=%d", g.Key, g.Count)
-		if len(g.Names) > 0 {
-			names := slices.Clone(g.Names)
-			if len(names) > 5 {
-				names = names[:5]
-				names = append(names, "...")
-			}
-			fmt.Fprintf(&sb, " names=[%s]", strings.Join(names, ", "))
-		}
-		sb.WriteString("\n")
-	}
-	return sb.String()
-}
-
-func formatGroupsJSON(result *Result) string {
-	var sb strings.Builder
-	sb.WriteString("[\n")
-	for i, g := range result.Groups {
-		if i > 0 {
-			sb.WriteString(",\n")
-		}
-		fmt.Fprintf(&sb, `  {"key": %q, "count": %d, "names": [`, g.Key, g.Count)
-		for j, n := range g.Names {
-			if j > 0 {
-				sb.WriteString(", ")
-			}
-			fmt.Fprintf(&sb, "%q", n)
-		}
-		sb.WriteString("]}")
-	}
-	sb.WriteString("\n]")
-	return sb.String()
 }
 
 // resolveDefaultFields returns default fields for the result set.

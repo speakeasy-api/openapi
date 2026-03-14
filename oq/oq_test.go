@@ -304,7 +304,7 @@ func TestFormatTable_Empty_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	table := oq.FormatTable(result, g)
-	assert.Equal(t, "(empty)", table, "empty result should format as (empty)")
+	assert.Equal(t, "(empty)\n", table, "empty result should format as (empty)")
 }
 
 func TestExecute_MatchesExpression_Success(t *testing.T) {
@@ -718,7 +718,9 @@ func TestFormatTable_Groups_Success(t *testing.T) {
 	assert.NotEmpty(t, result.Groups, "should have groups")
 
 	table := oq.FormatTable(result, g)
-	assert.Contains(t, table, "count=", "group table should show count")
+	assert.Contains(t, table, "key", "group table should have key column")
+	assert.Contains(t, table, "count", "group table should have count column")
+	assert.Contains(t, table, "names", "group table should have names column")
 }
 
 func TestFormatJSON_Groups_Success(t *testing.T) {
@@ -741,7 +743,7 @@ func TestFormatMarkdown_Groups_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
-	assert.Contains(t, md, "| Key |", "group markdown should include Key column")
+	assert.Contains(t, md, "| key |", "group markdown should include key column")
 }
 
 func TestExecute_InlineSource_Success(t *testing.T) {
@@ -798,7 +800,7 @@ func TestFormatMarkdown_Empty_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
-	assert.Equal(t, "(empty)", md, "empty result markdown should be (empty)")
+	assert.Equal(t, "(empty)\n", md, "empty result markdown should be (empty)")
 }
 
 func TestFormatJSON_Count_Success(t *testing.T) {
@@ -843,7 +845,7 @@ func TestFormatToon_Groups_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
-	assert.Contains(t, toon, "groups[", "toon should show groups header")
+	assert.Contains(t, toon, "results[", "toon should show results header")
 	assert.Contains(t, toon, "{key,count,names}:", "toon should show group fields")
 }
 
@@ -1226,8 +1228,8 @@ func TestFormatMarkdown_Groups_Details(t *testing.T) {
 	require.NoError(t, err)
 
 	md := oq.FormatMarkdown(result, g)
-	assert.Contains(t, md, "| Key |", "group markdown should include Key column")
-	assert.Contains(t, md, "| Count |", "group markdown should include Count column")
+	assert.Contains(t, md, "| key |", "group markdown should include key column")
+	assert.Contains(t, md, "| count |", "group markdown should include count column")
 }
 
 func TestFormatJSON_Explain(t *testing.T) {
