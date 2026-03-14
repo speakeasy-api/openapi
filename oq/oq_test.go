@@ -2141,6 +2141,92 @@ func TestExecute_KindField(t *testing.T) {
 	assert.Equal(t, "operation", kind.Str)
 }
 
+func TestExecute_DescendantsDepthLimited(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// descendants(1) = direct children only
+	d1, err := oq.Execute(`schemas | select(name == "Pet") | descendants(1) | length`, g)
+	require.NoError(t, err)
+
+	// descendants (unlimited) = full transitive closure
+	dAll, err := oq.Execute(`schemas | select(name == "Pet") | descendants | length`, g)
+	require.NoError(t, err)
+
+	assert.Greater(t, dAll.Count, d1.Count, "unlimited should find more than 1-hop")
+
+	// descendants(2) should include more than 1-hop but may equal unlimited for shallow graphs
+	d2, err := oq.Execute(`schemas | select(name == "Pet") | descendants(2) | length`, g)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, d2.Count, d1.Count)
+}
+
+func TestExecute_MixedTypeDefaultFields(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// blast-radius returns mixed schema+operation rows — should show kind column
+	result, err := oq.Execute(`schemas | select(name == "Pet") | blast-radius`, g)
+	require.NoError(t, err)
+
+	// Verify mixed types present
+	hasSchema := false
+	hasOp := false
+	for _, row := range result.Rows {
+		if row.Kind == oq.SchemaResult {
+			hasSchema = true
+		}
+		if row.Kind == oq.OperationResult {
+			hasOp = true
+		}
+	}
+	assert.True(t, hasSchema, "should have schema rows")
+	assert.True(t, hasOp, "should have operation rows")
+
+	// Table output should include "kind" column for mixed results
+	table := oq.FormatTable(result, g)
+	assert.Contains(t, table, "kind")
+}
+
+func TestExecute_EmitResponseKey(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Emit on responses should use operation/status_code as key
+	result, err := oq.Execute(`operations | first(1) | responses | first(1) | emit`, g)
+	require.NoError(t, err)
+	assert.True(t, result.EmitYAML)
+
+	yaml := oq.FormatYAML(result, g)
+	// Should contain operation name in the key (e.g., "listPets/200:")
+	assert.Contains(t, yaml, "listPets/")
+}
+
+func TestExecute_EmitSchemaPath(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Emit on schemas should use path as key
+	result, err := oq.Execute(`schemas | select(name == "Pet") | emit`, g)
+	require.NoError(t, err)
+
+	yaml := oq.FormatYAML(result, g)
+	assert.Contains(t, yaml, "/components/schemas/Pet")
+}
+
+func TestFormatJSON_ArrayValues(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// JSON format should render array fields as JSON arrays, not null
+	result, err := oq.Execute(`schemas | select(name == "Pet") | pick name, properties | format(json)`, g)
+	require.NoError(t, err)
+
+	json := oq.FormatJSON(result, g)
+	assert.Contains(t, json, "[")
+	assert.Contains(t, json, `"id"`)
+}
+
 // collectNames extracts the "name" field from all rows in the result.
 func collectNames(result *oq.Result, g *graph.SchemaGraph) []string {
 	var names []string
