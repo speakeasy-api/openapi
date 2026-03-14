@@ -19,7 +19,8 @@ var queryCmd = &cobra.Command{
 	Long: `Query an OpenAPI specification using the oq pipeline language to answer
 structural and semantic questions about schemas and operations.
 
-Pipeline stages (jq-style):
+For the full query language reference, run: openapi spec query-reference`,
+	Example: `Pipeline stages:
   Source:     schemas, schemas.components, schemas.inline, operations
   Traversal:  refs-out, refs-in, reachable, ancestors, properties, union-members, items,
               parent, ops, schemas, path(A; B), connected, blast-radius, neighbors(N)
@@ -34,8 +35,7 @@ Pipeline stages (jq-style):
 Expression operators: ==, !=, >, <, >=, <=, and, or, not, //, has(), matches,
                       if-then-else-end, string interpolation \(expr)
 
-For the full query language reference, run: openapi spec query-reference`,
-	Example: `  # Deeply nested components
+  # Deeply nested components
   openapi spec query 'schemas.components | sort_by(depth; desc) | first(10) | pick name, depth' petstore.yaml
 
   # Pipe from stdin
