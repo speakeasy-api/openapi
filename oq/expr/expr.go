@@ -15,6 +15,7 @@ type Value struct {
 	Str  string
 	Int  int
 	Bool bool
+	Arr  []string // for KindArray
 }
 
 type ValueKind int
@@ -24,6 +25,7 @@ const (
 	KindInt
 	KindBool
 	KindNull
+	KindArray
 )
 
 // Row provides field access for predicate evaluation.
@@ -40,6 +42,12 @@ type Expr interface {
 
 type binaryExpr struct {
 	op    string
+	left  Expr
+	right Expr
+}
+
+type arithmeticExpr struct {
+	op    byte // '+', '-', '*', '/'
 	left  Expr
 	right Expr
 }
@@ -70,6 +78,16 @@ type hasExpr struct {
 type matchesExpr struct {
 	field   string
 	pattern *regexp.Regexp
+}
+
+type containsExpr struct {
+	left  Expr // evaluates to string or array
+	right Expr // evaluates to string (element to find)
+}
+
+type funcCallExpr struct {
+	name string
+	args []Expr
 }
 
 type fieldExpr struct {
@@ -111,18 +129,160 @@ func (e *binaryExpr) Eval(row Row) Value {
 	}
 }
 
+func (e *arithmeticExpr) Eval(row Row) Value {
+	l := toInt(e.left.Eval(row))
+	r := toInt(e.right.Eval(row))
+	switch e.op {
+	case '+':
+		return IntVal(l + r)
+	case '-':
+		return IntVal(l - r)
+	case '*':
+		return IntVal(l * r)
+	case '/':
+		if r == 0 {
+			return NullVal()
+		}
+		return IntVal(l / r)
+	default:
+		return NullVal()
+	}
+}
+
 func (e *notExpr) Eval(row Row) Value {
 	return Value{Kind: KindBool, Bool: !toBool(e.inner.Eval(row))}
 }
 
 func (e *hasExpr) Eval(row Row) Value {
 	v := row.Field(e.field)
-	return Value{Kind: KindBool, Bool: v.Kind != KindNull && (v.Kind != KindInt || v.Int != 0) && (v.Kind != KindBool || v.Bool) && (v.Kind != KindString || v.Str != "")}
+	return Value{Kind: KindBool, Bool: v.Kind != KindNull && (v.Kind != KindInt || v.Int != 0) && (v.Kind != KindBool || v.Bool) && (v.Kind != KindString || v.Str != "") && (v.Kind != KindArray || len(v.Arr) != 0)}
 }
 
 func (e *matchesExpr) Eval(row Row) Value {
 	v := row.Field(e.field)
 	return Value{Kind: KindBool, Bool: v.Kind == KindString && e.pattern.MatchString(v.Str)}
+}
+
+func (e *containsExpr) Eval(row Row) Value {
+	haystack := e.left.Eval(row)
+	needle := e.right.Eval(row)
+	needleStr := toString(needle)
+	switch haystack.Kind {
+	case KindArray:
+		for _, item := range haystack.Arr {
+			if item == needleStr {
+				return BoolVal(true)
+			}
+		}
+		return BoolVal(false)
+	case KindString:
+		return BoolVal(strings.Contains(haystack.Str, needleStr))
+	default:
+		return BoolVal(false)
+	}
+}
+
+func (e *funcCallExpr) Eval(row Row) Value {
+	args := make([]Value, len(e.args))
+	for i, a := range e.args {
+		args[i] = a.Eval(row)
+	}
+	return evalFunc(e.name, args)
+}
+
+func evalFunc(name string, args []Value) Value {
+	switch name {
+	case "lower":
+		if len(args) != 1 {
+			return NullVal()
+		}
+		return StringVal(strings.ToLower(toString(args[0])))
+	case "upper":
+		if len(args) != 1 {
+			return NullVal()
+		}
+		return StringVal(strings.ToUpper(toString(args[0])))
+	case "len":
+		if len(args) != 1 {
+			return NullVal()
+		}
+		v := args[0]
+		switch v.Kind {
+		case KindString:
+			return IntVal(len(v.Str))
+		case KindArray:
+			return IntVal(len(v.Arr))
+		default:
+			return IntVal(0)
+		}
+	case "trim":
+		if len(args) != 1 {
+			return NullVal()
+		}
+		return StringVal(strings.TrimSpace(toString(args[0])))
+	case "startswith":
+		if len(args) != 2 {
+			return NullVal()
+		}
+		return BoolVal(strings.HasPrefix(toString(args[0]), toString(args[1])))
+	case "endswith":
+		if len(args) != 2 {
+			return NullVal()
+		}
+		return BoolVal(strings.HasSuffix(toString(args[0]), toString(args[1])))
+	case "contains":
+		if len(args) != 2 {
+			return NullVal()
+		}
+		haystack := args[0]
+		needleStr := toString(args[1])
+		switch haystack.Kind {
+		case KindArray:
+			for _, item := range haystack.Arr {
+				if item == needleStr {
+					return BoolVal(true)
+				}
+			}
+			return BoolVal(false)
+		default:
+			return BoolVal(strings.Contains(toString(haystack), needleStr))
+		}
+	case "replace":
+		if len(args) != 3 {
+			return NullVal()
+		}
+		return StringVal(strings.ReplaceAll(toString(args[0]), toString(args[1]), toString(args[2])))
+	case "split":
+		if len(args) < 2 || len(args) > 3 {
+			return NullVal()
+		}
+		parts := strings.Split(toString(args[0]), toString(args[1]))
+		if len(args) == 3 {
+			// split(str, sep, N) → return Nth segment
+			idx := toInt(args[2])
+			if idx < 0 || idx >= len(parts) {
+				return NullVal()
+			}
+			return StringVal(parts[idx])
+		}
+		// split(str, sep) → return array
+		return ArrayVal(parts)
+	case "count":
+		if len(args) != 1 {
+			return NullVal()
+		}
+		v := args[0]
+		switch v.Kind {
+		case KindArray:
+			return IntVal(len(v.Arr))
+		case KindString:
+			return IntVal(len(v.Str))
+		default:
+			return IntVal(0)
+		}
+	default:
+		return NullVal()
+	}
 }
 
 func (e *fieldExpr) Eval(row Row) Value {
@@ -171,6 +331,8 @@ func toBool(v Value) bool {
 		return v.Int != 0
 	case KindString:
 		return v.Str != ""
+	case KindArray:
+		return len(v.Arr) > 0
 	default:
 		return false
 	}
@@ -226,6 +388,8 @@ func toString(v Value) string {
 		return strconv.Itoa(v.Int)
 	case KindBool:
 		return strconv.FormatBool(v.Bool)
+	case KindArray:
+		return strings.Join(v.Arr, ", ")
 	default:
 		return ""
 	}
@@ -249,6 +413,11 @@ func BoolVal(b bool) Value {
 // NullVal creates a null Value.
 func NullVal() Value {
 	return Value{Kind: KindNull}
+}
+
+// ArrayVal creates an array Value.
+func ArrayVal(arr []string) Value {
+	return Value{Kind: KindArray, Arr: arr}
 }
 
 // --- Parser ---
@@ -276,6 +445,14 @@ func (p *parser) peek() string {
 		return ""
 	}
 	return p.tokens[p.pos]
+}
+
+func (p *parser) peekAt(offset int) string {
+	idx := p.pos + offset
+	if idx >= len(p.tokens) {
+		return ""
+	}
+	return p.tokens[idx]
 }
 
 func (p *parser) next() string {
@@ -332,7 +509,7 @@ func (p *parser) parseComparison() (Expr, error) {
 	switch p.peek() {
 	case "==", "!=", ">", "<", ">=", "<=":
 		op := p.next()
-		right, err := p.parseUnary()
+		right, err := p.parseAlternative()
 		if err != nil {
 			return nil, err
 		}
@@ -351,22 +528,61 @@ func (p *parser) parseComparison() (Expr, error) {
 			return nil, errors.New("matches requires a field on the left side")
 		}
 		return &matchesExpr{field: fieldRef.name, pattern: re}, nil
+	case "contains":
+		p.next()
+		right, err := p.parseAlternative()
+		if err != nil {
+			return nil, err
+		}
+		return &containsExpr{left: left, right: right}, nil
 	}
 	return left, nil
 }
 
 func (p *parser) parseAlternative() (Expr, error) {
-	left, err := p.parseUnary()
+	left, err := p.parseAddSub()
 	if err != nil {
 		return nil, err
 	}
 	for p.peek() == "//" {
 		p.next()
-		right, err := p.parseUnary()
+		right, err := p.parseAddSub()
 		if err != nil {
 			return nil, err
 		}
 		left = &alternativeExpr{left: left, right: right}
+	}
+	return left, nil
+}
+
+func (p *parser) parseAddSub() (Expr, error) {
+	left, err := p.parseMulDiv()
+	if err != nil {
+		return nil, err
+	}
+	for p.peek() == "+" || p.peek() == "-" {
+		op := p.next()[0]
+		right, err := p.parseMulDiv()
+		if err != nil {
+			return nil, err
+		}
+		left = &arithmeticExpr{op: op, left: left, right: right}
+	}
+	return left, nil
+}
+
+func (p *parser) parseMulDiv() (Expr, error) {
+	left, err := p.parseUnary()
+	if err != nil {
+		return nil, err
+	}
+	for p.peek() == "*" || p.peek() == "/" {
+		op := p.next()[0]
+		right, err := p.parseUnary()
+		if err != nil {
+			return nil, err
+		}
+		left = &arithmeticExpr{op: op, left: left, right: right}
 	}
 	return left, nil
 }
@@ -381,6 +597,13 @@ func (p *parser) parseUnary() (Expr, error) {
 		return &notExpr{inner: inner}, nil
 	}
 	return p.parsePrimary()
+}
+
+// knownFuncs is the set of built-in function names recognized by the parser.
+var knownFuncs = map[string]bool{
+	"lower": true, "upper": true, "len": true, "trim": true,
+	"startswith": true, "endswith": true, "contains": true,
+	"replace": true, "split": true, "count": true,
 }
 
 func (p *parser) parsePrimary() (Expr, error) {
@@ -404,7 +627,7 @@ func (p *parser) parsePrimary() (Expr, error) {
 		return expr, nil
 	}
 
-	// Function calls
+	// has(field) — special: takes a field name, not an expression
 	if tok == "has" {
 		p.next()
 		if err := p.expect("("); err != nil {
@@ -417,6 +640,7 @@ func (p *parser) parsePrimary() (Expr, error) {
 		return &hasExpr{field: field}, nil
 	}
 
+	// matches(field, pattern) — special: compiles regex at parse time
 	if tok == "matches" {
 		p.next()
 		if err := p.expect("("); err != nil {
@@ -436,6 +660,31 @@ func (p *parser) parsePrimary() (Expr, error) {
 			return nil, err
 		}
 		return &matchesExpr{field: field, pattern: re}, nil
+	}
+
+	// Generic function calls: lower(expr), startswith(expr, expr), etc.
+	// Only treat as function call if followed by '('
+	if knownFuncs[tok] && p.peekAt(1) == "(" {
+		name := tok
+		p.next()
+		p.next() // consume '('
+		var args []Expr
+		for p.peek() != ")" && p.peek() != "" {
+			if len(args) > 0 {
+				if err := p.expect(","); err != nil {
+					return nil, err
+				}
+			}
+			arg, err := p.parseOr()
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, arg)
+		}
+		if err := p.expect(")"); err != nil {
+			return nil, err
+		}
+		return &funcCallExpr{name: name, args: args}, nil
 	}
 
 	// String literal (possibly with interpolation).
@@ -594,8 +843,16 @@ func tokenize(input string) []string {
 			}
 		}
 
-		// Single-character tokens
-		if ch == '(' || ch == ')' || ch == ',' || ch == '>' || ch == '<' {
+		// Single-character tokens (including arithmetic operators)
+		if ch == '(' || ch == ')' || ch == ',' || ch == '>' || ch == '<' ||
+			ch == '+' || ch == '-' || ch == '*' {
+			tokens = append(tokens, string(ch))
+			i++
+			continue
+		}
+
+		// '/' alone (not '//') is division
+		if ch == '/' {
 			tokens = append(tokens, string(ch))
 			i++
 			continue
@@ -634,7 +891,8 @@ func tokenize(input string) []string {
 		j := i
 		for j < len(input) && input[j] != ' ' && input[j] != '\t' && input[j] != '\n' &&
 			input[j] != '(' && input[j] != ')' && input[j] != ',' &&
-			input[j] != '>' && input[j] != '<' && input[j] != '=' && input[j] != '!' && input[j] != '/' {
+			input[j] != '>' && input[j] != '<' && input[j] != '=' && input[j] != '!' &&
+			input[j] != '/' && input[j] != '+' && input[j] != '-' && input[j] != '*' {
 			j++
 		}
 		if j > i {

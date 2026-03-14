@@ -1,6 +1,7 @@
 package oq
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -209,12 +210,28 @@ func schemaContentField(s *graph.SchemaNode, name string) expr.Value {
 		}
 		return expr.IntVal(0)
 
-	// --- Counts ---
+	// --- Counts & Arrays ---
+	case "required":
+		if schema != nil {
+			return expr.ArrayVal(schema.Required)
+		}
+		return expr.ArrayVal(nil)
 	case "required_count":
 		if schema != nil {
 			return expr.IntVal(len(schema.Required))
 		}
 		return expr.IntVal(0)
+	case "enum":
+		if schema != nil {
+			vals := make([]string, len(schema.Enum))
+			for i, e := range schema.Enum {
+				if e != nil {
+					vals[i] = fmt.Sprintf("%v", e.Value)
+				}
+			}
+			return expr.ArrayVal(vals)
+		}
+		return expr.ArrayVal(nil)
 	case "enum_count":
 		if schema != nil {
 			return expr.IntVal(len(schema.Enum))
@@ -315,7 +332,7 @@ func operationContentField(o *graph.OperationNode, name string) expr.Value {
 	case "security_count":
 		return expr.IntVal(len(op.Security))
 	case "tags":
-		return expr.StringVal(strings.Join(op.Tags, ", "))
+		return expr.ArrayVal(op.Tags)
 	}
 
 	return expr.NullVal()
@@ -371,6 +388,8 @@ func valueToString(v expr.Value) string {
 		return strconv.Itoa(v.Int)
 	case expr.KindBool:
 		return strconv.FormatBool(v.Bool)
+	case expr.KindArray:
+		return strings.Join(v.Arr, ", ")
 	default:
 		return ""
 	}
