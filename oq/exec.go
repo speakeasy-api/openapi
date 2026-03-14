@@ -182,7 +182,11 @@ func execWhere(stage Stage, result *Result, g *graph.SchemaGraph, env map[string
 		return nil, fmt.Errorf("where expression error: %w", err)
 	}
 
-	filtered := &Result{Fields: result.Fields}
+	filtered := &Result{
+		Fields:     result.Fields,
+		FormatHint: result.FormatHint,
+		EmitYAML:   result.EmitYAML,
+	}
 	for _, row := range result.Rows {
 		r := rowAdapter{row: row, g: g, env: env}
 		val := predicate.Eval(r)
@@ -264,7 +268,11 @@ func execTake(stage Stage, result *Result) (*Result, error) {
 
 func execUnique(result *Result) (*Result, error) {
 	seen := make(map[string]bool)
-	filtered := &Result{Fields: result.Fields}
+	filtered := &Result{
+		Fields:     result.Fields,
+		FormatHint: result.FormatHint,
+		EmitYAML:   result.EmitYAML,
+	}
 	for _, row := range result.Rows {
 		key := rowKey(row)
 		if !seen[key] {
