@@ -1207,10 +1207,10 @@ Query an OpenAPI specification using the oq pipeline language to answer structur
 openapi spec query 'schemas | where(isComponent) | sort-by(depth, desc) | take(10) | select name, depth' ./spec.yaml
 
 # OneOf unions missing discriminator
-openapi spec query 'schemas | where(isComponent and unionWidth > 0 and not hasDiscriminator) | select name, unionWidth' ./spec.yaml
+openapi spec query 'schemas | where(isComponent and unionWidth > 0 and not has(discriminator)) | select name, unionWidth' ./spec.yaml
 
 # Schemas missing descriptions
-openapi spec query 'schemas | where(isComponent and not hasDescription) | select name, type' ./spec.yaml
+openapi spec query 'schemas | where(isComponent and not has(description)) | select name, type' ./spec.yaml
 
 # Operations missing error responses
 openapi spec query 'operations | where(not hasErrorResponse) | select name, method, path' ./spec.yaml

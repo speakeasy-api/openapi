@@ -163,9 +163,7 @@ Content-level (from schema object):
   Field                        Type     Description
   ─────                        ────     ───────────
   description                  string   Schema description text
-  hasDescription              bool     Whether description is non-empty
   title                        string   Schema title
-  hasTitle                    bool     Whether title is non-empty
   format                       string   Format hint (date-time, uuid, int32, ...)
   pattern                      string   Regex validation pattern
   nullable                     bool     Nullable flag
@@ -173,13 +171,13 @@ Content-level (from schema object):
   writeOnly                   bool     Write-only flag
   deprecated                   bool     Deprecated flag
   uniqueItems                 bool     Array unique items constraint
-  hasDiscriminator            bool     Has discriminator object
   discriminatorProperty       string   Discriminator property name
   discriminatorMappingCount  int      Number of discriminator mappings
   requiredCount               int      Number of required properties
   enumCount                   int      Number of enum values
-  hasDefault                  bool     Has a default value
-  hasExample                  bool     Has example(s)
+
+  Use has() to check for any schema field: has(discriminator), has(default),
+  has(example), has(additionalProperties), has(xml), has(externalDocs), etc.
   minimum                      int?     Minimum numeric value (null if unset)
   maximum                      int?     Maximum numeric value (null if unset)
   minLength                   int?     Minimum string length (null if unset)
@@ -190,7 +188,7 @@ Content-level (from schema object):
   maxProperties               int?     Maximum object properties (null if unset)
   extensionCount              int      Number of x- extensions
   contentEncoding             string   Content encoding (base64, ...)
-  content_mediaType           string   Content media type
+  contentMediaType           string   Content media type
 
 OPERATION FIELDS
 ----------------
@@ -443,10 +441,10 @@ Security:
 Content auditing:
 
   # OneOf unions missing discriminator
-  components.schemas | where(unionWidth > 0 and not hasDiscriminator) | select name, unionWidth
+  components.schemas | where(unionWidth > 0 and not has(discriminator)) | select name, unionWidth
 
   # Schemas missing descriptions
-  components.schemas | where(not hasDescription) | select name, type
+  components.schemas | where(not has(description)) | select name, type
 
   # Operations missing error responses
   operations | where(not hasErrorResponse) | select name, method, path

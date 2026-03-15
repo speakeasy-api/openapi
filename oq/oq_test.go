@@ -2595,7 +2595,7 @@ func TestExecute_SchemaContentFields_Success(t *testing.T) {
 		{"maxProperties", false},
 		{"extensionCount", true},
 		{"contentEncoding", false},
-		{"content_mediaType", false},
+		{"contentMediaType", false},
 	}
 
 	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet")`, g)

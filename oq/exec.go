@@ -121,12 +121,12 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		return &Result{IsCount: true, Count: len(result.Rows)}, nil
 	case StageRefsOut:
 		if stage.Limit < 0 {
-			return execTraversal(result, g, traverseReachable)
+			return execRefsClosure(result, g, true)
 		}
 		return execTraversal(result, g, traverseRefsOut)
 	case StageRefsIn:
 		if stage.Limit < 0 {
-			return execTraversal(result, g, traverseAncestors)
+			return execRefsClosure(result, g, false)
 		}
 		return execTraversal(result, g, traverseRefsIn)
 	case StageProperties:
@@ -486,26 +486,83 @@ func resolveToOwner(idx int, g *graph.SchemaGraph) (int, *graph.Edge) {
 	}
 }
 
-func nodeIDsToRows(ids []graph.NodeID) []Row {
-	result := make([]Row, len(ids))
-	for i, id := range ids {
-		result[i] = Row{Kind: SchemaResult, SchemaIdx: int(id)}
-	}
-	return result
-}
+// execRefsClosure performs full BFS closure with bfsDepth and edge annotations.
+// outgoing=true follows OutEdges; outgoing=false follows InEdges.
+func execRefsClosure(result *Result, g *graph.SchemaGraph, outgoing bool) (*Result, error) {
+	out := deriveResult(result)
+	seen := make(map[int]bool)
 
-func traverseReachable(row Row, g *graph.SchemaGraph) []Row {
-	if row.Kind != SchemaResult {
-		return nil
-	}
-	return nodeIDsToRows(g.Reachable(graph.NodeID(row.SchemaIdx)))
-}
+	for _, row := range result.Rows {
+		if row.Kind != SchemaResult {
+			continue
+		}
+		seedName := schemaName(row.SchemaIdx, g)
+		type entry struct {
+			id    graph.NodeID
+			depth int
+			via   string
+			key   string
+			from  string
+		}
+		seedID := graph.NodeID(row.SchemaIdx)
+		queue := []entry{{id: seedID, depth: 0}}
+		visited := map[graph.NodeID]bool{seedID: true}
 
-func traverseAncestors(row Row, g *graph.SchemaGraph) []Row {
-	if row.Kind != SchemaResult {
-		return nil
+		for len(queue) > 0 {
+			cur := queue[0]
+			queue = queue[1:]
+
+			if cur.id != seedID && !seen[int(cur.id)] {
+				seen[int(cur.id)] = true
+				out.Rows = append(out.Rows, Row{
+					Kind:      SchemaResult,
+					SchemaIdx: int(cur.id),
+					BFSDepth:  cur.depth,
+					Target:    seedName,
+					Via:       cur.via,
+					Key:       cur.key,
+					From:      cur.from,
+				})
+			}
+
+			if outgoing {
+				for _, edge := range g.OutEdges(cur.id) {
+					if !visited[edge.To] {
+						visited[edge.To] = true
+						queue = append(queue, entry{
+							id:    edge.To,
+							depth: cur.depth + 1,
+							via:   edgeKindString(edge.Kind),
+							key:   edge.Label,
+							from:  schemaName(int(cur.id), g),
+						})
+					}
+				}
+			} else {
+				for _, edge := range g.InEdges(cur.id) {
+					resolvedIdx, structEdge := resolveToOwner(int(edge.From), g)
+					resolvedID := graph.NodeID(resolvedIdx)
+					via := edgeKindString(edge.Kind)
+					key := edge.Label
+					if structEdge != nil {
+						via = edgeKindString(structEdge.Kind)
+						key = structEdge.Label
+					}
+					if !visited[resolvedID] {
+						visited[resolvedID] = true
+						queue = append(queue, entry{
+							id:    resolvedID,
+							depth: cur.depth + 1,
+							via:   via,
+							key:   key,
+							from:  schemaName(resolvedIdx, g),
+						})
+					}
+				}
+			}
+		}
 	}
-	return nodeIDsToRows(g.Ancestors(graph.NodeID(row.SchemaIdx)))
+	return out, nil
 }
 
 func traverseProperties(row Row, g *graph.SchemaGraph) []Row {
@@ -648,22 +705,40 @@ func traverseItems(row Row, g *graph.SchemaGraph) []Row {
 	if len(result) > 0 {
 		return result
 	}
-	// If no direct items, check allOf members (composition may contain the array items)
+	// If no direct items, check allOf members (composition may contain the array items).
+	// Also check allOf members' properties for a property named "items" that is an array —
+	// handles the common pattern: allOf: [PaginationMeta, {properties: {items: {type: array, items: ...}}}]
 	fromName := schemaName(row.SchemaIdx, g)
 	for _, edge := range g.OutEdges(graph.NodeID(row.SchemaIdx)) {
 		if edge.Kind != graph.EdgeAllOf {
 			continue
 		}
 		memberIdx := resolveRefTarget(int(edge.To), g)
-		for _, itemEdge := range g.OutEdges(graph.NodeID(memberIdx)) {
-			if itemEdge.Kind == graph.EdgeItems {
+		for _, innerEdge := range g.OutEdges(graph.NodeID(memberIdx)) {
+			// Direct EdgeItems on allOf member
+			if innerEdge.Kind == graph.EdgeItems {
 				result = append(result, Row{
 					Kind:      SchemaResult,
-					SchemaIdx: int(itemEdge.To),
-					Via:       edgeKindString(itemEdge.Kind),
-					Key:       itemEdge.Label,
+					SchemaIdx: int(innerEdge.To),
+					Via:       edgeKindString(innerEdge.Kind),
+					Key:       innerEdge.Label,
 					From:      fromName,
 				})
+			}
+			// Property named "items" that is an array — follow its EdgeItems
+			if innerEdge.Kind == graph.EdgeProperty && innerEdge.Label == "items" {
+				propIdx := resolveRefTarget(int(innerEdge.To), g)
+				for _, itemEdge := range g.OutEdges(graph.NodeID(propIdx)) {
+					if itemEdge.Kind == graph.EdgeItems {
+						result = append(result, Row{
+							Kind:      SchemaResult,
+							SchemaIdx: resolveRefTarget(int(itemEdge.To), g),
+							Via:       edgeKindString(itemEdge.Kind),
+							Key:       "items",
+							From:      fromName,
+						})
+					}
+				}
 			}
 		}
 	}
@@ -1347,9 +1422,7 @@ func execFields(result *Result) (*Result, error) {
 			{"bfsDepth", "int"},
 			// Schema content
 			{"description", "string"},
-			{"hasDescription", "bool"},
 			{"title", "string"},
-			{"hasTitle", "bool"},
 			{"format", "string"},
 			{"pattern", "string"},
 			{"nullable", "bool"},
@@ -1357,13 +1430,10 @@ func execFields(result *Result) (*Result, error) {
 			{"writeOnly", "bool"},
 			{"deprecated", "bool"},
 			{"uniqueItems", "bool"},
-			{"hasDiscriminator", "bool"},
 			{"discriminatorProperty", "string"},
 			{"discriminatorMappingCount", "int"},
 			{"requiredCount", "int"},
 			{"enumCount", "int"},
-			{"hasDefault", "bool"},
-			{"hasExample", "bool"},
 			{"minimum", "int?"},
 			{"maximum", "int?"},
 			{"minLength", "int?"},
