@@ -660,13 +660,10 @@ func execPropertiesFixpoint(result *Result, g *graph.SchemaGraph) (*Result, erro
 			if len(props) == 0 {
 				// No properties — try following items edges for arrays.
 				// This lets properties(*) traverse into array element schemas.
+				// traverseProperties already sets qualified from paths
+				// (e.g., TransformDefinition/oneOf/JqTransform), so don't override.
 				for _, itemRow := range traverseItems(row, g) {
-					itemProps := traverseProperties(itemRow, g)
-					elemName := schemaName(itemRow.SchemaIdx, g)
-					for i := range itemProps {
-						itemProps[i].From = elemName
-					}
-					props = append(props, itemProps...)
+					props = append(props, traverseProperties(itemRow, g)...)
 				}
 			}
 			for _, prop := range props {
