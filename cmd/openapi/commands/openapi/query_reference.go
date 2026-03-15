@@ -64,10 +64,9 @@ in the schema reference graph.
   to-operations       Schemas → operations that use them
   to-schemas          Operations → schemas they touch
   path(A, B)          Shortest path between two named schemas (auto-tries both directions)
-  connected           Full connected component (schemas + operations)
-  blast-radius        Ancestors + all affected operations (change impact)
   neighbors           Bidirectional neighborhood, 1 hop (default)
-  neighbors(*)        Full bidirectional closure (schema-only, vs connected which includes operations)
+  neighbors(*)        Full bidirectional closure
+  blast-radius        Ancestors + all affected operations (change impact)
 
 NAVIGATION STAGES
 -----------------

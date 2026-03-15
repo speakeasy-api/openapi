@@ -32,7 +32,7 @@ Pipeline stages:
                properties, properties(*), members, items,
                additional-properties, pattern-properties,
                parent, to-operations, to-schemas,
-               path(A, B), connected, blast-radius, neighbors, neighbors(*)
+               path(A, B), neighbors, neighbors(*), blast-radius
   Analysis:    orphans, leaves, cycles, clusters, cross-tag, shared-refs
   Filter:      where(expr), select <fields>, sort-by(field, desc), take(N), last(N),
                sample(N), highest(N, field), lowest(N, field), unique,

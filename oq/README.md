@@ -53,10 +53,9 @@ source | stage | stage | ... | terminal
 | `parent` | Navigate to structural parent schema (via graph in-edges) |
 | `to-operations` | Schemas → operations |
 | `to-schemas` | Operations → schemas |
-| `path(A, B)` | Shortest path between two schemas |
-| `connected` | Full connected component (schemas + operations) |
+| `path(A, B)` | Shortest path between two schemas (with edge annotations) |
+| `neighbors` / `neighbors(*)` | Bidirectional neighborhood: 1-hop default, or full closure |
 | `blast-radius` | Ancestors + all affected operations |
-| `neighbors` / `neighbors(*)` | Bidirectional neighborhood: 1-hop default, or full closure (schema-only) |
 
 ### Navigation Stages
 

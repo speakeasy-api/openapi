@@ -161,7 +161,6 @@ const (
 	StageHighest
 	StageLowest
 	StageFormat
-	StageConnected
 	StageBlastRadius
 	StageNeighbors
 	StageOrphans

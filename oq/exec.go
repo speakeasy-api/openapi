@@ -185,8 +185,6 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 	case StageFormat:
 		result.FormatHint = stage.Format
 		return result, nil
-	case StageConnected:
-		return execConnected(result, g)
 	case StageBlastRadius:
 		return execBlastRadius(result, g)
 	case StageNeighbors:
@@ -877,31 +875,6 @@ func execOpsToSchemas(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	return out, nil
 }
 
-func execConnected(result *Result, g *graph.SchemaGraph) (*Result, error) {
-	var schemaSeeds, opSeeds []graph.NodeID
-	for _, row := range result.Rows {
-		switch row.Kind {
-		case SchemaResult:
-			schemaSeeds = append(schemaSeeds, graph.NodeID(row.SchemaIdx))
-		case OperationResult:
-			opSeeds = append(opSeeds, graph.NodeID(row.OpIdx))
-		default:
-			// Non-schema/operation rows don't participate in connectivity analysis
-		}
-	}
-
-	schemas, ops := g.ConnectedComponent(schemaSeeds, opSeeds)
-
-	out := deriveResult(result)
-	for _, id := range schemas {
-		out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: int(id)})
-	}
-	for _, id := range ops {
-		out.Rows = append(out.Rows, Row{Kind: OperationResult, OpIdx: int(id)})
-	}
-	return out, nil
-}
-
 func execBlastRadius(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	out := deriveResult(result)
 	seenSchemas := make(map[int]bool)
@@ -1354,8 +1327,6 @@ func describeStage(stage Stage) string {
 		return "Lowest: " + strconv.Itoa(stage.Limit) + " by " + stage.SortField + " ascending"
 	case StageFormat:
 		return "Format: " + stage.Format
-	case StageConnected:
-		return "Traverse: full connected component (schemas + operations)"
 	case StageBlastRadius:
 		return "Traverse: blast radius (ancestors + affected operations)"
 	case StageNeighbors:

@@ -64,7 +64,6 @@ func TestParse_Success(t *testing.T) {
 		{"items", "schemas | items"},
 		{"to-operations", "schemas | to-operations"},
 		{"schemas from ops", "operations | to-schemas"},
-		{"connected", "schemas | where(isComponent) | where(name == \"Pet\") | connected"},
 		{"blast-radius", "schemas | where(isComponent) | where(name == \"Pet\") | blast-radius"},
 		{"neighbors", "schemas | where(isComponent) | where(name == \"Pet\") | neighbors"},
 		{"orphans", "schemas | where(isComponent) | orphans"},
@@ -554,48 +553,6 @@ func TestExecute_Items_Success(t *testing.T) {
 	assert.NotNil(t, result, "result should not be nil")
 }
 
-func TestExecute_Connected_Success(t *testing.T) {
-	t.Parallel()
-	g := loadTestGraph(t)
-
-	// Start from Pet, connected should return schemas and operations in the same component
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | connected`, g)
-	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows, "connected should return rows")
-
-	// Should have both schema and operation rows
-	hasSchema := false
-	hasOp := false
-	for _, row := range result.Rows {
-		if row.Kind == oq.SchemaResult {
-			hasSchema = true
-		}
-		if row.Kind == oq.OperationResult {
-			hasOp = true
-		}
-	}
-	assert.True(t, hasSchema, "connected should include schema nodes")
-	assert.True(t, hasOp, "connected should include operation nodes")
-}
-
-func TestExecute_Connected_FromOps_Success(t *testing.T) {
-	t.Parallel()
-	g := loadTestGraph(t)
-
-	// Start from an operation, connected should also find schemas
-	result, err := oq.Execute(`operations | take(1) | connected`, g)
-	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows, "connected from operation should return rows")
-
-	hasSchema := false
-	for _, row := range result.Rows {
-		if row.Kind == oq.SchemaResult {
-			hasSchema = true
-		}
-	}
-	assert.True(t, hasSchema, "connected from operation should include schema nodes")
-}
-
 func TestExecute_EdgeAnnotations_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
@@ -1003,11 +960,6 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 			"explain with format",
 			"schemas | where(isComponent) | format json | explain",
 			[]string{"Format: json"},
-		},
-		{
-			"explain with connected",
-			"schemas | where(isComponent) | where(name == \"Pet\") | connected | explain",
-			[]string{"Traverse: full connected"},
 		},
 		{
 			"explain with blast-radius",

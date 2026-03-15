@@ -352,9 +352,6 @@ func parseStage(s string) (Stage, error) {
 	case "to-yaml":
 		return Stage{Kind: StageToYAML}, nil
 
-	case "connected":
-		return Stage{Kind: StageConnected}, nil
-
 	case "blast-radius":
 		return Stage{Kind: StageBlastRadius}, nil
 
