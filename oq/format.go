@@ -436,8 +436,24 @@ func resolveDefaultFields(rows []Row) []string {
 	if mixed {
 		return []string{"kind", "name"}
 	}
-	fields := defaultFieldsForKind(firstKind)
-	return fields
+
+	// Schema rows with edge annotations (from traversal stages) get
+	// traversal-oriented defaults instead of overview defaults.
+	if firstKind == SchemaResult && hasEdgeAnnotations(rows) {
+		return []string{"from", "key", "type", "bfsDepth"}
+	}
+
+	return defaultFieldsForKind(firstKind)
+}
+
+// hasEdgeAnnotations returns true if any row has populated edge fields.
+func hasEdgeAnnotations(rows []Row) bool {
+	for _, row := range rows {
+		if row.Via != "" || row.From != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func defaultFieldsForKind(kind ResultKind) []string {
