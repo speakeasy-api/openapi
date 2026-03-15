@@ -1698,8 +1698,22 @@ func execPath(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 	}
 
 	out := &Result{}
-	for _, id := range path {
-		out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: int(id)})
+	for i, id := range path {
+		row := Row{Kind: SchemaResult, SchemaIdx: int(id)}
+		// For nodes after the first, find the connecting edge from the previous node
+		if i > 0 {
+			prevID := path[i-1]
+			row.From = schemaName(int(prevID), g)
+			for _, edge := range g.OutEdges(prevID) {
+				if edge.To == id {
+					row.Via = edgeKindString(edge.Kind)
+					row.Key = edge.Label
+					break
+				}
+			}
+			row.BFSDepth = i
+		}
+		out.Rows = append(out.Rows, row)
 	}
 	return out, nil
 }

@@ -398,6 +398,32 @@ func TestExecute_Path_Success(t *testing.T) {
 	assert.Equal(t, "Address", names[len(names)-1], "path should end at Address")
 }
 
+func TestExecute_Path_EdgeAnnotations_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Path from Pet to Address should have edge annotations on intermediate/final nodes
+	result, err := oq.Execute(`schemas | path(Pet, Address) | select name, via, key, from, bfsDepth`, g)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(result.Rows), 3, "path should have at least 3 nodes")
+
+	// First node (Pet) has no edge annotation
+	first := result.Rows[0]
+	assert.Empty(t, oq.FieldValuePublic(first, "via", g).Str, "first node should have no via")
+	assert.Equal(t, 0, oq.FieldValuePublic(first, "bfsDepth", g).Int, "first node should have bfsDepth 0")
+
+	// Second node should have edge annotations from Pet
+	second := result.Rows[1]
+	assert.NotEmpty(t, oq.FieldValuePublic(second, "via", g).Str, "second node should have via")
+	assert.Equal(t, "Pet", oq.FieldValuePublic(second, "from", g).Str, "second node should come from Pet")
+	assert.Equal(t, 1, oq.FieldValuePublic(second, "bfsDepth", g).Int, "second node should have bfsDepth 1")
+
+	// Last node (Address) should have edge annotations
+	last := result.Rows[len(result.Rows)-1]
+	assert.NotEmpty(t, oq.FieldValuePublic(last, "via", g).Str, "last node should have via")
+	assert.Equal(t, "Address", oq.FieldValuePublic(last, "name", g).Str)
+}
+
 func TestExecute_Path_NotFound_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
