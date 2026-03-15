@@ -36,17 +36,27 @@ func run(stages []Stage, g *graph.SchemaGraph) (*Result, error) {
 		}
 	}
 
-	// Execute source stage
-	result, err := execSource(stages[0], g)
-	if err != nil {
-		return nil, err
+	// Execute first stage — either a source or path(A, B) which can stand alone
+	var result *Result
+	var err error
+	startIdx := 1
+	if stages[0].Kind == StagePath {
+		result, err = execPath(stages[0], g)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		result, err = execSource(stages[0], g)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Thread env through stages for let bindings
 	env := map[string]expr.Value{}
 
 	// Execute remaining stages
-	for _, stage := range stages[1:] {
+	for _, stage := range stages[startIdx:] {
 		result, env, err = execStageWithEnv(stage, result, g, env)
 		if err != nil {
 			return nil, err
@@ -1143,6 +1153,9 @@ func execSharedRefs(stage Stage, result *Result, g *graph.SchemaGraph) (*Result,
 	}
 
 	if len(ops) == 0 {
+		if len(result.Rows) > 0 {
+			return nil, fmt.Errorf("shared-refs requires operation rows, got %s rows\n  hint: operations | shared-refs(%d)", resultKindName(result.Rows[0].Kind), stage.Limit)
+		}
 		return deriveResult(result), nil
 	}
 
@@ -1487,6 +1500,7 @@ func execFields(result *Result) (*Result, error) {
 		}
 	case ResponseResult:
 		fields = []struct{ name, typ string }{
+			{"name", "string"},
 			{"statusCode", "string"},
 			{"description", "string"},
 			{"contentTypeCount", "int"},
@@ -1957,7 +1971,6 @@ func componentRows(g *graph.SchemaGraph, kind componentKind) []Row {
 				Kind:         ResponseResult,
 				Response:     r,
 				ComponentKey: name,
-				StatusCode:   name, // component key serves as identifier
 				SourceOpIdx:  -1,
 			})
 		}

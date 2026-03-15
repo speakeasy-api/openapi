@@ -126,6 +126,11 @@ func parsePipeline(query string) ([]Stage, error) {
 		}
 
 		if i == 0 {
+			// Allow path(A, B) as a source — it doesn't need an input set
+			if stage, err := parseStage(part); err == nil && stage.Kind == StagePath {
+				stages = append(stages, stage)
+				continue
+			}
 			stages = append(stages, Stage{Kind: StageSource, Source: part})
 			continue
 		}

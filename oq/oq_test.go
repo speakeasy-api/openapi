@@ -1964,9 +1964,12 @@ func TestExecute_ComponentsResponses(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, result.Rows, 1)
 
-	// Component responses use the component key as statusCode identifier
+	// Component responses have name (component key) and empty statusCode
+	name := oq.FieldValuePublic(result.Rows[0], "name", g)
+	assert.Equal(t, "NotFound", name.Str)
+
 	sc := oq.FieldValuePublic(result.Rows[0], "statusCode", g)
-	assert.Equal(t, "NotFound", sc.Str)
+	assert.Empty(t, sc.Str, "component responses should not have statusCode")
 }
 
 func TestExecute_GroupByWithNameField(t *testing.T) {
@@ -2685,8 +2688,8 @@ func TestExecute_ComponentResponseFields_Success(t *testing.T) {
 	require.NotEmpty(t, result.Rows)
 
 	row := result.Rows[0]
-	sc := oq.FieldValuePublic(row, "statusCode", g)
-	assert.Equal(t, "NotFound", sc.Str)
+	name := oq.FieldValuePublic(row, "name", g)
+	assert.Equal(t, "NotFound", name.Str)
 
 	desc := oq.FieldValuePublic(row, "description", g)
 	assert.Equal(t, "Resource not found", desc.Str)

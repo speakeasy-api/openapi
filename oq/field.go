@@ -247,6 +247,8 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.NullVal()
 		}
 		switch name {
+		case "name":
+			return expr.StringVal(row.ComponentKey) // component key for reusable responses, empty for inline
 		case "statusCode":
 			return expr.StringVal(row.StatusCode)
 		case "description":
