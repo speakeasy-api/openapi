@@ -557,48 +557,20 @@ func schemaRawField(schema *oas3.Schema, name string) expr.Value {
 }
 
 // probeSchemaField checks if a named field exists and is non-nil on the schema.
+// probeSchemaField checks for arbitrary schema fields not covered by the
+// pre-defined field set. Returns (value, true) if the field is recognized,
+// (null, false) if not.
 func probeSchemaField(schema *oas3.Schema, name string) (expr.Value, bool) {
+	// Presence-check fields: non-nil → true, nil → null
+	if probe, ok := schemaPresenceProbes[name]; ok {
+		if probe(schema) {
+			return expr.BoolVal(true), true
+		}
+		return expr.NullVal(), true
+	}
+
+	// Value-returning fields
 	switch name {
-	case "additionalProperties":
-		if schema.AdditionalProperties != nil {
-			return expr.BoolVal(true), true
-		}
-		return expr.NullVal(), true
-	case "patternProperties":
-		if schema.PatternProperties != nil && schema.PatternProperties.Len() > 0 {
-			return expr.BoolVal(true), true
-		}
-		return expr.NullVal(), true
-	case "xml":
-		if schema.XML != nil {
-			return expr.BoolVal(true), true
-		}
-		return expr.NullVal(), true
-	case "externalDocs":
-		if schema.ExternalDocs != nil {
-			return expr.BoolVal(true), true
-		}
-		return expr.NullVal(), true
-	case "not":
-		if schema.Not != nil {
-			return expr.BoolVal(true), true
-		}
-		return expr.NullVal(), true
-	case "if":
-		if schema.If != nil {
-			return expr.BoolVal(true), true
-		}
-		return expr.NullVal(), true
-	case "then":
-		if schema.Then != nil {
-			return expr.BoolVal(true), true
-		}
-		return expr.NullVal(), true
-	case "else":
-		if schema.Else != nil {
-			return expr.BoolVal(true), true
-		}
-		return expr.NullVal(), true
 	case "const":
 		if schema.Const != nil {
 			return expr.StringVal(schema.Const.Value), true
@@ -607,36 +579,6 @@ func probeSchemaField(schema *oas3.Schema, name string) (expr.Value, bool) {
 	case "multipleOf":
 		if schema.MultipleOf != nil {
 			return expr.IntVal(int(*schema.MultipleOf)), true
-		}
-		return expr.NullVal(), true
-	case "contains":
-		if schema.Contains != nil {
-			return expr.BoolVal(true), true
-		}
-		return expr.NullVal(), true
-	case "propertyNames":
-		if schema.PropertyNames != nil {
-			return expr.BoolVal(true), true
-		}
-		return expr.NullVal(), true
-	case "prefixItems":
-		if len(schema.PrefixItems) > 0 {
-			return expr.IntVal(len(schema.PrefixItems)), true
-		}
-		return expr.NullVal(), true
-	case "dependentSchemas":
-		if schema.DependentSchemas != nil && schema.DependentSchemas.Len() > 0 {
-			return expr.IntVal(schema.DependentSchemas.Len()), true
-		}
-		return expr.NullVal(), true
-	case "unevaluatedItems":
-		if schema.UnevaluatedItems != nil {
-			return expr.BoolVal(true), true
-		}
-		return expr.NullVal(), true
-	case "unevaluatedProperties":
-		if schema.UnevaluatedProperties != nil {
-			return expr.BoolVal(true), true
 		}
 		return expr.NullVal(), true
 	case "anchor":
@@ -652,6 +594,16 @@ func probeSchemaField(schema *oas3.Schema, name string) (expr.Value, bool) {
 	case "schema":
 		if schema.Schema != nil {
 			return expr.StringVal(*schema.Schema), true
+		}
+		return expr.NullVal(), true
+	case "prefixItems":
+		if len(schema.PrefixItems) > 0 {
+			return expr.IntVal(len(schema.PrefixItems)), true
+		}
+		return expr.NullVal(), true
+	case "dependentSchemas":
+		if schema.DependentSchemas != nil && schema.DependentSchemas.Len() > 0 {
+			return expr.IntVal(schema.DependentSchemas.Len()), true
 		}
 		return expr.NullVal(), true
 	case "defs":
@@ -681,6 +633,23 @@ func probeSchemaField(schema *oas3.Schema, name string) (expr.Value, bool) {
 	}
 
 	return expr.NullVal(), false
+}
+
+// schemaPresenceProbes maps field names to nil-checks on the schema.
+// Each returns true if the field is present/non-nil.
+var schemaPresenceProbes = map[string]func(*oas3.Schema) bool{
+	"additionalProperties":  func(s *oas3.Schema) bool { return s.AdditionalProperties != nil },
+	"patternProperties":     func(s *oas3.Schema) bool { return s.PatternProperties != nil && s.PatternProperties.Len() > 0 },
+	"xml":                   func(s *oas3.Schema) bool { return s.XML != nil },
+	"externalDocs":          func(s *oas3.Schema) bool { return s.ExternalDocs != nil },
+	"not":                   func(s *oas3.Schema) bool { return s.Not != nil },
+	"if":                    func(s *oas3.Schema) bool { return s.If != nil },
+	"then":                  func(s *oas3.Schema) bool { return s.Then != nil },
+	"else":                  func(s *oas3.Schema) bool { return s.Else != nil },
+	"contains":              func(s *oas3.Schema) bool { return s.Contains != nil },
+	"propertyNames":         func(s *oas3.Schema) bool { return s.PropertyNames != nil },
+	"unevaluatedItems":      func(s *oas3.Schema) bool { return s.UnevaluatedItems != nil },
+	"unevaluatedProperties": func(s *oas3.Schema) bool { return s.UnevaluatedProperties != nil },
 }
 
 // operationContentField resolves fields by reading the underlying operation object.

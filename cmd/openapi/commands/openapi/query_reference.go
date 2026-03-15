@@ -62,8 +62,7 @@ in the schema reference graph.
   connected           Full connected component (schemas + operations)
   blast-radius        Ancestors + all affected operations (change impact)
   neighbors           Bidirectional neighborhood, 1 hop (default)
-  neighbors(N)        Bidirectional neighborhood within N hops
-  neighbors(*)        Full bidirectional closure
+  neighbors(*)        Full bidirectional closure (schema-only, vs connected which includes operations)
 
 NAVIGATION STAGES
 -----------------

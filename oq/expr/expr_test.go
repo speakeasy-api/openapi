@@ -664,3 +664,200 @@ func TestEval_ArrayVal(t *testing.T) {
 	result = e.Eval(testRow{"tags": expr.ArrayVal(nil)})
 	assert.False(t, result.Bool)
 }
+
+func TestEvalFunc_Coverage(t *testing.T) {
+	t.Parallel()
+
+	row := testRow{
+		"name":  expr.StringVal("Hello World"),
+		"items": expr.ArrayVal([]string{"a", "b", "c"}),
+		"num":   expr.IntVal(42),
+	}
+
+	// count() on array
+	e, err := expr.Parse(`count(items)`)
+	require.NoError(t, err)
+	assert.Equal(t, 3, e.Eval(row).Int)
+
+	// count() on string
+	e, _ = expr.Parse(`count(name)`)
+	assert.Equal(t, 11, e.Eval(row).Int)
+
+	// replace()
+	e, _ = expr.Parse(`replace(name, "World", "Go")`)
+	assert.Equal(t, "Hello Go", e.Eval(row).Str)
+
+	// split() with 2 args → array
+	e, _ = expr.Parse(`split(name, " ")`)
+	result := e.Eval(row)
+	assert.Equal(t, expr.KindArray, result.Kind)
+
+	// split() with 3 args → Nth segment
+	e, _ = expr.Parse(`split(name, " ", 1)`)
+	assert.Equal(t, "World", e.Eval(row).Str)
+
+	// split() with out-of-range index
+	e, _ = expr.Parse(`split(name, " ", 99)`)
+	assert.Equal(t, expr.KindNull, e.Eval(row).Kind)
+
+	// len() on int → 0
+	e, _ = expr.Parse(`len(num)`)
+	assert.Equal(t, 0, e.Eval(row).Int)
+
+	// Wrong arg count
+	e, _ = expr.Parse(`lower()`)
+	assert.Equal(t, expr.KindNull, e.Eval(row).Kind)
+
+	// trim()
+	e, _ = expr.Parse(`trim(name)`)
+	assert.Equal(t, "Hello World", e.Eval(row).Str)
+
+	// default keyword as alias for //
+	e, _ = expr.Parse(`missing default "fallback"`)
+	assert.Equal(t, "fallback", e.Eval(row).Str)
+}
+
+func TestMatches_ArrayField(t *testing.T) {
+	t.Parallel()
+
+	row := testRow{
+		"tags": expr.ArrayVal([]string{"api", "beta", "internal"}),
+	}
+
+	e, err := expr.Parse(`tags matches "^be"`)
+	require.NoError(t, err)
+	assert.True(t, e.Eval(row).Bool)
+
+	e, _ = expr.Parse(`tags matches "^zzz"`)
+	assert.False(t, e.Eval(row).Bool)
+}
+
+func TestStartsEndsWith_ArrayField(t *testing.T) {
+	t.Parallel()
+
+	row := testRow{
+		"tags": expr.ArrayVal([]string{"api-v1", "beta", "internal"}),
+	}
+
+	// startswith on array
+	e, _ := expr.Parse(`startswith(tags, "api")`)
+	assert.True(t, e.Eval(row).Bool)
+
+	e, _ = expr.Parse(`startswith(tags, "zzz")`)
+	assert.False(t, e.Eval(row).Bool)
+
+	// endswith on array
+	e, _ = expr.Parse(`endswith(tags, "nal")`)
+	assert.True(t, e.Eval(row).Bool)
+
+	e, _ = expr.Parse(`endswith(tags, "zzz")`)
+	assert.False(t, e.Eval(row).Bool)
+
+	// infix form
+	e, _ = expr.Parse(`tags startswith "api"`)
+	assert.True(t, e.Eval(row).Bool)
+
+	e, _ = expr.Parse(`tags endswith "nal"`)
+	assert.True(t, e.Eval(row).Bool)
+}
+
+func TestArithmetic_Coverage(t *testing.T) {
+	t.Parallel()
+	row := testRow{"x": expr.IntVal(10), "y": expr.IntVal(3)}
+
+	e, _ := expr.Parse(`x - y`)
+	assert.Equal(t, 7, e.Eval(row).Int)
+
+	e, _ = expr.Parse(`x * y`)
+	assert.Equal(t, 30, e.Eval(row).Int)
+
+	// Division by zero
+	e, _ = expr.Parse(`x / 0`)
+	assert.Equal(t, expr.KindNull, e.Eval(row).Kind)
+}
+
+func TestComparison_Coverage(t *testing.T) {
+	t.Parallel()
+	row := testRow{
+		"a": expr.IntVal(5),
+		"b": expr.IntVal(10),
+		"s": expr.StringVal("hello"),
+		"n": expr.NullVal(),
+	}
+
+	// <=
+	e, _ := expr.Parse(`a <= b`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// >=
+	e, _ = expr.Parse(`b >= a`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// toBool on null
+	e, _ = expr.Parse(`not n`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// toBool on int 0
+	e, _ = expr.Parse(`not 0`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// toString on null
+	e, _ = expr.Parse(`n == ""`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// toString on bool
+	e, _ = expr.Parse(`true == "true"`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// toInt on string
+	e, _ = expr.Parse(`"42" > 41`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// toInt on null
+	e, _ = expr.Parse(`n > 0`)
+	assert.False(t, e.Eval(row).Bool)
+}
+
+func TestContains_ArrayValue(t *testing.T) {
+	t.Parallel()
+	row := testRow{
+		"tags": expr.ArrayVal([]string{"api", "beta"}),
+	}
+
+	e, _ := expr.Parse(`tags contains "api"`)
+	assert.True(t, e.Eval(row).Bool)
+
+	e, _ = expr.Parse(`tags contains "nope"`)
+	assert.False(t, e.Eval(row).Bool)
+}
+
+func TestParse_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	// Unterminated interpolation
+	_, err := expr.Parse(`"\(name"`)
+	require.Error(t, err)
+
+	// Unexpected token at end
+	_, err = expr.Parse(`name )`)
+	require.Error(t, err)
+
+	// Trailing operator
+	_, err = expr.Parse(`name ==`)
+	require.Error(t, err)
+
+	// Single-quoted string (no interpolation)
+	e, err := expr.Parse(`'hello'`)
+	require.NoError(t, err)
+	assert.Equal(t, "hello", e.Eval(testRow{}).Str)
+
+	// elif chain
+	e, err = expr.Parse(`if false then 1 elif true then 2 else 3 end`)
+	require.NoError(t, err)
+	assert.Equal(t, 2, e.Eval(testRow{}).Int)
+
+	// if-then-end (no else)
+	e, err = expr.Parse(`if false then 1 end`)
+	require.NoError(t, err)
+	assert.Equal(t, expr.KindNull, e.Eval(testRow{}).Kind)
+}

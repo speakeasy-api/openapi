@@ -275,12 +275,11 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageSample, Limit: n}, nil
 
 	case "neighbors":
-		if isCall && args != "" {
-			limit, err := parseDepthArg(args, "neighbors")
-			if err != nil {
-				return Stage{}, err
-			}
-			return Stage{Kind: StageNeighbors, Limit: limit}, nil
+		if isCall && strings.TrimSpace(args) == "*" {
+			return Stage{Kind: StageNeighbors, Limit: -1}, nil
+		}
+		if isCall {
+			return Stage{}, errors.New("neighbors accepts only * for full closure: neighbors(*)")
 		}
 		// Default: 1-hop
 		return Stage{Kind: StageNeighbors, Limit: 1}, nil

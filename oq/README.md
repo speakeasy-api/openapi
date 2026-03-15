@@ -52,7 +52,7 @@ source | stage | stage | ... | terminal
 | `path(A, B)` | Shortest path between two schemas |
 | `connected` | Full connected component (schemas + operations) |
 | `blast-radius` | Ancestors + all affected operations |
-| `neighbors(N)` | Bidirectional neighborhood within N hops |
+| `neighbors` / `neighbors(*)` | Bidirectional neighborhood: 1-hop default, or full closure (schema-only) |
 
 ### Navigation Stages
 
@@ -337,8 +337,8 @@ schemas | where(isComponent) | where(name == "Pet") | refs-out | select name, vi
 # Blast radius — what breaks if Error changes?
 schemas | where(isComponent) | where(name == "Error") | blast-radius | length
 
-# 2-hop neighborhood
-schemas | where(isComponent) | where(name == "Pet") | neighbors(2) | select name
+# 1-hop neighborhood
+schemas | where(isComponent) | where(name == "Pet") | neighbors | select name
 
 # Orphaned schemas
 schemas | where(isComponent) | orphans | select name

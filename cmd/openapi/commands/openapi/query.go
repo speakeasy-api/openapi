@@ -29,7 +29,7 @@ Pipeline stages:
                to-schema, operation, security
   Traversal:   refs-out, refs-out(*), refs-in, refs-in(*),
                properties, properties(*), members, items, parent, to-operations,
-               to-schemas, path(A, B), connected, blast-radius, neighbors(N)
+               to-schemas, path(A, B), connected, blast-radius, neighbors, neighbors(*)
   Analysis:    orphans, leaves, cycles, clusters, cross-tag, shared-refs
   Filter:      where(expr), select <fields>, sort-by(field, desc), take(N), last(N),
                sample(N), highest(N, field), lowest(N, field), unique,
