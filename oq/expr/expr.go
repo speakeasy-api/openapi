@@ -160,7 +160,19 @@ func (e *hasExpr) Eval(row Row) Value {
 
 func (e *matchesExpr) Eval(row Row) Value {
 	v := row.Field(e.field)
-	return Value{Kind: KindBool, Bool: v.Kind == KindString && e.pattern.MatchString(v.Str)}
+	switch v.Kind {
+	case KindString:
+		return BoolVal(e.pattern.MatchString(v.Str))
+	case KindArray:
+		for _, item := range v.Arr {
+			if e.pattern.MatchString(item) {
+				return BoolVal(true)
+			}
+		}
+		return BoolVal(false)
+	default:
+		return BoolVal(false)
+	}
 }
 
 func (e *containsExpr) Eval(row Row) Value {
@@ -224,12 +236,30 @@ func evalFunc(name string, args []Value) Value {
 		if len(args) != 2 {
 			return NullVal()
 		}
-		return BoolVal(strings.HasPrefix(toString(args[0]), toString(args[1])))
+		prefix := toString(args[1])
+		if args[0].Kind == KindArray {
+			for _, item := range args[0].Arr {
+				if strings.HasPrefix(item, prefix) {
+					return BoolVal(true)
+				}
+			}
+			return BoolVal(false)
+		}
+		return BoolVal(strings.HasPrefix(toString(args[0]), prefix))
 	case "endswith":
 		if len(args) != 2 {
 			return NullVal()
 		}
-		return BoolVal(strings.HasSuffix(toString(args[0]), toString(args[1])))
+		suffix := toString(args[1])
+		if args[0].Kind == KindArray {
+			for _, item := range args[0].Arr {
+				if strings.HasSuffix(item, suffix) {
+					return BoolVal(true)
+				}
+			}
+			return BoolVal(false)
+		}
+		return BoolVal(strings.HasSuffix(toString(args[0]), suffix))
 	case "contains":
 		if len(args) != 2 {
 			return NullVal()
@@ -522,6 +552,20 @@ func (p *parser) parseComparison() (Expr, error) {
 			return nil, err
 		}
 		return &containsExpr{left: left, right: right}, nil
+	case "startswith":
+		p.next()
+		right, err := p.parseAlternative()
+		if err != nil {
+			return nil, err
+		}
+		return &funcCallExpr{name: "startswith", args: []Expr{left, right}}, nil
+	case "endswith":
+		p.next()
+		right, err := p.parseAlternative()
+		if err != nil {
+			return nil, err
+		}
+		return &funcCallExpr{name: "endswith", args: []Expr{left, right}}, nil
 	}
 	return left, nil
 }
@@ -531,7 +575,7 @@ func (p *parser) parseAlternative() (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	for p.peek() == "//" {
+	for p.peek() == "//" || p.peek() == "default" {
 		p.next()
 		right, err := p.parseAddSub()
 		if err != nil {

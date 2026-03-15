@@ -2,7 +2,6 @@ package oq
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -23,18 +22,13 @@ func FormatTable(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	// Use group-specific formatting only when no explicit field projection
-	if len(result.Groups) > 0 && len(result.Fields) == 0 {
-		return formatGroups(result)
-	}
-
 	if len(result.Rows) == 0 {
-		return "(empty)"
+		return "(empty)\n"
 	}
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		fields = defaultFieldsForKind(result.Rows[0].Kind)
+		fields = resolveDefaultFields(result.Rows)
 	}
 
 	// Build header
@@ -81,7 +75,12 @@ func FormatTable(result *Result, g *graph.SchemaGraph) string {
 			if i > 0 {
 				sb.WriteString("  ")
 			}
-			sb.WriteString(padRight(col, widths[i]))
+			// Don't pad the last column — avoids massive trailing whitespace
+			if i < len(row)-1 {
+				sb.WriteString(padRight(col, widths[i]))
+			} else {
+				sb.WriteString(col)
+			}
 		}
 		sb.WriteString("\n")
 	}
@@ -101,17 +100,13 @@ func FormatJSON(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	if len(result.Groups) > 0 && len(result.Fields) == 0 {
-		return formatGroupsJSON(result)
-	}
-
 	if len(result.Rows) == 0 {
 		return "[]"
 	}
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		fields = defaultFieldsForKind(result.Rows[0].Kind)
+		fields = resolveDefaultFields(result.Rows)
 	}
 
 	var sb strings.Builder
@@ -146,23 +141,13 @@ func FormatMarkdown(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	if len(result.Groups) > 0 && len(result.Fields) == 0 {
-		var sb strings.Builder
-		sb.WriteString("| Key | Count |\n")
-		sb.WriteString("| --- | --- |\n")
-		for _, grp := range result.Groups {
-			fmt.Fprintf(&sb, "| %s | %d |\n", grp.Key, grp.Count)
-		}
-		return sb.String()
-	}
-
 	if len(result.Rows) == 0 {
-		return "(empty)"
+		return "(empty)\n"
 	}
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		fields = defaultFieldsForKind(result.Rows[0].Kind)
+		fields = resolveDefaultFields(result.Rows)
 	}
 
 	var sb strings.Builder
@@ -206,17 +191,13 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 
 	syncGroupsFromRows(result)
 
-	if len(result.Groups) > 0 && len(result.Fields) == 0 {
-		return formatGroupsToon(result)
-	}
-
 	if len(result.Rows) == 0 {
 		return "results[0]:\n"
 	}
 
 	fields := result.Fields
 	if len(fields) == 0 {
-		fields = defaultFieldsForKind(result.Rows[0].Kind)
+		fields = resolveDefaultFields(result.Rows)
 	}
 
 	var sb strings.Builder
@@ -253,10 +234,6 @@ func FormatYAML(result *Result, g *graph.SchemaGraph) string {
 	}
 
 	syncGroupsFromRows(result)
-
-	if len(result.Groups) > 0 && len(result.Fields) == 0 {
-		return formatGroupsJSON(result)
-	}
 
 	if len(result.Rows) == 0 {
 		return ""
@@ -345,22 +322,22 @@ func getRootNode(row Row, g *graph.SchemaGraph) *yaml.Node {
 		if row.SecurityScheme != nil {
 			return row.SecurityScheme.GetRootNode()
 		}
+	case ServerResult:
+		if row.Server != nil {
+			return row.Server.GetRootNode()
+		}
+	case TagResult:
+		if row.Tag != nil {
+			return row.Tag.GetRootNode()
+		}
+	case LinkResult:
+		if row.Link != nil {
+			return row.Link.GetRootNode()
+		}
 	default:
 		return nil
 	}
 	return nil
-}
-
-func formatGroupsToon(result *Result) string {
-	var sb strings.Builder
-
-	// Groups as tabular array
-	fmt.Fprintf(&sb, "groups[%d]{key,count,names}:\n", len(result.Groups))
-	for _, grp := range result.Groups {
-		names := strings.Join(grp.Names, ";")
-		fmt.Fprintf(&sb, " %s,%d,%s\n", toonEscape(grp.Key), grp.Count, toonEscape(names))
-	}
-	return sb.String()
 }
 
 // toonValue encodes an expr.Value for TOON format.
@@ -372,6 +349,8 @@ func toonValue(v expr.Value) string {
 		return strconv.Itoa(v.Int)
 	case expr.KindBool:
 		return strconv.FormatBool(v.Bool)
+	case expr.KindArray:
+		return toonEscape(strings.Join(v.Arr, ";"))
 	default:
 		return "null"
 	}
@@ -439,70 +418,128 @@ func jsonValue(v expr.Value) string {
 		return strconv.Itoa(v.Int)
 	case expr.KindBool:
 		return strconv.FormatBool(v.Bool)
+	case expr.KindArray:
+		var sb strings.Builder
+		sb.WriteByte('[')
+		for i, s := range v.Arr {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			fmt.Fprintf(&sb, "%q", s)
+		}
+		sb.WriteByte(']')
+		return sb.String()
 	default:
 		return "null"
 	}
 }
 
-func formatGroups(result *Result) string {
-	var sb strings.Builder
-	for _, g := range result.Groups {
-		fmt.Fprintf(&sb, "%s: count=%d", g.Key, g.Count)
-		if len(g.Names) > 0 {
-			names := slices.Clone(g.Names)
-			if len(names) > 5 {
-				names = names[:5]
-				names = append(names, "...")
-			}
-			fmt.Fprintf(&sb, " names=[%s]", strings.Join(names, ", "))
-		}
-		sb.WriteString("\n")
+// resolveDefaultFields returns default fields for the result set.
+// For homogeneous results, uses the kind-specific defaults.
+// For mixed results (e.g., blast-radius returning schemas + operations),
+// prepends "kind" so the row type is visible.
+func resolveDefaultFields(rows []Row) []string {
+	if len(rows) == 0 {
+		return []string{"name"}
 	}
-	return sb.String()
+	firstKind := rows[0].Kind
+	mixed := false
+	for _, row := range rows[1:] {
+		if row.Kind != firstKind {
+			mixed = true
+			break
+		}
+	}
+	if mixed {
+		return []string{"kind", "name"}
+	}
+
+	// Schema rows with edge annotations (from traversal stages) get
+	// traversal-oriented defaults instead of overview defaults.
+	if firstKind == SchemaResult && hasEdgeAnnotations(rows) {
+		if hasBidiAnnotations(rows) {
+			return []string{"name", "direction", "via", "key", "bfsDepth"}
+		}
+		return []string{"from", "key", "type", "bfsDepth"}
+	}
+
+	return defaultFieldsForKind(firstKind)
 }
 
-func formatGroupsJSON(result *Result) string {
-	var sb strings.Builder
-	sb.WriteString("[\n")
-	for i, g := range result.Groups {
-		if i > 0 {
-			sb.WriteString(",\n")
+// expandStarFields replaces "*" in a field list with the context-aware defaults.
+// e.g., ["*", "bfsDepth"] → ["name", "type", "depth", "inDegree", "outDegree", "bfsDepth"]
+func expandStarFields(fields []string, rows []Row) []string {
+	hasStar := false
+	for _, f := range fields {
+		if f == "*" {
+			hasStar = true
+			break
 		}
-		fmt.Fprintf(&sb, `  {"key": %q, "count": %d, "names": [`, g.Key, g.Count)
-		for j, n := range g.Names {
-			if j > 0 {
-				sb.WriteString(", ")
-			}
-			fmt.Fprintf(&sb, "%q", n)
-		}
-		sb.WriteString("]}")
 	}
-	sb.WriteString("\n]")
-	return sb.String()
+	if !hasStar {
+		return fields
+	}
+
+	defaults := resolveDefaultFields(rows)
+	var result []string
+	for _, f := range fields {
+		if f == "*" {
+			result = append(result, defaults...)
+		} else {
+			result = append(result, f)
+		}
+	}
+	return result
+}
+
+// hasEdgeAnnotations returns true if any row has populated edge fields.
+func hasEdgeAnnotations(rows []Row) bool {
+	for _, row := range rows {
+		if row.Via != "" || row.From != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// hasBidiAnnotations returns true if any row has a populated Direction field.
+func hasBidiAnnotations(rows []Row) bool {
+	for _, row := range rows {
+		if row.Direction != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func defaultFieldsForKind(kind ResultKind) []string {
 	switch kind {
 	case SchemaResult:
-		return []string{"name", "type", "depth", "in_degree", "out_degree"}
+		return []string{"name", "type", "depth", "inDegree", "outDegree"}
 	case OperationResult:
-		return []string{"name", "method", "path", "schema_count"}
+		return []string{"name", "method", "path", "schemaCount"}
 	case GroupRowResult:
 		return []string{"key", "count", "names"}
 	case ParameterResult:
 		return []string{"name", "in", "required", "deprecated", "operation"}
 	case ResponseResult:
-		return []string{"status_code", "description", "content_type_count", "operation"}
+		return []string{"statusCode", "description", "contentTypeCount", "operation"}
 	case RequestBodyResult:
-		return []string{"description", "required", "content_type_count", "operation"}
+		return []string{"description", "required", "contentTypeCount", "operation"}
 	case ContentTypeResult:
-		return []string{"media_type", "has_schema", "status_code", "operation"}
+		return []string{"mediaType", "hasSchema", "statusCode", "operation"}
 	case HeaderResult:
-		return []string{"name", "required", "status_code", "operation"}
+		return []string{"name", "required", "statusCode", "operation"}
 	case SecuritySchemeResult:
-		return []string{"name", "type", "in", "scheme"}
+		return []string{"name", "schemeType", "in", "scheme"}
 	case SecurityRequirementResult:
-		return []string{"scheme_name", "scheme_type", "scopes", "operation"}
+		return []string{"schemeName", "schemeType", "scopes", "operation"}
+	case ServerResult:
+		return []string{"url", "description", "variableCount"}
+	case TagResult:
+		return []string{"name", "description", "operationCount"}
+	case LinkResult:
+		return []string{"name", "operationId", "description", "operation"}
 	default:
 		return []string{"name"}
 	}
@@ -540,7 +577,7 @@ func emitKey(row Row, g *graph.SchemaGraph) string {
 	switch row.Kind {
 	case SchemaResult:
 		// Use path for full attribution; fall back to name
-		if path := valueToString(fieldValue(row, "path", g)); path != "" {
+		if path := valueToString(fieldValue(row, "location", g)); path != "" {
 			return path
 		}
 		return valueToString(fieldValue(row, "name", g))
@@ -583,6 +620,22 @@ func emitKey(row Row, g *graph.SchemaGraph) string {
 		return row.HeaderName
 	case SecuritySchemeResult:
 		return row.SchemeName
+	case ServerResult:
+		if row.Server != nil {
+			return row.Server.URL
+		}
+		return "server"
+	case TagResult:
+		if row.Tag != nil {
+			return row.Tag.Name
+		}
+		return "tag"
+	case LinkResult:
+		op := operationName(row.SourceOpIdx, g)
+		if op != "" {
+			return op + "/" + row.StatusCode + "/links/" + row.LinkName
+		}
+		return row.LinkName
 	default:
 		return valueToString(fieldValue(row, "name", g))
 	}

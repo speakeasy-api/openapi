@@ -1204,28 +1204,28 @@ Query an OpenAPI specification using the oq pipeline language to answer structur
 
 ```bash
 # Find deeply nested components
-openapi spec query 'schemas | select(is_component) | sort_by(depth; desc) | first(10) | pick name, depth' ./spec.yaml
+openapi spec query 'schemas | where(isComponent) | sort-by(depth, desc) | take(10) | select name, depth' ./spec.yaml
 
 # OneOf unions missing discriminator
-openapi spec query 'schemas | select(is_component and union_width > 0 and not has_discriminator) | pick name, union_width' ./spec.yaml
+openapi spec query 'schemas | where(isComponent and unionWidth > 0 and not has(discriminator)) | select name, unionWidth' ./spec.yaml
 
 # Schemas missing descriptions
-openapi spec query 'schemas | select(is_component and not has_description) | pick name, type' ./spec.yaml
+openapi spec query 'schemas | where(isComponent and not has(description)) | select name, type' ./spec.yaml
 
 # Operations missing error responses
-openapi spec query 'operations | select(not has_error_response) | pick name, method, path' ./spec.yaml
+openapi spec query 'operations | where(not hasErrorResponse) | select name, method, path' ./spec.yaml
 
 # Blast radius — what breaks if I change a schema?
-openapi spec query 'schemas | select(name == "Error") | blast-radius | length' ./spec.yaml
+openapi spec query 'schemas | where(name == "Error") | blast-radius | length' ./spec.yaml
 
 # Duplicate inline schemas
-openapi spec query 'schemas | select(not is_component) | group_by(hash) | select(count > 1)' ./spec.yaml
+openapi spec query 'schemas | where(not isComponent) | group-by(hash) | where(count > 1)' ./spec.yaml
 
 # Navigate to a single schema by name
-openapi spec query 'schemas | select(name == "Pet") | explain' ./spec.yaml
+openapi spec query 'schemas | where(name == "Pet") | explain' ./spec.yaml
 
 # List all enum schemas
-openapi spec query 'schemas | select(is_component and enum_count > 0) | pick name, enum_count' ./spec.yaml
+openapi spec query 'schemas | where(isComponent and enumCount > 0) | select name, enumCount' ./spec.yaml
 
 # Pipe from stdin
 cat spec.yaml | openapi spec query 'schemas | length'
@@ -1234,7 +1234,7 @@ cat spec.yaml | openapi spec query 'schemas | length'
 openapi spec query -f analysis.oq ./spec.yaml
 
 # Output as JSON
-openapi spec query --format json 'schemas | select(is_component) | first(5)' ./spec.yaml
+openapi spec query --format json 'schemas | where(isComponent) | take(5)' ./spec.yaml
 ```
 
 **Flags:**

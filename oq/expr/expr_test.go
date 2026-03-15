@@ -58,26 +58,26 @@ func TestParse_Comparison_Success(t *testing.T) {
 		},
 		{
 			name:     "boolean field",
-			expr:     `is_component`,
-			row:      testRow{"is_component": expr.BoolVal(true)},
+			expr:     `isComponent`,
+			row:      testRow{"isComponent": expr.BoolVal(true)},
 			expected: true,
 		},
 		{
 			name:     "and operator",
-			expr:     `depth > 3 and is_component`,
-			row:      testRow{"depth": expr.IntVal(5), "is_component": expr.BoolVal(true)},
+			expr:     `depth > 3 and isComponent`,
+			row:      testRow{"depth": expr.IntVal(5), "isComponent": expr.BoolVal(true)},
 			expected: true,
 		},
 		{
 			name:     "or operator",
-			expr:     `depth > 10 or is_component`,
-			row:      testRow{"depth": expr.IntVal(2), "is_component": expr.BoolVal(true)},
+			expr:     `depth > 10 or isComponent`,
+			row:      testRow{"depth": expr.IntVal(2), "isComponent": expr.BoolVal(true)},
 			expected: true,
 		},
 		{
 			name:     "not operator",
-			expr:     `not is_inline`,
-			row:      testRow{"is_inline": expr.BoolVal(false)},
+			expr:     `not isInline`,
+			row:      testRow{"isInline": expr.BoolVal(false)},
 			expected: true,
 		},
 		{
@@ -106,14 +106,14 @@ func TestParse_Comparison_Success(t *testing.T) {
 		},
 		{
 			name:     "complex expression",
-			expr:     `property_count > 0 and in_degree == 0`,
-			row:      testRow{"property_count": expr.IntVal(3), "in_degree": expr.IntVal(0)},
+			expr:     `propertyCount > 0 and inDegree == 0`,
+			row:      testRow{"propertyCount": expr.IntVal(3), "inDegree": expr.IntVal(0)},
 			expected: true,
 		},
 		{
 			name:     "parenthesized expression",
-			expr:     `(depth > 3 or depth < 1) and is_component`,
-			row:      testRow{"depth": expr.IntVal(5), "is_component": expr.BoolVal(true)},
+			expr:     `(depth > 3 or depth < 1) and isComponent`,
+			row:      testRow{"depth": expr.IntVal(5), "isComponent": expr.BoolVal(true)},
 			expected: true,
 		},
 	}
@@ -194,20 +194,20 @@ func TestEval_Operators_Coverage(t *testing.T) {
 		},
 		{
 			name:     "and short-circuit false",
-			exprStr:  `depth > 100 and is_component`,
-			row:      testRow{"depth": expr.IntVal(1), "is_component": expr.BoolVal(true)},
+			exprStr:  `depth > 100 and isComponent`,
+			row:      testRow{"depth": expr.IntVal(1), "isComponent": expr.BoolVal(true)},
 			expected: false,
 		},
 		{
 			name:     "or short-circuit true",
-			exprStr:  `is_component or depth > 100`,
-			row:      testRow{"depth": expr.IntVal(1), "is_component": expr.BoolVal(true)},
+			exprStr:  `isComponent or depth > 100`,
+			row:      testRow{"depth": expr.IntVal(1), "isComponent": expr.BoolVal(true)},
 			expected: true,
 		},
 		{
 			name:     "not true value",
-			exprStr:  `not is_component`,
-			row:      testRow{"is_component": expr.BoolVal(true)},
+			exprStr:  `not isComponent`,
+			row:      testRow{"isComponent": expr.BoolVal(true)},
 			expected: false,
 		},
 		{
@@ -248,8 +248,8 @@ func TestEval_Operators_Coverage(t *testing.T) {
 		},
 		{
 			name:     "boolean equality",
-			exprStr:  `is_component == is_inline`,
-			row:      testRow{"is_component": expr.BoolVal(true), "is_inline": expr.BoolVal(true)},
+			exprStr:  `isComponent == isInline`,
+			row:      testRow{"isComponent": expr.BoolVal(true), "isInline": expr.BoolVal(true)},
 			expected: true,
 		},
 	}
@@ -410,20 +410,20 @@ func TestParse_IfThenElse(t *testing.T) {
 	}{
 		{
 			name:     "if true then value",
-			exprStr:  `if is_component then depth else 0 end`,
-			row:      testRow{"is_component": expr.BoolVal(true), "depth": expr.IntVal(5)},
+			exprStr:  `if isComponent then depth else 0 end`,
+			row:      testRow{"isComponent": expr.BoolVal(true), "depth": expr.IntVal(5)},
 			expected: expr.IntVal(5),
 		},
 		{
 			name:     "if false else value",
-			exprStr:  `if is_component then depth else 0 end`,
-			row:      testRow{"is_component": expr.BoolVal(false), "depth": expr.IntVal(5)},
+			exprStr:  `if isComponent then depth else 0 end`,
+			row:      testRow{"isComponent": expr.BoolVal(false), "depth": expr.IntVal(5)},
 			expected: expr.IntVal(0),
 		},
 		{
 			name:     "if without else returns null",
-			exprStr:  `if is_component then depth end`,
-			row:      testRow{"is_component": expr.BoolVal(false), "depth": expr.IntVal(5)},
+			exprStr:  `if isComponent then depth end`,
+			row:      testRow{"isComponent": expr.BoolVal(false), "depth": expr.IntVal(5)},
 			expected: expr.NullVal(),
 		},
 		{
@@ -434,8 +434,8 @@ func TestParse_IfThenElse(t *testing.T) {
 		},
 		{
 			name:     "if in boolean context",
-			exprStr:  `if is_component then depth > 3 else depth > 5 end`,
-			row:      testRow{"is_component": expr.BoolVal(true), "depth": expr.IntVal(4)},
+			exprStr:  `if isComponent then depth > 3 else depth > 5 end`,
+			row:      testRow{"isComponent": expr.BoolVal(true), "depth": expr.IntVal(4)},
 			expected: expr.BoolVal(true),
 		},
 	}
@@ -525,22 +525,22 @@ func TestParse_ComplexPrecedence(t *testing.T) {
 	t.Parallel()
 
 	// a and b or c and d — "and" binds tighter, so this is (a and b) or (c and d)
-	e, err := expr.Parse(`depth > 0 and is_component or depth < 0 and is_inline`)
+	e, err := expr.Parse(`depth > 0 and isComponent or depth < 0 and isInline`)
 	require.NoError(t, err)
 
 	// Both "and" groups are false -> false
 	result := e.Eval(testRow{
-		"depth":        expr.IntVal(0),
-		"is_component": expr.BoolVal(true),
-		"is_inline":    expr.BoolVal(true),
+		"depth":       expr.IntVal(0),
+		"isComponent": expr.BoolVal(true),
+		"isInline":    expr.BoolVal(true),
 	})
 	assert.False(t, result.Bool)
 
 	// First "and" group is true -> true
 	result = e.Eval(testRow{
-		"depth":        expr.IntVal(5),
-		"is_component": expr.BoolVal(true),
-		"is_inline":    expr.BoolVal(false),
+		"depth":       expr.IntVal(5),
+		"isComponent": expr.BoolVal(true),
+		"isInline":    expr.BoolVal(false),
 	})
 	assert.True(t, result.Bool)
 }
@@ -600,8 +600,8 @@ func TestEval_Arithmetic(t *testing.T) {
 		{"divide", `depth / 2`, testRow{"depth": expr.IntVal(10)}, expr.IntVal(5)},
 		{"divide by zero", `depth / 0`, testRow{"depth": expr.IntVal(10)}, expr.NullVal()},
 		{"precedence mul before add", `2 + 3 * 4`, testRow{}, expr.IntVal(14)},
-		{"field arithmetic", `in_degree + out_degree`, testRow{"in_degree": expr.IntVal(3), "out_degree": expr.IntVal(5)}, expr.IntVal(8)},
-		{"arithmetic in comparison", `in_degree + out_degree > 5`, testRow{"in_degree": expr.IntVal(3), "out_degree": expr.IntVal(5)}, expr.BoolVal(true)},
+		{"field arithmetic", `inDegree + outDegree`, testRow{"inDegree": expr.IntVal(3), "outDegree": expr.IntVal(5)}, expr.IntVal(8)},
+		{"arithmetic in comparison", `inDegree + outDegree > 5`, testRow{"inDegree": expr.IntVal(3), "outDegree": expr.IntVal(5)}, expr.BoolVal(true)},
 	}
 
 	for _, tt := range tests {
@@ -663,4 +663,201 @@ func TestEval_ArrayVal(t *testing.T) {
 	assert.True(t, result.Bool)
 	result = e.Eval(testRow{"tags": expr.ArrayVal(nil)})
 	assert.False(t, result.Bool)
+}
+
+func TestEvalFunc_Coverage(t *testing.T) {
+	t.Parallel()
+
+	row := testRow{
+		"name":  expr.StringVal("Hello World"),
+		"items": expr.ArrayVal([]string{"a", "b", "c"}),
+		"num":   expr.IntVal(42),
+	}
+
+	// count() on array
+	e, err := expr.Parse(`count(items)`)
+	require.NoError(t, err)
+	assert.Equal(t, 3, e.Eval(row).Int)
+
+	// count() on string
+	e, _ = expr.Parse(`count(name)`)
+	assert.Equal(t, 11, e.Eval(row).Int)
+
+	// replace()
+	e, _ = expr.Parse(`replace(name, "World", "Go")`)
+	assert.Equal(t, "Hello Go", e.Eval(row).Str)
+
+	// split() with 2 args → array
+	e, _ = expr.Parse(`split(name, " ")`)
+	result := e.Eval(row)
+	assert.Equal(t, expr.KindArray, result.Kind)
+
+	// split() with 3 args → Nth segment
+	e, _ = expr.Parse(`split(name, " ", 1)`)
+	assert.Equal(t, "World", e.Eval(row).Str)
+
+	// split() with out-of-range index
+	e, _ = expr.Parse(`split(name, " ", 99)`)
+	assert.Equal(t, expr.KindNull, e.Eval(row).Kind)
+
+	// len() on int → 0
+	e, _ = expr.Parse(`len(num)`)
+	assert.Equal(t, 0, e.Eval(row).Int)
+
+	// Wrong arg count
+	e, _ = expr.Parse(`lower()`)
+	assert.Equal(t, expr.KindNull, e.Eval(row).Kind)
+
+	// trim()
+	e, _ = expr.Parse(`trim(name)`)
+	assert.Equal(t, "Hello World", e.Eval(row).Str)
+
+	// default keyword as alias for //
+	e, _ = expr.Parse(`missing default "fallback"`)
+	assert.Equal(t, "fallback", e.Eval(row).Str)
+}
+
+func TestMatches_ArrayField(t *testing.T) {
+	t.Parallel()
+
+	row := testRow{
+		"tags": expr.ArrayVal([]string{"api", "beta", "internal"}),
+	}
+
+	e, err := expr.Parse(`tags matches "^be"`)
+	require.NoError(t, err)
+	assert.True(t, e.Eval(row).Bool)
+
+	e, _ = expr.Parse(`tags matches "^zzz"`)
+	assert.False(t, e.Eval(row).Bool)
+}
+
+func TestStartsEndsWith_ArrayField(t *testing.T) {
+	t.Parallel()
+
+	row := testRow{
+		"tags": expr.ArrayVal([]string{"api-v1", "beta", "internal"}),
+	}
+
+	// startswith on array
+	e, _ := expr.Parse(`startswith(tags, "api")`)
+	assert.True(t, e.Eval(row).Bool)
+
+	e, _ = expr.Parse(`startswith(tags, "zzz")`)
+	assert.False(t, e.Eval(row).Bool)
+
+	// endswith on array
+	e, _ = expr.Parse(`endswith(tags, "nal")`)
+	assert.True(t, e.Eval(row).Bool)
+
+	e, _ = expr.Parse(`endswith(tags, "zzz")`)
+	assert.False(t, e.Eval(row).Bool)
+
+	// infix form
+	e, _ = expr.Parse(`tags startswith "api"`)
+	assert.True(t, e.Eval(row).Bool)
+
+	e, _ = expr.Parse(`tags endswith "nal"`)
+	assert.True(t, e.Eval(row).Bool)
+}
+
+func TestArithmetic_Coverage(t *testing.T) {
+	t.Parallel()
+	row := testRow{"x": expr.IntVal(10), "y": expr.IntVal(3)}
+
+	e, _ := expr.Parse(`x - y`)
+	assert.Equal(t, 7, e.Eval(row).Int)
+
+	e, _ = expr.Parse(`x * y`)
+	assert.Equal(t, 30, e.Eval(row).Int)
+
+	// Division by zero
+	e, _ = expr.Parse(`x / 0`)
+	assert.Equal(t, expr.KindNull, e.Eval(row).Kind)
+}
+
+func TestComparison_Coverage(t *testing.T) {
+	t.Parallel()
+	row := testRow{
+		"a": expr.IntVal(5),
+		"b": expr.IntVal(10),
+		"s": expr.StringVal("hello"),
+		"n": expr.NullVal(),
+	}
+
+	// <=
+	e, _ := expr.Parse(`a <= b`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// >=
+	e, _ = expr.Parse(`b >= a`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// toBool on null
+	e, _ = expr.Parse(`not n`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// toBool on int 0
+	e, _ = expr.Parse(`not 0`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// toString on null
+	e, _ = expr.Parse(`n == ""`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// toString on bool
+	e, _ = expr.Parse(`true == "true"`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// toInt on string
+	e, _ = expr.Parse(`"42" > 41`)
+	assert.True(t, e.Eval(row).Bool)
+
+	// toInt on null
+	e, _ = expr.Parse(`n > 0`)
+	assert.False(t, e.Eval(row).Bool)
+}
+
+func TestContains_ArrayValue(t *testing.T) {
+	t.Parallel()
+	row := testRow{
+		"tags": expr.ArrayVal([]string{"api", "beta"}),
+	}
+
+	e, _ := expr.Parse(`tags contains "api"`)
+	assert.True(t, e.Eval(row).Bool)
+
+	e, _ = expr.Parse(`tags contains "nope"`)
+	assert.False(t, e.Eval(row).Bool)
+}
+
+func TestParse_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	// Unterminated interpolation
+	_, err := expr.Parse(`"\(name"`)
+	require.Error(t, err)
+
+	// Unexpected token at end
+	_, err = expr.Parse(`name )`)
+	require.Error(t, err)
+
+	// Trailing operator
+	_, err = expr.Parse(`name ==`)
+	require.Error(t, err)
+
+	// Single-quoted string (no interpolation)
+	e, err := expr.Parse(`'hello'`)
+	require.NoError(t, err)
+	assert.Equal(t, "hello", e.Eval(testRow{}).Str)
+
+	// elif chain
+	e, err = expr.Parse(`if false then 1 elif true then 2 else 3 end`)
+	require.NoError(t, err)
+	assert.Equal(t, 2, e.Eval(testRow{}).Int)
+
+	// if-then-end (no else)
+	e, err = expr.Parse(`if false then 1 end`)
+	require.NoError(t, err)
+	assert.Equal(t, expr.KindNull, e.Eval(testRow{}).Kind)
 }

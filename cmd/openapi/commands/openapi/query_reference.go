@@ -30,37 +30,43 @@ result set.
 
   schemas                      All schemas (component + inline)
   operations                   All operations
-  components.schemas           Component schemas only
-  components.parameters        Reusable parameter definitions
-  components.responses         Reusable response definitions
-  components.request-bodies    Reusable request body definitions
-  components.headers           Reusable header definitions
-  components.security-schemes  Security scheme definitions
+  components                   All component types (schemas, parameters, responses, headers, security-schemes)
+  webhooks                     Webhook operations only
+  servers                      Document-level servers
+  tags                         Document-level tags
+  security                     Global security requirements
 
-Tip: use select(is_component) or select(is_inline) to filter the schemas source:
-  schemas | select(is_component)
-  schemas | select(is_inline)
+Filter sources with where():
+  schemas | where(isComponent)
+  schemas | where(isInline)
+  components | where(kind == "schema")
+  components | where(kind == "parameter")
 
 TRAVERSAL STAGES
 ----------------
 Graph navigation stages replace the current result set by following edges
 in the schema reference graph.
 
-  refs-out          Direct outgoing references (1 hop, with edge annotations)
-  refs-in           Direct incoming references (1 hop, with edge annotations)
-  reachable         Transitive closure of outgoing references (all hops)
-  reachable(N)      Depth-limited reachable: only follow N hops
-  ancestors         Transitive closure of incoming references
-  properties        Expand to property sub-schemas (with edge annotations)
-  union-members     Expand allOf/oneOf/anyOf children (with edge annotations)
-  items             Expand to array items schema (with edge annotations)
-  parent            Navigate back to source schema of edge annotations
-  ops               Schemas → operations that use them
-  schemas           Operations → schemas they touch
-  path(A; B)        Shortest path between two named schemas
-  connected         Full connected component (schemas + operations)
-  blast-radius      Ancestors + all affected operations (change impact)
-  neighbors(N)      Bidirectional neighborhood within N hops
+  refs                Bidirectional references, 1 hop (with direction annotation →/←)
+  refs(*)             Bidirectional transitive closure
+  refs(out)           Outgoing references only, 1 hop
+  refs(out, *)        Outgoing transitive closure
+  refs(in)            Incoming references only, 1 hop
+  refs(in, *)         Incoming transitive closure
+  refs(N)             Bidirectional, depth-limited to N hops
+  refs(out, N)        Outgoing, depth-limited to N hops
+  properties          Expand to property sub-schemas (flattens allOf; with edge annotations)
+  properties(*)       Recursive properties (follows $refs, flattens allOf,
+                      expands oneOf/anyOf with qualified from paths)
+  members             Expand allOf/oneOf/anyOf children, or group rows into schemas
+  items               Expand to array items schema (checks allOf; with edge annotations)
+  additional-properties  Expand to additionalProperties schema
+  pattern-properties  Expand to patternProperties schemas (with edge annotations)
+  parent              Navigate to structural parent schema (via graph in-edges)
+  to-operations       Schemas → operations that use them
+  to-schemas          Operations → schemas they touch
+  path(A, B)          Shortest bidirectional path between two named schemas (with direction →/←)
+  blast-radius        Ancestors + all affected operations (change impact)
 
 NAVIGATION STAGES
 -----------------
@@ -72,7 +78,9 @@ typed rows that can be filtered, projected, and navigated back to the source.
   request-body          Operation request body (yields RequestBodyRow)
   content-types         Content types from responses or request body (yields ContentTypeRow)
   headers               Response headers (yields HeaderRow)
-  schema                Extract schema from parameter, content-type, or header (bridges to graph)
+  callbacks             Operation callbacks → callback operations (yields OperationRow)
+  links                 Response links (yields LinkRow)
+  to-schema             Extract schema from parameter, content-type, or header (bridges to graph)
   operation             Back-navigate to source operation
   security              Operation security requirements (inherits global when not overridden)
 
@@ -83,36 +91,37 @@ ANALYSIS STAGES
   leaves             Schemas with no outgoing refs (leaf/terminal nodes)
   cycles             Strongly connected components (actual reference cycles)
   clusters           Weakly connected component grouping
-  tag-boundary       Schemas used by operations across multiple tags
+  cross-tag          Component schemas used by operations across multiple tags
   shared-refs        Schemas shared by ALL operations in result set
+  shared-refs(N)     Schemas shared by at least N operations
 
 FILTER & TRANSFORM STAGES
 --------------------------
 
-  select(expr)         Filter rows by predicate expression (jq-style)
-  pick <fields>        Project specific fields (comma-separated)
-  sort_by(field)       Sort ascending by field
-  sort_by(field; desc) Sort descending by field
-  first(N)             Limit to first N results
-  last(N)              Limit to last N results
-  sample(N)            Deterministic pseudo-random sample of N rows
-  top(N; field)        Sort descending by field and take N (shorthand)
-  bottom(N; field)     Sort ascending by field and take N (shorthand)
-  unique               Deduplicate rows (by projected fields when pick is active)
-  group_by(field)      Group rows and aggregate counts
-  group_by(field; name_field)  Group with custom name field for aggregation
-  length               Count rows (terminal — returns a single number)
-  let $var = expr      Bind expression result to a variable for later stages
+  where(expr)            Filter rows by predicate expression
+  select <fields>        Project specific fields (comma-separated)
+  sort-by(field)         Sort ascending by field
+  sort-by(field, desc)   Sort descending by field
+  take(N)                Limit to first N results
+  last(N)                Limit to last N results
+  sample(N)              Deterministic pseudo-random sample of N rows
+  highest(N, field)      Sort descending by field and take N (shorthand)
+  lowest(N, field)       Sort ascending by field and take N (shorthand)
+  unique                 Deduplicate rows (by projected fields when select is active)
+  group-by(field)        Group rows and aggregate counts
+  group-by(field, name_field)  Group with custom name field for aggregation
+  length                 Count rows (terminal — returns a single number)
+  let $var = expr        Bind expression result to a variable for later stages
 
 FUNCTION DEFINITIONS & MODULES
 -------------------------------
 Define reusable pipeline fragments:
 
-  def hot: select(in_degree > 10);
-  def impact($name): select(name == $name) | blast-radius;
+  def hot: where(inDegree > 10);
+  def impact($name): where(name == $name) | blast-radius;
 
   Syntax: def name: body;
-          def name($p1; $p2): body;
+          def name($p1, $p2): body;
 
 Load definitions from .oq files:
 
@@ -125,7 +134,7 @@ META STAGES
 
   explain              Print the query execution plan instead of running it
   fields               List available fields for the current result kind
-  emit                 Output raw YAML nodes from underlying spec objects (pipe into yq)
+  to-yaml              Output raw YAML nodes from underlying spec objects (pipe into yq)
   format(fmt)          Set output format: table, json, markdown, or toon
 
 SCHEMA FIELDS
@@ -138,52 +147,56 @@ Graph-level (pre-computed):
   name              string   Component name or JSON pointer
   type              string   Schema type (object, array, string, ...)
   depth             int      Max nesting depth
-  in_degree         int      Number of schemas referencing this one
-  out_degree        int      Number of schemas this references
-  union_width       int      oneOf + anyOf + allOf member count
-  property_count    int      Number of properties
-  is_component      bool     In #/components/schemas
-  is_inline         bool     Defined inline
-  is_circular       bool     Part of a circular reference chain
-  has_ref           bool     Has a $ref
+  inDegree         int      Number of schemas referencing this one
+  outDegree        int      Number of schemas this references
+  unionWidth       int      oneOf + anyOf + allOf member count
+  allOfCount       int      Number of allOf members
+  oneOfCount       int      Number of oneOf members
+  anyOfCount       int      Number of anyOf members
+  propertyCount    int      Number of properties
+  properties        array    Property names (for 'contains' filtering)
+  isComponent      bool     In #/components/schemas
+  isInline         bool     Defined inline
+  isCircular       bool     Part of a circular reference chain
+  hasRef           bool     Has a $ref
   hash              string   Content hash
-  path              string   JSON pointer in document
-  op_count          int      Number of operations using this schema
-  tag_count         int      Number of distinct tags across operations
+  location          string   Fully qualified JSON pointer in document
+  opCount          int      Number of operations using this schema
+  tagCount         int      Number of distinct tags across operations
 
 Content-level (from schema object):
 
   Field                        Type     Description
   ─────                        ────     ───────────
   description                  string   Schema description text
-  has_description              bool     Whether description is non-empty
   title                        string   Schema title
-  has_title                    bool     Whether title is non-empty
   format                       string   Format hint (date-time, uuid, int32, ...)
   pattern                      string   Regex validation pattern
   nullable                     bool     Nullable flag
-  read_only                    bool     Read-only flag
-  write_only                   bool     Write-only flag
+  readOnly                    bool     Read-only flag
+  writeOnly                   bool     Write-only flag
   deprecated                   bool     Deprecated flag
-  unique_items                 bool     Array unique items constraint
-  has_discriminator            bool     Has discriminator object
-  discriminator_property       string   Discriminator property name
-  discriminator_mapping_count  int      Number of discriminator mappings
-  required_count               int      Number of required properties
-  enum_count                   int      Number of enum values
-  has_default                  bool     Has a default value
-  has_example                  bool     Has example(s)
+  uniqueItems                 bool     Array unique items constraint
+  discriminatorProperty       string   Discriminator property name
+  discriminatorMappingCount  int      Number of discriminator mappings
+  requiredProperties          array    Names of required properties
+  requiredCount               int      Number of required properties
+  enumCount                   int      Number of enum values
+
+  Use has() to check for any schema field: has(discriminator), has(default),
+  has(example), has(additionalProperties), has(xml), has(externalDocs), etc.
   minimum                      int?     Minimum numeric value (null if unset)
   maximum                      int?     Maximum numeric value (null if unset)
-  min_length                   int?     Minimum string length (null if unset)
-  max_length                   int?     Maximum string length (null if unset)
-  min_items                    int?     Minimum array items (null if unset)
-  max_items                    int?     Maximum array items (null if unset)
-  min_properties               int?     Minimum object properties (null if unset)
-  max_properties               int?     Maximum object properties (null if unset)
-  extension_count              int      Number of x- extensions
-  content_encoding             string   Content encoding (base64, ...)
-  content_media_type           string   Content media type
+  minLength                   int?     Minimum string length (null if unset)
+  maxLength                   int?     Maximum string length (null if unset)
+  minItems                    int?     Minimum array items (null if unset)
+  maxItems                    int?     Maximum array items (null if unset)
+  minProperties               int?     Minimum object properties (null if unset)
+  maxProperties               int?     Maximum object properties (null if unset)
+  extensionCount              int      Number of x- extensions
+  contentEncoding             string   Content encoding (base64, ...)
+  contentMediaType           string   Content media type
+  default                     string   Default value (null if unset)
 
 OPERATION FIELDS
 ----------------
@@ -193,31 +206,36 @@ OPERATION FIELDS
   name                string   operationId or "METHOD /path"
   method              string   HTTP method (GET, POST, ...)
   path                string   URL path
-  operation_id        string   operationId
-  schema_count        int      Total reachable schema count
-  component_count     int      Reachable component schema count
+  operationId        string   operationId
+  schemaCount        int      Total reachable schema count
+  componentCount     int      Reachable component schema count
   tag                 string   First tag
   tags                string   All tags (comma-separated)
-  parameter_count     int      Number of parameters
+  parameterCount     int      Number of parameters
   deprecated          bool     Whether the operation is deprecated
   description         string   Operation description
   summary             string   Operation summary
-  response_count      int      Number of response status codes
-  has_error_response  bool     Has 4xx/5xx or default response
-  has_request_body    bool     Has a request body
-  security_count      int      Number of security requirements
+  responseCount      int      Number of response status codes
+  hasErrorResponse  bool     Has 4xx/5xx or default response
+  hasRequestBody    bool     Has a request body
+  securityCount      int      Number of security requirements
+  isWebhook          bool     Whether the operation is a webhook
+  callbackName       string   Callback name (set by callbacks stage)
+  callbackCount      int      Number of callbacks
 
 EDGE ANNOTATION FIELDS
 ----------------------
-Available on rows produced by 1-hop traversal stages (refs-out, refs-in,
-properties, union-members, items). Use 'parent' to navigate back to the
-source schema.
+Available on rows produced by traversal stages (refs, properties,
+members, items, path). Use 'parent' to navigate back to the source schema.
 
   Field             Type     Description
   ─────             ────     ───────────
-  via               string   Edge type: property, items, allOf, oneOf, ref, ...
-  key               string   Edge key: property name, array index, etc.
-  from              string   Source node name
+  via               string   Structural edge kind: property, items, allOf, oneOf, ref, ...
+  key               string   Structural edge label: property name, array index, etc.
+  from              string   Source schema name (the schema containing the relationship)
+  seed              string   Seed schema name (the schema that initiated the traversal)
+  bfsDepth         int      BFS depth from seed
+  direction        string   → (outgoing) or ← (incoming) — set by bidi traversals (refs, path)
 
 PARAMETER FIELDS
 ----------------
@@ -231,9 +249,9 @@ PARAMETER FIELDS
   description         string   Parameter description
   style               string   Serialization style
   explode             bool     Whether arrays/objects generate separate params
-  has_schema          bool     Whether the parameter has a schema
-  allow_empty_value   bool     Whether empty values are allowed
-  allow_reserved      bool     Whether reserved characters are allowed
+  hasSchema          bool     Whether the parameter has a schema
+  allowEmptyValue   bool     Whether empty values are allowed
+  allowReserved      bool     Whether reserved characters are allowed
   operation           string   Source operation (operationId or METHOD /path)
 
 RESPONSE FIELDS
@@ -241,13 +259,13 @@ RESPONSE FIELDS
 
   Field               Type     Description
   ─────               ────     ───────────
-  status_code         string   HTTP status code (200, 404, default, ...)
+  statusCode         string   HTTP status code (200, 404, default, ...)
   name                string   Response name
   description         string   Response description
-  content_type_count  int      Number of content types
-  header_count        int      Number of response headers
-  link_count          int      Number of links
-  has_content         bool     Whether response has content
+  contentTypeCount  int      Number of content types
+  headerCount        int      Number of response headers
+  linkCount          int      Number of links
+  hasContent         bool     Whether response has content
   operation           string   Source operation
 
 REQUEST BODY FIELDS
@@ -258,7 +276,7 @@ REQUEST BODY FIELDS
   name                string   Request body name
   description         string   Request body description
   required            bool     Whether the request body is required
-  content_type_count  int      Number of content types
+  contentTypeCount  int      Number of content types
   operation           string   Source operation
 
 CONTENT-TYPE FIELDS
@@ -266,12 +284,12 @@ CONTENT-TYPE FIELDS
 
   Field               Type     Description
   ─────               ────     ───────────
-  media_type          string   Media type (application/json, text/event-stream, ...)
+  mediaType          string   Media type (application/json, text/event-stream, ...)
   name                string   Content type name
-  has_schema          bool     Whether it has a schema
-  has_encoding        bool     Whether it has encoding info
-  has_example         bool     Whether it has an example
-  status_code         string   Source response status code (if from response)
+  hasSchema          bool     Whether it has a schema
+  hasEncoding        bool     Whether it has encoding info
+  hasExample         bool     Whether it has an example
+  statusCode         string   Source response status code (if from response)
   operation           string   Source operation
 
 HEADER FIELDS
@@ -283,24 +301,62 @@ HEADER FIELDS
   description         string   Header description
   required            bool     Whether the header is required
   deprecated          bool     Whether the header is deprecated
-  has_schema          bool     Whether the header has a schema
-  status_code         string   Source response status code
+  hasSchema          bool     Whether the header has a schema
+  statusCode         string   Source response status code
   operation           string   Source operation
 
 SECURITY SCHEME FIELDS
 ----------------------
-Available from components.security-schemes source.
+Available from components | where(kind == "security-scheme").
 
   Field               Type     Description
   ─────               ────     ───────────
   name                string   Security scheme name (component key)
-  type                string   Scheme type: apiKey, http, oauth2, openIdConnect, mutualTLS
+  schemeType          string   Scheme type: apiKey, http, oauth2, openIdConnect, mutualTLS
   in                  string   API key location: header, query, cookie (apiKey only)
   scheme              string   HTTP auth scheme: bearer, basic, etc. (http only)
-  bearer_format       string   Bearer token format hint, e.g. JWT (http only)
+  bearerFormat       string   Bearer token format hint, e.g. JWT (http only)
   description         string   Scheme description
-  has_flows           bool     Whether OAuth2 flows are defined (oauth2 only)
+  hasFlows           bool     Whether OAuth2 flows are defined (oauth2 only)
   deprecated          bool     Whether the scheme is deprecated
+
+SERVER FIELDS
+-------------
+Available from servers source.
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  url                 string   Server URL
+  name                string   Server name (from x-speakeasy-server-id or name field)
+  description         string   Server description
+  variableCount      int      Number of server variables
+
+TAG FIELDS
+----------
+Available from tags source.
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  name                string   Tag name
+  description         string   Tag description
+  summary             string   Tag summary
+  operationCount     int      Number of operations with this tag
+
+LINK FIELDS
+-----------
+Available from operations | responses | links.
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  name                string   Link name
+  operationId        string   Target operation ID (mutually exclusive with operationRef)
+  operationRef       string   Target operation reference (mutually exclusive with operationId)
+  description         string   Link description
+  parameterCount     int      Number of link parameters
+  hasRequestBody    bool     Whether the link has a request body value
+  hasServer          bool     Whether the link has a server override
+  statusCode         string   Source response status code
+  operation           string   Source operation
 
 SECURITY REQUIREMENT FIELDS
 ----------------------------
@@ -310,24 +366,34 @@ on an operation means "no security" (yields zero rows).
 
   Field               Type     Description
   ─────               ────     ───────────
-  scheme_name         string   Security scheme name
-  scheme_type         string   Resolved scheme type (apiKey, http, oauth2, ...)
+  schemeName         string   Security scheme name
+  schemeType         string   Resolved scheme type (apiKey, http, oauth2, ...)
   scopes              array    Required OAuth2 scopes
-  scope_count         int      Number of required scopes
+  scopeCount         int      Number of required scopes
   operation           string   Source operation
+
+EXTENSION FIELDS (x-*)
+----------------------
+Access x-* extension values on any object (schemas, operations, servers, tags, links).
+In expressions, use underscores instead of dashes: x_speakeasy_name → x-speakeasy-name.
+
+  schemas | where(has(x_speakeasy_entity)) | select name, x_speakeasy_entity
+  operations | where(has(x_speakeasy_name_override))
 
 EXPRESSIONS
 -----------
-The expression language is used in select(), let, and if-then-else:
+The expression language is used in where(), let, and if-then-else:
 
   Comparison:     ==  !=  >  <  >=  <=
   Logical:        and  or  not
-  Alternative:    //  (returns left if truthy, else right)
+  Alternative:    //  (alias: default) — returns left if truthy, else right
   Predicates:     has(<field>)  — true if field is non-null/non-zero
-                  <field> matches "<regex>"  — regex match
+  Infix:          <expr> matches "<regex>"  — regex match
                   <expr> contains "<str>"  — substring/array membership
+                  <expr> startswith "<str>"  — prefix match
+                  <expr> endswith "<str>"  — suffix match
   String funcs:   lower(), upper(), trim(), len(), count()
-                  startswith(), endswith(), replace(), split()
+                  replace(), split()
   Arithmetic:     +  -  *  /
   Conditional:    if <cond> then <expr> else <expr> end
                   if <cond> then <expr> elif <cond> then <expr> else <expr> end
@@ -350,12 +416,12 @@ Set via --format flag or inline format stage:
 RAW YAML EXTRACTION
 -------------------
 
-Use the emit stage to extract raw YAML nodes from the underlying spec objects.
+Use the to-yaml stage to extract raw YAML nodes from the underlying spec objects.
 Schema rows use full JSON pointer paths as keys. Navigation rows use contextual
 compound keys (e.g., "listUsers/200" for responses, "createUser/parameters/limit"
 for parameters). Pipe into yq for content-level queries:
-  openapi spec query 'schemas | select(name == "Pet") | emit' spec.yaml | yq '.properties | keys'
-  openapi spec query 'operations | first(1) | responses | emit' spec.yaml
+  openapi spec query 'schemas | where(name == "Pet") | to-yaml' spec.yaml | yq '.properties | keys'
+  openapi spec query 'operations | take(1) | responses | to-yaml' spec.yaml
 
 EXAMPLES
 --------
@@ -363,62 +429,71 @@ EXAMPLES
 Schema analysis:
 
   # Deeply nested component schemas
-  components.schemas | sort_by(depth; desc) | first(10) | pick name, depth
+  components.schemas | sort-by(depth, desc) | take(10) | select name, depth
 
   # Most referenced schemas
-  components.schemas | sort_by(in_degree; desc) | first(10) | pick name, in_degree
+  components.schemas | sort-by(inDegree, desc) | take(10) | select name, inDegree
 
   # Dead components — defined but never referenced
-  components.schemas | orphans | pick name
+  components.schemas | orphans | select name
 
   # Circular references
-  schemas | select(is_circular) | pick name, path
+  schemas | where(isCircular) | select name, location
 
   # Blast radius — what breaks if I change this schema?
-  schemas | select(name == "Error") | blast-radius | length
+  schemas | where(name == "Error") | blast-radius | length
 
-  # Depth-limited traversal — see 2 hops from a schema
-  schemas | select(name == "User") | reachable(2) | pick name, type
+  # Component schemas within 3 hops
+  schemas | where(name == "User") | refs(out, *) | where(isComponent and bfsDepth <= 3) | select name, bfsDepth
 
   # Edge annotations — how a schema references others
-  schemas | select(name == "Pet") | refs-out | pick name, via, key, from
+  schemas | where(name == "Pet") | refs(out) | select name, via, key, from
 
-  # Schemas with properties matching a pattern
-  schemas | properties | select(key matches "(?i)date") | parent | unique | pick name
+  # All transitive dependencies (full closure)
+  schemas | where(name == "Pet") | refs(out, *) | where(isComponent) | select name
+
+  # Schemas containing a property named "email"
+  schemas | where(properties contains "email") | select name
+
+  # Schemas with properties matching a pattern (via traversal)
+  schemas | properties | where(key matches "(?i)date") | parent | unique | select name
+
+  # Schemas with names starting with "Error"
+  components.schemas | where(name startswith "Error") | select name, type
 
 Operations & navigation:
 
   # Operation sprawl — most complex endpoints
-  operations | sort_by(schema_count; desc) | first(10) | pick name, schema_count
+  operations | sort-by(schemaCount, desc) | take(10) | select name, schemaCount
 
   # Find SSE/streaming endpoints
-  operations | responses | content-types | select(media_type == "text/event-stream") | operation | unique
+  operations | responses | content-types | where(mediaType == "text/event-stream") | operation | unique
 
   # All content types across the API
-  operations | responses | content-types | pick media_type | unique | sort_by(media_type)
+  operations | responses | content-types | select mediaType | unique | sort-by(mediaType)
 
   # Deprecated parameters
-  operations | parameters | select(deprecated) | pick name, in, operation
+  operations | parameters | where(deprecated) | select name, in, operation
 
   # Operations accepting multipart uploads
-  operations | request-body | content-types | select(media_type matches "multipart/") | operation | unique
+  operations | request-body | content-types | where(mediaType matches "multipart/") | operation | unique
 
   # Response headers
-  operations | responses | headers | pick name, required, status_code, operation
+  operations | responses | headers | select name, required, statusCode, operation
 
   # Drill into a response schema
-  operations | select(name == "createUser") | request-body | content-types | schema | reachable(2) | emit
+  operations | where(name == "createUser") | request-body | content-types | to-schema | refs(out, *) | to-yaml
 
   # Group responses by status code (showing operation names)
-  operations | responses | group_by(status_code; operation)
+  operations | responses | group-by(statusCode, operation)
 
 Security:
 
   # List all security schemes
-  components.security-schemes | pick name, type, scheme
+  components.security-schemes | select name, type, scheme
 
   # Operations using OAuth2
-  operations | security | select(scheme_type == "oauth2") | pick scheme_name, scopes, operation
+  operations | security | where(schemeType == "oauth2") | select schemeName, scopes, operation
 
   # Operations with no security
   operations | security | length  # compare with: operations | length
@@ -426,27 +501,54 @@ Security:
 Content auditing:
 
   # OneOf unions missing discriminator
-  components.schemas | select(union_width > 0 and not has_discriminator) | pick name, union_width
+  components.schemas | where(unionWidth > 0 and not has(discriminator)) | select name, unionWidth
 
   # Schemas missing descriptions
-  components.schemas | select(not has_description) | pick name, type
+  components.schemas | where(not has(description)) | select name, type
 
   # Operations missing error responses
-  operations | select(not has_error_response) | pick name, method, path
+  operations | where(not hasErrorResponse) | select name, method, path
 
   # Duplicate inline schemas (same hash)
-  schemas | select(is_inline) | group_by(hash) | select(count > 1)
+  schemas | where(isInline) | group-by(hash) | where(count > 1)
+
+Webhooks, servers, tags, callbacks & links:
+
+  # List all webhook operations
+  webhooks | select name, method, path
+
+  # Document servers
+  servers | select url, description, variableCount
+
+  # Tags with operation counts
+  tags | select name, operationCount | sort-by(operationCount, desc)
+
+  # Callback operations
+  operations | where(callbackCount > 0) | callbacks | select name, callbackName
+
+  # Response links
+  operations | responses | links | select name, operationId, description
+
+  # Additional/pattern properties traversal
+  schemas | where(has(additionalProperties)) | additional-properties
+  schemas | where(has(patternProperties)) | pattern-properties
+
+  # Schemas with default values
+  schemas | properties | where(has(default)) | select from, key, default
+
+  # Operations with extensions
+  operations | where(has(x_speakeasy_name_override)) | select name, x_speakeasy_name_override
 
 Advanced:
 
   # Variable binding
-  schemas | select(name == "Pet") | let $pet = name | reachable | select(name != $pet) | pick name
+  schemas | where(name == "Pet") | let $pet = name | refs(out) | where(name != $pet) | select name
 
   # User-defined functions
-  def hot: select(in_degree > 10);
-  schemas | select(is_component) | hot | pick name, in_degree
+  def hot: where(inDegree > 10);
+  schemas | where(isComponent) | hot | select name, inDegree
 
   # Raw YAML extraction (pipe into yq)
-  operations | first(1) | responses | emit
-  schemas | select(name == "Pet") | emit | yq '.Pet.properties | keys'
+  operations | take(1) | responses | to-yaml
+  schemas | where(name == "Pet") | to-yaml | yq '.Pet.properties | keys'
 `

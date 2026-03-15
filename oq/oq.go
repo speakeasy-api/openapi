@@ -1,8 +1,8 @@
 // Package oq implements a pipeline query language for OpenAPI schema graphs.
 //
-// Queries are written as pipeline expressions with jq-inspired syntax:
+// Queries are written as pipeline expressions:
 //
-//	schemas | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth
+//	schemas | where(depth > 5) | sort-by(depth, desc) | take(10) | select name, depth
 package oq
 
 import (
@@ -26,6 +26,9 @@ const (
 	HeaderResult
 	SecuritySchemeResult
 	SecurityRequirementResult
+	ServerResult
+	TagResult
+	LinkResult
 )
 
 // Row represents a single result in the pipeline.
@@ -34,10 +37,15 @@ type Row struct {
 	SchemaIdx int // index into SchemaGraph.Schemas
 	OpIdx     int // index into SchemaGraph.Operations
 
-	// Edge annotations (populated by 1-hop traversal stages)
-	Via  string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
-	Key  string // edge key: property name, array index, etc.
-	From string // source node name
+	// Edge annotations (populated by traversal stages)
+	Via       string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
+	Key       string // edge key: property name, array index, etc.
+	From      string // source node name (the node that contains the reference)
+	Target    string // target/seed node name (the node traversal originated from)
+	Direction string // "→" (outgoing) or "←" (incoming) — set by bidi traversals
+
+	// BFS depth (populated by depth-limited traversals)
+	BFSDepth int
 
 	// Group annotations (populated by group-by stages)
 	GroupKey   string   // group key value
@@ -60,6 +68,13 @@ type Row struct {
 	SchemeName    string   // security scheme name
 	Scopes        []string // security requirement scopes
 	SourceOpIdx   int      // operation this row originated from (-1 if N/A)
+
+	// Server, Tag, Link objects (populated by server/tag/link sources/stages)
+	Server       *openapi.Server
+	Tag          *openapi.Tag
+	Link         *openapi.Link
+	LinkName     string // link name within response
+	CallbackName string // callback name within operation
 }
 
 // Result is the output of a query execution.
@@ -134,43 +149,42 @@ const (
 	StageUnique
 	StageGroupBy
 	StageCount
-	StageRefsOut
-	StageRefsIn
-	StageReachable
-	StageAncestors
+	StageRefs
 	StageProperties
-	StageUnionMembers
 	StageItems
-	StageOps
-	StageSchemas
+	StageToOperations
+	StageToSchemas
 	StageExplain
 	StageFields
 	StageSample
 	StagePath
-	StageTop
-	StageBottom
+	StageHighest
+	StageLowest
 	StageFormat
-	StageConnected
 	StageBlastRadius
-	StageNeighbors
 	StageOrphans
 	StageLeaves
 	StageCycles
 	StageClusters
-	StageTagBoundary
+	StageCrossTag
 	StageSharedRefs
 	StageLast
 	StageLet
-	StageParent
-	StageEmit
+	StageOrigin
+	StageToYAML
 	StageParameters
 	StageResponses
 	StageRequestBody
 	StageContentTypes
 	StageHeaders
-	StageSchema    // singular: extract schema from nav row
-	StageOperation // back-navigate to source operation
-	StageSecurity  // operation security requirements
+	StageToSchema             // singular: extract schema from nav row
+	StageOperation            // back-navigate to source operation
+	StageSecurity             // operation security requirements
+	StageMembers              // union members (allOf/oneOf/anyOf children) or group row expansion
+	StageCallbacks            // operation callbacks → operations
+	StageLinks                // response links
+	StageAdditionalProperties // schema additional properties traversal
+	StagePatternProperties    // schema pattern properties traversal
 )
 
 // Stage represents a single stage in the query pipeline.
@@ -181,11 +195,12 @@ type Stage struct {
 	Fields    []string // for StageSelect, StageGroupBy
 	SortField string   // for StageSort
 	SortDesc  bool     // for StageSort
-	Limit     int      // for StageTake, StageLast, StageSample, StageTop, StageBottom
+	Limit     int      // for StageTake, StageLast, StageSample, StageHighest, StageLowest, StageRefs
 	PathFrom  string   // for StagePath
 	PathTo    string   // for StagePath
 	Format    string   // for StageFormat
 	VarName   string   // for StageLet
+	RefsDir   string   // for StageRefs: "out", "in", or "" (bidi)
 }
 
 // Query represents a parsed query with optional includes, defs, and pipeline stages.

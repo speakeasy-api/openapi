@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/graph"
 	oas3 "github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -35,6 +36,11 @@ func FieldValuePublic(row Row, name string, g *graph.SchemaGraph) expr.Value {
 }
 
 func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
+	// Universal field: kind returns the row type as a string
+	if name == "kind" {
+		return expr.StringVal(resultKindName(row.Kind))
+	}
+
 	switch row.Kind {
 	case SchemaResult:
 		if row.SchemaIdx < 0 || row.SchemaIdx >= len(g.Schemas) {
@@ -46,32 +52,67 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		case "name":
 			return expr.StringVal(s.Name)
 		case "type":
-			return expr.StringVal(s.Type)
+			if s.Type != "" {
+				return expr.StringVal(s.Type)
+			}
+			// When type is empty, show the effective type:
+			// $ref target name, or composition kind
+			if s.HasRef {
+				target := resolveRefTarget(row.SchemaIdx, g)
+				if target != row.SchemaIdx {
+					return expr.StringVal("$ref:" + schemaName(target, g))
+				}
+			}
+			if s.OneOfCount > 0 {
+				return expr.StringVal("oneOf")
+			}
+			if s.AnyOfCount > 0 {
+				return expr.StringVal("anyOf")
+			}
+			if s.AllOfCount > 0 {
+				return expr.StringVal("allOf")
+			}
+			return expr.StringVal("")
 		case "depth":
 			return expr.IntVal(s.Depth)
-		case "in_degree":
+		case "inDegree":
 			return expr.IntVal(s.InDegree)
-		case "out_degree":
+		case "outDegree":
 			return expr.IntVal(s.OutDegree)
-		case "union_width":
+		case "unionWidth":
 			return expr.IntVal(s.UnionWidth)
-		case "property_count":
+		case "allOfCount":
+			return expr.IntVal(s.AllOfCount)
+		case "oneOfCount":
+			return expr.IntVal(s.OneOfCount)
+		case "anyOfCount":
+			return expr.IntVal(s.AnyOfCount)
+		case "propertyCount":
 			return expr.IntVal(s.PropertyCount)
-		case "is_component":
+		case "isComponent":
 			return expr.BoolVal(s.IsComponent)
-		case "is_inline":
+		case "isInline":
 			return expr.BoolVal(s.IsInline)
-		case "is_circular":
+		case "isCircular":
 			return expr.BoolVal(s.IsCircular)
-		case "has_ref":
+		case "hasRef":
 			return expr.BoolVal(s.HasRef)
 		case "hash":
 			return expr.StringVal(s.Hash)
-		case "path":
+		case "location":
+			// Fully qualified JSON pointer. For inline schemas, prepends
+			// the parent component path to get the absolute location.
+			if s.IsComponent || strings.HasPrefix(s.Path, "/components/") {
+				return expr.StringVal(s.Path)
+			}
+			ownerIdx, _ := resolveToOwner(row.SchemaIdx, g)
+			if ownerIdx != row.SchemaIdx && ownerIdx < len(g.Schemas) {
+				return expr.StringVal(g.Schemas[ownerIdx].Path + s.Path)
+			}
 			return expr.StringVal(s.Path)
-		case "op_count":
+		case "opCount":
 			return expr.IntVal(g.SchemaOpCount(graph.NodeID(row.SchemaIdx)))
-		case "tag_count":
+		case "tagCount":
 			return expr.IntVal(schemaTagCount(row.SchemaIdx, g))
 		case "via":
 			return expr.StringVal(row.Via)
@@ -79,6 +120,21 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal(row.Key)
 		case "from":
 			return expr.StringVal(row.From)
+		case "seed":
+			return expr.StringVal(row.Target)
+		case "bfsDepth":
+			return expr.IntVal(row.BFSDepth)
+		case "direction":
+			return expr.StringVal(row.Direction)
+		case "isRequired":
+			// Check if this property's key appears in the parent schema's required array.
+			// Only meaningful on property edge rows (from traversal stages).
+			if row.Via == "property" && row.Key != "" {
+				return expr.BoolVal(isPropertyRequired(row.Key, row.From, g))
+			}
+			return expr.BoolVal(false)
+		case "properties":
+			return schemaPropertyNames(row.SchemaIdx, g)
 		default:
 			// Schema-content fields require the underlying schema object
 			return schemaContentField(s, name)
@@ -95,18 +151,18 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal(o.Method)
 		case "path":
 			return expr.StringVal(o.Path)
-		case "operation_id":
+		case "operationId":
 			return expr.StringVal(o.OperationID)
-		case "schema_count":
+		case "schemaCount":
 			return expr.IntVal(o.SchemaCount)
-		case "component_count":
+		case "componentCount":
 			return expr.IntVal(o.ComponentCount)
 		case "tag":
 			if o.Operation != nil && len(o.Operation.Tags) > 0 {
 				return expr.StringVal(o.Operation.Tags[0])
 			}
 			return expr.StringVal("")
-		case "parameter_count":
+		case "parameterCount":
 			if o.Operation != nil {
 				return expr.IntVal(len(o.Operation.Parameters))
 			}
@@ -126,6 +182,15 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 				return expr.StringVal(o.Operation.GetSummary())
 			}
 			return expr.StringVal("")
+		case "isWebhook":
+			return expr.BoolVal(openapi.IsWebhookLocation(o.Location))
+		case "callbackName":
+			return expr.StringVal(row.CallbackName)
+		case "callbackCount":
+			if o.Operation != nil && o.Operation.Callbacks != nil {
+				return expr.IntVal(o.Operation.Callbacks.Len())
+			}
+			return expr.IntVal(0)
 		case "via":
 			return expr.StringVal(row.Via)
 		case "key":
@@ -141,8 +206,6 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal(row.GroupKey)
 		case "count":
 			return expr.IntVal(row.GroupCount)
-		case "name":
-			return expr.StringVal(row.GroupKey)
 		case "names":
 			return expr.StringVal(strings.Join(row.GroupNames, ", "))
 		}
@@ -169,11 +232,11 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal("")
 		case "explode":
 			return expr.BoolVal(p.Explode != nil && *p.Explode)
-		case "has_schema":
+		case "hasSchema":
 			return expr.BoolVal(p.Schema != nil)
-		case "allow_empty_value":
+		case "allowEmptyValue":
 			return expr.BoolVal(p.AllowEmptyValue != nil && *p.AllowEmptyValue)
-		case "allow_reserved":
+		case "allowReserved":
 			return expr.BoolVal(p.AllowReserved != nil && *p.AllowReserved)
 		case "operation":
 			return expr.StringVal(operationName(row.SourceOpIdx, g))
@@ -184,22 +247,19 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.NullVal()
 		}
 		switch name {
-		case "status_code":
-			return expr.StringVal(row.StatusCode)
 		case "name":
-			if row.ComponentKey != "" {
-				return expr.StringVal(row.ComponentKey)
-			}
+			return expr.StringVal(row.ComponentKey) // component key for reusable responses, empty for inline
+		case "statusCode":
 			return expr.StringVal(row.StatusCode)
 		case "description":
 			return expr.StringVal(r.Description)
-		case "content_type_count":
+		case "contentTypeCount":
 			return expr.IntVal(r.Content.Len())
-		case "header_count":
+		case "headerCount":
 			return expr.IntVal(r.Headers.Len())
-		case "link_count":
+		case "linkCount":
 			return expr.IntVal(r.Links.Len())
-		case "has_content":
+		case "hasContent":
 			return expr.BoolVal(r.Content != nil && r.Content.Len() > 0)
 		case "operation":
 			return expr.StringVal(operationName(row.SourceOpIdx, g))
@@ -210,16 +270,11 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.NullVal()
 		}
 		switch name {
-		case "name":
-			if row.ComponentKey != "" {
-				return expr.StringVal(row.ComponentKey)
-			}
-			return expr.StringVal("request-body")
 		case "description":
 			return expr.StringVal(rb.GetDescription())
 		case "required":
 			return expr.BoolVal(rb.Required != nil && *rb.Required)
-		case "content_type_count":
+		case "contentTypeCount":
 			return expr.IntVal(rb.Content.Len())
 		case "operation":
 			return expr.StringVal(operationName(row.SourceOpIdx, g))
@@ -230,15 +285,15 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.NullVal()
 		}
 		switch name {
-		case "media_type", "name":
+		case "mediaType":
 			return expr.StringVal(row.MediaTypeName)
-		case "has_schema":
+		case "hasSchema":
 			return expr.BoolVal(mt.Schema != nil)
-		case "has_encoding":
+		case "hasEncoding":
 			return expr.BoolVal(mt.Encoding != nil && mt.Encoding.Len() > 0)
-		case "has_example":
+		case "hasExample":
 			return expr.BoolVal(mt.Example != nil || (mt.Examples != nil && mt.Examples.Len() > 0))
-		case "status_code":
+		case "statusCode":
 			return expr.StringVal(row.StatusCode)
 		case "operation":
 			return expr.StringVal(operationName(row.SourceOpIdx, g))
@@ -257,9 +312,9 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.BoolVal(h.Required != nil && *h.Required)
 		case "deprecated":
 			return expr.BoolVal(h.Deprecated != nil && *h.Deprecated)
-		case "has_schema":
+		case "hasSchema":
 			return expr.BoolVal(h.Schema != nil)
-		case "status_code":
+		case "statusCode":
 			return expr.StringVal(row.StatusCode)
 		case "operation":
 			return expr.StringVal(operationName(row.SourceOpIdx, g))
@@ -272,39 +327,160 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		switch name {
 		case "name":
 			return expr.StringVal(row.SchemeName)
-		case "type":
+		case "schemeType":
 			return expr.StringVal(string(ss.GetType()))
 		case "in":
 			return expr.StringVal(string(ss.GetIn()))
 		case "scheme":
 			return expr.StringVal(ss.GetScheme())
-		case "bearer_format":
+		case "bearerFormat":
 			return expr.StringVal(ss.GetBearerFormat())
 		case "description":
 			return expr.StringVal(ss.GetDescription())
-		case "has_flows":
+		case "hasFlows":
 			return expr.BoolVal(ss.GetFlows() != nil)
 		case "deprecated":
 			return expr.BoolVal(ss.Deprecated != nil && *ss.Deprecated)
 		}
 	case SecurityRequirementResult:
 		switch name {
-		case "name", "scheme_name":
+		case "schemeName":
 			return expr.StringVal(row.SchemeName)
-		case "scheme_type":
+		case "schemeType":
 			if row.SecurityScheme != nil {
 				return expr.StringVal(string(row.SecurityScheme.GetType()))
 			}
 			return expr.StringVal("")
 		case "scopes":
 			return expr.ArrayVal(row.Scopes)
-		case "scope_count":
+		case "scopeCount":
 			return expr.IntVal(len(row.Scopes))
 		case "operation":
 			return expr.StringVal(operationName(row.SourceOpIdx, g))
 		}
+	case ServerResult:
+		srv := row.Server
+		if srv == nil {
+			return expr.NullVal()
+		}
+		switch name {
+		case "url":
+			return expr.StringVal(srv.URL)
+		case "description":
+			return expr.StringVal(srv.GetDescription())
+		case "variableCount":
+			if srv.Variables != nil {
+				return expr.IntVal(srv.Variables.Len())
+			}
+			return expr.IntVal(0)
+		}
+		return extensionFieldValue(srv.Extensions, name)
+	case TagResult:
+		tag := row.Tag
+		if tag == nil {
+			return expr.NullVal()
+		}
+		switch name {
+		case "name":
+			return expr.StringVal(tag.Name)
+		case "description":
+			if tag.Description != nil {
+				return expr.StringVal(*tag.Description)
+			}
+			return expr.StringVal("")
+		case "summary":
+			if tag.Summary != nil {
+				return expr.StringVal(*tag.Summary)
+			}
+			return expr.StringVal("")
+		case "operationCount":
+			return expr.IntVal(tagOperationCount(tag.Name, g))
+		}
+		return extensionFieldValue(tag.Extensions, name)
+	case LinkResult:
+		l := row.Link
+		if l == nil {
+			return expr.NullVal()
+		}
+		switch name {
+		case "name":
+			return expr.StringVal(row.LinkName)
+		case "operationId":
+			if l.OperationID != nil {
+				return expr.StringVal(*l.OperationID)
+			}
+			return expr.StringVal("")
+		case "operationRef":
+			if l.OperationRef != nil {
+				return expr.StringVal(*l.OperationRef)
+			}
+			return expr.StringVal("")
+		case "description":
+			if l.Description != nil {
+				return expr.StringVal(*l.Description)
+			}
+			return expr.StringVal("")
+		case "parameterCount":
+			if l.Parameters != nil {
+				return expr.IntVal(l.Parameters.Len())
+			}
+			return expr.IntVal(0)
+		case "hasRequestBody":
+			return expr.BoolVal(l.RequestBody != nil)
+		case "hasServer":
+			return expr.BoolVal(l.Server != nil)
+		case "statusCode":
+			return expr.StringVal(row.StatusCode)
+		case "operation":
+			return expr.StringVal(operationName(row.SourceOpIdx, g))
+		}
+		return extensionFieldValue(l.Extensions, name)
 	}
 	return expr.NullVal()
+}
+
+func resultKindName(k ResultKind) string {
+	switch k {
+	case SchemaResult:
+		return "schema"
+	case OperationResult:
+		return "operation"
+	case GroupRowResult:
+		return "group"
+	case ParameterResult:
+		return "parameter"
+	case ResponseResult:
+		return "response"
+	case RequestBodyResult:
+		return "request-body"
+	case ContentTypeResult:
+		return "content-type"
+	case HeaderResult:
+		return "header"
+	case SecuritySchemeResult:
+		return "security-scheme"
+	case SecurityRequirementResult:
+		return "security-requirement"
+	case ServerResult:
+		return "server"
+	case TagResult:
+		return "tag"
+	case LinkResult:
+		return "link"
+	default:
+		return "unknown"
+	}
+}
+
+// schemaPropertyNames returns the property names of a schema as an array value.
+func schemaPropertyNames(schemaIdx int, g *graph.SchemaGraph) expr.Value {
+	var names []string
+	for _, edge := range g.OutEdges(graph.NodeID(schemaIdx)) {
+		if edge.Kind == graph.EdgeProperty {
+			names = append(names, edge.Label)
+		}
+	}
+	return expr.ArrayVal(names)
 }
 
 // operationName returns the operation name for the given index, or empty string if out of range.
@@ -326,16 +502,11 @@ func schemaContentField(s *graph.SchemaNode, name string) expr.Value {
 			return expr.StringVal(*schema.Description)
 		}
 		return expr.StringVal("")
-	case "has_description":
-		return expr.BoolVal(schema != nil && schema.Description != nil && *schema.Description != "")
 	case "title":
 		if schema != nil && schema.Title != nil {
 			return expr.StringVal(*schema.Title)
 		}
 		return expr.StringVal("")
-	case "has_title":
-		return expr.BoolVal(schema != nil && schema.Title != nil && *schema.Title != "")
-
 	// --- Format & Pattern ---
 	case "format":
 		if schema != nil && schema.Format != nil {
@@ -350,37 +521,48 @@ func schemaContentField(s *graph.SchemaNode, name string) expr.Value {
 
 	// --- Flags ---
 	case "nullable":
-		return expr.BoolVal(schema != nil && schema.Nullable != nil && *schema.Nullable)
-	case "read_only":
+		if schema == nil {
+			return expr.BoolVal(false)
+		}
+		// OAS 3.0: nullable: true
+		if schema.Nullable != nil && *schema.Nullable {
+			return expr.BoolVal(true)
+		}
+		// OAS 3.1: type array containing "null" (e.g., type: ["string", "null"])
+		for _, t := range schema.GetType() {
+			if string(t) == "null" {
+				return expr.BoolVal(true)
+			}
+		}
+		return expr.BoolVal(false)
+	case "readOnly":
 		return expr.BoolVal(schema != nil && schema.ReadOnly != nil && *schema.ReadOnly)
-	case "write_only":
+	case "writeOnly":
 		return expr.BoolVal(schema != nil && schema.WriteOnly != nil && *schema.WriteOnly)
 	case "deprecated":
 		return expr.BoolVal(schema != nil && schema.Deprecated != nil && *schema.Deprecated)
-	case "unique_items":
+	case "uniqueItems":
 		return expr.BoolVal(schema != nil && schema.UniqueItems != nil && *schema.UniqueItems)
 
 	// --- Discriminator ---
-	case "has_discriminator":
-		return expr.BoolVal(schema != nil && schema.Discriminator != nil)
-	case "discriminator_property":
+	case "discriminatorProperty":
 		if schema != nil && schema.Discriminator != nil {
 			return expr.StringVal(schema.Discriminator.PropertyName)
 		}
 		return expr.StringVal("")
-	case "discriminator_mapping_count":
+	case "discriminatorMappingCount":
 		if schema != nil && schema.Discriminator != nil && schema.Discriminator.Mapping != nil {
 			return expr.IntVal(schema.Discriminator.Mapping.Len())
 		}
 		return expr.IntVal(0)
 
 	// --- Counts & Arrays ---
-	case "required":
+	case "requiredProperties":
 		if schema != nil {
 			return expr.ArrayVal(schema.Required)
 		}
 		return expr.ArrayVal(nil)
-	case "required_count":
+	case "requiredCount":
 		if schema != nil {
 			return expr.IntVal(len(schema.Required))
 		}
@@ -396,17 +578,11 @@ func schemaContentField(s *graph.SchemaNode, name string) expr.Value {
 			return expr.ArrayVal(vals)
 		}
 		return expr.ArrayVal(nil)
-	case "enum_count":
+	case "enumCount":
 		if schema != nil {
 			return expr.IntVal(len(schema.Enum))
 		}
 		return expr.IntVal(0)
-
-	// --- Defaults & Examples ---
-	case "has_default":
-		return expr.BoolVal(schema != nil && schema.Default != nil)
-	case "has_example":
-		return expr.BoolVal(schema != nil && (schema.Example != nil || len(schema.Examples) > 0))
 
 	// --- Numeric constraints ---
 	case "minimum":
@@ -421,62 +597,242 @@ func schemaContentField(s *graph.SchemaNode, name string) expr.Value {
 		return expr.NullVal()
 
 	// --- String constraints ---
-	case "min_length":
+	case "minLength":
 		if schema != nil && schema.MinLength != nil {
 			return expr.IntVal(int(*schema.MinLength))
 		}
 		return expr.NullVal()
-	case "max_length":
+	case "maxLength":
 		if schema != nil && schema.MaxLength != nil {
 			return expr.IntVal(int(*schema.MaxLength))
 		}
 		return expr.NullVal()
 
 	// --- Array constraints ---
-	case "min_items":
+	case "minItems":
 		if schema != nil && schema.MinItems != nil {
 			return expr.IntVal(int(*schema.MinItems))
 		}
 		return expr.NullVal()
-	case "max_items":
+	case "maxItems":
 		if schema != nil && schema.MaxItems != nil {
 			return expr.IntVal(int(*schema.MaxItems))
 		}
 		return expr.NullVal()
 
 	// --- Object constraints ---
-	case "min_properties":
+	case "minProperties":
 		if schema != nil && schema.MinProperties != nil {
 			return expr.IntVal(int(*schema.MinProperties))
 		}
 		return expr.NullVal()
-	case "max_properties":
+	case "maxProperties":
 		if schema != nil && schema.MaxProperties != nil {
 			return expr.IntVal(int(*schema.MaxProperties))
 		}
 		return expr.NullVal()
 
 	// --- Extensions ---
-	case "extension_count":
+	case "extensionCount":
 		if schema != nil && schema.Extensions != nil {
 			return expr.IntVal(schema.Extensions.Len())
 		}
 		return expr.IntVal(0)
 
+	// --- Default value ---
+	case "default":
+		if schema != nil && schema.Default != nil {
+			return expr.StringVal(schema.Default.Value)
+		}
+		return expr.NullVal()
+
 	// --- Content encoding (OAS 3.1+) ---
-	case "content_encoding":
+	case "contentEncoding":
 		if schema != nil && schema.ContentEncoding != nil {
 			return expr.StringVal(*schema.ContentEncoding)
 		}
 		return expr.StringVal("")
-	case "content_media_type":
+	case "contentMediaType":
 		if schema != nil && schema.ContentMediaType != nil {
 			return expr.StringVal(*schema.ContentMediaType)
 		}
 		return expr.StringVal("")
 	}
 
+	// --- Raw YAML fallback ---
+	// Unknown fields fall through to the underlying schema object.
+	// Supports snake_case (additional_properties) and camelCase (additionalProperties).
+	if schema != nil {
+		return schemaRawField(schema, name)
+	}
 	return expr.NullVal()
+}
+
+// snakeToCamel converts snake_case to camelCase.
+func snakeToCamel(s string) string {
+	parts := strings.Split(s, "_")
+	for i := 1; i < len(parts); i++ {
+		if len(parts[i]) > 0 {
+			parts[i] = strings.ToUpper(parts[i][:1]) + parts[i][1:]
+		}
+	}
+	return strings.Join(parts, "")
+}
+
+// schemaRawField probes the underlying schema object for arbitrary fields.
+// This allows queries like where(has(additionalProperties)) or
+// select name, additional_properties without pre-defining every field.
+func schemaRawField(schema *oas3.Schema, name string) expr.Value {
+	// Normalize: try the name as-is, then convert snake_case → camelCase
+	candidates := []string{name}
+	if strings.Contains(name, "_") {
+		candidates = append(candidates, snakeToCamel(name))
+	}
+
+	for _, field := range candidates {
+		if v, ok := probeSchemaField(schema, field); ok {
+			return v
+		}
+	}
+	return expr.NullVal()
+}
+
+// probeSchemaField checks if a named field exists and is non-nil on the schema.
+// probeSchemaField checks for arbitrary schema fields not covered by the
+// pre-defined field set. Returns (value, true) if the field is recognized,
+// (null, false) if not.
+func probeSchemaField(schema *oas3.Schema, name string) (expr.Value, bool) {
+	// Presence-check fields: non-nil → true, nil → null
+	if probe, ok := schemaPresenceProbes[name]; ok {
+		if probe(schema) {
+			return expr.BoolVal(true), true
+		}
+		return expr.NullVal(), true
+	}
+
+	// Value-returning fields
+	switch name {
+	case "const":
+		if schema.Const != nil {
+			return expr.StringVal(schema.Const.Value), true
+		}
+		return expr.NullVal(), true
+	case "multipleOf":
+		if schema.MultipleOf != nil {
+			return expr.IntVal(int(*schema.MultipleOf)), true
+		}
+		return expr.NullVal(), true
+	case "anchor":
+		if schema.Anchor != nil {
+			return expr.StringVal(*schema.Anchor), true
+		}
+		return expr.NullVal(), true
+	case "id":
+		if schema.ID != nil {
+			return expr.StringVal(*schema.ID), true
+		}
+		return expr.NullVal(), true
+	case "schema":
+		if schema.Schema != nil {
+			return expr.StringVal(*schema.Schema), true
+		}
+		return expr.NullVal(), true
+	case "prefixItems":
+		if len(schema.PrefixItems) > 0 {
+			return expr.IntVal(len(schema.PrefixItems)), true
+		}
+		return expr.NullVal(), true
+	case "dependentSchemas":
+		if schema.DependentSchemas != nil && schema.DependentSchemas.Len() > 0 {
+			return expr.IntVal(schema.DependentSchemas.Len()), true
+		}
+		return expr.NullVal(), true
+	case "defs":
+		if schema.Defs != nil && schema.Defs.Len() > 0 {
+			return expr.IntVal(schema.Defs.Len()), true
+		}
+		return expr.NullVal(), true
+	case "examples":
+		if len(schema.Examples) > 0 {
+			return expr.IntVal(len(schema.Examples)), true
+		}
+		return expr.NullVal(), true
+	}
+
+	// Check x- extensions
+	if strings.HasPrefix(name, "x-") || strings.HasPrefix(name, "x_") {
+		extKey := name
+		if strings.HasPrefix(name, "x_") {
+			extKey = "x-" + strings.ReplaceAll(name[2:], "_", "-")
+		}
+		if schema.Extensions != nil {
+			if v, ok := schema.Extensions.Get(extKey); ok {
+				return expr.StringVal(v.Value), true
+			}
+		}
+		return expr.NullVal(), true
+	}
+
+	return expr.NullVal(), false
+}
+
+// schemaPresenceProbes maps field names to nil-checks on the schema.
+// Each returns true if the field is present/non-nil.
+var schemaPresenceProbes = map[string]func(*oas3.Schema) bool{
+	"additionalProperties":  func(s *oas3.Schema) bool { return s.AdditionalProperties != nil },
+	"patternProperties":     func(s *oas3.Schema) bool { return s.PatternProperties != nil && s.PatternProperties.Len() > 0 },
+	"xml":                   func(s *oas3.Schema) bool { return s.XML != nil },
+	"externalDocs":          func(s *oas3.Schema) bool { return s.ExternalDocs != nil },
+	"not":                   func(s *oas3.Schema) bool { return s.Not != nil },
+	"if":                    func(s *oas3.Schema) bool { return s.If != nil },
+	"then":                  func(s *oas3.Schema) bool { return s.Then != nil },
+	"else":                  func(s *oas3.Schema) bool { return s.Else != nil },
+	"contains":              func(s *oas3.Schema) bool { return s.Contains != nil },
+	"propertyNames":         func(s *oas3.Schema) bool { return s.PropertyNames != nil },
+	"unevaluatedItems":      func(s *oas3.Schema) bool { return s.UnevaluatedItems != nil },
+	"unevaluatedProperties": func(s *oas3.Schema) bool { return s.UnevaluatedProperties != nil },
+}
+
+// isPropertyRequired checks if a property key is in the parent schema's required array.
+func isPropertyRequired(key, fromName string, g *graph.SchemaGraph) bool {
+	// For qualified from paths like "Event/oneOf/EntityCreatedEvent",
+	// extract the actual schema name (last segment).
+	lookupName := fromName
+	if idx := strings.LastIndex(fromName, "/"); idx >= 0 {
+		lookupName = fromName[idx+1:]
+	}
+
+	// Find the parent schema by name
+	for i := range g.Schemas {
+		if g.Schemas[i].Name == lookupName {
+			schema := getSchema(&g.Schemas[i])
+			if schema == nil {
+				return false
+			}
+			for _, req := range schema.Required {
+				if req == key {
+					return true
+				}
+			}
+			// Also check allOf members' required arrays
+			for _, allOfSchema := range schema.GetAllOf() {
+				if allOfSchema == nil {
+					continue
+				}
+				memberSchema := allOfSchema.GetSchema()
+				if memberSchema == nil {
+					continue
+				}
+				for _, req := range memberSchema.Required {
+					if req == key {
+						return true
+					}
+				}
+			}
+			return false
+		}
+	}
+	return false
 }
 
 // operationContentField resolves fields by reading the underlying operation object.
@@ -487,19 +843,19 @@ func operationContentField(o *graph.OperationNode, name string) expr.Value {
 	}
 
 	switch name {
-	case "response_count":
+	case "responseCount":
 		return expr.IntVal(op.Responses.Len())
-	case "has_error_response":
+	case "hasErrorResponse":
 		return expr.BoolVal(hasErrorResponse(op))
-	case "has_request_body":
+	case "hasRequestBody":
 		return expr.BoolVal(op.RequestBody != nil)
-	case "security_count":
+	case "securityCount":
 		return expr.IntVal(len(op.Security))
 	case "tags":
 		return expr.ArrayVal(op.Tags)
 	}
 
-	return expr.NullVal()
+	return extensionFieldValue(op.Extensions, name)
 }
 
 // getSchema extracts the underlying *Schema from a SchemaNode, if available.
@@ -521,6 +877,42 @@ func hasErrorResponse(op *openapi.Operation) bool {
 		}
 	}
 	return op.Responses.Default != nil
+}
+
+// extensionFieldValue checks for x-* extension fields on any object with extensions.
+func extensionFieldValue(exts *extensions.Extensions, name string) expr.Value {
+	if !strings.HasPrefix(name, "x-") && !strings.HasPrefix(name, "x_") {
+		return expr.NullVal()
+	}
+	extKey := name
+	if strings.HasPrefix(name, "x_") {
+		// Convert x_foo_bar → x-foo-bar for extension lookup
+		extKey = "x-" + strings.ReplaceAll(name[2:], "_", "-")
+	}
+	if exts != nil {
+		if v, ok := exts.Get(extKey); ok {
+			return expr.StringVal(v.Value)
+		}
+	}
+	return expr.NullVal()
+}
+
+// tagOperationCount counts operations tagged with the given tag name.
+func tagOperationCount(tagName string, g *graph.SchemaGraph) int {
+	count := 0
+	for i := range g.Operations {
+		op := g.Operations[i].Operation
+		if op == nil {
+			continue
+		}
+		for _, t := range op.Tags {
+			if t == tagName {
+				count++
+				break
+			}
+		}
+	}
+	return count
 }
 
 func compareValues(a, b expr.Value) int {
@@ -581,6 +973,18 @@ func rowKey(row Row) string {
 		return "ss:" + row.SchemeName
 	case SecurityRequirementResult:
 		return "sr:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.SchemeName
+	case ServerResult:
+		if row.Server != nil {
+			return "sv:" + row.Server.URL
+		}
+		return "sv:"
+	case TagResult:
+		if row.Tag != nil {
+			return "t:" + row.Tag.Name
+		}
+		return "t:"
+	case LinkResult:
+		return "l:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.StatusCode + ":" + row.LinkName
 	default:
 		return "?:" + strconv.Itoa(row.OpIdx)
 	}

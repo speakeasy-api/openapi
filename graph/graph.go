@@ -66,6 +66,9 @@ type SchemaNode struct {
 	InDegree      int
 	OutDegree     int
 	UnionWidth    int
+	AllOfCount    int
+	OneOfCount    int
+	AnyOfCount    int
 	PropertyCount int
 	Hash          string
 }
@@ -596,7 +599,10 @@ func (g *SchemaGraph) computeMetrics() {
 
 		schema := sn.Schema.GetSchema()
 		if schema != nil {
-			sn.UnionWidth = len(schema.AllOf) + len(schema.OneOf) + len(schema.AnyOf)
+			sn.AllOfCount = len(schema.AllOf)
+			sn.OneOfCount = len(schema.OneOf)
+			sn.AnyOfCount = len(schema.AnyOf)
+			sn.UnionWidth = sn.AllOfCount + sn.OneOfCount + sn.AnyOfCount
 			if schema.Properties != nil {
 				sn.PropertyCount = schema.Properties.Len()
 			}
@@ -657,18 +663,6 @@ func (g *SchemaGraph) detectCycle(id NodeID, visited, inStack map[NodeID]bool, c
 	return outerEntry
 }
 
-// Reachable returns all schema NodeIDs transitively reachable from the given node via out-edges.
-func (g *SchemaGraph) Reachable(id NodeID) []NodeID {
-	visited := make(map[NodeID]bool)
-	g.reachableBFS(id, visited)
-	delete(visited, id) // exclude self
-	result := make([]NodeID, 0, len(visited))
-	for nid := range visited {
-		result = append(result, nid)
-	}
-	return result
-}
-
 // Ancestors returns all schema NodeIDs that can transitively reach the given node via in-edges.
 func (g *SchemaGraph) Ancestors(id NodeID) []NodeID {
 	visited := make(map[NodeID]bool)
@@ -695,87 +689,91 @@ func (g *SchemaGraph) Ancestors(id NodeID) []NodeID {
 	return result
 }
 
-// ShortestPath returns the shortest path from `from` to `to` using out-edges (BFS).
-// Returns nil if no path exists. The returned slice includes both endpoints.
-func (g *SchemaGraph) ShortestPath(from, to NodeID) []NodeID {
+// PathHop represents a single node in a bidirectional shortest path.
+type PathHop struct {
+	Node    NodeID
+	Edge    *Edge // nil for the seed node
+	Forward bool  // true = followed out-edge, false = followed in-edge
+}
+
+// ShortestBidiPath finds the shortest undirected path between two nodes,
+// following both out-edges and in-edges. Each hop records which direction
+// the edge was traversed (Forward=true for out-edges, false for in-edges).
+// Returns nil if no path exists.
+func (g *SchemaGraph) ShortestBidiPath(from, to NodeID) []PathHop {
 	if from == to {
-		return []NodeID{from}
+		return []PathHop{{Node: from}}
 	}
 
-	parent := make(map[NodeID]NodeID)
-	visited := make(map[NodeID]bool)
-	visited[from] = true
+	type parent struct {
+		node    NodeID
+		edge    *Edge
+		forward bool
+	}
+	parents := make(map[NodeID]parent)
+	visited := map[NodeID]bool{from: true}
 	queue := []NodeID{from}
 
-	for len(queue) > 0 {
+	found := false
+	for len(queue) > 0 && !found {
 		current := queue[0]
 		queue = queue[1:]
 
-		for _, edge := range g.outEdges[current] {
-			if visited[edge.To] {
-				continue
-			}
-			visited[edge.To] = true
-			parent[edge.To] = current
-
-			if edge.To == to {
-				// Reconstruct path
-				var path []NodeID
-				for n := to; n != from; n = parent[n] {
-					path = append(path, n)
+		// Out-edges (forward)
+		for i := range g.outEdges[current] {
+			e := &g.outEdges[current][i]
+			if !visited[e.To] {
+				visited[e.To] = true
+				parents[e.To] = parent{current, e, true}
+				if e.To == to {
+					found = true
+					break
 				}
-				path = append(path, from)
-				// Reverse
-				for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
-					path[i], path[j] = path[j], path[i]
-				}
-				return path
+				queue = append(queue, e.To)
 			}
+		}
+		if found {
+			break
+		}
 
-			queue = append(queue, edge.To)
+		// In-edges (reverse)
+		for i := range g.inEdges[current] {
+			e := &g.inEdges[current][i]
+			if !visited[e.From] {
+				visited[e.From] = true
+				parents[e.From] = parent{current, e, false}
+				if e.From == to {
+					found = true
+					break
+				}
+				queue = append(queue, e.From)
+			}
 		}
 	}
 
-	return nil
+	if !found {
+		return nil
+	}
+
+	// Reconstruct path
+	var hops []PathHop
+	for n := to; n != from; {
+		p := parents[n]
+		hops = append(hops, PathHop{Node: n, Edge: p.edge, Forward: p.forward})
+		n = p.node
+	}
+	hops = append(hops, PathHop{Node: from})
+
+	// Reverse to get from→to order
+	for i, j := 0, len(hops)-1; i < j; i, j = i+1, j-1 {
+		hops[i], hops[j] = hops[j], hops[i]
+	}
+	return hops
 }
 
 // SchemaOpCount returns the number of operations that reference the given schema.
 func (g *SchemaGraph) SchemaOpCount(id NodeID) int {
 	return len(g.schemaOps[id])
-}
-
-// Neighbors returns schema NodeIDs within maxDepth hops of the given node,
-// following both out-edges and in-edges (bidirectional BFS).
-// The result excludes the seed node itself.
-func (g *SchemaGraph) Neighbors(id NodeID, maxDepth int) []NodeID {
-	visited := map[NodeID]bool{id: true}
-	current := []NodeID{id}
-
-	for depth := 0; depth < maxDepth && len(current) > 0; depth++ {
-		var next []NodeID
-		for _, nid := range current {
-			for _, edge := range g.outEdges[nid] {
-				if !visited[edge.To] {
-					visited[edge.To] = true
-					next = append(next, edge.To)
-				}
-			}
-			for _, edge := range g.inEdges[nid] {
-				if !visited[edge.From] {
-					visited[edge.From] = true
-					next = append(next, edge.From)
-				}
-			}
-		}
-		current = next
-	}
-
-	delete(visited, id)
-	result := make([]NodeID, 0, len(visited))
-	for nid := range visited {
-		result = append(result, nid)
-	}
-	return result
 }
 
 // StronglyConnectedComponents returns the SCCs of the schema graph using
@@ -838,86 +836,6 @@ func (g *SchemaGraph) StronglyConnectedComponents() [][]NodeID {
 	}
 
 	return sccs
-}
-
-// ConnectedComponent computes the full connected component reachable from the
-// given seed schema and operation nodes. It treats schema edges as undirected
-// (follows both out-edges and in-edges) and crosses schema↔operation links.
-// Returns the sets of reachable schema and operation NodeIDs (including seeds).
-func (g *SchemaGraph) ConnectedComponent(schemaSeeds, opSeeds []NodeID) (schemas []NodeID, ops []NodeID) {
-	visitedSchemas := make(map[NodeID]bool)
-	visitedOps := make(map[NodeID]bool)
-
-	// Queues for BFS across both node types
-	schemaQueue := make([]NodeID, 0, len(schemaSeeds))
-	opQueue := make([]NodeID, 0, len(opSeeds))
-
-	for _, id := range schemaSeeds {
-		if !visitedSchemas[id] {
-			visitedSchemas[id] = true
-			schemaQueue = append(schemaQueue, id)
-		}
-	}
-	for _, id := range opSeeds {
-		if !visitedOps[id] {
-			visitedOps[id] = true
-			opQueue = append(opQueue, id)
-		}
-	}
-
-	for len(schemaQueue) > 0 || len(opQueue) > 0 {
-		// Process schema nodes
-		for len(schemaQueue) > 0 {
-			current := schemaQueue[0]
-			schemaQueue = schemaQueue[1:]
-
-			// Follow out-edges (undirected: treat as bidirectional)
-			for _, edge := range g.outEdges[current] {
-				if !visitedSchemas[edge.To] {
-					visitedSchemas[edge.To] = true
-					schemaQueue = append(schemaQueue, edge.To)
-				}
-			}
-			// Follow in-edges
-			for _, edge := range g.inEdges[current] {
-				if !visitedSchemas[edge.From] {
-					visitedSchemas[edge.From] = true
-					schemaQueue = append(schemaQueue, edge.From)
-				}
-			}
-			// Cross to operations
-			for opID := range g.schemaOps[current] {
-				if !visitedOps[opID] {
-					visitedOps[opID] = true
-					opQueue = append(opQueue, opID)
-				}
-			}
-		}
-
-		// Process operation nodes
-		for len(opQueue) > 0 {
-			current := opQueue[0]
-			opQueue = opQueue[1:]
-
-			// Cross to schemas
-			for sid := range g.opSchemas[current] {
-				if !visitedSchemas[sid] {
-					visitedSchemas[sid] = true
-					schemaQueue = append(schemaQueue, sid)
-				}
-			}
-		}
-	}
-
-	schemas = make([]NodeID, 0, len(visitedSchemas))
-	for id := range visitedSchemas {
-		schemas = append(schemas, id)
-	}
-	ops = make([]NodeID, 0, len(visitedOps))
-	for id := range visitedOps {
-		ops = append(ops, id)
-	}
-	return schemas, ops
 }
 
 func intStr(i int) string {

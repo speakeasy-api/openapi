@@ -2,12 +2,28 @@ openapi: "3.1.0"
 info:
   title: Petstore
   version: "1.0.0"
+servers:
+  - url: https://api.petstore.io/v1
+    description: Production server
+    variables:
+      version:
+        default: v1
+  - url: https://staging.petstore.io
+    description: Staging server
 security:
   - bearerAuth: []
+tags:
+  - name: pets
+    description: Everything about your pets
+    summary: Pet operations
+  - name: owners
+    description: Pet owner management
 paths:
   /pets:
     get:
       operationId: listPets
+      tags: [pets]
+      x-speakeasy-name-override: ListAllPets
       parameters:
         - name: limit
           in: query
@@ -27,10 +43,28 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Pet'
+          links:
+            GetPetById:
+              operationId: showPetById
+              description: Get a specific pet by ID from the list
     post:
       operationId: createPet
+      tags: [pets]
       security:
         - bearerAuth: [pets:write]
+      callbacks:
+        onPetCreated:
+          '{$request.body#/callbackUrl}':
+            post:
+              operationId: petCreatedCallback
+              requestBody:
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/Pet'
+              responses:
+                "200":
+                  description: Callback acknowledged
       requestBody:
         required: true
         content:
@@ -58,6 +92,7 @@ paths:
   /pets/{petId}:
     get:
       operationId: showPetById
+      tags: [pets]
       parameters:
         - name: petId
           in: path
@@ -91,6 +126,7 @@ paths:
   /owners:
     get:
       operationId: listOwners
+      tags: [owners]
       responses:
         "200":
           description: A list of owners
@@ -100,6 +136,18 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Owner'
+webhooks:
+  petAdopted:
+    post:
+      operationId: petAdoptedWebhook
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pet'
+      responses:
+        "200":
+          description: Webhook acknowledged
 components:
   securitySchemes:
     bearerAuth:
@@ -123,6 +171,7 @@ components:
   schemas:
     Pet:
       type: object
+      x-speakeasy-entity: Pet
       properties:
         id:
           type: integer
@@ -130,6 +179,13 @@ components:
           type: string
         tag:
           type: string
+        status:
+          type: string
+          default: available
+          enum:
+            - available
+            - pending
+            - sold
         owner:
           $ref: '#/components/schemas/Owner'
       required:
@@ -179,4 +235,14 @@ components:
       type: object
       properties:
         data:
+          type: string
+    Metadata:
+      type: object
+      properties:
+        name:
+          type: string
+      additionalProperties:
+        type: string
+      patternProperties:
+        "^x-":
           type: string
