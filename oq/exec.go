@@ -1272,9 +1272,10 @@ func describeStage(stage Stage) string {
 		return "Count: count rows"
 	case StageRefs:
 		dir := "bidi"
-		if stage.RefsDir == "out" {
+		switch stage.RefsDir {
+		case "out":
 			dir = "out"
-		} else if stage.RefsDir == "in" {
+		case "in":
 			dir = "in"
 		}
 		if stage.Limit < 0 {
