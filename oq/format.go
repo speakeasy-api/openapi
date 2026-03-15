@@ -75,7 +75,12 @@ func FormatTable(result *Result, g *graph.SchemaGraph) string {
 			if i > 0 {
 				sb.WriteString("  ")
 			}
-			sb.WriteString(padRight(col, widths[i]))
+			// Don't pad the last column — avoids massive trailing whitespace
+			if i < len(row)-1 {
+				sb.WriteString(padRight(col, widths[i]))
+			} else {
+				sb.WriteString(col)
+			}
 		}
 		sb.WriteString("\n")
 	}
