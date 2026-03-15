@@ -143,7 +143,7 @@ Module search paths: current directory, then `~/.config/oq/`
 | `isCircular` | bool | Part of circular reference |
 | `hasRef` | bool | Has $ref |
 | `hash` | string | Content hash |
-| `path` | string | JSON pointer |
+| `location` | string | Fully qualified JSON pointer |
 | `opCount` | int | Operations using this schema |
 | `tagCount` | int | Distinct tags across operations |
 

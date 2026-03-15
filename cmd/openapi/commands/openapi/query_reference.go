@@ -154,7 +154,7 @@ Graph-level (pre-computed):
   isCircular       bool     Part of a circular reference chain
   hasRef           bool     Has a $ref
   hash              string   Content hash
-  path              string   JSON pointer in document
+  location          string   Fully qualified JSON pointer in document
   opCount          int      Number of operations using this schema
   tagCount         int      Number of distinct tags across operations
 
@@ -381,7 +381,7 @@ Schema analysis:
   components.schemas | orphans | select name
 
   # Circular references
-  schemas | where(isCircular) | select name, path
+  schemas | where(isCircular) | select name, location
 
   # Blast radius — what breaks if I change this schema?
   schemas | where(name == "Error") | blast-radius | length

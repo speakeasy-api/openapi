@@ -764,7 +764,7 @@ func TestExecute_SchemaFields_Coverage(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Select all schema fields to cover fieldValue branches
-	result, err := oq.Execute("schemas | where(isComponent) | take(1) | select name, type, depth, inDegree, outDegree, unionWidth, propertyCount, isComponent, isInline, isCircular, hasRef, hash, path", g)
+	result, err := oq.Execute("schemas | where(isComponent) | take(1) | select name, type, depth, inDegree, outDegree, unionWidth, propertyCount, isComponent, isInline, isCircular, hasRef, hash, location", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "should have schema rows")
 
@@ -870,11 +870,11 @@ func TestFormatToon_Escaping_Success(t *testing.T) {
 
 	// Paths contain special chars like / that don't need escaping,
 	// but hash values and paths are good coverage
-	result, err := oq.Execute("schemas | where(isComponent) | take(1) | select name, hash, path", g)
+	result, err := oq.Execute("schemas | where(isComponent) | take(1) | select name, hash, location", g)
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)
-	assert.Contains(t, toon, "results[1]{name,hash,path}:", "toon should show result count and selected fields")
+	assert.Contains(t, toon, "results[1]{name,hash,location}:", "toon should show result count and selected fields")
 }
 
 func TestFormatMarkdown_Count_Success(t *testing.T) {
@@ -1416,7 +1416,7 @@ func TestExecute_ToonEscape_SpecialChars(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// path fields contain "/" which doesn't need quoting, but let's cover the formatter
-	result, err := oq.Execute("schemas | take(3) | select path", g)
+	result, err := oq.Execute("schemas | take(3) | select location", g)
 	require.NoError(t, err)
 
 	toon := oq.FormatToon(result, g)

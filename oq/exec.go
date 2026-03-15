@@ -1423,7 +1423,7 @@ func execFields(result *Result) (*Result, error) {
 			{"isCircular", "bool"},
 			{"hasRef", "bool"},
 			{"hash", "string"},
-			{"path", "string"},
+			{"location", "string"},
 			{"opCount", "int"},
 			{"tagCount", "int"},
 			{"via", "string"},

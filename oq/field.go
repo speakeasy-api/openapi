@@ -98,7 +98,7 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.BoolVal(s.HasRef)
 		case "hash":
 			return expr.StringVal(s.Hash)
-		case "path":
+		case "location":
 			// Fully qualified JSON pointer. For inline schemas, prepends
 			// the parent component path to get the absolute location.
 			if s.IsComponent || strings.HasPrefix(s.Path, "/components/") {

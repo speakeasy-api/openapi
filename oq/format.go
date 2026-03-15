@@ -541,7 +541,7 @@ func emitKey(row Row, g *graph.SchemaGraph) string {
 	switch row.Kind {
 	case SchemaResult:
 		// Use path for full attribution; fall back to name
-		if path := valueToString(fieldValue(row, "path", g)); path != "" {
+		if path := valueToString(fieldValue(row, "location", g)); path != "" {
 			return path
 		}
 		return valueToString(fieldValue(row, "name", g))
