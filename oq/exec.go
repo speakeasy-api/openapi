@@ -83,6 +83,28 @@ func execSource(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 		result.Rows = append(result.Rows, componentRows(g, componentHeaders)...)
 	case "components.security-schemes":
 		result.Rows = append(result.Rows, componentRows(g, componentSecuritySchemes)...)
+	case "webhooks":
+		for i := range g.Operations {
+			if openapi.IsWebhookLocation(g.Operations[i].Location) {
+				result.Rows = append(result.Rows, Row{Kind: OperationResult, OpIdx: i})
+			}
+		}
+	case "servers":
+		if g.Index != nil && g.Index.Doc != nil {
+			for _, srv := range g.Index.Doc.GetServers() {
+				if srv != nil {
+					result.Rows = append(result.Rows, Row{Kind: ServerResult, Server: srv})
+				}
+			}
+		}
+	case "tags":
+		if g.Index != nil && g.Index.Doc != nil {
+			for _, tag := range g.Index.Doc.GetTags() {
+				if tag != nil {
+					result.Rows = append(result.Rows, Row{Kind: TagResult, Tag: tag})
+				}
+			}
+		}
 	default:
 		return nil, fmt.Errorf("unknown source: %q", stage.Source)
 	}
@@ -204,6 +226,14 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		return execSecurity(result, g)
 	case StageMembers:
 		return execMembers(result, g)
+	case StageCallbacks:
+		return execCallbacks(result, g)
+	case StageLinks:
+		return execLinks(result, g)
+	case StageAdditionalProperties:
+		return execTraversal(result, g, traverseAdditionalProperties)
+	case StagePatternProperties:
+		return execTraversal(result, g, traversePatternProperties)
 	default:
 		return nil, fmt.Errorf("unimplemented stage kind: %d", stage.Kind)
 	}
@@ -1370,6 +1400,14 @@ func describeStage(stage Stage) string {
 		return "Navigate: operation security requirements"
 	case StageMembers:
 		return "Expand: union members (allOf/oneOf/anyOf) or group row members"
+	case StageCallbacks:
+		return "Navigate: operation callbacks → callback operations"
+	case StageLinks:
+		return "Navigate: response links"
+	case StageAdditionalProperties:
+		return "Traverse: additional properties schema"
+	case StagePatternProperties:
+		return "Traverse: pattern properties schemas"
 	default:
 		return "Unknown stage"
 	}
@@ -1457,6 +1495,7 @@ func execFields(result *Result) (*Result, error) {
 			{"extensionCount", "int"},
 			{"contentEncoding", "string"},
 			{"contentMediaType", "string"},
+			{"default", "string"},
 		}
 	case OperationResult:
 		fields = []struct{ name, typ string }{
@@ -1476,6 +1515,9 @@ func execFields(result *Result) (*Result, error) {
 			{"hasErrorResponse", "bool"},
 			{"hasRequestBody", "bool"},
 			{"securityCount", "int"},
+			{"isWebhook", "bool"},
+			{"callbackName", "string"},
+			{"callbackCount", "int"},
 			{"via", "string"},
 			{"key", "string"},
 			{"from", "string"},
@@ -1550,6 +1592,32 @@ func execFields(result *Result) (*Result, error) {
 			{"schemeType", "string"},
 			{"scopes", "array"},
 			{"scopeCount", "int"},
+			{"operation", "string"},
+		}
+	case ServerResult:
+		fields = []struct{ name, typ string }{
+			{"url", "string"},
+			{"description", "string"},
+			{"name", "string"},
+			{"variableCount", "int"},
+		}
+	case TagResult:
+		fields = []struct{ name, typ string }{
+			{"name", "string"},
+			{"description", "string"},
+			{"summary", "string"},
+			{"operationCount", "int"},
+		}
+	case LinkResult:
+		fields = []struct{ name, typ string }{
+			{"name", "string"},
+			{"operationId", "string"},
+			{"operationRef", "string"},
+			{"description", "string"},
+			{"parameterCount", "int"},
+			{"hasRequestBody", "bool"},
+			{"hasServer", "bool"},
+			{"statusCode", "string"},
 			{"operation", "string"},
 		}
 	default:
@@ -1862,7 +1930,7 @@ func execOperation(result *Result, g *graph.SchemaGraph) (*Result, error) {
 		case OperationResult:
 			opIdx = row.OpIdx
 		case ParameterResult, ResponseResult, RequestBodyResult, ContentTypeResult, HeaderResult,
-			SecurityRequirementResult:
+			SecurityRequirementResult, LinkResult:
 			opIdx = row.SourceOpIdx
 		default:
 			continue
@@ -2087,6 +2155,102 @@ func execSecurity(result *Result, g *graph.SchemaGraph) (*Result, error) {
 		}
 	}
 	return out, nil
+}
+
+// --- Callbacks ---
+
+func execCallbacks(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	// Build a map from *openapi.Operation to opIdx for lookup
+	opPtrIdx := make(map[*openapi.Operation]int, len(g.Operations))
+	for i := range g.Operations {
+		if g.Operations[i].Operation != nil {
+			opPtrIdx[g.Operations[i].Operation] = i
+		}
+	}
+
+	for _, row := range result.Rows {
+		if row.Kind != OperationResult {
+			continue
+		}
+		op := &g.Operations[row.OpIdx]
+		if op.Operation == nil || op.Operation.Callbacks == nil {
+			continue
+		}
+		for cbName, cbRef := range op.Operation.Callbacks.All() {
+			if cbRef == nil {
+				continue
+			}
+			cb := cbRef.GetObject()
+			if cb == nil || cb.Map == nil {
+				continue
+			}
+			for _, piRef := range cb.All() {
+				if piRef == nil {
+					continue
+				}
+				pi := piRef.GetObject()
+				if pi == nil || pi.Map == nil {
+					continue
+				}
+				for _, cbOp := range pi.All() {
+					if cbOp == nil {
+						continue
+					}
+					cbOpIdx, ok := opPtrIdx[cbOp]
+					if !ok {
+						continue
+					}
+					out.Rows = append(out.Rows, Row{
+						Kind:         OperationResult,
+						OpIdx:        cbOpIdx,
+						CallbackName: cbName,
+						SourceOpIdx:  row.OpIdx,
+					})
+				}
+			}
+		}
+	}
+	return out, nil
+}
+
+// --- Links ---
+
+func execLinks(result *Result, _ *graph.SchemaGraph) (*Result, error) {
+	out := deriveResult(result)
+	for _, row := range result.Rows {
+		if row.Kind != ResponseResult || row.Response == nil || row.Response.Links == nil {
+			continue
+		}
+		for name, linkRef := range row.Response.Links.All() {
+			if linkRef == nil {
+				continue
+			}
+			l := linkRef.GetObject()
+			if l == nil {
+				continue
+			}
+			out.Rows = append(out.Rows, Row{
+				Kind:        LinkResult,
+				Link:        l,
+				LinkName:    name,
+				StatusCode:  row.StatusCode,
+				SourceOpIdx: row.SourceOpIdx,
+				OpIdx:       row.OpIdx,
+			})
+		}
+	}
+	return out, nil
+}
+
+// --- Additional/Pattern Properties ---
+
+func traverseAdditionalProperties(row Row, g *graph.SchemaGraph) []Row {
+	return traverseOutEdges(row, g, graph.EdgeAdditionalProps)
+}
+
+func traversePatternProperties(row Row, g *graph.SchemaGraph) []Row {
+	return traverseOutEdges(row, g, graph.EdgePatternProperty)
 }
 
 func buildSecuritySchemeMap(g *graph.SchemaGraph) map[string]*openapi.SecurityScheme {

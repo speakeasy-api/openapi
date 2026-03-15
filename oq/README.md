@@ -35,6 +35,9 @@ source | stage | stage | ... | terminal
 |--------|-------------|
 | `schemas` | All schemas (component + inline) |
 | `operations` | All operations |
+| `webhooks` | Webhook operations only |
+| `servers` | Document-level servers |
+| `tags` | Document-level tags |
 
 ### Traversal Stages
 
@@ -45,8 +48,9 @@ source | stage | stage | ... | terminal
 | `properties` / `properties(*)` | Property sub-schemas (allOf-flattening). `properties(*)` recursively expands through `$ref`, `oneOf`, `anyOf` with qualified `from` paths |
 | `members` | allOf/oneOf/anyOf children, or expand group rows into schemas |
 | `items` | Array items schema (with edge annotations) |
+| `additional-properties` | Expand to additionalProperties schema |
+| `pattern-properties` | Expand to patternProperties schemas |
 | `parent` | Navigate to structural parent schema (via graph in-edges) |
-| `members` | Expand group rows (from `cycles`, `clusters`, `group-by`) into member schema rows |
 | `to-operations` | Schemas → operations |
 | `to-schemas` | Operations → schemas |
 | `path(A, B)` | Shortest path between two schemas |
@@ -65,8 +69,11 @@ Navigate into the internal structure of operations. These stages produce new row
 | `request-body` | Operation request body |
 | `content-types` | Content types from response or request body |
 | `headers` | Response headers |
+| `callbacks` | Operation callbacks → callback operations |
+| `links` | Response links |
 | `to-schema` | Extract schema from parameter, content-type, or header |
 | `operation` | Back-navigate to source operation |
+| `security` | Operation security requirements |
 
 ### Analysis Stages
 
@@ -162,6 +169,9 @@ Module search paths: current directory, then `~/.config/oq/`
 | `deprecated` | bool | Deprecated flag |
 | `description` | string | Description |
 | `summary` | string | Summary |
+| `isWebhook` | bool | Whether the operation is a webhook |
+| `callbackName` | string | Callback name (set by callbacks stage) |
+| `callbackCount` | int | Number of callbacks |
 
 ### Edge Annotation Fields
 
@@ -247,6 +257,38 @@ Produced by the `headers` navigation stage.
 | `hasSchema` | bool | Has associated schema |
 | `statusCode` | string | Status code of parent response |
 | `operation` | string | Source operation name |
+
+### Server Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `url` | string | Server URL |
+| `name` | string | Server name |
+| `description` | string | Server description |
+| `variableCount` | int | Number of server variables |
+
+### Tag Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Tag name |
+| `description` | string | Tag description |
+| `summary` | string | Tag summary |
+| `operationCount` | int | Number of operations with this tag |
+
+### Link Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Link name |
+| `operationId` | string | Target operation ID |
+| `operationRef` | string | Target operation reference |
+| `description` | string | Link description |
+| `parameterCount` | int | Number of link parameters |
+| `hasRequestBody` | bool | Whether the link has a request body |
+| `hasServer` | bool | Whether the link has a server override |
+| `statusCode` | string | Source response status code |
+| `operation` | string | Source operation |
 
 ## Expressions
 
@@ -397,6 +439,33 @@ operations | where(method == "post") | request-body | content-types | select med
 
 # Extract raw YAML for a schema
 schemas | where(name == "Pet") | to-yaml
+
+# --- New capabilities ---
+
+# Webhook operations
+webhooks | select name, method, path
+
+# Document servers
+servers | select url, description, variableCount
+
+# Tags with operation counts
+tags | select name, operationCount | sort-by(operationCount, desc)
+
+# Callback operations
+operations | where(callbackCount > 0) | callbacks | select name, callbackName
+
+# Response links
+operations | responses | links | select name, operationId
+
+# Additional/pattern properties
+schemas | where(has(additionalProperties)) | additional-properties
+schemas | where(has(patternProperties)) | pattern-properties
+
+# Schemas with default values
+schemas | properties | where(has(default)) | select from, key, default
+
+# Extension fields (use underscores for dashes in expressions)
+operations | where(has(x_speakeasy_name_override)) | select name, x_speakeasy_name_override
 ```
 
 ## CLI Reference

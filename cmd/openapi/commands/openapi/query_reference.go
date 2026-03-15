@@ -30,6 +30,9 @@ result set.
 
   schemas                      All schemas (component + inline)
   operations                   All operations
+  webhooks                     Webhook operations only
+  servers                      Document-level servers
+  tags                         Document-level tags
   components.schemas           Component schemas only
   components.parameters        Reusable parameter definitions
   components.responses         Reusable response definitions
@@ -55,6 +58,8 @@ in the schema reference graph.
                       expands oneOf/anyOf with qualified from paths)
   members             Expand allOf/oneOf/anyOf children, or group rows into schemas
   items               Expand to array items schema (checks allOf; with edge annotations)
+  additional-properties  Expand to additionalProperties schema
+  pattern-properties  Expand to patternProperties schemas (with edge annotations)
   parent              Navigate to structural parent schema (via graph in-edges)
   to-operations       Schemas → operations that use them
   to-schemas          Operations → schemas they touch
@@ -74,6 +79,8 @@ typed rows that can be filtered, projected, and navigated back to the source.
   request-body          Operation request body (yields RequestBodyRow)
   content-types         Content types from responses or request body (yields ContentTypeRow)
   headers               Response headers (yields HeaderRow)
+  callbacks             Operation callbacks → callback operations (yields OperationRow)
+  links                 Response links (yields LinkRow)
   to-schema             Extract schema from parameter, content-type, or header (bridges to graph)
   operation             Back-navigate to source operation
   security              Operation security requirements (inherits global when not overridden)
@@ -189,6 +196,7 @@ Content-level (from schema object):
   extensionCount              int      Number of x- extensions
   contentEncoding             string   Content encoding (base64, ...)
   contentMediaType           string   Content media type
+  default                     string   Default value (null if unset)
 
 OPERATION FIELDS
 ----------------
@@ -211,6 +219,9 @@ OPERATION FIELDS
   hasErrorResponse  bool     Has 4xx/5xx or default response
   hasRequestBody    bool     Has a request body
   securityCount      int      Number of security requirements
+  isWebhook          bool     Whether the operation is a webhook
+  callbackName       string   Callback name (set by callbacks stage)
+  callbackCount      int      Number of callbacks
 
 EDGE ANNOTATION FIELDS
 ----------------------
@@ -309,6 +320,44 @@ Available from components.security-schemes source.
   hasFlows           bool     Whether OAuth2 flows are defined (oauth2 only)
   deprecated          bool     Whether the scheme is deprecated
 
+SERVER FIELDS
+-------------
+Available from servers source.
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  url                 string   Server URL
+  name                string   Server name (from x-speakeasy-server-id or name field)
+  description         string   Server description
+  variableCount      int      Number of server variables
+
+TAG FIELDS
+----------
+Available from tags source.
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  name                string   Tag name
+  description         string   Tag description
+  summary             string   Tag summary
+  operationCount     int      Number of operations with this tag
+
+LINK FIELDS
+-----------
+Available from operations | responses | links.
+
+  Field               Type     Description
+  ─────               ────     ───────────
+  name                string   Link name
+  operationId        string   Target operation ID (mutually exclusive with operationRef)
+  operationRef       string   Target operation reference (mutually exclusive with operationId)
+  description         string   Link description
+  parameterCount     int      Number of link parameters
+  hasRequestBody    bool     Whether the link has a request body value
+  hasServer          bool     Whether the link has a server override
+  statusCode         string   Source response status code
+  operation           string   Source operation
+
 SECURITY REQUIREMENT FIELDS
 ----------------------------
 Available from operations | security stage. Inherits global security when
@@ -322,6 +371,14 @@ on an operation means "no security" (yields zero rows).
   scopes              array    Required OAuth2 scopes
   scopeCount         int      Number of required scopes
   operation           string   Source operation
+
+EXTENSION FIELDS (x-*)
+----------------------
+Access x-* extension values on any object (schemas, operations, servers, tags, links).
+In expressions, use underscores instead of dashes: x_speakeasy_name → x-speakeasy-name.
+
+  schemas | where(has(x_speakeasy_entity)) | select name, x_speakeasy_entity
+  operations | where(has(x_speakeasy_name_override))
 
 EXPRESSIONS
 -----------
@@ -454,6 +511,33 @@ Content auditing:
 
   # Duplicate inline schemas (same hash)
   schemas | where(isInline) | group-by(hash) | where(count > 1)
+
+Webhooks, servers, tags, callbacks & links:
+
+  # List all webhook operations
+  webhooks | select name, method, path
+
+  # Document servers
+  servers | select url, description, variableCount
+
+  # Tags with operation counts
+  tags | select name, operationCount | sort-by(operationCount, desc)
+
+  # Callback operations
+  operations | where(callbackCount > 0) | callbacks | select name, callbackName
+
+  # Response links
+  operations | responses | links | select name, operationId, description
+
+  # Additional/pattern properties traversal
+  schemas | where(has(additionalProperties)) | additional-properties
+  schemas | where(has(patternProperties)) | pattern-properties
+
+  # Schemas with default values
+  schemas | properties | where(has(default)) | select from, key, default
+
+  # Operations with extensions
+  operations | where(has(x_speakeasy_name_override)) | select name, x_speakeasy_name_override
 
 Advanced:
 

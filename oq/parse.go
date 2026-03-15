@@ -414,6 +414,18 @@ func parseStage(s string) (Stage, error) {
 	case "members":
 		return Stage{Kind: StageMembers}, nil
 
+	case "callbacks":
+		return Stage{Kind: StageCallbacks}, nil
+
+	case "links":
+		return Stage{Kind: StageLinks}, nil
+
+	case "additional-properties":
+		return Stage{Kind: StageAdditionalProperties}, nil
+
+	case "pattern-properties":
+		return Stage{Kind: StagePatternProperties}, nil
+
 	default:
 		return Stage{}, fmt.Errorf("unknown stage: %q", keyword)
 	}

@@ -22,14 +22,17 @@ responses, content types, and headers.`,
 	Example: `Queries are pipelines: source | stage | stage | ...
 
 Pipeline stages:
-  Source:      schemas, operations, components.schemas, components.parameters,
+  Source:      schemas, operations, webhooks, servers, tags,
+               components.schemas, components.parameters,
                components.responses, components.request-bodies, components.headers,
                components.security-schemes
   Navigation:  parameters, responses, request-body, content-types, headers,
-               to-schema, operation, security
+               callbacks, links, to-schema, operation, security
   Traversal:   refs-out, refs-out(*), refs-in, refs-in(*),
-               properties, properties(*), members, items, parent, to-operations,
-               to-schemas, path(A, B), connected, blast-radius, neighbors, neighbors(*)
+               properties, properties(*), members, items,
+               additional-properties, pattern-properties,
+               parent, to-operations, to-schemas,
+               path(A, B), connected, blast-radius, neighbors, neighbors(*)
   Analysis:    orphans, leaves, cycles, clusters, cross-tag, shared-refs
   Filter:      where(expr), select <fields>, sort-by(field, desc), take(N), last(N),
                sample(N), highest(N, field), lowest(N, field), unique,

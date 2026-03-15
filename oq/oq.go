@@ -26,6 +26,9 @@ const (
 	HeaderResult
 	SecuritySchemeResult
 	SecurityRequirementResult
+	ServerResult
+	TagResult
+	LinkResult
 )
 
 // Row represents a single result in the pipeline.
@@ -64,6 +67,13 @@ type Row struct {
 	SchemeName    string   // security scheme name
 	Scopes        []string // security requirement scopes
 	SourceOpIdx   int      // operation this row originated from (-1 if N/A)
+
+	// Server, Tag, Link objects (populated by server/tag/link sources/stages)
+	Server       *openapi.Server
+	Tag          *openapi.Tag
+	Link         *openapi.Link
+	LinkName     string // link name within response
+	CallbackName string // callback name within operation
 }
 
 // Result is the output of a query execution.
@@ -169,10 +179,14 @@ const (
 	StageRequestBody
 	StageContentTypes
 	StageHeaders
-	StageToSchema  // singular: extract schema from nav row
-	StageOperation // back-navigate to source operation
-	StageSecurity  // operation security requirements
-	StageMembers   // union members (allOf/oneOf/anyOf children) or group row expansion
+	StageToSchema             // singular: extract schema from nav row
+	StageOperation            // back-navigate to source operation
+	StageSecurity             // operation security requirements
+	StageMembers              // union members (allOf/oneOf/anyOf children) or group row expansion
+	StageCallbacks            // operation callbacks → operations
+	StageLinks                // response links
+	StageAdditionalProperties // schema additional properties traversal
+	StagePatternProperties    // schema pattern properties traversal
 )
 
 // Stage represents a single stage in the query pipeline.

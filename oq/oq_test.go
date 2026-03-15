@@ -4257,3 +4257,415 @@ func TestLoadModule_ParseError(t *testing.T) {
 	_, err = oq.LoadModule(dir+"/bad.oq", nil)
 	assert.Error(t, err)
 }
+
+// --- New capability tests ---
+
+func TestExecute_WebhooksSource(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`webhooks`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+
+	// All rows should be webhook operations
+	for _, row := range result.Rows {
+		assert.Equal(t, oq.OperationResult, row.Kind)
+		v := oq.FieldValuePublic(row, "isWebhook", g)
+		assert.True(t, v.Bool, "webhook source should only return webhook operations")
+	}
+}
+
+func TestExecute_WebhookIsWebhookField(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Non-webhook operations should have isWebhook=false
+	result, err := oq.Execute(`operations | where(not isWebhook) | select name, isWebhook`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "should have non-webhook operations")
+
+	// Webhook operations should have isWebhook=true
+	result, err = oq.Execute(`operations | where(isWebhook) | select name, isWebhook`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "should have webhook operations")
+}
+
+func TestExecute_ServersSource(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`servers`, g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 2, "petstore has 2 servers")
+
+	// Check fields
+	row := result.Rows[0]
+	url := oq.FieldValuePublic(row, "url", g)
+	assert.Equal(t, "https://api.petstore.io/v1", url.Str)
+
+	desc := oq.FieldValuePublic(row, "description", g)
+	assert.Equal(t, "Production server", desc.Str)
+
+	varCount := oq.FieldValuePublic(row, "variableCount", g)
+	assert.Equal(t, 1, varCount.Int)
+}
+
+func TestExecute_ServersSelect(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`servers | select url, description`, g)
+	require.NoError(t, err)
+	assert.Len(t, result.Rows, 2)
+	assert.Equal(t, []string{"url", "description"}, result.Fields)
+}
+
+func TestExecute_TagsSource(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`tags`, g)
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 2, "petstore has 2 tags")
+
+	// Check tag fields
+	row := result.Rows[0]
+	name := oq.FieldValuePublic(row, "name", g)
+	assert.Equal(t, "pets", name.Str)
+
+	desc := oq.FieldValuePublic(row, "description", g)
+	assert.Equal(t, "Everything about your pets", desc.Str)
+
+	summary := oq.FieldValuePublic(row, "summary", g)
+	assert.Equal(t, "Pet operations", summary.Str)
+
+	opCount := oq.FieldValuePublic(row, "operationCount", g)
+	assert.Equal(t, 3, opCount.Int, "pets tag should have 3 operations (listPets, createPet, showPetById)")
+}
+
+func TestExecute_TagsSelect(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`tags | select name, operationCount`, g)
+	require.NoError(t, err)
+	assert.Len(t, result.Rows, 2)
+	assert.Equal(t, []string{"name", "operationCount"}, result.Fields)
+}
+
+func TestExecute_Callbacks(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | where(name == "createPet") | callbacks`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows, "createPet has callbacks")
+
+	row := result.Rows[0]
+	assert.Equal(t, oq.OperationResult, row.Kind)
+	assert.Equal(t, "onPetCreated", row.CallbackName)
+}
+
+func TestExecute_CallbackCount(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | where(callbackCount > 0) | select name, callbackCount`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+	name := oq.FieldValuePublic(result.Rows[0], "name", g)
+	assert.Equal(t, "createPet", name.Str)
+}
+
+func TestExecute_Links(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | where(name == "listPets") | responses | links`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows, "listPets 200 response has links")
+
+	row := result.Rows[0]
+	assert.Equal(t, oq.LinkResult, row.Kind)
+	name := oq.FieldValuePublic(row, "name", g)
+	assert.Equal(t, "GetPetById", name.Str)
+
+	opId := oq.FieldValuePublic(row, "operationId", g)
+	assert.Equal(t, "showPetById", opId.Str)
+
+	desc := oq.FieldValuePublic(row, "description", g)
+	assert.Contains(t, desc.Str, "specific pet")
+}
+
+func TestExecute_LinksSelect(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | responses | links | select name, operationId, description`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+	assert.Equal(t, []string{"name", "operationId", "description"}, result.Fields)
+}
+
+func TestExecute_AdditionalProperties(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas | where(has(additionalProperties)) | additional-properties`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "Metadata has additionalProperties")
+
+	row := result.Rows[0]
+	via := oq.FieldValuePublic(row, "via", g)
+	assert.Equal(t, "additionalProperties", via.Str)
+}
+
+func TestExecute_PatternProperties(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas | where(has(patternProperties)) | pattern-properties`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows, "Metadata has patternProperties")
+
+	row := result.Rows[0]
+	via := oq.FieldValuePublic(row, "via", g)
+	assert.Equal(t, "patternProperty", via.Str)
+}
+
+func TestExecute_SchemaDefaultField(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Pet.status has default: available
+	result, err := oq.Execute(`schemas | where(name == "Pet") | properties | where(key == "status") | select key, default`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+	def := oq.FieldValuePublic(result.Rows[0], "default", g)
+	assert.Equal(t, "available", def.Str)
+}
+
+func TestExecute_SchemaEnumField(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Pet.status has enum values
+	result, err := oq.Execute(`schemas | where(name == "Pet") | properties | where(key == "status") | select key, enum, enumCount`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+	enumCount := oq.FieldValuePublic(result.Rows[0], "enumCount", g)
+	assert.Equal(t, 3, enumCount.Int)
+}
+
+func TestExecute_OperationExtensionField(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// listPets has x-speakeasy-name-override; use x_ prefix in expr to avoid dash parsing issues
+	result, err := oq.Execute(`operations | where(has(x_speakeasy_name_override)) | select name, x_speakeasy_name_override`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+	name := oq.FieldValuePublic(result.Rows[0], "name", g)
+	assert.Equal(t, "listPets", name.Str)
+	// Field access via direct fieldValue works with the canonical x- name
+	ext := oq.FieldValuePublic(result.Rows[0], "x-speakeasy-name-override", g)
+	assert.Equal(t, "ListAllPets", ext.Str)
+}
+
+func TestExecute_SchemaExtensionField(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Pet has x-speakeasy-entity; use x_ prefix in has() for parser compatibility
+	result, err := oq.Execute(`schemas | where(has(x_speakeasy_entity)) | select name, x_speakeasy_entity`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+	name := oq.FieldValuePublic(result.Rows[0], "name", g)
+	assert.Equal(t, "Pet", name.Str)
+	ext := oq.FieldValuePublic(result.Rows[0], "x-speakeasy-entity", g)
+	assert.Equal(t, "Pet", ext.Str)
+}
+
+func TestExecute_ParseNewStages(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{"webhooks source", "webhooks"},
+		{"servers source", "servers"},
+		{"tags source", "tags"},
+		{"callbacks", "operations | callbacks"},
+		{"links", "operations | responses | links"},
+		{"additional-properties", "schemas | additional-properties"},
+		{"pattern-properties", "schemas | pattern-properties"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			stages, err := oq.Parse(tt.query)
+			require.NoError(t, err)
+			assert.NotEmpty(t, stages)
+		})
+	}
+}
+
+func TestExecute_ServerKindName(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`servers | select kind, url`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+	kind := oq.FieldValuePublic(result.Rows[0], "kind", g)
+	assert.Equal(t, "server", kind.Str)
+}
+
+func TestExecute_TagKindName(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`tags | select kind, name`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+	kind := oq.FieldValuePublic(result.Rows[0], "kind", g)
+	assert.Equal(t, "tag", kind.Str)
+}
+
+func TestExecute_LinkKindName(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | responses | links | select kind, name`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+	kind := oq.FieldValuePublic(result.Rows[0], "kind", g)
+	assert.Equal(t, "link", kind.Str)
+}
+
+func TestExecute_LinkOperationBackNav(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// links should support back-navigation to operation
+	result, err := oq.Execute(`operations | responses | links | operation | unique | select name`, g)
+	require.NoError(t, err)
+	assert.NotEmpty(t, result.Rows)
+}
+
+func TestExecute_ServerEmitYAML(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`servers | take(1) | to-yaml`, g)
+	require.NoError(t, err)
+	assert.True(t, result.EmitYAML)
+	output := oq.FormatYAML(result, g)
+	assert.Contains(t, output, "api.petstore.io")
+}
+
+func TestExecute_TagEmitYAML(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`tags | take(1) | to-yaml`, g)
+	require.NoError(t, err)
+	assert.True(t, result.EmitYAML)
+	output := oq.FormatYAML(result, g)
+	assert.Contains(t, output, "pets")
+}
+
+func TestExecute_LinkEmitYAML(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`operations | responses | links | to-yaml`, g)
+	require.NoError(t, err)
+	output := oq.FormatYAML(result, g)
+	assert.Contains(t, output, "GetPetById")
+}
+
+func TestExecute_ExplainNewStages(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	tests := []struct {
+		query    string
+		contains string
+	}{
+		{"operations | callbacks | explain", "callbacks"},
+		{"operations | responses | links | explain", "links"},
+		{"schemas | additional-properties | explain", "additional properties"},
+		{"schemas | pattern-properties | explain", "pattern properties"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.query, func(t *testing.T) {
+			t.Parallel()
+			result, err := oq.Execute(tt.query, g)
+			require.NoError(t, err)
+			assert.Contains(t, strings.ToLower(result.Explain), tt.contains)
+		})
+	}
+}
+
+func TestExecute_FieldsNewKinds(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Verify 'fields' stage works for new kinds
+	tests := []struct {
+		query    string
+		contains string
+	}{
+		{"servers | fields", "url"},
+		{"tags | fields", "operationCount"},
+		{"operations | responses | links | fields", "operationId"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.query, func(t *testing.T) {
+			t.Parallel()
+			result, err := oq.Execute(tt.query, g)
+			require.NoError(t, err)
+			assert.Contains(t, result.Explain, tt.contains)
+		})
+	}
+}
+
+func TestExecute_DefaultFieldsNewKinds(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// servers default fields
+	result, err := oq.Execute(`servers`, g)
+	require.NoError(t, err)
+	output := oq.FormatTable(result, g)
+	assert.Contains(t, output, "url")
+	assert.Contains(t, output, "description")
+	assert.Contains(t, output, "variableCount")
+
+	// tags default fields
+	result, err = oq.Execute(`tags`, g)
+	require.NoError(t, err)
+	output = oq.FormatTable(result, g)
+	assert.Contains(t, output, "name")
+	assert.Contains(t, output, "description")
+	assert.Contains(t, output, "operationCount")
+}
+
+func TestExecute_ComponentDefaultField(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// LimitParam has default: 20 on its schema
+	result, err := oq.Execute(`components.parameters | to-schema | select name, default`, g)
+	require.NoError(t, err)
+	if len(result.Rows) > 0 {
+		def := oq.FieldValuePublic(result.Rows[0], "default", g)
+		assert.Equal(t, "20", def.Str)
+	}
+}

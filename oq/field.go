@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/graph"
 	oas3 "github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -179,6 +180,15 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 				return expr.StringVal(o.Operation.GetSummary())
 			}
 			return expr.StringVal("")
+		case "isWebhook":
+			return expr.BoolVal(openapi.IsWebhookLocation(o.Location))
+		case "callbackName":
+			return expr.StringVal(row.CallbackName)
+		case "callbackCount":
+			if o.Operation != nil && o.Operation.Callbacks != nil {
+				return expr.IntVal(o.Operation.Callbacks.Len())
+			}
+			return expr.IntVal(0)
 		case "via":
 			return expr.StringVal(row.Via)
 		case "key":
@@ -356,6 +366,86 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		case "operation":
 			return expr.StringVal(operationName(row.SourceOpIdx, g))
 		}
+	case ServerResult:
+		srv := row.Server
+		if srv == nil {
+			return expr.NullVal()
+		}
+		switch name {
+		case "url", "name":
+			if name == "name" && srv.Name != nil {
+				return expr.StringVal(*srv.Name)
+			}
+			return expr.StringVal(srv.URL)
+		case "description":
+			return expr.StringVal(srv.GetDescription())
+		case "variableCount":
+			if srv.Variables != nil {
+				return expr.IntVal(srv.Variables.Len())
+			}
+			return expr.IntVal(0)
+		}
+		return extensionFieldValue(srv.Extensions, name)
+	case TagResult:
+		tag := row.Tag
+		if tag == nil {
+			return expr.NullVal()
+		}
+		switch name {
+		case "name":
+			return expr.StringVal(tag.Name)
+		case "description":
+			if tag.Description != nil {
+				return expr.StringVal(*tag.Description)
+			}
+			return expr.StringVal("")
+		case "summary":
+			if tag.Summary != nil {
+				return expr.StringVal(*tag.Summary)
+			}
+			return expr.StringVal("")
+		case "operationCount":
+			return expr.IntVal(tagOperationCount(tag.Name, g))
+		}
+		return extensionFieldValue(tag.Extensions, name)
+	case LinkResult:
+		l := row.Link
+		if l == nil {
+			return expr.NullVal()
+		}
+		switch name {
+		case "name":
+			return expr.StringVal(row.LinkName)
+		case "operationId":
+			if l.OperationID != nil {
+				return expr.StringVal(*l.OperationID)
+			}
+			return expr.StringVal("")
+		case "operationRef":
+			if l.OperationRef != nil {
+				return expr.StringVal(*l.OperationRef)
+			}
+			return expr.StringVal("")
+		case "description":
+			if l.Description != nil {
+				return expr.StringVal(*l.Description)
+			}
+			return expr.StringVal("")
+		case "parameterCount":
+			if l.Parameters != nil {
+				return expr.IntVal(l.Parameters.Len())
+			}
+			return expr.IntVal(0)
+		case "hasRequestBody":
+			return expr.BoolVal(l.RequestBody != nil)
+		case "hasServer":
+			return expr.BoolVal(l.Server != nil)
+		case "statusCode":
+			return expr.StringVal(row.StatusCode)
+		case "operation":
+			return expr.StringVal(operationName(row.SourceOpIdx, g))
+		}
+		return extensionFieldValue(l.Extensions, name)
 	}
 	return expr.NullVal()
 }
@@ -382,6 +472,12 @@ func resultKindName(k ResultKind) string {
 		return "security-scheme"
 	case SecurityRequirementResult:
 		return "security-requirement"
+	case ServerResult:
+		return "server"
+	case TagResult:
+		return "tag"
+	case LinkResult:
+		return "link"
 	default:
 		return "unknown"
 	}
@@ -554,6 +650,13 @@ func schemaContentField(s *graph.SchemaNode, name string) expr.Value {
 		}
 		return expr.IntVal(0)
 
+	// --- Default value ---
+	case "default":
+		if schema != nil && schema.Default != nil {
+			return expr.StringVal(schema.Default.Value)
+		}
+		return expr.NullVal()
+
 	// --- Content encoding (OAS 3.1+) ---
 	case "contentEncoding":
 		if schema != nil && schema.ContentEncoding != nil {
@@ -671,7 +774,7 @@ func probeSchemaField(schema *oas3.Schema, name string) (expr.Value, bool) {
 	if strings.HasPrefix(name, "x-") || strings.HasPrefix(name, "x_") {
 		extKey := name
 		if strings.HasPrefix(name, "x_") {
-			extKey = "x-" + name[2:]
+			extKey = "x-" + strings.ReplaceAll(name[2:], "_", "-")
 		}
 		if schema.Extensions != nil {
 			if v, ok := schema.Extensions.Get(extKey); ok {
@@ -763,7 +866,7 @@ func operationContentField(o *graph.OperationNode, name string) expr.Value {
 		return expr.ArrayVal(op.Tags)
 	}
 
-	return expr.NullVal()
+	return extensionFieldValue(op.Extensions, name)
 }
 
 // getSchema extracts the underlying *Schema from a SchemaNode, if available.
@@ -785,6 +888,42 @@ func hasErrorResponse(op *openapi.Operation) bool {
 		}
 	}
 	return op.Responses.Default != nil
+}
+
+// extensionFieldValue checks for x-* extension fields on any object with extensions.
+func extensionFieldValue(exts *extensions.Extensions, name string) expr.Value {
+	if !strings.HasPrefix(name, "x-") && !strings.HasPrefix(name, "x_") {
+		return expr.NullVal()
+	}
+	extKey := name
+	if strings.HasPrefix(name, "x_") {
+		// Convert x_foo_bar → x-foo-bar for extension lookup
+		extKey = "x-" + strings.ReplaceAll(name[2:], "_", "-")
+	}
+	if exts != nil {
+		if v, ok := exts.Get(extKey); ok {
+			return expr.StringVal(v.Value)
+		}
+	}
+	return expr.NullVal()
+}
+
+// tagOperationCount counts operations tagged with the given tag name.
+func tagOperationCount(tagName string, g *graph.SchemaGraph) int {
+	count := 0
+	for i := range g.Operations {
+		op := g.Operations[i].Operation
+		if op == nil {
+			continue
+		}
+		for _, t := range op.Tags {
+			if t == tagName {
+				count++
+				break
+			}
+		}
+	}
+	return count
 }
 
 func compareValues(a, b expr.Value) int {
@@ -845,6 +984,18 @@ func rowKey(row Row) string {
 		return "ss:" + row.SchemeName
 	case SecurityRequirementResult:
 		return "sr:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.SchemeName
+	case ServerResult:
+		if row.Server != nil {
+			return "sv:" + row.Server.URL
+		}
+		return "sv:"
+	case TagResult:
+		if row.Tag != nil {
+			return "t:" + row.Tag.Name
+		}
+		return "t:"
+	case LinkResult:
+		return "l:" + strconv.Itoa(row.SourceOpIdx) + ":" + row.StatusCode + ":" + row.LinkName
 	default:
 		return "?:" + strconv.Itoa(row.OpIdx)
 	}

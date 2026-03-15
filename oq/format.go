@@ -317,6 +317,18 @@ func getRootNode(row Row, g *graph.SchemaGraph) *yaml.Node {
 		if row.SecurityScheme != nil {
 			return row.SecurityScheme.GetRootNode()
 		}
+	case ServerResult:
+		if row.Server != nil {
+			return row.Server.GetRootNode()
+		}
+	case TagResult:
+		if row.Tag != nil {
+			return row.Tag.GetRootNode()
+		}
+	case LinkResult:
+		if row.Link != nil {
+			return row.Link.GetRootNode()
+		}
 	default:
 		return nil
 	}
@@ -504,6 +516,12 @@ func defaultFieldsForKind(kind ResultKind) []string {
 		return []string{"name", "type", "in", "scheme"}
 	case SecurityRequirementResult:
 		return []string{"schemeName", "schemeType", "scopes", "operation"}
+	case ServerResult:
+		return []string{"url", "description", "variableCount"}
+	case TagResult:
+		return []string{"name", "description", "operationCount"}
+	case LinkResult:
+		return []string{"name", "operationId", "description", "operation"}
 	default:
 		return []string{"name"}
 	}
@@ -584,6 +602,22 @@ func emitKey(row Row, g *graph.SchemaGraph) string {
 		return row.HeaderName
 	case SecuritySchemeResult:
 		return row.SchemeName
+	case ServerResult:
+		if row.Server != nil {
+			return row.Server.URL
+		}
+		return "server"
+	case TagResult:
+		if row.Tag != nil {
+			return row.Tag.Name
+		}
+		return "tag"
+	case LinkResult:
+		op := operationName(row.SourceOpIdx, g)
+		if op != "" {
+			return op + "/" + row.StatusCode + "/links/" + row.LinkName
+		}
+		return row.LinkName
 	default:
 		return valueToString(fieldValue(row, "name", g))
 	}
