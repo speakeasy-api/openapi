@@ -47,7 +47,7 @@ Operators: ==, !=, >, <, >=, <=, and, or, not, // (or default), has(),
   openapi spec query 'operations | security | group-by(schemeType, operation)' spec.yaml
   openapi spec query 'schemas | where(isComponent) | sort-by(depth, desc) | take(10) | select name, depth' spec.yaml
   openapi spec query 'schemas | where(properties contains "email") | select name' spec.yaml
-  openapi spec query 'operations | where(name == "createUser") | request-body | content-types | to-schema | refs-out(2) | to-yaml' spec.yaml
+  openapi spec query 'operations | where(name == "createUser") | request-body | content-types | to-schema | refs-out(*) | where(isComponent) | to-yaml' spec.yaml
   openapi spec query 'components.security-schemes | select name, type, scheme' spec.yaml
   cat spec.yaml | openapi spec query 'schemas | length'
 

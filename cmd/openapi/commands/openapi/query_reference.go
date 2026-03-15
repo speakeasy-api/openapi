@@ -47,9 +47,9 @@ Graph navigation stages replace the current result set by following edges
 in the schema reference graph.
 
   refs-out            Outgoing references, 1 hop (with edge annotations)
-  refs-out(*)         Full transitive closure of outgoing references
+  refs-out(*)         Full transitive closure (with bfsDepth for range queries)
   refs-in             Incoming references, 1 hop (with edge annotations)
-  refs-in(*)          Full transitive closure of incoming references
+  refs-in(*)          Full transitive closure (with bfsDepth for range queries)
   properties          Expand to property sub-schemas (flattens allOf; with edge annotations)
   properties(*)       Recursive properties (follows $refs, flattens allOf,
                       expands oneOf/anyOf with qualified from paths)
@@ -224,7 +224,7 @@ source schema.
   key               string   Structural edge label: property name, array index, etc.
   from              string   Source schema name (the schema containing the relationship)
   target            string   Seed schema name (the schema that initiated the traversal)
-  bfsDepth         int      BFS depth from seed (populated by properties(*))
+  bfsDepth         int      BFS depth from seed (populated by refs-out(*), refs-in(*), properties(*))
 
 PARAMETER FIELDS
 ----------------
@@ -386,11 +386,14 @@ Schema analysis:
   # Blast radius — what breaks if I change this schema?
   schemas | where(name == "Error") | blast-radius | length
 
-  # Depth-limited traversal — see 2 hops from a schema
-  schemas | where(name == "User") | refs-out(2) | select name, type
+  # Component schemas within 3 hops
+  schemas | where(name == "User") | refs-out(*) | where(isComponent and bfsDepth <= 3) | select name, bfsDepth
 
   # Edge annotations — how a schema references others
   schemas | where(name == "Pet") | refs-out | select name, via, key, from
+
+  # All transitive dependencies (full closure)
+  schemas | where(name == "Pet") | refs-out(*) | where(isComponent) | select name
 
   # Schemas containing a property named "email"
   schemas | where(properties contains "email") | select name
@@ -422,7 +425,7 @@ Operations & navigation:
   operations | responses | headers | select name, required, statusCode, operation
 
   # Drill into a response schema
-  operations | where(name == "createUser") | request-body | content-types | to-schema | refs-out(2) | to-yaml
+  operations | where(name == "createUser") | request-body | content-types | to-schema | refs-out(*) | to-yaml
 
   # Group responses by status code (showing operation names)
   operations | responses | group-by(statusCode, operation)
