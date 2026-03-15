@@ -172,7 +172,7 @@ Available on rows produced by traversal stages (`refs-out`, `refs-in`, `properti
 | `via` | string | Structural edge kind: property, items, allOf, oneOf, ... |
 | `key` | string | Structural edge label: property name, array index, etc. |
 | `from` | string | Source schema name (the schema containing the relationship) |
-| `target` | string | Seed schema name (the schema that initiated the traversal) |
+| `seed` | string | Seed schema name (the schema that initiated the traversal) |
 | `bfsDepth` | int | BFS depth from seed (populated by `refs-out(*)`, `refs-in(*)`) |
 
 ### Parameter Fields

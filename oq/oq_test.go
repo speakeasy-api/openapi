@@ -2531,7 +2531,7 @@ func TestExecute_TargetField_Success(t *testing.T) {
 	assert.NotEmpty(t, result.Rows)
 
 	for _, row := range result.Rows {
-		target := oq.FieldValuePublic(row, "target", g)
+		target := oq.FieldValuePublic(row, "seed", g)
 		assert.Equal(t, "Pet", target.Str, "target should be the seed schema name")
 	}
 }
@@ -2822,7 +2822,7 @@ func TestExecute_FieldsIntrospection_Success(t *testing.T) {
 	}{
 		{"operations | fields", "method"},
 		{"schemas | where(isComponent) | fields", "bfsDepth"},
-		{"schemas | where(isComponent) | fields", "target"},
+		{"schemas | where(isComponent) | fields", "seed"},
 		{"operations | where(operationId == \"listPets\") | parameters | fields", "in"},
 		{"operations | where(operationId == \"listPets\") | responses | fields", "statusCode"},
 		{"operations | where(operationId == \"createPet\") | request-body | fields", "required"},

@@ -90,7 +90,7 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal(row.Key)
 		case "from":
 			return expr.StringVal(row.From)
-		case "target":
+		case "seed":
 			return expr.StringVal(row.Target)
 		case "bfsDepth":
 			return expr.IntVal(row.BFSDepth)

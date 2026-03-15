@@ -1418,7 +1418,7 @@ func execFields(result *Result) (*Result, error) {
 			{"via", "string"},
 			{"key", "string"},
 			{"from", "string"},
-			{"target", "string"},
+			{"seed", "string"},
 			{"bfsDepth", "int"},
 			// Schema content
 			{"description", "string"},
