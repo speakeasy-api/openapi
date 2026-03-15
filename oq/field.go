@@ -270,6 +270,11 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.NullVal()
 		}
 		switch name {
+		case "name":
+			if row.ComponentKey != "" {
+				return expr.StringVal(row.ComponentKey)
+			}
+			return expr.StringVal("request-body")
 		case "description":
 			return expr.StringVal(rb.GetDescription())
 		case "required":
@@ -285,7 +290,7 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.NullVal()
 		}
 		switch name {
-		case "mediaType":
+		case "name", "mediaType":
 			return expr.StringVal(row.MediaTypeName)
 		case "hasSchema":
 			return expr.BoolVal(mt.Schema != nil)
