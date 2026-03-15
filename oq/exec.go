@@ -1431,6 +1431,7 @@ func execFields(result *Result) (*Result, error) {
 			{"from", "string"},
 			{"seed", "string"},
 			{"bfsDepth", "int"},
+			{"isRequired", "bool"},
 			// Schema content
 			{"description", "string"},
 			{"title", "string"},

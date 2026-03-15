@@ -114,6 +114,13 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal(row.Target)
 		case "bfsDepth":
 			return expr.IntVal(row.BFSDepth)
+		case "isRequired":
+			// Check if this property's key appears in the parent schema's required array.
+			// Only meaningful on property edge rows (from traversal stages).
+			if row.Via == "property" && row.Key != "" {
+				return expr.BoolVal(isPropertyRequired(row.Key, row.From, g))
+			}
+			return expr.BoolVal(false)
 		case "properties":
 			return schemaPropertyNames(row.SchemaIdx, g)
 		default:
@@ -420,7 +427,20 @@ func schemaContentField(s *graph.SchemaNode, name string) expr.Value {
 
 	// --- Flags ---
 	case "nullable":
-		return expr.BoolVal(schema != nil && schema.Nullable != nil && *schema.Nullable)
+		if schema == nil {
+			return expr.BoolVal(false)
+		}
+		// OAS 3.0: nullable: true
+		if schema.Nullable != nil && *schema.Nullable {
+			return expr.BoolVal(true)
+		}
+		// OAS 3.1: type array containing "null" (e.g., type: ["string", "null"])
+		for _, t := range schema.GetType() {
+			if string(t) == "null" {
+				return expr.BoolVal(true)
+			}
+		}
+		return expr.BoolVal(false)
 	case "readOnly":
 		return expr.BoolVal(schema != nil && schema.ReadOnly != nil && *schema.ReadOnly)
 	case "writeOnly":
@@ -670,6 +690,48 @@ var schemaPresenceProbes = map[string]func(*oas3.Schema) bool{
 	"propertyNames":         func(s *oas3.Schema) bool { return s.PropertyNames != nil },
 	"unevaluatedItems":      func(s *oas3.Schema) bool { return s.UnevaluatedItems != nil },
 	"unevaluatedProperties": func(s *oas3.Schema) bool { return s.UnevaluatedProperties != nil },
+}
+
+// isPropertyRequired checks if a property key is in the parent schema's required array.
+func isPropertyRequired(key, fromName string, g *graph.SchemaGraph) bool {
+	// For qualified from paths like "Event/oneOf/EntityCreatedEvent",
+	// extract the actual schema name (last segment).
+	lookupName := fromName
+	if idx := strings.LastIndex(fromName, "/"); idx >= 0 {
+		lookupName = fromName[idx+1:]
+	}
+
+	// Find the parent schema by name
+	for i := range g.Schemas {
+		if g.Schemas[i].Name == lookupName {
+			schema := getSchema(&g.Schemas[i])
+			if schema == nil {
+				return false
+			}
+			for _, req := range schema.Required {
+				if req == key {
+					return true
+				}
+			}
+			// Also check allOf members' required arrays
+			for _, allOfSchema := range schema.GetAllOf() {
+				if allOfSchema == nil {
+					continue
+				}
+				memberSchema := allOfSchema.GetSchema()
+				if memberSchema == nil {
+					continue
+				}
+				for _, req := range memberSchema.Required {
+					if req == key {
+						return true
+					}
+				}
+			}
+			return false
+		}
+	}
+	return false
 }
 
 // operationContentField resolves fields by reading the underlying operation object.
