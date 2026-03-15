@@ -107,7 +107,7 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 	case StageLast:
 		return execLast(stage, result)
 	case StageSelect:
-		result.Fields = stage.Fields
+		result.Fields = expandStarFields(stage.Fields, result.Rows)
 		return result, nil
 	case StageSort:
 		return execSort(stage, result, g)

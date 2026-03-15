@@ -446,6 +446,32 @@ func resolveDefaultFields(rows []Row) []string {
 	return defaultFieldsForKind(firstKind)
 }
 
+// expandStarFields replaces "*" in a field list with the context-aware defaults.
+// e.g., ["*", "bfsDepth"] → ["name", "type", "depth", "inDegree", "outDegree", "bfsDepth"]
+func expandStarFields(fields []string, rows []Row) []string {
+	hasStar := false
+	for _, f := range fields {
+		if f == "*" {
+			hasStar = true
+			break
+		}
+	}
+	if !hasStar {
+		return fields
+	}
+
+	defaults := resolveDefaultFields(rows)
+	var result []string
+	for _, f := range fields {
+		if f == "*" {
+			result = append(result, defaults...)
+		} else {
+			result = append(result, f)
+		}
+	}
+	return result
+}
+
 // hasEdgeAnnotations returns true if any row has populated edge fields.
 func hasEdgeAnnotations(rows []Row) bool {
 	for _, row := range rows {
