@@ -453,7 +453,7 @@ func defaultFieldsForKind(kind ResultKind) []string {
 	case ResponseResult:
 		return []string{"statusCode", "description", "contentTypeCount", "operation"}
 	case RequestBodyResult:
-		return []string{"description", "required", "contentTypeCount", "operation"}
+		return []string{"name", "description", "required", "contentTypeCount", "operation"}
 	case ContentTypeResult:
 		return []string{"mediaType", "hasSchema", "statusCode", "operation"}
 	case HeaderResult:

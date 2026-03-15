@@ -94,6 +94,14 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal(row.Target)
 		case "bfsDepth":
 			return expr.IntVal(row.BFSDepth)
+		case "ref":
+			if s.HasRef {
+				target := resolveRefTarget(row.SchemaIdx, g)
+				if target != row.SchemaIdx {
+					return expr.StringVal(schemaName(target, g))
+				}
+			}
+			return expr.StringVal("")
 		case "properties":
 			return schemaPropertyNames(row.SchemaIdx, g)
 		default:

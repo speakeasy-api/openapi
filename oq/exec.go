@@ -1425,6 +1425,7 @@ func execFields(result *Result) (*Result, error) {
 			{"isInline", "bool"},
 			{"isCircular", "bool"},
 			{"hasRef", "bool"},
+			{"ref", "string"},
 			{"hash", "string"},
 			{"path", "string"},
 			{"opCount", "int"},
