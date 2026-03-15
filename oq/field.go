@@ -51,7 +51,27 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		case "name":
 			return expr.StringVal(s.Name)
 		case "type":
-			return expr.StringVal(s.Type)
+			if s.Type != "" {
+				return expr.StringVal(s.Type)
+			}
+			// When type is empty, show the effective type:
+			// $ref target name, or composition kind
+			if s.HasRef {
+				target := resolveRefTarget(row.SchemaIdx, g)
+				if target != row.SchemaIdx {
+					return expr.StringVal("$ref:" + schemaName(target, g))
+				}
+			}
+			if s.OneOfCount > 0 {
+				return expr.StringVal("oneOf")
+			}
+			if s.AnyOfCount > 0 {
+				return expr.StringVal("anyOf")
+			}
+			if s.AllOfCount > 0 {
+				return expr.StringVal("allOf")
+			}
+			return expr.StringVal("")
 		case "depth":
 			return expr.IntVal(s.Depth)
 		case "inDegree":
@@ -94,14 +114,6 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal(row.Target)
 		case "bfsDepth":
 			return expr.IntVal(row.BFSDepth)
-		case "ref":
-			if s.HasRef {
-				target := resolveRefTarget(row.SchemaIdx, g)
-				if target != row.SchemaIdx {
-					return expr.StringVal(schemaName(target, g))
-				}
-			}
-			return expr.StringVal("")
 		case "properties":
 			return schemaPropertyNames(row.SchemaIdx, g)
 		default:
