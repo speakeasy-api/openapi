@@ -219,25 +219,8 @@ func parseStage(s string) (Stage, error) {
 		}
 		return Stage{}, errors.New("group-by requires parentheses: group-by(field)")
 
-	case "refs-out":
-		if isCall && strings.TrimSpace(args) == "*" {
-			return Stage{Kind: StageRefsOut, Limit: -1}, nil
-		}
-		if isCall {
-			return Stage{}, errors.New("refs-out accepts only * for transitive closure: refs-out(*)")
-		}
-		// Default: 1-hop
-		return Stage{Kind: StageRefsOut, Limit: 1}, nil
-
-	case "refs-in":
-		if isCall && strings.TrimSpace(args) == "*" {
-			return Stage{Kind: StageRefsIn, Limit: -1}, nil
-		}
-		if isCall {
-			return Stage{}, errors.New("refs-in accepts only * for transitive closure: refs-in(*)")
-		}
-		// Default: 1-hop
-		return Stage{Kind: StageRefsIn, Limit: 1}, nil
+	case "refs":
+		return parseRefs(isCall, args)
 
 	case "properties":
 		if isCall && args != "" {
@@ -274,15 +257,6 @@ func parseStage(s string) (Stage, error) {
 		}
 		return Stage{Kind: StageSample, Limit: n}, nil
 
-	case "neighbors":
-		if isCall && strings.TrimSpace(args) == "*" {
-			return Stage{Kind: StageNeighbors, Limit: -1}, nil
-		}
-		if isCall {
-			return Stage{}, errors.New("neighbors accepts only * for full closure: neighbors(*)")
-		}
-		// Default: 1-hop
-		return Stage{Kind: StageNeighbors, Limit: 1}, nil
 
 	case "path":
 		if isCall {
@@ -426,6 +400,46 @@ func parseStage(s string) (Stage, error) {
 	default:
 		return Stage{}, fmt.Errorf("unknown stage: %q", keyword)
 	}
+}
+
+// parseRefs parses the refs(...) syntax.
+// Syntax: refs, refs(*), refs(out), refs(out, *), refs(in, 3), refs(3), etc.
+func parseRefs(isCall bool, args string) (Stage, error) {
+	if !isCall {
+		return Stage{Kind: StageRefs, Limit: 1}, nil
+	}
+
+	parts := splitCommaArgs(args)
+	if len(parts) == 0 || strings.TrimSpace(parts[0]) == "" {
+		return Stage{Kind: StageRefs, Limit: 1}, nil
+	}
+
+	first := strings.TrimSpace(parts[0])
+
+	// Single arg: direction, depth, or *
+	if len(parts) == 1 {
+		switch first {
+		case "out", "in":
+			return Stage{Kind: StageRefs, RefsDir: first, Limit: 1}, nil
+		default:
+			limit, err := parseDepthArg(first, "refs")
+			if err != nil {
+				return Stage{}, fmt.Errorf("refs accepts direction (out, in), depth number, or *: %w", err)
+			}
+			return Stage{Kind: StageRefs, Limit: limit}, nil
+		}
+	}
+
+	// Two args: direction + depth
+	dir := first
+	if dir != "out" && dir != "in" {
+		return Stage{}, fmt.Errorf("refs first argument must be out or in, got %q", dir)
+	}
+	limit, err := parseDepthArg(strings.TrimSpace(parts[1]), "refs")
+	if err != nil {
+		return Stage{}, err
+	}
+	return Stage{Kind: StageRefs, RefsDir: dir, Limit: limit}, nil
 }
 
 // parseDepthArg parses a depth argument: a positive integer or "*" for unbounded.

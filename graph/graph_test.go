@@ -96,24 +96,6 @@ func TestBuild_Edges_Success(t *testing.T) {
 	assert.Equal(t, graph.EdgeProperty, edgeLabels["owner"])
 }
 
-func TestBuild_Reachable_Success(t *testing.T) {
-	t.Parallel()
-	g := loadTestGraph(t)
-
-	pet, _ := g.SchemaByName("Pet")
-	reachable := g.Reachable(pet.ID)
-	assert.NotEmpty(t, reachable, "Pet should have reachable schemas")
-
-	reachableNames := make(map[string]bool)
-	for _, id := range reachable {
-		reachableNames[g.Schemas[id].Name] = true
-	}
-
-	// Pet -> owner -> Owner -> address -> Address
-	assert.True(t, reachableNames["Owner"], "Owner should be reachable from Pet")
-	assert.True(t, reachableNames["Address"], "Address should be reachable from Pet")
-}
-
 func TestBuild_Ancestors_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
@@ -160,26 +142,41 @@ func TestBuild_OperationSchemas_Success(t *testing.T) {
 	t.Fatal("listPets operation not found")
 }
 
-func TestBuild_ShortestPath_Success(t *testing.T) {
+func TestBuild_ShortestBidiPath_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
 	pet, _ := g.SchemaByName("Pet")
 	addr, _ := g.SchemaByName("Address")
-	path := g.ShortestPath(pet.ID, addr.ID)
-	assert.NotEmpty(t, path, "should find path from Pet to Address")
-	assert.Equal(t, pet.ID, path[0])
-	assert.Equal(t, addr.ID, path[len(path)-1])
+	hops := g.ShortestBidiPath(pet.ID, addr.ID)
+	assert.NotEmpty(t, hops, "should find bidi path from Pet to Address")
+	assert.Equal(t, pet.ID, hops[0].Node)
+	assert.Equal(t, addr.ID, hops[len(hops)-1].Node)
+
+	// Each hop after the first should have direction info
+	for i, hop := range hops[1:] {
+		assert.NotNil(t, hop.Edge, "hop %d should have an edge", i+1)
+	}
 }
 
-func TestBuild_ShortestPath_NoPath_Success(t *testing.T) {
+func TestBuild_ShortestBidiPath_NoPath_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
 	unused, _ := g.SchemaByName("Unused")
 	pet, _ := g.SchemaByName("Pet")
-	path := g.ShortestPath(unused.ID, pet.ID)
-	assert.Empty(t, path, "Unused should not reach Pet")
+	hops := g.ShortestBidiPath(unused.ID, pet.ID)
+	assert.Empty(t, hops, "Unused should not reach Pet")
+}
+
+func TestBuild_ShortestBidiPath_SameNode_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	pet, _ := g.SchemaByName("Pet")
+	hops := g.ShortestBidiPath(pet.ID, pet.ID)
+	assert.Len(t, hops, 1, "path from node to itself should be length 1")
+	assert.Equal(t, pet.ID, hops[0].Node)
 }
 
 func TestBuild_Metrics_Success(t *testing.T) {
@@ -236,25 +233,6 @@ func TestBuild_SchemaOpCount_Success(t *testing.T) {
 	assert.Equal(t, 0, count, "Unused should have no operations")
 }
 
-func TestBuild_Neighbors_Success(t *testing.T) {
-	t.Parallel()
-	g := loadTestGraph(t)
-
-	pet, _ := g.SchemaByName("Pet")
-
-	// Depth 1: direct out-edges and in-edges
-	n1 := g.Neighbors(pet.ID, 1)
-	assert.NotEmpty(t, n1, "Pet should have depth-1 neighbors")
-
-	// Depth 0: should return nothing (no hops)
-	n0 := g.Neighbors(pet.ID, 0)
-	assert.Empty(t, n0, "depth-0 neighbors should be empty")
-
-	// Depth 2: should be >= depth 1
-	n2 := g.Neighbors(pet.ID, 2)
-	assert.GreaterOrEqual(t, len(n2), len(n1), "depth-2 should include at least depth-1 neighbors")
-}
-
 func TestBuild_StronglyConnectedComponents_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
@@ -264,42 +242,4 @@ func TestBuild_StronglyConnectedComponents_Success(t *testing.T) {
 	assert.Empty(t, sccs, "petstore should have no strongly connected components")
 }
 
-func TestBuild_ConnectedComponent_Success(t *testing.T) {
-	t.Parallel()
-	g := loadTestGraph(t)
 
-	pet, _ := g.SchemaByName("Pet")
-	schemas, ops := g.ConnectedComponent([]graph.NodeID{pet.ID}, nil)
-	assert.NotEmpty(t, schemas, "connected component from Pet should include schemas")
-	assert.NotEmpty(t, ops, "connected component from Pet should include operations")
-
-	// Should include Pet itself
-	hasPet := false
-	for _, id := range schemas {
-		if id == pet.ID {
-			hasPet = true
-		}
-	}
-	assert.True(t, hasPet, "connected component should include the seed")
-}
-
-func TestBuild_ConnectedComponent_FromOp_Success(t *testing.T) {
-	t.Parallel()
-	g := loadTestGraph(t)
-
-	// Start from first operation
-	require.NotEmpty(t, g.Operations)
-	schemas, ops := g.ConnectedComponent(nil, []graph.NodeID{g.Operations[0].ID})
-	assert.NotEmpty(t, schemas, "connected component from operation should include schemas")
-	assert.NotEmpty(t, ops, "connected component from operation should include the seed operation")
-}
-
-func TestBuild_ShortestPath_SameNode_Success(t *testing.T) {
-	t.Parallel()
-	g := loadTestGraph(t)
-
-	pet, _ := g.SchemaByName("Pet")
-	path := g.ShortestPath(pet.ID, pet.ID)
-	assert.Len(t, path, 1, "path from node to itself should be length 1")
-	assert.Equal(t, pet.ID, path[0])
-}

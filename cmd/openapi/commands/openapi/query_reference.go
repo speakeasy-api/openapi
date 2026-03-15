@@ -30,29 +30,31 @@ result set.
 
   schemas                      All schemas (component + inline)
   operations                   All operations
+  components                   All component types (schemas, parameters, responses, headers, security-schemes)
   webhooks                     Webhook operations only
   servers                      Document-level servers
   tags                         Document-level tags
-  components.schemas           Component schemas only
-  components.parameters        Reusable parameter definitions
-  components.responses         Reusable response definitions
-  components.request-bodies    Reusable request body definitions
-  components.headers           Reusable header definitions
-  components.security-schemes  Security scheme definitions
+  security                     Global security requirements
 
-Tip: use where(isComponent) or where(isInline) to filter the schemas source:
+Filter sources with where():
   schemas | where(isComponent)
   schemas | where(isInline)
+  components | where(kind == "schema")
+  components | where(kind == "parameter")
 
 TRAVERSAL STAGES
 ----------------
 Graph navigation stages replace the current result set by following edges
 in the schema reference graph.
 
-  refs-out            Outgoing references, 1 hop (with edge annotations)
-  refs-out(*)         Full transitive closure (with bfsDepth for range queries)
-  refs-in             Incoming references, 1 hop (with edge annotations)
-  refs-in(*)          Full transitive closure (with bfsDepth for range queries)
+  refs                Bidirectional references, 1 hop (with direction annotation →/←)
+  refs(*)             Bidirectional transitive closure
+  refs(out)           Outgoing references only, 1 hop
+  refs(out, *)        Outgoing transitive closure
+  refs(in)            Incoming references only, 1 hop
+  refs(in, *)         Incoming transitive closure
+  refs(N)             Bidirectional, depth-limited to N hops
+  refs(out, N)        Outgoing, depth-limited to N hops
   properties          Expand to property sub-schemas (flattens allOf; with edge annotations)
   properties(*)       Recursive properties (follows $refs, flattens allOf,
                       expands oneOf/anyOf with qualified from paths)
@@ -63,9 +65,7 @@ in the schema reference graph.
   parent              Navigate to structural parent schema (via graph in-edges)
   to-operations       Schemas → operations that use them
   to-schemas          Operations → schemas they touch
-  path(A, B)          Shortest path between two named schemas (auto-tries both directions)
-  neighbors           Bidirectional neighborhood, 1 hop (default)
-  neighbors(*)        Full bidirectional closure
+  path(A, B)          Shortest bidirectional path between two named schemas (with direction →/←)
   blast-radius        Ancestors + all affected operations (change impact)
 
 NAVIGATION STAGES
@@ -179,6 +179,7 @@ Content-level (from schema object):
   uniqueItems                 bool     Array unique items constraint
   discriminatorProperty       string   Discriminator property name
   discriminatorMappingCount  int      Number of discriminator mappings
+  requiredProperties          array    Names of required properties
   requiredCount               int      Number of required properties
   enumCount                   int      Number of enum values
 
@@ -224,17 +225,17 @@ OPERATION FIELDS
 
 EDGE ANNOTATION FIELDS
 ----------------------
-Available on rows produced by traversal stages (refs-out, refs-in,
-properties, members, items). Use 'parent' to navigate back to the
-source schema.
+Available on rows produced by traversal stages (refs, properties,
+members, items, path). Use 'parent' to navigate back to the source schema.
 
   Field             Type     Description
   ─────             ────     ───────────
-  via               string   Structural edge kind: property, items, allOf, oneOf, ...
+  via               string   Structural edge kind: property, items, allOf, oneOf, ref, ...
   key               string   Structural edge label: property name, array index, etc.
   from              string   Source schema name (the schema containing the relationship)
   seed              string   Seed schema name (the schema that initiated the traversal)
-  bfsDepth         int      BFS depth from seed (populated by refs-out(*), refs-in(*), properties(*))
+  bfsDepth         int      BFS depth from seed
+  direction        string   → (outgoing) or ← (incoming) — set by bidi traversals (refs, path)
 
 PARAMETER FIELDS
 ----------------
@@ -306,12 +307,12 @@ HEADER FIELDS
 
 SECURITY SCHEME FIELDS
 ----------------------
-Available from components.security-schemes source.
+Available from components | where(kind == "security-scheme").
 
   Field               Type     Description
   ─────               ────     ───────────
   name                string   Security scheme name (component key)
-  type                string   Scheme type: apiKey, http, oauth2, openIdConnect, mutualTLS
+  schemeType          string   Scheme type: apiKey, http, oauth2, openIdConnect, mutualTLS
   in                  string   API key location: header, query, cookie (apiKey only)
   scheme              string   HTTP auth scheme: bearer, basic, etc. (http only)
   bearerFormat       string   Bearer token format hint, e.g. JWT (http only)
@@ -443,13 +444,13 @@ Schema analysis:
   schemas | where(name == "Error") | blast-radius | length
 
   # Component schemas within 3 hops
-  schemas | where(name == "User") | refs-out(*) | where(isComponent and bfsDepth <= 3) | select name, bfsDepth
+  schemas | where(name == "User") | refs(out, *) | where(isComponent and bfsDepth <= 3) | select name, bfsDepth
 
   # Edge annotations — how a schema references others
-  schemas | where(name == "Pet") | refs-out | select name, via, key, from
+  schemas | where(name == "Pet") | refs(out) | select name, via, key, from
 
   # All transitive dependencies (full closure)
-  schemas | where(name == "Pet") | refs-out(*) | where(isComponent) | select name
+  schemas | where(name == "Pet") | refs(out, *) | where(isComponent) | select name
 
   # Schemas containing a property named "email"
   schemas | where(properties contains "email") | select name
@@ -481,7 +482,7 @@ Operations & navigation:
   operations | responses | headers | select name, required, statusCode, operation
 
   # Drill into a response schema
-  operations | where(name == "createUser") | request-body | content-types | to-schema | refs-out(*) | to-yaml
+  operations | where(name == "createUser") | request-body | content-types | to-schema | refs(out, *) | to-yaml
 
   # Group responses by status code (showing operation names)
   operations | responses | group-by(statusCode, operation)
@@ -541,7 +542,7 @@ Webhooks, servers, tags, callbacks & links:
 Advanced:
 
   # Variable binding
-  schemas | where(name == "Pet") | let $pet = name | refs-out | where(name != $pet) | select name
+  schemas | where(name == "Pet") | let $pet = name | refs(out) | where(name != $pet) | select name
 
   # User-defined functions
   def hot: where(inDegree > 10);

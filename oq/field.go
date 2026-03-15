@@ -124,6 +124,8 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal(row.Target)
 		case "bfsDepth":
 			return expr.IntVal(row.BFSDepth)
+		case "direction":
+			return expr.StringVal(row.Direction)
 		case "isRequired":
 			// Check if this property's key appears in the parent schema's required array.
 			// Only meaningful on property edge rows (from traversal stages).
@@ -204,8 +206,6 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.StringVal(row.GroupKey)
 		case "count":
 			return expr.IntVal(row.GroupCount)
-		case "name":
-			return expr.StringVal(row.GroupKey)
 		case "names":
 			return expr.StringVal(strings.Join(row.GroupNames, ", "))
 		}
@@ -249,11 +249,6 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		switch name {
 		case "statusCode":
 			return expr.StringVal(row.StatusCode)
-		case "name":
-			if row.ComponentKey != "" {
-				return expr.StringVal(row.ComponentKey)
-			}
-			return expr.StringVal(row.StatusCode)
 		case "description":
 			return expr.StringVal(r.Description)
 		case "contentTypeCount":
@@ -273,11 +268,6 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.NullVal()
 		}
 		switch name {
-		case "name":
-			if row.ComponentKey != "" {
-				return expr.StringVal(row.ComponentKey)
-			}
-			return expr.StringVal("request-body")
 		case "description":
 			return expr.StringVal(rb.GetDescription())
 		case "required":
@@ -293,7 +283,7 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.NullVal()
 		}
 		switch name {
-		case "mediaType", "name":
+		case "mediaType":
 			return expr.StringVal(row.MediaTypeName)
 		case "hasSchema":
 			return expr.BoolVal(mt.Schema != nil)
@@ -335,7 +325,7 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		switch name {
 		case "name":
 			return expr.StringVal(row.SchemeName)
-		case "type":
+		case "schemeType":
 			return expr.StringVal(string(ss.GetType()))
 		case "in":
 			return expr.StringVal(string(ss.GetIn()))
@@ -352,7 +342,7 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		}
 	case SecurityRequirementResult:
 		switch name {
-		case "name", "schemeName":
+		case "schemeName":
 			return expr.StringVal(row.SchemeName)
 		case "schemeType":
 			if row.SecurityScheme != nil {
@@ -372,10 +362,7 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			return expr.NullVal()
 		}
 		switch name {
-		case "url", "name":
-			if name == "name" && srv.Name != nil {
-				return expr.StringVal(*srv.Name)
-			}
+		case "url":
 			return expr.StringVal(srv.URL)
 		case "description":
 			return expr.StringVal(srv.GetDescription())
@@ -568,7 +555,7 @@ func schemaContentField(s *graph.SchemaNode, name string) expr.Value {
 		return expr.IntVal(0)
 
 	// --- Counts & Arrays ---
-	case "required":
+	case "requiredProperties":
 		if schema != nil {
 			return expr.ArrayVal(schema.Required)
 		}

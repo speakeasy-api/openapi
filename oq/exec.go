@@ -67,21 +67,17 @@ func execSource(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 		for i := range g.Operations {
 			result.Rows = append(result.Rows, Row{Kind: OperationResult, OpIdx: i})
 		}
-	case "components.schemas":
+	case "components":
+		// Unified: all component types (schemas, parameters, responses, request-bodies, headers, security-schemes)
 		for i, s := range g.Schemas {
 			if s.IsComponent {
 				result.Rows = append(result.Rows, Row{Kind: SchemaResult, SchemaIdx: i})
 			}
 		}
-	case "components.parameters":
 		result.Rows = append(result.Rows, componentRows(g, componentParameters)...)
-	case "components.responses":
 		result.Rows = append(result.Rows, componentRows(g, componentResponses)...)
-	case "components.request-bodies":
 		result.Rows = append(result.Rows, componentRows(g, componentRequestBodies)...)
-	case "components.headers":
 		result.Rows = append(result.Rows, componentRows(g, componentHeaders)...)
-	case "components.security-schemes":
 		result.Rows = append(result.Rows, componentRows(g, componentSecuritySchemes)...)
 	case "webhooks":
 		for i := range g.Operations {
@@ -102,6 +98,28 @@ func execSource(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 			for _, tag := range g.Index.Doc.GetTags() {
 				if tag != nil {
 					result.Rows = append(result.Rows, Row{Kind: TagResult, Tag: tag})
+				}
+			}
+		}
+	case "security":
+		// Global security requirements from the spec root
+		if g.Index != nil && g.Index.Doc != nil {
+			schemeMap := buildSecuritySchemeMap(g)
+			for _, req := range g.Index.Doc.GetSecurity() {
+				if req == nil {
+					continue
+				}
+				for schemeName, scopes := range req.All() {
+					r := Row{
+						Kind:        SecurityRequirementResult,
+						SchemeName:  schemeName,
+						Scopes:      scopes,
+						SourceOpIdx: -1,
+					}
+					if ss, ok := schemeMap[schemeName]; ok {
+						r.SecurityScheme = ss
+					}
+					result.Rows = append(result.Rows, r)
 				}
 			}
 		}
@@ -141,16 +159,8 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		return execGroupBy(stage, result, g)
 	case StageCount:
 		return &Result{IsCount: true, Count: len(result.Rows)}, nil
-	case StageRefsOut:
-		if stage.Limit < 0 {
-			return execRefsClosure(result, g, true)
-		}
-		return execTraversal(result, g, traverseRefsOut)
-	case StageRefsIn:
-		if stage.Limit < 0 {
-			return execRefsClosure(result, g, false)
-		}
-		return execTraversal(result, g, traverseRefsIn)
+	case StageRefs:
+		return execRefs(stage, result, g)
 	case StageProperties:
 		if stage.Limit < 0 {
 			return execPropertiesFixpoint(result, g)
@@ -187,8 +197,6 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		return result, nil
 	case StageBlastRadius:
 		return execBlastRadius(result, g)
-	case StageNeighbors:
-		return execNeighbors(stage, result, g)
 	case StageOrphans:
 		return execOrphans(result, g)
 	case StageLeaves:
@@ -455,37 +463,113 @@ func edgeKindMatch(k graph.EdgeKind, kinds []graph.EdgeKind) bool {
 	return false
 }
 
-func traverseRefsOut(row Row, g *graph.SchemaGraph) []Row {
-	return traverseOutEdges(row, g)
-}
+// execRefs is the unified graph traversal function.
+// It replaces refs-out, refs-in, and neighbors with a single BFS that:
+//   - Supports direction modes: "out", "in", "" (bidi)
+//   - Supports depth limits: 1-hop, N-hop, or unbounded (*)
+//   - Always preserves edge metadata (via, key, from, bfsDepth)
+//   - In bidi mode, annotates each hop with Direction ("→" or "←")
+func execRefs(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
+	dir := stage.RefsDir
+	maxDepth := stage.Limit
+	if maxDepth < 0 {
+		maxDepth = len(g.Schemas) // unbounded
+	}
+	isBidi := dir == ""
 
-func traverseRefsIn(row Row, g *graph.SchemaGraph) []Row {
-	if row.Kind != SchemaResult {
-		return nil
-	}
-	var result []Row
-	for _, edge := range g.InEdges(graph.NodeID(row.SchemaIdx)) {
-		idx := int(edge.From)
-		// Resolve through inline wrapper nodes to reach the owning component schema.
-		// Also capture the structural edge (the edge from the owner to the first
-		// intermediate node) so via/key reflect how the owner includes this reference
-		// (e.g., via=property key=owner) rather than the raw $ref edge.
-		idx, structEdge := resolveToOwner(idx, g)
-		via := edgeKindString(edge.Kind)
-		key := edge.Label
-		if structEdge != nil {
-			via = edgeKindString(structEdge.Kind)
-			key = structEdge.Label
+	out := deriveResult(result)
+	globalSeen := make(map[int]bool)
+
+	for _, row := range result.Rows {
+		if row.Kind != SchemaResult {
+			continue
 		}
-		result = append(result, Row{
-			Kind:      SchemaResult,
-			SchemaIdx: idx,
-			Via:       via,
-			Key:       key,
-			From:      schemaName(idx, g),
-		})
+
+		seedID := graph.NodeID(row.SchemaIdx)
+		seedName := schemaName(row.SchemaIdx, g)
+
+		type entry struct {
+			id        graph.NodeID
+			depth     int
+			via       string
+			key       string
+			from      string
+			direction string // "→" or "←"
+		}
+
+		visited := map[graph.NodeID]bool{seedID: true}
+		queue := []entry{{id: seedID, depth: 0}}
+
+		for len(queue) > 0 {
+			cur := queue[0]
+			queue = queue[1:]
+
+			// Emit non-seed nodes
+			if cur.id != seedID && !globalSeen[int(cur.id)] {
+				globalSeen[int(cur.id)] = true
+				r := Row{
+					Kind:      SchemaResult,
+					SchemaIdx: int(cur.id),
+					BFSDepth:  cur.depth,
+					Target:    seedName,
+					Via:       cur.via,
+					Key:       cur.key,
+					From:      cur.from,
+				}
+				if isBidi {
+					r.Direction = cur.direction
+				}
+				out.Rows = append(out.Rows, r)
+			}
+
+			if cur.depth >= maxDepth {
+				continue
+			}
+
+			// Follow out-edges
+			if dir == "out" || dir == "" {
+				for _, edge := range g.OutEdges(cur.id) {
+					if !visited[edge.To] {
+						visited[edge.To] = true
+						queue = append(queue, entry{
+							id:        edge.To,
+							depth:     cur.depth + 1,
+							via:       edgeKindString(edge.Kind),
+							key:       edge.Label,
+							from:      schemaName(int(cur.id), g),
+							direction: "→",
+						})
+					}
+				}
+			}
+
+			// Follow in-edges
+			if dir == "in" || dir == "" {
+				for _, edge := range g.InEdges(cur.id) {
+					resolvedIdx, structEdge := resolveToOwner(int(edge.From), g)
+					resolvedID := graph.NodeID(resolvedIdx)
+					via := edgeKindString(edge.Kind)
+					key := edge.Label
+					if structEdge != nil {
+						via = edgeKindString(structEdge.Kind)
+						key = structEdge.Label
+					}
+					if !visited[resolvedID] {
+						visited[resolvedID] = true
+						queue = append(queue, entry{
+							id:        resolvedID,
+							depth:     cur.depth + 1,
+							via:       via,
+							key:       key,
+							from:      schemaName(resolvedIdx, g),
+							direction: "←",
+						})
+					}
+				}
+			}
+		}
 	}
-	return result
+	return out, nil
 }
 
 // resolveToOwner walks up through inline schema nodes via in-edges
@@ -514,84 +598,6 @@ func resolveToOwner(idx int, g *graph.SchemaGraph) (int, *graph.Edge) {
 	}
 }
 
-// execRefsClosure performs full BFS closure with bfsDepth and edge annotations.
-// outgoing=true follows OutEdges; outgoing=false follows InEdges.
-func execRefsClosure(result *Result, g *graph.SchemaGraph, outgoing bool) (*Result, error) {
-	out := deriveResult(result)
-	seen := make(map[int]bool)
-
-	for _, row := range result.Rows {
-		if row.Kind != SchemaResult {
-			continue
-		}
-		seedName := schemaName(row.SchemaIdx, g)
-		type entry struct {
-			id    graph.NodeID
-			depth int
-			via   string
-			key   string
-			from  string
-		}
-		seedID := graph.NodeID(row.SchemaIdx)
-		queue := []entry{{id: seedID, depth: 0}}
-		visited := map[graph.NodeID]bool{seedID: true}
-
-		for len(queue) > 0 {
-			cur := queue[0]
-			queue = queue[1:]
-
-			if cur.id != seedID && !seen[int(cur.id)] {
-				seen[int(cur.id)] = true
-				out.Rows = append(out.Rows, Row{
-					Kind:      SchemaResult,
-					SchemaIdx: int(cur.id),
-					BFSDepth:  cur.depth,
-					Target:    seedName,
-					Via:       cur.via,
-					Key:       cur.key,
-					From:      cur.from,
-				})
-			}
-
-			if outgoing {
-				for _, edge := range g.OutEdges(cur.id) {
-					if !visited[edge.To] {
-						visited[edge.To] = true
-						queue = append(queue, entry{
-							id:    edge.To,
-							depth: cur.depth + 1,
-							via:   edgeKindString(edge.Kind),
-							key:   edge.Label,
-							from:  schemaName(int(cur.id), g),
-						})
-					}
-				}
-			} else {
-				for _, edge := range g.InEdges(cur.id) {
-					resolvedIdx, structEdge := resolveToOwner(int(edge.From), g)
-					resolvedID := graph.NodeID(resolvedIdx)
-					via := edgeKindString(edge.Kind)
-					key := edge.Label
-					if structEdge != nil {
-						via = edgeKindString(structEdge.Kind)
-						key = structEdge.Label
-					}
-					if !visited[resolvedID] {
-						visited[resolvedID] = true
-						queue = append(queue, entry{
-							id:    resolvedID,
-							depth: cur.depth + 1,
-							via:   via,
-							key:   key,
-							from:  schemaName(resolvedIdx, g),
-						})
-					}
-				}
-			}
-		}
-	}
-	return out, nil
-}
 
 func traverseProperties(row Row, g *graph.SchemaGraph) []Row {
 	if row.Kind != SchemaResult {
@@ -924,34 +930,6 @@ func execBlastRadius(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	return out, nil
 }
 
-func execNeighbors(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
-	out := deriveResult(result)
-	seen := make(map[int]bool)
-
-	depth := stage.Limit
-	if depth < 0 {
-		depth = len(g.Schemas) // unbounded
-	}
-
-	for _, row := range result.Rows {
-		if row.Kind != SchemaResult {
-			continue
-		}
-		// Include seed
-		if !seen[row.SchemaIdx] {
-			seen[row.SchemaIdx] = true
-			out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: row.SchemaIdx})
-		}
-		for _, id := range g.Neighbors(graph.NodeID(row.SchemaIdx), depth) {
-			if !seen[int(id)] {
-				seen[int(id)] = true
-				out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: int(id)})
-			}
-		}
-	}
-
-	return out, nil
-}
 
 func execOrphans(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	out := deriveResult(result)
@@ -1294,16 +1272,20 @@ func describeStage(stage Stage) string {
 		return "Group: group-by(" + strings.Join(stage.Fields, ", ") + ")"
 	case StageCount:
 		return "Count: count rows"
-	case StageRefsOut:
-		if stage.Limit < 0 {
-			return "Traverse: refs-out(*) transitive closure"
+	case StageRefs:
+		dir := "bidi"
+		if stage.RefsDir == "out" {
+			dir = "out"
+		} else if stage.RefsDir == "in" {
+			dir = "in"
 		}
-		return "Traverse: refs-out " + strconv.Itoa(stage.Limit) + " hop(s)"
-	case StageRefsIn:
 		if stage.Limit < 0 {
-			return "Traverse: refs-in(*) transitive closure"
+			return "Traverse: refs(" + dir + ", *) full closure"
 		}
-		return "Traverse: refs-in " + strconv.Itoa(stage.Limit) + " hop(s)"
+		if stage.Limit == 1 {
+			return "Traverse: refs(" + dir + ") 1 hop"
+		}
+		return "Traverse: refs(" + dir + ", " + strconv.Itoa(stage.Limit) + ") depth-limited"
 	case StageProperties:
 		if stage.Limit < 0 {
 			return "Traverse: properties(*) recursive"
@@ -1329,11 +1311,6 @@ func describeStage(stage Stage) string {
 		return "Format: " + stage.Format
 	case StageBlastRadius:
 		return "Traverse: blast radius (ancestors + affected operations)"
-	case StageNeighbors:
-		if stage.Limit < 0 {
-			return "Traverse: neighbors(*) full bidirectional closure"
-		}
-		return "Traverse: neighbors " + strconv.Itoa(stage.Limit) + " hop(s)"
 	case StageOrphans:
 		return "Filter: schemas with no incoming refs and no operation usage"
 	case StageLeaves:
@@ -1440,6 +1417,7 @@ func execFields(result *Result) (*Result, error) {
 			{"from", "string"},
 			{"seed", "string"},
 			{"bfsDepth", "int"},
+			{"direction", "string"},
 			{"isRequired", "bool"},
 			// Schema content
 			{"description", "string"},
@@ -1453,6 +1431,7 @@ func execFields(result *Result) (*Result, error) {
 			{"uniqueItems", "bool"},
 			{"discriminatorProperty", "string"},
 			{"discriminatorMappingCount", "int"},
+			{"requiredProperties", "array"},
 			{"requiredCount", "int"},
 			{"enumCount", "int"},
 			{"minimum", "int?"},
@@ -1510,7 +1489,6 @@ func execFields(result *Result) (*Result, error) {
 	case ResponseResult:
 		fields = []struct{ name, typ string }{
 			{"statusCode", "string"},
-			{"name", "string"},
 			{"description", "string"},
 			{"contentTypeCount", "int"},
 			{"headerCount", "int"},
@@ -1520,7 +1498,6 @@ func execFields(result *Result) (*Result, error) {
 		}
 	case RequestBodyResult:
 		fields = []struct{ name, typ string }{
-			{"name", "string"},
 			{"description", "string"},
 			{"required", "bool"},
 			{"contentTypeCount", "int"},
@@ -1529,7 +1506,6 @@ func execFields(result *Result) (*Result, error) {
 	case ContentTypeResult:
 		fields = []struct{ name, typ string }{
 			{"mediaType", "string"},
-			{"name", "string"},
 			{"hasSchema", "bool"},
 			{"hasEncoding", "bool"},
 			{"hasExample", "bool"},
@@ -1549,7 +1525,7 @@ func execFields(result *Result) (*Result, error) {
 	case SecuritySchemeResult:
 		fields = []struct{ name, typ string }{
 			{"name", "string"},
-			{"type", "string"},
+			{"schemeType", "string"},
 			{"in", "string"},
 			{"scheme", "string"},
 			{"bearerFormat", "string"},
@@ -1569,7 +1545,6 @@ func execFields(result *Result) (*Result, error) {
 		fields = []struct{ name, typ string }{
 			{"url", "string"},
 			{"description", "string"},
-			{"name", "string"},
 			{"variableCount", "int"},
 		}
 	case TagResult:
@@ -1662,27 +1637,23 @@ func execPath(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 		return nil, fmt.Errorf("schema %q not found", stage.PathTo)
 	}
 
-	// Try forward direction first, then reverse if no path found
-	path := g.ShortestPath(fromNode.ID, toNode.ID)
-	if len(path) == 0 {
-		path = g.ShortestPath(toNode.ID, fromNode.ID)
-	}
+	hops := g.ShortestBidiPath(fromNode.ID, toNode.ID)
 
 	out := &Result{}
-	for i, id := range path {
-		row := Row{Kind: SchemaResult, SchemaIdx: int(id)}
-		// For nodes after the first, find the connecting edge from the previous node
+	for i, hop := range hops {
+		row := Row{Kind: SchemaResult, SchemaIdx: int(hop.Node)}
 		if i > 0 {
-			prevID := path[i-1]
-			row.From = schemaName(int(prevID), g)
-			for _, edge := range g.OutEdges(prevID) {
-				if edge.To == id {
-					row.Via = edgeKindString(edge.Kind)
-					row.Key = edge.Label
-					break
-				}
-			}
+			row.From = schemaName(int(hops[i-1].Node), g)
 			row.BFSDepth = i
+			if hop.Edge != nil {
+				row.Via = edgeKindString(hop.Edge.Kind)
+				row.Key = hop.Edge.Label
+			}
+			if hop.Forward {
+				row.Direction = "→"
+			} else {
+				row.Direction = "←"
+			}
 		}
 		out.Rows = append(out.Rows, row)
 	}
@@ -1987,6 +1958,7 @@ func componentRows(g *graph.SchemaGraph, kind componentKind) []Row {
 				Kind:         ResponseResult,
 				Response:     r,
 				ComponentKey: name,
+				StatusCode:   name, // component key serves as identifier
 				SourceOpIdx:  -1,
 			})
 		}

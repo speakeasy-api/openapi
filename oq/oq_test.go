@@ -54,18 +54,18 @@ func TestParse_Success(t *testing.T) {
 		{"length", "schemas | length"},
 		{"unique", "schemas | unique"},
 		{"group-by", "schemas | group-by(hash)"},
-		{"refs-out", "schemas | refs-out"},
-		{"refs-in 1-hop", "schemas | refs-in"},
-		{"refs-out", "schemas | refs-out"},
-		{"refs-in", "schemas | refs-in"},
-		{"refs-in closure", "schemas | refs-in(*)"},
+		{"refs(out)", "schemas | refs(out)"},
+		{"refs(in) 1-hop", "schemas | refs(in)"},
+		{"refs(out)", "schemas | refs(out)"},
+		{"refs(in)", "schemas | refs(in)"},
+		{"refs(in) closure", "schemas | refs(in, *)"},
 		{"properties", "schemas | properties"},
 		{"members", "schemas | members"},
 		{"items", "schemas | items"},
 		{"to-operations", "schemas | to-operations"},
 		{"schemas from ops", "operations | to-schemas"},
 		{"blast-radius", "schemas | where(isComponent) | where(name == \"Pet\") | blast-radius"},
-		{"neighbors", "schemas | where(isComponent) | where(name == \"Pet\") | neighbors"},
+		{"refs", "schemas | where(isComponent) | where(name == \"Pet\") | refs"},
 		{"orphans", "schemas | where(isComponent) | orphans"},
 		{"leaves", "schemas | where(isComponent) | leaves"},
 		{"cycles", "schemas | cycles"},
@@ -164,7 +164,7 @@ func TestExecute_Reachable_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs-out(*) | select name`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs(out, *) | select name`, g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
@@ -177,7 +177,7 @@ func TestExecute_Ancestors_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Address") | refs-in(*) | select name`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Address") | refs(in, *) | select name`, g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
@@ -528,7 +528,7 @@ func TestExecute_RefsOut_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs-out | select name`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs(out) | select name`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "Pet should have outgoing refs")
 }
@@ -537,7 +537,7 @@ func TestExecute_RefsIn_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Owner") | refs-in | select name`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Owner") | refs(in) | select name`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "Owner should have incoming refs")
 }
@@ -557,7 +557,7 @@ func TestExecute_EdgeAnnotations_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs-out | select name, via, key, from`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs(out) | select name, via, key, from`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "references from Pet should have results")
 
@@ -593,21 +593,21 @@ func TestExecute_BlastRadius_Success(t *testing.T) {
 	assert.True(t, hasOp, "blast-radius should include operations")
 }
 
-func TestExecute_Neighbors_Success(t *testing.T) {
+func TestExecute_Refs_Bidi_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | neighbors`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs`, g)
 	require.NoError(t, err)
-	assert.NotEmpty(t, result.Rows, "neighbors should return rows")
+	assert.NotEmpty(t, result.Rows, "refs (bidi) should return rows")
 
-	// Depth-1 neighbors should include seed + direct refs in both directions
-	names := make(map[string]bool)
+	// Bidi refs should have direction annotations and edge metadata
 	for _, row := range result.Rows {
-		n := oq.FieldValuePublic(row, "name", g)
-		names[n.Str] = true
+		dir := oq.FieldValuePublic(row, "direction", g)
+		assert.Contains(t, []string{"→", "←"}, dir.Str, "bidi refs should set direction")
+		via := oq.FieldValuePublic(row, "via", g)
+		assert.NotEmpty(t, via.Str, "refs should set via")
 	}
-	assert.True(t, names["Pet"], "neighbors should include the seed node")
 }
 
 func TestExecute_Orphans_Success(t *testing.T) {
@@ -892,24 +892,24 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 			[]string{"Group: group-by("},
 		},
 		{
-			"explain with refs-out 1-hop",
-			"schemas | where(isComponent) | where(name == \"Pet\") | refs-out | explain",
-			[]string{"Traverse: refs-out 1 hop"},
+			"explain with refs(out) 1-hop",
+			"schemas | where(isComponent) | where(name == \"Pet\") | refs(out) | explain",
+			[]string{"Traverse: refs(out) 1 hop"},
 		},
 		{
-			"explain with refs-in 1-hop",
-			"schemas | where(isComponent) | where(name == \"Owner\") | refs-in | explain",
-			[]string{"Traverse: refs-in 1 hop"},
+			"explain with refs(in) 1-hop",
+			"schemas | where(isComponent) | where(name == \"Owner\") | refs(in) | explain",
+			[]string{"Traverse: refs(in) 1 hop"},
 		},
 		{
-			"explain with refs-out full",
-			"schemas | where(isComponent) | where(name == \"Pet\") | refs-out(*) | explain",
-			[]string{"Traverse: refs-out(*) transitive closure"},
+			"explain with refs(out) full",
+			"schemas | where(isComponent) | where(name == \"Pet\") | refs(out, *) | explain",
+			[]string{"Traverse: refs(out, *) full closure"},
 		},
 		{
-			"explain with refs-in full",
-			"schemas | where(isComponent) | where(name == \"Address\") | refs-in(*) | explain",
-			[]string{"Traverse: refs-in(*) transitive closure"},
+			"explain with refs(in) full",
+			"schemas | where(isComponent) | where(name == \"Address\") | refs(in, *) | explain",
+			[]string{"Traverse: refs(in, *) full closure"},
 		},
 		{
 			"explain with properties",
@@ -967,9 +967,9 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 			[]string{"Traverse: blast radius"},
 		},
 		{
-			"explain with neighbors",
-			"schemas | where(isComponent) | where(name == \"Pet\") | neighbors | explain",
-			[]string{"Traverse: neighbors 1 hop(s)"},
+			"explain with refs",
+			"schemas | where(isComponent) | where(name == \"Pet\") | refs | explain",
+			[]string{"Traverse: refs(bidi) 1 hop"},
 		},
 		{
 			"explain with orphans",
@@ -1002,14 +1002,14 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 			[]string{"Analyze: schemas shared"},
 		},
 		{
-			"explain with refs-in 1-hop",
-			"schemas | where(isComponent) | where(name == \"Address\") | refs-in | explain",
-			[]string{"Traverse: refs-in 1 hop(s)"},
+			"explain with refs(in) 1-hop",
+			"schemas | where(isComponent) | where(name == \"Address\") | refs(in) | explain",
+			[]string{"Traverse: refs(in) 1 hop"},
 		},
 		{
-			"explain with refs-out 1-hop",
-			"schemas | where(isComponent) | where(name == \"Pet\") | refs-out | explain",
-			[]string{"Traverse: refs-out 1 hop(s)"},
+			"explain with refs(out) 1-hop",
+			"schemas | where(isComponent) | where(name == \"Pet\") | refs(out) | explain",
+			[]string{"Traverse: refs(out) 1 hop"},
 		},
 		{
 			"explain with parent",
@@ -1130,7 +1130,7 @@ func TestParse_Error_MoreCases(t *testing.T) {
 		{"unknown stage", "schemas | bogus_stage"},
 		{"first non-integer", "schemas | first abc"},
 		{"sample non-integer", "schemas | sample xyz"},
-		{"neighbors non-integer", "schemas | neighbors(abc)"},
+		{"refs non-integer", "schemas | refs(abc)"},
 		{"top missing field", "schemas | top 5"},
 		{"bottom missing field", "schemas | bottom 5"},
 		{"path missing args", "schemas | path"},
@@ -1261,7 +1261,7 @@ func TestExecute_Leaves_NoComponentRefs(t *testing.T) {
 	// Leaf schemas should not reference any component schemas
 	for _, row := range result.Rows {
 		refs, err := oq.Execute(
-			fmt.Sprintf(`schemas | where(name == "%s") | refs-out(*) | where(isComponent)`,
+			fmt.Sprintf(`schemas | where(name == "%s") | refs(out, *) | where(isComponent)`,
 				oq.FieldValuePublic(row, "name", g).Str), g)
 		require.NoError(t, err)
 		assert.Empty(t, refs.Rows, "leaf %s should not reference any component schemas",
@@ -1327,7 +1327,7 @@ func TestExecute_CyclicSpec_EdgeAnnotations(t *testing.T) {
 	g := loadCyclicGraph(t)
 
 	// Test references to cover edgeKindString branches
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "NodeA") | refs-out | select name, via, key`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "NodeA") | refs(out) | select name, via, key`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "NodeA should have outgoing refs")
 
@@ -1441,8 +1441,8 @@ func TestParse_NewSyntax_Success(t *testing.T) {
 		{"length", "schemas | length"},
 		{"group-by", "schemas | group-by(type)"},
 		{"sample call", "schemas | sample(3)"},
-		{"neighbors bare", "schemas | neighbors"},
-		{"neighbors closure", "schemas | neighbors(*)"},
+		{"refs bare", "schemas | refs"},
+		{"refs closure", "schemas | refs(*)"},
 		{"path call", "schemas | path(Pet, Address)"},
 		{"highest call", "schemas | highest(3, depth)"},
 		{"lowest call", "schemas | lowest(3, depth)"},
@@ -1526,12 +1526,12 @@ func TestExecute_LetBinding_Success(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// let $pet = name, then use $pet in subsequent filter
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | let $pet = name | refs-out(*) | where(name != $pet) | select name`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | let $pet = name | refs(out, *) | where(name != $pet) | select name`, g)
 	require.NoError(t, err)
 
 	names := collectNames(result, g)
 	assert.NotContains(t, names, "Pet", "should not include the $pet variable value")
-	assert.Contains(t, names, "Owner", "should include refs-out schemas")
+	assert.Contains(t, names, "Owner", "should include refs(out) schemas")
 }
 
 func TestExecute_DefExpansion_Success(t *testing.T) {
@@ -1799,19 +1799,19 @@ func TestExecute_ComponentsSources(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	// components.schemas = schemas | where(isComponent)
-	compSchemas, err := oq.Execute("components.schemas | length", g)
+	// components | where(kind == "schema") = schemas | where(isComponent)
+	compSchemas, err := oq.Execute(`components | where(kind == "schema") | length`, g)
 	require.NoError(t, err)
 	filteredSchemas, err := oq.Execute("schemas | where(isComponent) | length", g)
 	require.NoError(t, err)
 	assert.Equal(t, filteredSchemas.Count, compSchemas.Count)
 
-	// components.parameters should work (may be 0 for petstore)
-	_, err = oq.Execute("components.parameters | length", g)
+	// components | where(kind == "parameter") should work (may be 0 for petstore)
+	_, err = oq.Execute(`components | where(kind == "parameter") | length`, g)
 	require.NoError(t, err)
 
-	// components.responses should work
-	_, err = oq.Execute("components.responses | length", g)
+	// components | where(kind == "response") should work
+	_, err = oq.Execute(`components | where(kind == "response") | length`, g)
 	require.NoError(t, err)
 }
 
@@ -1820,7 +1820,7 @@ func TestExecute_NavigationFullChain(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Full navigation chain: operation → responses → content-types → schema → graph traversal
-	result, err := oq.Execute("operations | take(1) | responses | content-types | to-schema | refs-out | take(3)", g)
+	result, err := oq.Execute("operations | take(1) | responses | content-types | to-schema | refs(out) | take(3)", g)
 	require.NoError(t, err)
 	// May be empty depending on whether the schema has refs, but should not error
 	for _, row := range result.Rows {
@@ -1873,12 +1873,7 @@ func TestParse_NavigationStages(t *testing.T) {
 		{"to-schema", "operations | parameters | to-schema"},
 		{"operation", "operations | parameters | operation"},
 		{"security", "operations | security"},
-		{"components.schemas", "components.schemas"},
-		{"components.parameters", "components.parameters"},
-		{"components.responses", "components.responses"},
-		{"components.request-bodies", "components.request-bodies"},
-		{"components.headers", "components.headers"},
-		{"components.security-schemes", "components.security-schemes"},
+		{"components", "components | length"},
 	}
 
 	for _, tt := range tests {
@@ -1935,14 +1930,14 @@ func TestExecute_ComponentsSecuritySchemes(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("components.security-schemes", g)
+	result, err := oq.Execute(`components | where(kind == "security-scheme")`, g)
 	require.NoError(t, err)
 	require.Len(t, result.Rows, 1)
 
 	name := oq.FieldValuePublic(result.Rows[0], "name", g)
 	assert.Equal(t, "bearerAuth", name.Str)
 
-	schemeType := oq.FieldValuePublic(result.Rows[0], "type", g)
+	schemeType := oq.FieldValuePublic(result.Rows[0], "schemeType", g)
 	assert.Equal(t, "http", schemeType.Str)
 
 	scheme := oq.FieldValuePublic(result.Rows[0], "scheme", g)
@@ -1953,7 +1948,7 @@ func TestExecute_ComponentsParameters(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("components.parameters", g)
+	result, err := oq.Execute(`components | where(kind == "parameter")`, g)
 	require.NoError(t, err)
 	require.Len(t, result.Rows, 1)
 
@@ -1965,16 +1960,13 @@ func TestExecute_ComponentsResponses(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute("components.responses", g)
+	result, err := oq.Execute(`components | where(kind == "response")`, g)
 	require.NoError(t, err)
 	require.Len(t, result.Rows, 1)
 
-	name := oq.FieldValuePublic(result.Rows[0], "name", g)
-	assert.Equal(t, "NotFound", name.Str)
-
-	// statusCode should be empty for component responses (not leaked from key)
+	// Component responses use the component key as statusCode identifier
 	sc := oq.FieldValuePublic(result.Rows[0], "statusCode", g)
-	assert.Empty(t, sc.Str)
+	assert.Equal(t, "NotFound", sc.Str)
 }
 
 func TestExecute_GroupByWithNameField(t *testing.T) {
@@ -2150,12 +2142,12 @@ func TestExecute_RefsOutClosure(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	// refs-out = 1-hop only
-	d1, err := oq.Execute(`schemas | where(name == "Pet") | refs-out | length`, g)
+	// refs(out) = 1-hop only
+	d1, err := oq.Execute(`schemas | where(name == "Pet") | refs(out) | length`, g)
 	require.NoError(t, err)
 
-	// refs-out(*) = full transitive closure
-	dAll, err := oq.Execute(`schemas | where(name == "Pet") | refs-out(*) | length`, g)
+	// refs(out, *) = full transitive closure
+	dAll, err := oq.Execute(`schemas | where(name == "Pet") | refs(out, *) | length`, g)
 	require.NoError(t, err)
 
 	assert.Greater(t, dAll.Count, d1.Count, "closure should find more than 1-hop")
@@ -2288,7 +2280,7 @@ func TestExecute_EmitSecuritySchemeKey(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`components.security-schemes | to-yaml`, g)
+	result, err := oq.Execute(`components | where(kind == "security-scheme") | to-yaml`, g)
 	require.NoError(t, err)
 	yaml := oq.FormatYAML(result, g)
 	assert.Contains(t, yaml, "bearerAuth", "to-yaml key should be scheme name")
@@ -2357,7 +2349,7 @@ func TestExecute_KindFieldAllTypes(t *testing.T) {
 		{"operations | take(1) | responses | take(1)", "response"},
 		{"operations | where(name == \"createPet\") | request-body", "request-body"},
 		{"operations | take(1) | responses | take(1) | content-types | take(1)", "content-type"},
-		{"components.security-schemes | take(1)", "security-scheme"},
+		{`components | where(kind == "security-scheme") | take(1)`, "security-scheme"},
 	}
 
 	for _, tt := range tests {
@@ -2382,7 +2374,7 @@ func TestExecute_DefaultFieldsForAllTypes(t *testing.T) {
 		"operations | take(1) | responses | take(1)",
 		"operations | where(name == \"createPet\") | request-body",
 		"operations | take(1) | responses | take(1) | content-types | take(1)",
-		"components.security-schemes",
+		`components | where(kind == "security-scheme")`,
 		"operations | take(1) | security",
 	}
 
@@ -2432,7 +2424,7 @@ func TestExecute_ReferencedByResolvesWrappers_Success(t *testing.T) {
 
 	// Owner is referenced via Pet.owner (which goes through an inline $ref wrapper).
 	// After the fix, referenced-by should resolve through the wrapper to return Pet.
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Owner") | refs-in`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Owner") | refs(in)`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows)
 
@@ -2471,16 +2463,16 @@ func TestExecute_AncestorsDepthLimited_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	// refs-in = 1-hop
-	result1, err := oq.Execute(`schemas | where(isComponent) | where(name == "Address") | refs-in`, g)
+	// refs(in) = 1-hop
+	result1, err := oq.Execute(`schemas | where(isComponent) | where(name == "Address") | refs(in)`, g)
 	require.NoError(t, err)
 
-	// refs-in(*) = full closure
-	resultAll, err := oq.Execute(`schemas | where(isComponent) | where(name == "Address") | refs-in(*)`, g)
+	// refs(in, *) = full closure
+	resultAll, err := oq.Execute(`schemas | where(isComponent) | where(name == "Address") | refs(in, *)`, g)
 	require.NoError(t, err)
 
 	assert.LessOrEqual(t, len(result1.Rows), len(resultAll.Rows),
-		"refs-in should return <= refs-in(*)")
+		"refs(in) should return <= refs(in, *)")
 	assert.NotEmpty(t, result1.Rows, "Address should have at least one ancestor")
 }
 
@@ -2488,14 +2480,14 @@ func TestExecute_BFSDepthField_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	// refs-out should populate edge annotations on result rows
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs-out`, g)
+	// refs(out) should populate edge annotations on result rows
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs(out)`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows)
 
 	for _, row := range result.Rows {
 		via := oq.FieldValuePublic(row, "via", g)
-		assert.NotEmpty(t, via.Str, "via should be populated on refs-out rows")
+		assert.NotEmpty(t, via.Str, "via should be populated on refs(out) rows")
 	}
 }
 
@@ -2503,8 +2495,8 @@ func TestExecute_TargetField_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	// refs-out from Pet should have target == "Pet" (the seed)
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs-out`, g)
+	// refs(out) from Pet should have target == "Pet" (the seed)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs(out)`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows)
 
@@ -2518,20 +2510,20 @@ func TestExecute_RefsInAnnotations_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	// refs-in on Owner should populate edge annotations
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Owner") | refs-in`, g)
+	// refs(in) on Owner should populate edge annotations
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Owner") | refs(in)`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows)
 
 	for _, row := range result.Rows {
 		via := oq.FieldValuePublic(row, "via", g)
-		assert.NotEmpty(t, via.Str, "via should be populated on refs-in rows")
+		assert.NotEmpty(t, via.Str, "via should be populated on refs(in) rows")
 	}
 }
 
 func TestParse_RefsOutStar_Success(t *testing.T) {
 	t.Parallel()
-	stages, err := oq.Parse("schemas | refs-out(*)")
+	stages, err := oq.Parse("schemas | refs(out, *)")
 	require.NoError(t, err)
 	assert.Len(t, stages, 2)
 	assert.Equal(t, -1, stages[1].Limit)
@@ -2559,7 +2551,7 @@ func TestExecute_SchemaContentFields_Success(t *testing.T) {
 		{"uniqueItems", true},
 		{"discriminatorProperty", false},
 		{"discriminatorMappingCount", true},
-		{"required", true},
+		{"requiredProperties", true},
 		{"requiredCount", true},
 		{"enum", true},
 		{"enumCount", true},
@@ -2591,7 +2583,7 @@ func TestExecute_SchemaContentFields_Success(t *testing.T) {
 	reqCount := oq.FieldValuePublic(result.Rows[0], "requiredCount", g)
 	assert.Equal(t, 2, reqCount.Int)
 
-	reqArr := oq.FieldValuePublic(result.Rows[0], "required", g)
+	reqArr := oq.FieldValuePublic(result.Rows[0], "requiredProperties", g)
 	assert.Equal(t, expr.KindArray, reqArr.Kind)
 	assert.Contains(t, reqArr.Arr, "id")
 	assert.Contains(t, reqArr.Arr, "name")
@@ -2641,12 +2633,12 @@ func TestExecute_ComponentSources_Success(t *testing.T) {
 		hasRows  bool
 		rowField string
 	}{
-		{`components.parameters | select name`, true, "name"},
-		{`components.responses | select name`, true, "name"},
-		{`components.security-schemes | select name`, true, "name"},
+		{`components | where(kind == "parameter") | select name`, true, "name"},
+		{`components | where(kind == "response") | select name`, true, "name"},
+		{`components | where(kind == "security-scheme") | select name`, true, "name"},
 		// No request-bodies or headers in components in our fixture
-		{`components.request-bodies`, false, ""},
-		{`components.headers`, false, ""},
+		{`components | where(kind == "request-body")`, false, ""},
+		{`components | where(kind == "header")`, false, ""},
 	}
 
 	for _, s := range sources {
@@ -2665,7 +2657,7 @@ func TestExecute_ComponentParameterFields_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`components.parameters | select name`, g)
+	result, err := oq.Execute(`components | where(kind == "parameter") | select name`, g)
 	require.NoError(t, err)
 	require.NotEmpty(t, result.Rows)
 
@@ -2688,13 +2680,13 @@ func TestExecute_ComponentResponseFields_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`components.responses`, g)
+	result, err := oq.Execute(`components | where(kind == "response")`, g)
 	require.NoError(t, err)
 	require.NotEmpty(t, result.Rows)
 
 	row := result.Rows[0]
-	name := oq.FieldValuePublic(row, "name", g)
-	assert.Equal(t, "NotFound", name.Str)
+	sc := oq.FieldValuePublic(row, "statusCode", g)
+	assert.Equal(t, "NotFound", sc.Str)
 
 	desc := oq.FieldValuePublic(row, "description", g)
 	assert.Equal(t, "Resource not found", desc.Str)
@@ -2710,7 +2702,7 @@ func TestExecute_SecuritySchemeFields_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`components.security-schemes`, g)
+	result, err := oq.Execute(`components | where(kind == "security-scheme")`, g)
 	require.NoError(t, err)
 	require.NotEmpty(t, result.Rows)
 
@@ -2718,7 +2710,7 @@ func TestExecute_SecuritySchemeFields_Success(t *testing.T) {
 	name := oq.FieldValuePublic(row, "name", g)
 	assert.Equal(t, "bearerAuth", name.Str)
 
-	typ := oq.FieldValuePublic(row, "type", g)
+	typ := oq.FieldValuePublic(row, "schemeType", g)
 	assert.Equal(t, "http", typ.Str)
 
 	scheme := oq.FieldValuePublic(row, "scheme", g)
@@ -2806,7 +2798,7 @@ func TestExecute_FieldsIntrospection_Success(t *testing.T) {
 		{"operations | where(operationId == \"createPet\") | request-body | fields", "required"},
 		{"operations | where(operationId == \"listPets\") | responses | content-types | fields", "mediaType"},
 		{"operations | where(operationId == \"createPet\") | responses | where(statusCode == \"201\") | headers | fields", "name"},
-		{"components.security-schemes | fields", "bearerFormat"},
+		{`components | where(kind == "security-scheme") | fields`, "bearerFormat"},
 		{"operations | where(operationId == \"createPet\") | security | fields", "scopes"},
 	}
 
@@ -2830,7 +2822,7 @@ func TestExecute_EdgeKinds_Success(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Pet has property edges and Shape has oneOf edges — verify edge kind strings
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs-out | select via`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs(out) | select via`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows)
 
@@ -2842,7 +2834,7 @@ func TestExecute_EdgeKinds_Success(t *testing.T) {
 	assert.True(t, vias["property"], "Pet should have property edges")
 
 	// Shape has oneOf edges
-	result2, err := oq.Execute(`schemas | where(isComponent) | where(name == "Shape") | refs-out | select via`, g)
+	result2, err := oq.Execute(`schemas | where(isComponent) | where(name == "Shape") | refs(out) | select via`, g)
 	require.NoError(t, err)
 	for _, row := range result2.Rows {
 		v := oq.FieldValuePublic(row, "via", g)
@@ -2891,7 +2883,7 @@ func TestExecute_RowKeyDedup_Success(t *testing.T) {
 	assert.NotEmpty(t, result6.Rows)
 
 	// Security schemes unique
-	result7, err := oq.Execute(`components.security-schemes | unique`, g)
+	result7, err := oq.Execute(`components | where(kind == "security-scheme") | unique`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result7.Rows)
 
@@ -3118,7 +3110,7 @@ func TestExecute_KindField_Success(t *testing.T) {
 	kind7 := oq.FieldValuePublic(result7.Rows[0], "kind", g)
 	assert.Equal(t, "header", kind7.Str)
 
-	result8, err := oq.Execute(`components.security-schemes | take(1)`, g)
+	result8, err := oq.Execute(`components | where(kind == "security-scheme") | take(1)`, g)
 	require.NoError(t, err)
 	kind8 := oq.FieldValuePublic(result8.Rows[0], "kind", g)
 	assert.Equal(t, "security-scheme", kind8.Str)
@@ -3196,7 +3188,7 @@ func TestExecute_EmitYAML_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, output7)
 
-	result8, err := oq.Execute(`components.security-schemes | to-yaml`, g)
+	result8, err := oq.Execute(`components | where(kind == "security-scheme") | to-yaml`, g)
 	require.NoError(t, err)
 	output8 := oq.FormatYAML(result8, g)
 	require.NoError(t, err)
@@ -3248,7 +3240,7 @@ func TestFormatTable_NavigationRows_Success(t *testing.T) {
 	assert.Contains(t, output4, "bearerAuth")
 
 	// Security schemes
-	result5, err := oq.Execute(`components.security-schemes`, g)
+	result5, err := oq.Execute(`components | where(kind == "security-scheme")`, g)
 	require.NoError(t, err)
 	output5 := oq.FormatTable(result5, g)
 	require.NoError(t, err)
@@ -3398,13 +3390,13 @@ func TestParseDepthArg_Star(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	// refs-out(*) uses parseDepthArg with "*"
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs-out(*) | select name`, g)
+	// refs(out, *) uses parseDepthArg with "*"
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs(out, *) | select name`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows)
 
-	// refs-in(*) uses parseDepthArg with "*"
-	result2, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs-in(*) | select name`, g)
+	// refs(in, *) uses parseDepthArg with "*"
+	result2, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs(in, *) | select name`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result2.Rows)
 
@@ -3440,8 +3432,8 @@ func TestEdgeKindString_CyclicSpec(t *testing.T) {
 	t.Parallel()
 	g := loadCyclicGraph(t)
 
-	// Get refs-out from ALL schemas (including inline) to capture allOf, anyOf, items edges
-	result, err := oq.Execute(`schemas | refs-out | select name, via, key`, g)
+	// Get refs(out) from ALL schemas (including inline) to capture allOf, anyOf, items edges
+	result, err := oq.Execute(`schemas | refs(out) | select name, via, key`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows)
 
@@ -3457,13 +3449,13 @@ func TestComponentRows_RequestBodiesAndHeaders(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	// components.request-bodies — petstore may or may not have them, but should not error
-	result, err := oq.Execute(`components.request-bodies | select name`, g)
+	// components | where(kind == "request-body") — petstore may or may not have them, but should not error
+	result, err := oq.Execute(`components | where(kind == "request-body") | select name`, g)
 	require.NoError(t, err)
 	// Just verify it ran without error; may be empty
 
-	// components.headers — same
-	result2, err := oq.Execute(`components.headers | select name`, g)
+	// components | where(kind == "header") — same
+	result2, err := oq.Execute(`components | where(kind == "header") | select name`, g)
 	require.NoError(t, err)
 	_ = result
 	_ = result2
@@ -3618,8 +3610,8 @@ func TestEdgeKindString_AllEdgeTypes_CyclicSpec(t *testing.T) {
 	t.Parallel()
 	g := loadCyclicGraph(t)
 
-	// Get ALL refs-out from all schemas to hit more edge kind branches
-	result, err := oq.Execute(`schemas | refs-out | select name, via`, g)
+	// Get ALL refs(out) from all schemas to hit more edge kind branches
+	result, err := oq.Execute(`schemas | refs(out) | select name, via`, g)
 	require.NoError(t, err)
 
 	edgeKinds := make(map[string]bool)
@@ -3669,12 +3661,12 @@ func TestComponentRows_AllSources(t *testing.T) {
 
 	// Test all component sources — cyclic spec has minimal components but should not error
 	sources := []string{
-		"components.schemas",
-		"components.parameters",
-		"components.responses",
-		"components.request-bodies",
-		"components.headers",
-		"components.security-schemes",
+		`components | where(kind == "schema")`,
+		`components | where(kind == "parameter")`,
+		`components | where(kind == "response")`,
+		`components | where(kind == "request-body")`,
+		`components | where(kind == "header")`,
+		`components | where(kind == "security-scheme")`,
 	}
 	for _, src := range sources {
 		t.Run(src, func(t *testing.T) {
@@ -3691,38 +3683,38 @@ func TestComponentRows_PetstoreComponents(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Petstore has securitySchemes, parameters, and responses as components
-	t.Run("components.parameters", func(t *testing.T) {
+	t.Run(`components | where(kind == "parameter")`, func(t *testing.T) {
 		t.Parallel()
-		result, err := oq.Execute(`components.parameters | select name`, g)
+		result, err := oq.Execute(`components | where(kind == "parameter") | select name`, g)
 		require.NoError(t, err)
 		assert.NotEmpty(t, result.Rows, "petstore should have component parameters")
 	})
 
-	t.Run("components.responses", func(t *testing.T) {
+	t.Run(`components | where(kind == "response")`, func(t *testing.T) {
 		t.Parallel()
-		result, err := oq.Execute(`components.responses | select name`, g)
+		result, err := oq.Execute(`components | where(kind == "response") | select name`, g)
 		require.NoError(t, err)
 		assert.NotEmpty(t, result.Rows, "petstore should have component responses")
 	})
 
-	t.Run("components.security-schemes", func(t *testing.T) {
+	t.Run(`components | where(kind == "security-scheme")`, func(t *testing.T) {
 		t.Parallel()
-		result, err := oq.Execute(`components.security-schemes | select name`, g)
+		result, err := oq.Execute(`components | where(kind == "security-scheme") | select name`, g)
 		require.NoError(t, err)
 		assert.NotEmpty(t, result.Rows, "petstore should have security schemes")
 	})
 
-	t.Run("components.request-bodies empty", func(t *testing.T) {
+	t.Run(`components | where(kind == "request-body") empty`, func(t *testing.T) {
 		t.Parallel()
-		result, err := oq.Execute(`components.request-bodies`, g)
+		result, err := oq.Execute(`components | where(kind == "request-body")`, g)
 		require.NoError(t, err)
 		// Petstore has no component request-bodies
 		_ = result
 	})
 
-	t.Run("components.headers empty", func(t *testing.T) {
+	t.Run(`components | where(kind == "header") empty`, func(t *testing.T) {
 		t.Parallel()
-		result, err := oq.Execute(`components.headers`, g)
+		result, err := oq.Execute(`components | where(kind == "header")`, g)
 		require.NoError(t, err)
 		_ = result
 	})
@@ -3887,7 +3879,7 @@ func TestFieldValue_SecuritySchemeFields(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Exercise security scheme fields
-	result, err := oq.Execute(`components.security-schemes | select name, type, in, scheme, bearerFormat, description, hasFlows, deprecated`, g)
+	result, err := oq.Execute(`components | where(kind == "security-scheme") | select name, schemeType, in, scheme, bearerFormat, description, hasFlows, deprecated`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows)
 }
@@ -3973,7 +3965,7 @@ func TestRowKey_AllKinds(t *testing.T) {
 	})
 	t.Run("security-scheme unique", func(t *testing.T) {
 		t.Parallel()
-		result, err := oq.Execute(`components.security-schemes | unique | select name`, g)
+		result, err := oq.Execute(`components | where(kind == "security-scheme") | unique | select name`, g)
 		require.NoError(t, err)
 		_ = result
 	})
@@ -4097,7 +4089,7 @@ func TestFormatYAML_SecuritySchemes(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`components.security-schemes | to-yaml`, g)
+	result, err := oq.Execute(`components | where(kind == "security-scheme") | to-yaml`, g)
 	require.NoError(t, err)
 
 	yaml := oq.FormatYAML(result, g)
@@ -4640,7 +4632,7 @@ func TestExecute_ComponentDefaultField(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// LimitParam has default: 20 on its schema
-	result, err := oq.Execute(`components.parameters | to-schema | select name, default`, g)
+	result, err := oq.Execute(`components | where(kind == "parameter") | to-schema | select name, default`, g)
 	require.NoError(t, err)
 	if len(result.Rows) > 0 {
 		def := oq.FieldValuePublic(result.Rows[0], "default", g)

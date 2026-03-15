@@ -35,16 +35,21 @@ source | stage | stage | ... | terminal
 |--------|-------------|
 | `schemas` | All schemas (component + inline) |
 | `operations` | All operations |
+| `components` | All component types (schemas, parameters, responses, headers, security-schemes). Filter with `where(kind == "schema")` etc. |
 | `webhooks` | Webhook operations only |
 | `servers` | Document-level servers |
 | `tags` | Document-level tags |
+| `security` | Global security requirements |
 
 ### Traversal Stages
 
 | Stage | Description |
 |-------|-------------|
-| `refs-out` / `refs-out(*)` | Outgoing refs: 1-hop default, or full closure |
-| `refs-in` / `refs-in(*)` | Incoming refs: 1-hop default, or full closure |
+| `refs` | Bidirectional refs: 1-hop, with `direction` annotation (`→`/`←`) |
+| `refs(*)` | Bidirectional transitive closure |
+| `refs(out)` / `refs(out, *)` | Outgoing refs only: 1-hop or closure |
+| `refs(in)` / `refs(in, *)` | Incoming refs only: 1-hop or closure |
+| `refs(N)` / `refs(out, N)` | Depth-limited to N hops |
 | `properties` / `properties(*)` | Property sub-schemas (allOf-flattening). `properties(*)` recursively expands through `$ref`, `oneOf`, `anyOf` with qualified `from` paths |
 | `members` | allOf/oneOf/anyOf children, or expand group rows into schemas |
 | `items` | Array items schema (with edge annotations) |
@@ -53,8 +58,7 @@ source | stage | stage | ... | terminal
 | `parent` | Navigate to structural parent schema (via graph in-edges) |
 | `to-operations` | Schemas → operations |
 | `to-schemas` | Operations → schemas |
-| `path(A, B)` | Shortest path between two schemas (with edge annotations) |
-| `neighbors` / `neighbors(*)` | Bidirectional neighborhood: 1-hop default, or full closure |
+| `path(A, B)` | Shortest bidirectional path between two schemas (with `direction` annotation) |
 | `blast-radius` | Ancestors + all affected operations |
 
 ### Navigation Stages
@@ -174,15 +178,16 @@ Module search paths: current directory, then `~/.config/oq/`
 
 ### Edge Annotation Fields
 
-Available on rows produced by traversal stages (`refs-out`, `refs-in`, `properties`, `members`, `items`).
+Available on rows produced by traversal stages (`refs`, `properties`, `members`, `items`, `path`).
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `via` | string | Structural edge kind: property, items, allOf, oneOf, ... |
+| `via` | string | Structural edge kind: property, items, allOf, oneOf, ref, ... |
 | `key` | string | Structural edge label: property name, array index, etc. |
 | `from` | string | Source schema name (the schema containing the relationship) |
 | `seed` | string | Seed schema name (the schema that initiated the traversal) |
-| `bfsDepth` | int | BFS depth from seed (populated by `refs-out(*)`, `refs-in(*)`) |
+| `bfsDepth` | int | BFS depth from seed |
+| `direction` | string | `→` (outgoing) or `←` (incoming) — set by bidi traversals (`refs`, `path`) |
 
 ### Parameter Fields
 
@@ -323,7 +328,7 @@ if isComponent then depth > 3 else true end   # conditional
 Use `let` to bind values for use in later stages:
 
 ```
-schemas | where(name == "Pet") | let $pet = name | refs-out | where(name != $pet)
+schemas | where(name == "Pet") | let $pet = name | refs(out) | where(name != $pet)
 ```
 
 ## Output Formats
@@ -373,13 +378,13 @@ schemas | where(name matches "Error.*") | select name, path
 schemas | group-by(type)
 
 # Edge annotations — how does Pet reference other schemas?
-schemas | where(isComponent) | where(name == "Pet") | refs-out | select name, via, key, from
+schemas | where(isComponent) | where(name == "Pet") | refs(out) | select name, via, key, from
 
 # Blast radius — what breaks if Error changes?
 schemas | where(isComponent) | where(name == "Error") | blast-radius | length
 
-# 1-hop neighborhood
-schemas | where(isComponent) | where(name == "Pet") | neighbors | select name
+# 1-hop bidirectional refs (with direction arrows)
+schemas | where(isComponent) | where(name == "Pet") | refs | select name, direction, via, key
 
 # Orphaned schemas
 schemas | where(isComponent) | orphans | select name
@@ -399,8 +404,8 @@ schemas | cross-tag | select name, tagCount
 # Schemas shared across all operations
 operations | shared-refs | select name, opCount
 
-# Variable binding — find Pet's refs-out schemas (excluding Pet itself)
-schemas | where(name == "Pet") | let $pet = name | refs-out | where(name != $pet) | select name
+# Variable binding — find Pet's refs(out) schemas (excluding Pet itself)
+schemas | where(name == "Pet") | let $pet = name | refs(out) | where(name != $pet) | select name
 
 # User-defined functions
 def hot: where(inDegree > 10);

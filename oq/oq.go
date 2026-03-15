@@ -37,13 +37,14 @@ type Row struct {
 	SchemaIdx int // index into SchemaGraph.Schemas
 	OpIdx     int // index into SchemaGraph.Operations
 
-	// Edge annotations (populated by 1-hop traversal stages)
-	Via    string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
-	Key    string // edge key: property name, array index, etc.
-	From   string // source node name (the node that contains the reference)
-	Target string // target/seed node name (the node traversal originated from)
+	// Edge annotations (populated by traversal stages)
+	Via       string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
+	Key       string // edge key: property name, array index, etc.
+	From      string // source node name (the node that contains the reference)
+	Target    string // target/seed node name (the node traversal originated from)
+	Direction string // "→" (outgoing) or "←" (incoming) — set by bidi traversals
 
-	// BFS depth (populated by depth-limited traversals: refs-out(N), refs-in(N))
+	// BFS depth (populated by depth-limited traversals)
 	BFSDepth int
 
 	// Group annotations (populated by group-by stages)
@@ -148,8 +149,7 @@ const (
 	StageUnique
 	StageGroupBy
 	StageCount
-	StageRefsOut
-	StageRefsIn
+	StageRefs
 	StageProperties
 	StageItems
 	StageToOperations
@@ -162,7 +162,6 @@ const (
 	StageLowest
 	StageFormat
 	StageBlastRadius
-	StageNeighbors
 	StageOrphans
 	StageLeaves
 	StageCycles
@@ -196,11 +195,12 @@ type Stage struct {
 	Fields    []string // for StageSelect, StageGroupBy
 	SortField string   // for StageSort
 	SortDesc  bool     // for StageSort
-	Limit     int      // for StageTake, StageLast, StageSample, StageHighest, StageLowest
+	Limit     int      // for StageTake, StageLast, StageSample, StageHighest, StageLowest, StageRefs
 	PathFrom  string   // for StagePath
 	PathTo    string   // for StagePath
 	Format    string   // for StageFormat
 	VarName   string   // for StageLet
+	RefsDir   string   // for StageRefs: "out", "in", or "" (bidi)
 }
 
 // Query represents a parsed query with optional includes, defs, and pipeline stages.
