@@ -82,8 +82,8 @@ func TestBuild_Edges_Success(t *testing.T) {
 	pet, _ := g.SchemaByName("Pet")
 	edges := g.OutEdges(pet.ID)
 
-	// Pet has properties: id, name, tag, owner
-	assert.Len(t, edges, 4, "Pet should have 4 out-edges")
+	// Pet has properties: id, name, tag, status, owner
+	assert.Len(t, edges, 5, "Pet should have 5 out-edges")
 
 	edgeLabels := make(map[string]graph.EdgeKind)
 	for _, e := range edges {
@@ -92,6 +92,7 @@ func TestBuild_Edges_Success(t *testing.T) {
 	assert.Equal(t, graph.EdgeProperty, edgeLabels["id"])
 	assert.Equal(t, graph.EdgeProperty, edgeLabels["name"])
 	assert.Equal(t, graph.EdgeProperty, edgeLabels["tag"])
+	assert.Equal(t, graph.EdgeProperty, edgeLabels["status"])
 	assert.Equal(t, graph.EdgeProperty, edgeLabels["owner"])
 }
 
@@ -186,8 +187,8 @@ func TestBuild_Metrics_Success(t *testing.T) {
 	g := loadTestGraph(t)
 
 	pet, _ := g.SchemaByName("Pet")
-	assert.Equal(t, 4, pet.PropertyCount, "Pet should have 4 properties")
-	assert.Equal(t, 4, pet.OutDegree, "Pet should have 4 out-edges")
+	assert.Equal(t, 5, pet.PropertyCount, "Pet should have 5 properties")
+	assert.Equal(t, 5, pet.OutDegree, "Pet should have 5 out-edges")
 	assert.Positive(t, pet.InDegree, "Pet should be referenced")
 	assert.NotEmpty(t, pet.Hash, "Pet should have a hash")
 
