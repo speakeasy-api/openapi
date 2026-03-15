@@ -99,6 +99,15 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		case "hash":
 			return expr.StringVal(s.Hash)
 		case "path":
+			// Fully qualified JSON pointer. For inline schemas, prepends
+			// the parent component path to get the absolute location.
+			if s.IsComponent || strings.HasPrefix(s.Path, "/components/") {
+				return expr.StringVal(s.Path)
+			}
+			ownerIdx, _ := resolveToOwner(row.SchemaIdx, g)
+			if ownerIdx != row.SchemaIdx && ownerIdx < len(g.Schemas) {
+				return expr.StringVal(g.Schemas[ownerIdx].Path + s.Path)
+			}
 			return expr.StringVal(s.Path)
 		case "opCount":
 			return expr.IntVal(g.SchemaOpCount(graph.NodeID(row.SchemaIdx)))
