@@ -45,7 +45,7 @@ source | stage | stage | ... | terminal
 | `properties` / `properties(*)` | Property sub-schemas (allOf-flattening). `properties(*)` recursively expands through `$ref`, `oneOf`, `anyOf` with qualified `from` paths |
 | `members` | allOf/oneOf/anyOf children, or expand group rows into schemas |
 | `items` | Array items schema (with edge annotations) |
-| `origin` | Navigate to structural parent schema (via graph in-edges) |
+| `parent` | Navigate to structural parent schema (via graph in-edges) |
 | `members` | Expand group rows (from `cycles`, `clusters`, `group-by`) into member schema rows |
 | `to-operations` | Schemas → operations |
 | `to-schemas` | Operations → schemas |

@@ -66,7 +66,7 @@ func TestParse_Success(t *testing.T) {
 		{"schemas from ops", "operations | to-schemas"},
 		{"connected", "schemas | where(isComponent) | where(name == \"Pet\") | connected"},
 		{"blast-radius", "schemas | where(isComponent) | where(name == \"Pet\") | blast-radius"},
-		{"neighbors", "schemas | where(isComponent) | where(name == \"Pet\") | neighbors 2"},
+		{"neighbors", "schemas | where(isComponent) | where(name == \"Pet\") | neighbors(2)"},
 		{"orphans", "schemas | where(isComponent) | orphans"},
 		{"leaves", "schemas | where(isComponent) | leaves"},
 		{"cycles", "schemas | cycles"},
@@ -614,7 +614,7 @@ func TestExecute_Neighbors_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | neighbors 1`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | neighbors`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "neighbors should return rows")
 
@@ -990,8 +990,8 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 		},
 		{
 			"explain with neighbors",
-			"schemas | where(isComponent) | where(name == \"Pet\") | neighbors 2 | explain",
-			[]string{"Traverse: bidirectional neighbors within 2"},
+			"schemas | where(isComponent) | where(name == \"Pet\") | neighbors(2) | explain",
+			[]string{"Traverse: neighbors 2 hop(s)"},
 		},
 		{
 			"explain with orphans",
@@ -1034,9 +1034,9 @@ func TestExecute_Explain_AllStages_Success(t *testing.T) {
 			[]string{"Traverse: refs-out 1 hop(s)"},
 		},
 		{
-			"explain with origin",
-			"schemas | where(isComponent) | where(name == \"Pet\") | properties | origin | explain",
-			[]string{"Traverse: structural origin"},
+			"explain with parent",
+			"schemas | where(isComponent) | where(name == \"Pet\") | properties | parent | explain",
+			[]string{"Traverse: structural parent"},
 		},
 	}
 
@@ -1152,7 +1152,7 @@ func TestParse_Error_MoreCases(t *testing.T) {
 		{"unknown stage", "schemas | bogus_stage"},
 		{"first non-integer", "schemas | first abc"},
 		{"sample non-integer", "schemas | sample xyz"},
-		{"neighbors non-integer", "schemas | neighbors abc"},
+		{"neighbors non-integer", "schemas | neighbors(abc)"},
 		{"top missing field", "schemas | top 5"},
 		{"bottom missing field", "schemas | bottom 5"},
 		{"path missing args", "schemas | path"},
@@ -2480,7 +2480,7 @@ func TestExecute_ParentStructural_Success(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Get properties of Pet, then navigate to parent — should return Pet
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | properties | origin`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | properties | parent`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "parent of Pet's properties should return results")
 

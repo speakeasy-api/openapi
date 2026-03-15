@@ -252,7 +252,7 @@ func parseStage(s string) (Stage, error) {
 	case "items":
 		return Stage{Kind: StageItems}, nil
 
-	case "origin":
+	case "parent":
 		return Stage{Kind: StageOrigin}, nil
 
 	case "to-operations":
@@ -275,11 +275,15 @@ func parseStage(s string) (Stage, error) {
 		return Stage{Kind: StageSample, Limit: n}, nil
 
 	case "neighbors":
-		n, err := strconv.Atoi(strings.TrimSpace(args))
-		if err != nil {
-			return Stage{}, fmt.Errorf("neighbors requires a depth number: %w", err)
+		if isCall && args != "" {
+			limit, err := parseDepthArg(args, "neighbors")
+			if err != nil {
+				return Stage{}, err
+			}
+			return Stage{Kind: StageNeighbors, Limit: limit}, nil
 		}
-		return Stage{Kind: StageNeighbors, Limit: n}, nil
+		// Default: 1-hop
+		return Stage{Kind: StageNeighbors, Limit: 1}, nil
 
 	case "path":
 		if isCall {

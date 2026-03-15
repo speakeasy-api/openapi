@@ -839,6 +839,11 @@ func execNeighbors(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, 
 	out := deriveResult(result)
 	seen := make(map[int]bool)
 
+	depth := stage.Limit
+	if depth < 0 {
+		depth = len(g.Schemas) // unbounded
+	}
+
 	for _, row := range result.Rows {
 		if row.Kind != SchemaResult {
 			continue
@@ -848,7 +853,7 @@ func execNeighbors(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, 
 			seen[row.SchemaIdx] = true
 			out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: row.SchemaIdx})
 		}
-		for _, id := range g.Neighbors(graph.NodeID(row.SchemaIdx), stage.Limit) {
+		for _, id := range g.Neighbors(graph.NodeID(row.SchemaIdx), depth) {
 			if !seen[int(id)] {
 				seen[int(id)] = true
 				out.Rows = append(out.Rows, Row{Kind: SchemaResult, SchemaIdx: int(id)})
@@ -1238,7 +1243,10 @@ func describeStage(stage Stage) string {
 	case StageBlastRadius:
 		return "Traverse: blast radius (ancestors + affected operations)"
 	case StageNeighbors:
-		return "Traverse: bidirectional neighbors within " + strconv.Itoa(stage.Limit) + " hops"
+		if stage.Limit < 0 {
+			return "Traverse: neighbors(*) full bidirectional closure"
+		}
+		return "Traverse: neighbors " + strconv.Itoa(stage.Limit) + " hop(s)"
 	case StageOrphans:
 		return "Filter: schemas with no incoming refs and no operation usage"
 	case StageLeaves:
@@ -1255,7 +1263,7 @@ func describeStage(stage Stage) string {
 		}
 		return "Analyze: schemas shared by all operations in result"
 	case StageOrigin:
-		return "Traverse: structural origin schema (walk up JSON pointer)"
+		return "Traverse: structural parent schema (walk up JSON pointer)"
 	case StageToYAML:
 		return "Output: raw YAML nodes from underlying spec objects"
 	case StageParameters:

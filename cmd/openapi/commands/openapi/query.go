@@ -28,7 +28,7 @@ Pipeline stages:
   Navigation:  parameters, responses, request-body, content-types, headers,
                to-schema, operation, security
   Traversal:   refs-out, refs-out(*), refs-in, refs-in(*),
-               properties, properties(*), members, items, origin, to-operations,
+               properties, properties(*), members, items, parent, to-operations,
                to-schemas, path(A, B), connected, blast-radius, neighbors(N)
   Analysis:    orphans, leaves, cycles, clusters, cross-tag, shared-refs
   Filter:      where(expr), select <fields>, sort-by(field, desc), take(N), last(N),

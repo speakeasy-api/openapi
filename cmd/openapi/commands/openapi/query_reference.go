@@ -55,13 +55,15 @@ in the schema reference graph.
                       expands oneOf/anyOf with qualified from paths)
   members             Expand allOf/oneOf/anyOf children, or group rows into schemas
   items               Expand to array items schema (checks allOf; with edge annotations)
-  origin              Navigate to structural parent schema (via graph in-edges)
+  parent              Navigate to structural parent schema (via graph in-edges)
   to-operations       Schemas → operations that use them
   to-schemas          Operations → schemas they touch
   path(A, B)          Shortest path between two named schemas (auto-tries both directions)
   connected           Full connected component (schemas + operations)
   blast-radius        Ancestors + all affected operations (change impact)
+  neighbors           Bidirectional neighborhood, 1 hop (default)
   neighbors(N)        Bidirectional neighborhood within N hops
+  neighbors(*)        Full bidirectional closure
 
 NAVIGATION STAGES
 -----------------
@@ -216,7 +218,7 @@ OPERATION FIELDS
 EDGE ANNOTATION FIELDS
 ----------------------
 Available on rows produced by traversal stages (refs-out, refs-in,
-properties, members, items). Use 'origin' to navigate back to the
+properties, members, items). Use 'parent' to navigate back to the
 source schema.
 
   Field             Type     Description
@@ -397,7 +399,7 @@ Schema analysis:
   schemas | where(properties contains "email") | select name
 
   # Schemas with properties matching a pattern (via traversal)
-  schemas | properties | where(key matches "(?i)date") | origin | unique | select name
+  schemas | properties | where(key matches "(?i)date") | parent | unique | select name
 
   # Schemas with names starting with "Error"
   components.schemas | where(name startswith "Error") | select name, type
