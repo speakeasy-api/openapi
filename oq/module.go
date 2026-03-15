@@ -95,7 +95,7 @@ func ExpandDefs(pipelineText string, defs []FuncDef) (string, error) {
 
 		body := def.Body
 		if isCall && len(def.Params) > 0 {
-			callArgs := splitSemicolonArgs(args)
+			callArgs := splitCommaArgs(args)
 			if len(callArgs) != len(def.Params) {
 				return "", fmt.Errorf("def %q expects %d params, got %d", def.Name, len(def.Params), len(callArgs))
 			}

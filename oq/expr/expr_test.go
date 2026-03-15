@@ -58,26 +58,26 @@ func TestParse_Comparison_Success(t *testing.T) {
 		},
 		{
 			name:     "boolean field",
-			expr:     `is_component`,
-			row:      testRow{"is_component": expr.BoolVal(true)},
+			expr:     `isComponent`,
+			row:      testRow{"isComponent": expr.BoolVal(true)},
 			expected: true,
 		},
 		{
 			name:     "and operator",
-			expr:     `depth > 3 and is_component`,
-			row:      testRow{"depth": expr.IntVal(5), "is_component": expr.BoolVal(true)},
+			expr:     `depth > 3 and isComponent`,
+			row:      testRow{"depth": expr.IntVal(5), "isComponent": expr.BoolVal(true)},
 			expected: true,
 		},
 		{
 			name:     "or operator",
-			expr:     `depth > 10 or is_component`,
-			row:      testRow{"depth": expr.IntVal(2), "is_component": expr.BoolVal(true)},
+			expr:     `depth > 10 or isComponent`,
+			row:      testRow{"depth": expr.IntVal(2), "isComponent": expr.BoolVal(true)},
 			expected: true,
 		},
 		{
 			name:     "not operator",
-			expr:     `not is_inline`,
-			row:      testRow{"is_inline": expr.BoolVal(false)},
+			expr:     `not isInline`,
+			row:      testRow{"isInline": expr.BoolVal(false)},
 			expected: true,
 		},
 		{
@@ -106,14 +106,14 @@ func TestParse_Comparison_Success(t *testing.T) {
 		},
 		{
 			name:     "complex expression",
-			expr:     `property_count > 0 and in_degree == 0`,
-			row:      testRow{"property_count": expr.IntVal(3), "in_degree": expr.IntVal(0)},
+			expr:     `propertyCount > 0 and inDegree == 0`,
+			row:      testRow{"propertyCount": expr.IntVal(3), "inDegree": expr.IntVal(0)},
 			expected: true,
 		},
 		{
 			name:     "parenthesized expression",
-			expr:     `(depth > 3 or depth < 1) and is_component`,
-			row:      testRow{"depth": expr.IntVal(5), "is_component": expr.BoolVal(true)},
+			expr:     `(depth > 3 or depth < 1) and isComponent`,
+			row:      testRow{"depth": expr.IntVal(5), "isComponent": expr.BoolVal(true)},
 			expected: true,
 		},
 	}
@@ -194,20 +194,20 @@ func TestEval_Operators_Coverage(t *testing.T) {
 		},
 		{
 			name:     "and short-circuit false",
-			exprStr:  `depth > 100 and is_component`,
-			row:      testRow{"depth": expr.IntVal(1), "is_component": expr.BoolVal(true)},
+			exprStr:  `depth > 100 and isComponent`,
+			row:      testRow{"depth": expr.IntVal(1), "isComponent": expr.BoolVal(true)},
 			expected: false,
 		},
 		{
 			name:     "or short-circuit true",
-			exprStr:  `is_component or depth > 100`,
-			row:      testRow{"depth": expr.IntVal(1), "is_component": expr.BoolVal(true)},
+			exprStr:  `isComponent or depth > 100`,
+			row:      testRow{"depth": expr.IntVal(1), "isComponent": expr.BoolVal(true)},
 			expected: true,
 		},
 		{
 			name:     "not true value",
-			exprStr:  `not is_component`,
-			row:      testRow{"is_component": expr.BoolVal(true)},
+			exprStr:  `not isComponent`,
+			row:      testRow{"isComponent": expr.BoolVal(true)},
 			expected: false,
 		},
 		{
@@ -248,8 +248,8 @@ func TestEval_Operators_Coverage(t *testing.T) {
 		},
 		{
 			name:     "boolean equality",
-			exprStr:  `is_component == is_inline`,
-			row:      testRow{"is_component": expr.BoolVal(true), "is_inline": expr.BoolVal(true)},
+			exprStr:  `isComponent == isInline`,
+			row:      testRow{"isComponent": expr.BoolVal(true), "isInline": expr.BoolVal(true)},
 			expected: true,
 		},
 	}
@@ -410,20 +410,20 @@ func TestParse_IfThenElse(t *testing.T) {
 	}{
 		{
 			name:     "if true then value",
-			exprStr:  `if is_component then depth else 0 end`,
-			row:      testRow{"is_component": expr.BoolVal(true), "depth": expr.IntVal(5)},
+			exprStr:  `if isComponent then depth else 0 end`,
+			row:      testRow{"isComponent": expr.BoolVal(true), "depth": expr.IntVal(5)},
 			expected: expr.IntVal(5),
 		},
 		{
 			name:     "if false else value",
-			exprStr:  `if is_component then depth else 0 end`,
-			row:      testRow{"is_component": expr.BoolVal(false), "depth": expr.IntVal(5)},
+			exprStr:  `if isComponent then depth else 0 end`,
+			row:      testRow{"isComponent": expr.BoolVal(false), "depth": expr.IntVal(5)},
 			expected: expr.IntVal(0),
 		},
 		{
 			name:     "if without else returns null",
-			exprStr:  `if is_component then depth end`,
-			row:      testRow{"is_component": expr.BoolVal(false), "depth": expr.IntVal(5)},
+			exprStr:  `if isComponent then depth end`,
+			row:      testRow{"isComponent": expr.BoolVal(false), "depth": expr.IntVal(5)},
 			expected: expr.NullVal(),
 		},
 		{
@@ -434,8 +434,8 @@ func TestParse_IfThenElse(t *testing.T) {
 		},
 		{
 			name:     "if in boolean context",
-			exprStr:  `if is_component then depth > 3 else depth > 5 end`,
-			row:      testRow{"is_component": expr.BoolVal(true), "depth": expr.IntVal(4)},
+			exprStr:  `if isComponent then depth > 3 else depth > 5 end`,
+			row:      testRow{"isComponent": expr.BoolVal(true), "depth": expr.IntVal(4)},
 			expected: expr.BoolVal(true),
 		},
 	}
@@ -525,22 +525,22 @@ func TestParse_ComplexPrecedence(t *testing.T) {
 	t.Parallel()
 
 	// a and b or c and d — "and" binds tighter, so this is (a and b) or (c and d)
-	e, err := expr.Parse(`depth > 0 and is_component or depth < 0 and is_inline`)
+	e, err := expr.Parse(`depth > 0 and isComponent or depth < 0 and isInline`)
 	require.NoError(t, err)
 
 	// Both "and" groups are false -> false
 	result := e.Eval(testRow{
-		"depth":        expr.IntVal(0),
-		"is_component": expr.BoolVal(true),
-		"is_inline":    expr.BoolVal(true),
+		"depth":       expr.IntVal(0),
+		"isComponent": expr.BoolVal(true),
+		"isInline":    expr.BoolVal(true),
 	})
 	assert.False(t, result.Bool)
 
 	// First "and" group is true -> true
 	result = e.Eval(testRow{
-		"depth":        expr.IntVal(5),
-		"is_component": expr.BoolVal(true),
-		"is_inline":    expr.BoolVal(false),
+		"depth":       expr.IntVal(5),
+		"isComponent": expr.BoolVal(true),
+		"isInline":    expr.BoolVal(false),
 	})
 	assert.True(t, result.Bool)
 }
@@ -600,8 +600,8 @@ func TestEval_Arithmetic(t *testing.T) {
 		{"divide", `depth / 2`, testRow{"depth": expr.IntVal(10)}, expr.IntVal(5)},
 		{"divide by zero", `depth / 0`, testRow{"depth": expr.IntVal(10)}, expr.NullVal()},
 		{"precedence mul before add", `2 + 3 * 4`, testRow{}, expr.IntVal(14)},
-		{"field arithmetic", `in_degree + out_degree`, testRow{"in_degree": expr.IntVal(3), "out_degree": expr.IntVal(5)}, expr.IntVal(8)},
-		{"arithmetic in comparison", `in_degree + out_degree > 5`, testRow{"in_degree": expr.IntVal(3), "out_degree": expr.IntVal(5)}, expr.BoolVal(true)},
+		{"field arithmetic", `inDegree + outDegree`, testRow{"inDegree": expr.IntVal(3), "outDegree": expr.IntVal(5)}, expr.IntVal(8)},
+		{"arithmetic in comparison", `inDegree + outDegree > 5`, testRow{"inDegree": expr.IntVal(3), "outDegree": expr.IntVal(5)}, expr.BoolVal(true)},
 	}
 
 	for _, tt := range tests {

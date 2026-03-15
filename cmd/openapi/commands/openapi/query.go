@@ -26,29 +26,29 @@ Pipeline stages:
                components.responses, components.request-bodies, components.headers,
                components.security-schemes
   Navigation:  parameters, responses, request-body, content-types, headers,
-               schema, operation, security
-  Traversal:   references, referenced-by, descendants, descendants(N), ancestors,
-               ancestors(N), properties, union-members, items, parent, ops, schemas,
-               path(A; B), connected, blast-radius, neighbors(N)
-  Analysis:    orphans, leaves, cycles, clusters, tag-boundary, shared-refs
-  Filter:      select(expr), pick <fields>, sort_by(field; desc), first(N), last(N),
-               sample(N), top(N; field), bottom(N; field), unique,
-               group_by(field), group_by(field; name_field), length
+               to-schema, operation, security
+  Traversal:   refs-out, refs-out(*), refs-in, refs-in(*),
+               properties, properties(*), members, items, origin, to-operations,
+               to-schemas, path(A, B), connected, blast-radius, neighbors(N)
+  Analysis:    orphans, leaves, cycles, clusters, cross-tag, shared-refs
+  Filter:      where(expr), select <fields>, sort-by(field, desc), take(N), last(N),
+               sample(N), highest(N, field), lowest(N, field), unique,
+               group-by(field), group-by(field, name_field), length
   Variables:   let $var = expr
   Functions:   def name: body;  def name($p): body;  include "file.oq";
-  Output:      emit, format(table|json|markdown|toon)
+  Output:      to-yaml, format(table|json|markdown|toon)
   Meta:        explain, fields
 
-Operators: ==, !=, >, <, >=, <=, and, or, not, //, has(),
+Operators: ==, !=, >, <, >=, <=, and, or, not, // (or default), has(),
            matches, contains, startswith, endswith (all infix),
            if-then-else-end, \(interpolation), lower(), upper(), len(), split()
 
-  openapi spec query 'operations | responses | content-types | select(media_type == "text/event-stream") | operation | unique' spec.yaml
-  openapi spec query 'operations | security | group_by(scheme_type; operation)' spec.yaml
-  openapi spec query 'schemas | select(is_component) | sort_by(depth; desc) | first(10) | pick name, depth' spec.yaml
-  openapi spec query 'schemas | select(properties contains "email") | pick name' spec.yaml
-  openapi spec query 'operations | select(name == "createUser") | request-body | content-types | schema | descendants(2) | emit' spec.yaml
-  openapi spec query 'components.security-schemes | pick name, type, scheme' spec.yaml
+  openapi spec query 'operations | responses | content-types | where(mediaType == "text/event-stream") | operation | unique' spec.yaml
+  openapi spec query 'operations | security | group-by(schemeType, operation)' spec.yaml
+  openapi spec query 'schemas | where(isComponent) | sort-by(depth, desc) | take(10) | select name, depth' spec.yaml
+  openapi spec query 'schemas | where(properties contains "email") | select name' spec.yaml
+  openapi spec query 'operations | where(name == "createUser") | request-body | content-types | to-schema | refs-out(2) | to-yaml' spec.yaml
+  openapi spec query 'components.security-schemes | select name, type, scheme' spec.yaml
   cat spec.yaml | openapi spec query 'schemas | length'
 
 For the full query language reference, run: openapi spec query-reference`,

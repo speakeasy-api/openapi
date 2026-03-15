@@ -575,7 +575,7 @@ func (p *parser) parseAlternative() (Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	for p.peek() == "//" {
+	for p.peek() == "//" || p.peek() == "default" {
 		p.next()
 		right, err := p.parseAddSub()
 		if err != nil {

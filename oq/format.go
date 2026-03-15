@@ -443,25 +443,25 @@ func resolveDefaultFields(rows []Row) []string {
 func defaultFieldsForKind(kind ResultKind) []string {
 	switch kind {
 	case SchemaResult:
-		return []string{"name", "type", "depth", "in_degree", "out_degree"}
+		return []string{"name", "type", "depth", "inDegree", "outDegree"}
 	case OperationResult:
-		return []string{"name", "method", "path", "schema_count"}
+		return []string{"name", "method", "path", "schemaCount"}
 	case GroupRowResult:
 		return []string{"key", "count", "names"}
 	case ParameterResult:
 		return []string{"name", "in", "required", "deprecated", "operation"}
 	case ResponseResult:
-		return []string{"status_code", "description", "content_type_count", "operation"}
+		return []string{"statusCode", "description", "contentTypeCount", "operation"}
 	case RequestBodyResult:
-		return []string{"description", "required", "content_type_count", "operation"}
+		return []string{"description", "required", "contentTypeCount", "operation"}
 	case ContentTypeResult:
-		return []string{"media_type", "has_schema", "status_code", "operation"}
+		return []string{"mediaType", "hasSchema", "statusCode", "operation"}
 	case HeaderResult:
-		return []string{"name", "required", "status_code", "operation"}
+		return []string{"name", "required", "statusCode", "operation"}
 	case SecuritySchemeResult:
 		return []string{"name", "type", "in", "scheme"}
 	case SecurityRequirementResult:
-		return []string{"scheme_name", "scheme_type", "scopes", "operation"}
+		return []string{"schemeName", "schemeType", "scopes", "operation"}
 	default:
 		return []string{"name"}
 	}

@@ -1,8 +1,8 @@
 // Package oq implements a pipeline query language for OpenAPI schema graphs.
 //
-// Queries are written as pipeline expressions with jq-inspired syntax:
+// Queries are written as pipeline expressions:
 //
-//	schemas | select(depth > 5) | sort_by(depth; desc) | first(10) | pick name, depth
+//	schemas | where(depth > 5) | sort-by(depth, desc) | take(10) | select name, depth
 package oq
 
 import (
@@ -40,7 +40,7 @@ type Row struct {
 	From   string // source node name (the node that contains the reference)
 	Target string // target/seed node name (the node traversal originated from)
 
-	// BFS depth (populated by depth-limited traversals: descendants(N), ancestors(N))
+	// BFS depth (populated by depth-limited traversals: refs-out(N), refs-in(N))
 	BFSDepth int
 
 	// Group annotations (populated by group-by stages)
@@ -138,21 +138,18 @@ const (
 	StageUnique
 	StageGroupBy
 	StageCount
-	StageReferences
-	StageReferencedBy
-	StageDescendants
-	StageAncestors
+	StageRefsOut
+	StageRefsIn
 	StageProperties
-	StageUnionMembers
 	StageItems
-	StageOps
-	StageSchemas
+	StageToOperations
+	StageToSchemas
 	StageExplain
 	StageFields
 	StageSample
 	StagePath
-	StageTop
-	StageBottom
+	StageHighest
+	StageLowest
 	StageFormat
 	StageConnected
 	StageBlastRadius
@@ -161,21 +158,21 @@ const (
 	StageLeaves
 	StageCycles
 	StageClusters
-	StageTagBoundary
+	StageCrossTag
 	StageSharedRefs
 	StageLast
 	StageLet
-	StageParent
-	StageEmit
+	StageOrigin
+	StageToYAML
 	StageParameters
 	StageResponses
 	StageRequestBody
 	StageContentTypes
 	StageHeaders
-	StageSchema    // singular: extract schema from nav row
+	StageToSchema  // singular: extract schema from nav row
 	StageOperation // back-navigate to source operation
 	StageSecurity  // operation security requirements
-	StageMembers   // expand group rows into member schema rows
+	StageMembers   // union members (allOf/oneOf/anyOf children) or group row expansion
 )
 
 // Stage represents a single stage in the query pipeline.
@@ -186,7 +183,7 @@ type Stage struct {
 	Fields    []string // for StageSelect, StageGroupBy
 	SortField string   // for StageSort
 	SortDesc  bool     // for StageSort
-	Limit     int      // for StageTake, StageLast, StageSample, StageTop, StageBottom
+	Limit     int      // for StageTake, StageLast, StageSample, StageHighest, StageLowest
 	PathFrom  string   // for StagePath
 	PathTo    string   // for StagePath
 	Format    string   // for StageFormat

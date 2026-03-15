@@ -19,9 +19,9 @@ constructs that users need to query.
 1. **Two sources, many stages.** `operations` and `schemas` are the only pipeline
    entry points. Everything else is reached by navigation stages.
 2. **Navigation over filtering.** `schemas.components` and `schemas.inline` are
-   removed. Use `select(is_component)` / `select(is_inline)` instead.
+   removed. Use `select(isComponent)` / `select(isInline)` instead.
 3. **Context propagation.** Navigation stages propagate parent context as fields
-   on child rows. A content-type row carries `status_code` from its response and
+   on child rows. A content-type row carries `statusCode` from its response and
    `op_idx` from its operation — no special lineage system needed.
 4. **Position disambiguates.** `schemas` as the first token = source (all schemas).
    `operations | schemas` = navigation stage. Same word, different meaning based
@@ -31,8 +31,8 @@ constructs that users need to query.
 
 | Change | Before | After |
 |--------|--------|-------|
-| `schemas.components` | Component schemas | Removed — use `schemas \| select(is_component)` |
-| `schemas.inline` | Inline schemas | Removed — use `schemas \| select(is_inline)` |
+| `schemas.components` | Component schemas | Removed — use `schemas \| select(isComponent)` |
+| `schemas.inline` | Inline schemas | Removed — use `schemas \| select(isInline)` |
 
 Note: `schemas` source continues to return **all** schemas (components + inline).
 This preserves the ability to query the full schema set. The sub-sources are
@@ -53,9 +53,9 @@ Produced by: `operations | parameters`
 | `description` | string | Parameter description |
 | `style` | string | Serialization style |
 | `explode` | bool | Whether to explode |
-| `has_schema` | bool | Whether a schema is defined |
-| `allow_empty_value` | bool | Whether empty values are allowed |
-| `allow_reserved` | bool | Whether reserved chars are allowed |
+| `hasSchema` | bool | Whether a schema is defined |
+| `allowEmptyValue` | bool | Whether empty values are allowed |
+| `allowReserved` | bool | Whether reserved chars are allowed |
 | `operation` | string | Source operation name (inherited) |
 
 ### ResponseRow
@@ -64,12 +64,12 @@ Produced by: `operations | responses`
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status_code` | string | "200", "404", "default", etc. |
+| `statusCode` | string | "200", "404", "default", etc. |
 | `description` | string | Response description |
-| `content_type_count` | int | Number of media types |
-| `header_count` | int | Number of headers |
-| `link_count` | int | Number of links |
-| `has_content` | bool | Whether content is defined |
+| `contentTypeCount` | int | Number of media types |
+| `headerCount` | int | Number of headers |
+| `linkCount` | int | Number of links |
+| `hasContent` | bool | Whether content is defined |
 | `operation` | string | Source operation name (inherited) |
 
 ### RequestBodyRow
@@ -80,7 +80,7 @@ Produced by: `operations | request-body`
 |-------|------|-------------|
 | `description` | string | Request body description |
 | `required` | bool | Whether required |
-| `content_type_count` | int | Number of media types |
+| `contentTypeCount` | int | Number of media types |
 | `operation` | string | Source operation name (inherited) |
 
 ### ContentTypeRow
@@ -89,11 +89,11 @@ Produced by: `responses | content-types` or `request-body | content-types`
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `media_type` | string | "application/json", "text/event-stream", etc. |
-| `has_schema` | bool | Whether a schema is defined |
-| `has_encoding` | bool | Whether encoding is defined |
-| `has_example` | bool | Whether examples are defined |
-| `status_code` | string | Response status code (propagated from parent response, empty for request body) |
+| `mediaType` | string | "application/json", "text/event-stream", etc. |
+| `hasSchema` | bool | Whether a schema is defined |
+| `hasEncoding` | bool | Whether encoding is defined |
+| `hasExample` | bool | Whether examples are defined |
+| `statusCode` | string | Response status code (propagated from parent response, empty for request body) |
 | `operation` | string | Source operation name (inherited) |
 
 ### HeaderRow
@@ -106,8 +106,8 @@ Produced by: `responses | headers`
 | `description` | string | Header description |
 | `required` | bool | Whether required |
 | `deprecated` | bool | Whether deprecated |
-| `has_schema` | bool | Whether a schema is defined |
-| `status_code` | string | Response status code (propagated from parent response) |
+| `hasSchema` | bool | Whether a schema is defined |
+| `statusCode` | string | Response status code (propagated from parent response) |
 | `operation` | string | Source operation name (inherited) |
 
 ## Navigation Map
@@ -149,10 +149,10 @@ Every non-schema row carries the index of the operation it originated from.
 
 ```bash
 # Operations serving SSE responses
-operations | responses | content-types | select(media_type == "text/event-stream") | operation | unique
+operations | responses | content-types | select(mediaType == "text/event-stream") | operation | unique
 
 # All content types used across the API
-operations | responses | content-types | pick media_type | unique | sort_by(media_type)
+operations | responses | content-types | pick mediaType | unique | sort_by(mediaType)
 
 # Operations with deprecated parameters
 operations | parameters | select(deprecated) | operation | unique
@@ -161,19 +161,19 @@ operations | parameters | select(deprecated) | operation | unique
 operations | parameters | select(in == "cookie") | pick name, in, operation
 
 # Responses without content bodies
-operations | responses | select(not has_content) | pick status_code, description, operation
+operations | responses | select(not hasContent) | pick statusCode, description, operation
 
 # Schema for a specific content type
-operations | select(name == "createUser") | request-body | content-types | select(media_type == "application/json") | schema
+operations | select(name == "createUser") | request-body | content-types | select(mediaType == "application/json") | schema
 
 # Headers on error responses
-operations | responses | select(status_code matches "^[45]") | headers | pick name, required
+operations | responses | select(statusCode matches "^[45]") | headers | pick name, required
 
 # Operations that accept multipart uploads
-operations | request-body | content-types | select(media_type matches "multipart/") | operation | unique
+operations | request-body | content-types | select(mediaType matches "multipart/") | operation | unique
 
 # Content-types on 200 responses only
-operations | responses | content-types | select(status_code == "200") | pick media_type, operation
+operations | responses | content-types | select(statusCode == "200") | pick mediaType, operation
 ```
 
 ## Emit Attribution Fix
@@ -270,7 +270,7 @@ public `SchemaByPtr(*oas3.JSONSchemaReferenceable) (NodeID, bool)` method to
 
 - `schemas.components` source
 - `schemas.inline` source
-- Tests for removed sources (update to use `schemas | select(is_component)` etc.)
+- Tests for removed sources (update to use `schemas | select(isComponent)` etc.)
 
 ## What Does NOT Change
 
@@ -287,6 +287,6 @@ public `SchemaByPtr(*oas3.JSONSchemaReferenceable) (NodeID, bool)` method to
 - **Reverse navigation** (`usages` stage): schema → content-types/parameters that
   reference it. Requires graph changes to store usage context during construction.
 - **Webhooks source**: OAS 3.1 webhooks as a third entry point or merged into
-  operations with an `is_webhook` field.
+  operations with an `isWebhook` field.
 - **Security schemes**: queryable security requirements on operations.
 - **Links**: response link objects as a navigable construct.
