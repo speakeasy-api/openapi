@@ -598,7 +598,6 @@ func resolveToOwner(idx int, g *graph.SchemaGraph) (int, *graph.Edge) {
 	}
 }
 
-
 func traverseProperties(row Row, g *graph.SchemaGraph) []Row {
 	if row.Kind != SchemaResult {
 		return nil
@@ -929,7 +928,6 @@ func execBlastRadius(result *Result, g *graph.SchemaGraph) (*Result, error) {
 
 	return out, nil
 }
-
 
 func execOrphans(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	out := deriveResult(result)

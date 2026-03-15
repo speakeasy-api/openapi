@@ -257,7 +257,6 @@ func parseStage(s string) (Stage, error) {
 		}
 		return Stage{Kind: StageSample, Limit: n}, nil
 
-
 	case "path":
 		if isCall {
 			parts := splitCommaArgs(args)

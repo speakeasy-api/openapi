@@ -241,5 +241,3 @@ func TestBuild_StronglyConnectedComponents_Success(t *testing.T) {
 	// Petstore shouldn't have cycles, so SCCs should be empty (no multi-node components)
 	assert.Empty(t, sccs, "petstore should have no strongly connected components")
 }
-
-
