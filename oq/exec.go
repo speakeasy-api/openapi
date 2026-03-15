@@ -1587,9 +1587,9 @@ func execSample(stage Stage, result *Result) (*Result, error) {
 		return result, nil
 	}
 
-	// Deterministic shuffle using Fisher-Yates with a fixed seed derived from row count.
+	// Random shuffle using Fisher-Yates.
 	rows := append([]Row{}, result.Rows...)
-	rng := rand.New(rand.NewPCG(uint64(len(rows)), 0)) //nolint:gosec // deterministic seed is intentional
+	rng := rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())) //nolint:gosec // non-crypto random is fine
 	rng.Shuffle(len(rows), func(i, j int) {
 		rows[i], rows[j] = rows[j], rows[i]
 	})
