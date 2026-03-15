@@ -647,6 +647,7 @@ func collectUnionProperties(idx int, _ string, g *graph.SchemaGraph, seen map[st
 
 // execPropertiesFixpoint recursively expands properties until no new rows appear.
 // Each call to traverseProperties handles $ref, allOf, and oneOf/anyOf uniformly.
+// Array schemas are followed through items edges to reach element properties.
 func execPropertiesFixpoint(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	out := deriveResult(result)
 	seen := make(map[int]bool)
@@ -655,7 +656,20 @@ func execPropertiesFixpoint(result *Result, g *graph.SchemaGraph) (*Result, erro
 	for depth := 1; len(current) > 0; depth++ {
 		var nextLevel []Row
 		for _, row := range current {
-			for _, prop := range traverseProperties(row, g) {
+			props := traverseProperties(row, g)
+			if len(props) == 0 {
+				// No properties — try following items edges for arrays.
+				// This lets properties(*) traverse into array element schemas.
+				for _, itemRow := range traverseItems(row, g) {
+					itemProps := traverseProperties(itemRow, g)
+					elemName := schemaName(itemRow.SchemaIdx, g)
+					for i := range itemProps {
+						itemProps[i].From = elemName
+					}
+					props = append(props, itemProps...)
+				}
+			}
+			for _, prop := range props {
 				if !seen[prop.SchemaIdx] {
 					seen[prop.SchemaIdx] = true
 					prop.BFSDepth = depth
