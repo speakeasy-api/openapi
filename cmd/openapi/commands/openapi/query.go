@@ -14,9 +14,8 @@ import (
 )
 
 var queryCmd = &cobra.Command{
-	Use:     "query <query> [input-file]",
-	Aliases: []string{"oq"},
-	Short:   "Query an OpenAPI specification using the oq pipeline language",
+	Use:   "query <query> [input-file]",
+	Short: "Query an OpenAPI specification using the oq pipeline language",
 	Long: `Query an OpenAPI specification using the oq pipeline language to answer
 structural and semantic questions about schemas, operations, parameters,
 responses, content types, and headers.`,
