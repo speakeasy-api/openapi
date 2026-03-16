@@ -19,7 +19,7 @@ constructs that users need to query.
 1. **Two sources, many stages.** `operations` and `schemas` are the only pipeline
    entry points. Everything else is reached by navigation stages.
 2. **Navigation over filtering.** `schemas.components` and `schemas.inline` are
-   removed. Use `select(isComponent)` / `select(isInline)` instead.
+   removed. Use `where(isComponent)` / `where(isInline)` instead.
 3. **Context propagation.** Navigation stages propagate parent context as fields
    on child rows. A content-type row carries `statusCode` from its response and
    `op_idx` from its operation — no special lineage system needed.
@@ -31,12 +31,12 @@ constructs that users need to query.
 
 | Change | Before | After |
 |--------|--------|-------|
-| `schemas.components` | Component schemas | Removed — use `schemas \| select(isComponent)` |
-| `schemas.inline` | Inline schemas | Removed — use `schemas \| select(isInline)` |
+| `schemas.components` | Component schemas | Removed — use `schemas \| where(isComponent)` |
+| `schemas.inline` | Inline schemas | Removed — use `schemas \| where(isInline)` |
 
 Note: `schemas` source continues to return **all** schemas (components + inline).
 This preserves the ability to query the full schema set. The sub-sources are
-removed because they're just `select()` predicates.
+removed because they're just `where()` predicates.
 
 ## New Row Types
 
@@ -121,8 +121,8 @@ operations ──┬── parameters ────── schema
              ├── request-body ── content-types ── schema
              └── schemas ──────── (existing graph traversal)
 
-schemas ─────┬── refs-out, refs-in, reachable, ancestors
-             ├── properties, union-members, items
+schemas ─────┬── refs(out), refs(in), reachable, ancestors
+             ├── properties, members, items
              ├── ops
              └── (all existing schema traversal stages)
 ```
@@ -133,7 +133,7 @@ Every non-schema row carries the index of the operation it originated from.
 
 - `operation` stage: from any row type with an OpIdx → yields the OperationResult
 - Works on: parameters, responses, request-body, content-types, headers
-- Enables: `operations | responses | content-types | select(...) | operation | unique`
+- Enables: `operations | responses | content-types | where(...) | operation | unique`
 
 ### Schema Resolution
 
@@ -149,31 +149,31 @@ Every non-schema row carries the index of the operation it originated from.
 
 ```bash
 # Operations serving SSE responses
-operations | responses | content-types | select(mediaType == "text/event-stream") | operation | unique
+operations | responses | content-types | where(mediaType == "text/event-stream") | operation | unique
 
 # All content types used across the API
-operations | responses | content-types | pick mediaType | unique | sort_by(mediaType)
+operations | responses | content-types | select mediaType | unique | sort-by(mediaType)
 
 # Operations with deprecated parameters
-operations | parameters | select(deprecated) | operation | unique
+operations | parameters | where(deprecated) | operation | unique
 
 # Cookie parameters (potential security review)
-operations | parameters | select(in == "cookie") | pick name, in, operation
+operations | parameters | where(in == "cookie") | select name, in, operation
 
 # Responses without content bodies
-operations | responses | select(not hasContent) | pick statusCode, description, operation
+operations | responses | where(not hasContent) | select statusCode, description, operation
 
 # Schema for a specific content type
-operations | select(name == "createUser") | request-body | content-types | select(mediaType == "application/json") | schema
+operations | where(name == "createUser") | request-body | content-types | where(mediaType == "application/json") | to-schema
 
 # Headers on error responses
-operations | responses | select(statusCode matches "^[45]") | headers | pick name, required
+operations | responses | where(statusCode matches "^[45]") | headers | select name, required
 
 # Operations that accept multipart uploads
-operations | request-body | content-types | select(mediaType matches "multipart/") | operation | unique
+operations | request-body | content-types | where(mediaType matches "multipart/") | operation | unique
 
 # Content-types on 200 responses only
-operations | responses | content-types | select(statusCode == "200") | pick mediaType, operation
+operations | responses | content-types | where(statusCode == "200") | select mediaType, operation
 ```
 
 ## Emit Attribution Fix
@@ -270,7 +270,7 @@ public `SchemaByPtr(*oas3.JSONSchemaReferenceable) (NodeID, bool)` method to
 
 - `schemas.components` source
 - `schemas.inline` source
-- Tests for removed sources (update to use `schemas | select(isComponent)` etc.)
+- Tests for removed sources (update to use `schemas | where(isComponent)` etc.)
 
 ## What Does NOT Change
 

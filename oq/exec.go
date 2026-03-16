@@ -219,6 +219,8 @@ func execStage(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, erro
 		return execTagBoundary(result, g)
 	case StageSharedRefs:
 		return execSharedRefs(stage, result, g)
+	case StageDuplicates:
+		return execDuplicates(result, g)
 	case StageOrigin:
 		return execOrigin(result, g)
 	case StageToYAML:
@@ -337,7 +339,7 @@ func execUnique(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	for _, row := range result.Rows {
 		var key string
 		if len(result.Fields) > 0 {
-			// When pick is active, deduplicate by projected field values
+			// When select is active, deduplicate by projected field values
 			var sb strings.Builder
 			for i, f := range result.Fields {
 				if i > 0 {
@@ -420,8 +422,8 @@ func execTraversal(result *Result, g *graph.SchemaGraph, fn traversalFunc) (*Res
 	for _, row := range result.Rows {
 		seedName := schemaName(row.SchemaIdx, g)
 		for _, newRow := range fn(row, g) {
-			if newRow.Target == "" {
-				newRow.Target = seedName
+			if newRow.Seed == "" {
+				newRow.Seed = seedName
 			}
 			key := edgeRowKey(newRow)
 			if !seen[key] {
@@ -435,10 +437,10 @@ func execTraversal(result *Result, g *graph.SchemaGraph, fn traversalFunc) (*Res
 
 func edgeRowKey(row Row) string {
 	base := rowKey(row)
-	if row.Via == "" {
+	if row.EdgeKind == "" {
 		return base
 	}
-	return base + "|" + row.From + "|" + row.Via + "|" + row.Key
+	return base + "|" + row.Traversal + "|" + row.EdgeKind + "|" + row.EdgeLabel
 }
 
 // traverseOutEdges returns outgoing edge rows, optionally filtered by edge kind.
@@ -456,9 +458,9 @@ func traverseOutEdges(row Row, g *graph.SchemaGraph, kinds ...graph.EdgeKind) []
 		result = append(result, Row{
 			Kind:      SchemaResult,
 			SchemaIdx: int(edge.To),
-			Via:       edgeKindString(edge.Kind),
-			Key:       edge.Label,
-			From:      fromName,
+			EdgeKind:  edgeKindString(edge.Kind),
+			EdgeLabel: edge.Label,
+			Traversal: fromName,
 		})
 	}
 	return result
@@ -477,7 +479,7 @@ func edgeKindMatch(k graph.EdgeKind, kinds []graph.EdgeKind) bool {
 // It replaces refs-out, refs-in, and neighbors with a single BFS that:
 //   - Supports direction modes: "out", "in", "" (bidi)
 //   - Supports depth limits: 1-hop, N-hop, or unbounded (*)
-//   - Always preserves edge metadata (via, key, from, bfsDepth)
+//   - Always preserves edge metadata (via, traversal, hops)
 //   - In bidi mode, annotates each hop with Direction ("→" or "←")
 func execRefs(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error) {
 	dir := stage.RefsDir
@@ -501,9 +503,9 @@ func execRefs(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error
 		type entry struct {
 			id        graph.NodeID
 			depth     int
-			via       string
-			key       string
-			from      string
+			edgeKind  string
+			edgeLabel string
+			traversal string
 			direction string // "→" or "←"
 		}
 
@@ -520,11 +522,11 @@ func execRefs(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error
 				r := Row{
 					Kind:      SchemaResult,
 					SchemaIdx: int(cur.id),
-					BFSDepth:  cur.depth,
-					Target:    seedName,
-					Via:       cur.via,
-					Key:       cur.key,
-					From:      cur.from,
+					Hops:      cur.depth,
+					Seed:      seedName,
+					EdgeKind:  cur.edgeKind,
+					EdgeLabel: cur.edgeLabel,
+					Traversal: cur.traversal,
 				}
 				if isBidi {
 					r.Direction = cur.direction
@@ -544,9 +546,9 @@ func execRefs(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error
 						queue = append(queue, entry{
 							id:        edge.To,
 							depth:     cur.depth + 1,
-							via:       edgeKindString(edge.Kind),
-							key:       edge.Label,
-							from:      schemaName(int(cur.id), g),
+							edgeKind:  edgeKindString(edge.Kind),
+							edgeLabel: edge.Label,
+							traversal: schemaName(int(cur.id), g),
 							direction: "→",
 						})
 					}
@@ -569,9 +571,9 @@ func execRefs(stage Stage, result *Result, g *graph.SchemaGraph) (*Result, error
 						queue = append(queue, entry{
 							id:        resolvedID,
 							depth:     cur.depth + 1,
-							via:       via,
-							key:       key,
-							from:      schemaName(resolvedIdx, g),
+							edgeKind:  via,
+							edgeLabel: key,
+							traversal: schemaName(resolvedIdx, g),
 							direction: "←",
 						})
 					}
@@ -644,9 +646,9 @@ func collectPropertiesDirect(idx int, fromName string, g *graph.SchemaGraph, see
 				*result = append(*result, Row{
 					Kind:      SchemaResult,
 					SchemaIdx: int(edge.To),
-					Via:       edgeKindString(edge.Kind),
-					Key:       edge.Label,
-					From:      fromName,
+					EdgeKind:  edgeKindString(edge.Kind),
+					EdgeLabel: edge.Label,
+					Traversal: fromName,
 				})
 			}
 		}
@@ -712,7 +714,7 @@ func execPropertiesFixpoint(result *Result, g *graph.SchemaGraph) (*Result, erro
 			for _, prop := range props {
 				if !seen[prop.SchemaIdx] {
 					seen[prop.SchemaIdx] = true
-					prop.BFSDepth = depth
+					prop.Hops = depth
 					nextLevel = append(nextLevel, prop)
 				}
 			}
@@ -739,9 +741,9 @@ func traverseUnionMembers(row Row, g *graph.SchemaGraph) []Row {
 			result = append(result, Row{
 				Kind:      SchemaResult,
 				SchemaIdx: target,
-				Via:       edgeKindString(edge.Kind),
-				Key:       edge.Label,
-				From:      fromName,
+				EdgeKind:  edgeKindString(edge.Kind),
+				EdgeLabel: edge.Label,
+				Traversal: fromName,
 			})
 		}
 	}
@@ -774,9 +776,9 @@ func traverseItems(row Row, g *graph.SchemaGraph) []Row {
 				result = append(result, Row{
 					Kind:      SchemaResult,
 					SchemaIdx: int(innerEdge.To),
-					Via:       edgeKindString(innerEdge.Kind),
-					Key:       innerEdge.Label,
-					From:      fromName,
+					EdgeKind:  edgeKindString(innerEdge.Kind),
+					EdgeLabel: innerEdge.Label,
+					Traversal: fromName,
 				})
 			}
 			// Property named "items" that is an array — follow its EdgeItems
@@ -787,9 +789,9 @@ func traverseItems(row Row, g *graph.SchemaGraph) []Row {
 						result = append(result, Row{
 							Kind:      SchemaResult,
 							SchemaIdx: resolveRefTarget(int(itemEdge.To), g),
-							Via:       edgeKindString(itemEdge.Kind),
-							Key:       "items",
-							From:      fromName,
+							EdgeKind:  edgeKindString(itemEdge.Kind),
+							EdgeLabel: "items",
+							Traversal: fromName,
 						})
 					}
 				}
@@ -1189,6 +1191,42 @@ func execSharedRefs(stage Stage, result *Result, g *graph.SchemaGraph) (*Result,
 	return out, nil
 }
 
+// execDuplicates filters schema rows to only those sharing a content hash with
+// at least one other schema in the input set. This makes it easy to find and
+// inspect duplicate inline schemas without the group-by/members dance.
+func execDuplicates(result *Result, g *graph.SchemaGraph) (*Result, error) {
+	// Count occurrences of each hash
+	hashCounts := make(map[string]int)
+	for _, row := range result.Rows {
+		if row.Kind != SchemaResult {
+			continue
+		}
+		if row.SchemaIdx < 0 || row.SchemaIdx >= len(g.Schemas) {
+			continue
+		}
+		h := g.Schemas[row.SchemaIdx].Hash
+		if h != "" {
+			hashCounts[h]++
+		}
+	}
+
+	// Keep only rows whose hash appears more than once
+	out := deriveResult(result)
+	for _, row := range result.Rows {
+		if row.Kind != SchemaResult {
+			continue
+		}
+		if row.SchemaIdx < 0 || row.SchemaIdx >= len(g.Schemas) {
+			continue
+		}
+		h := g.Schemas[row.SchemaIdx].Hash
+		if h != "" && hashCounts[h] > 1 {
+			out.Rows = append(out.Rows, row)
+		}
+	}
+	return out, nil
+}
+
 // --- Edge annotation helpers ---
 
 func schemaName(idx int, g *graph.SchemaGraph) string {
@@ -1338,6 +1376,8 @@ func describeStage(stage Stage) string {
 			return "Analyze: schemas shared by at least " + strconv.Itoa(stage.Limit) + " operations"
 		}
 		return "Analyze: schemas shared by all operations in result"
+	case StageDuplicates:
+		return "Filter: schemas sharing the same content hash (duplicates)"
 	case StageOrigin:
 		return "Traverse: structural parent schema (walk up JSON pointer)"
 	case StageToYAML:
@@ -1425,10 +1465,11 @@ func execFields(result *Result) (*Result, error) {
 			{"opCount", "int"},
 			{"tagCount", "int"},
 			{"via", "string"},
-			{"key", "string"},
-			{"from", "string"},
+			{"edge", "string"},
+			{"traversal", "string"},
+			{"schema", "string"},
 			{"seed", "string"},
-			{"bfsDepth", "int"},
+			{"hops", "int"},
 			{"direction", "string"},
 			{"isRequired", "bool"},
 			// Schema content
@@ -1481,8 +1522,8 @@ func execFields(result *Result) (*Result, error) {
 			{"callbackName", "string"},
 			{"callbackCount", "int"},
 			{"via", "string"},
-			{"key", "string"},
-			{"from", "string"},
+			{"edge", "string"},
+			{"traversal", "string"},
 		}
 	case ParameterResult:
 		fields = []struct{ name, typ string }{
@@ -1538,7 +1579,7 @@ func execFields(result *Result) (*Result, error) {
 	case SecuritySchemeResult:
 		fields = []struct{ name, typ string }{
 			{"name", "string"},
-			{"schemeType", "string"},
+			{"type", "string"},
 			{"in", "string"},
 			{"scheme", "string"},
 			{"bearerFormat", "string"},
@@ -1593,9 +1634,9 @@ func execFields(result *Result) (*Result, error) {
 // --- Origin ---
 
 // execOrigin navigates back to the source schema of 1-hop edge annotations.
-// After properties, union-members, items, refs-out, or refs-in, each row has
-// a From field naming the source node. This stage looks up those source schemas
-// by name, replacing the result set with the origin schemas.
+// After properties, members, items, or refs traversals, each row has
+// a Traversal field naming the source node. This stage looks up those source
+// schemas by name, replacing the result set with the origin schemas.
 func execOrigin(result *Result, g *graph.SchemaGraph) (*Result, error) {
 	out := deriveResult(result)
 	seen := make(map[int]bool)
@@ -1656,11 +1697,11 @@ func execPath(stage Stage, g *graph.SchemaGraph) (*Result, error) {
 	for i, hop := range hops {
 		row := Row{Kind: SchemaResult, SchemaIdx: int(hop.Node)}
 		if i > 0 {
-			row.From = schemaName(int(hops[i-1].Node), g)
-			row.BFSDepth = i
+			row.Traversal = schemaName(int(hops[i-1].Node), g)
+			row.Hops = i
 			if hop.Edge != nil {
-				row.Via = edgeKindString(hop.Edge.Kind)
-				row.Key = hop.Edge.Label
+				row.EdgeKind = edgeKindString(hop.Edge.Kind)
+				row.EdgeLabel = hop.Edge.Label
 			}
 			if hop.Forward {
 				row.Direction = "→"

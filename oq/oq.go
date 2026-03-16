@@ -38,14 +38,14 @@ type Row struct {
 	OpIdx     int // index into SchemaGraph.Operations
 
 	// Edge annotations (populated by traversal stages)
-	Via       string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
-	Key       string // edge key: property name, array index, etc.
-	From      string // source node name (the node that contains the reference)
-	Target    string // target/seed node name (the node traversal originated from)
+	EdgeKind  string // edge type: "property", "items", "allOf", "oneOf", "ref", etc.
+	EdgeLabel string // edge label: property name, array index, etc.
+	Traversal string // qualified traversal path from seed (e.g. "User/allOf/BaseModel")
+	Seed      string // seed schema name (the schema that initiated the traversal)
 	Direction string // "→" (outgoing) or "←" (incoming) — set by bidi traversals
 
-	// BFS depth (populated by depth-limited traversals)
-	BFSDepth int
+	// Traversal depth (populated by depth-limited traversals)
+	Hops int
 
 	// Group annotations (populated by group-by stages)
 	GroupKey   string   // group key value
@@ -185,6 +185,7 @@ const (
 	StageLinks                // response links
 	StageAdditionalProperties // schema additional properties traversal
 	StagePatternProperties    // schema pattern properties traversal
+	StageDuplicates           // schemas sharing the same content hash
 )
 
 // Stage represents a single stage in the query pipeline.

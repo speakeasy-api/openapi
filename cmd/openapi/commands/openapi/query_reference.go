@@ -57,7 +57,7 @@ in the schema reference graph.
   refs(out, N)        Outgoing, depth-limited to N hops
   properties          Expand to property sub-schemas (flattens allOf; with edge annotations)
   properties(*)       Recursive properties (follows $refs, flattens allOf,
-                      expands oneOf/anyOf with qualified from paths)
+                      expands oneOf/anyOf with qualified traversal paths)
   members             Expand allOf/oneOf/anyOf children, or group rows into schemas
   items               Expand to array items schema (checks allOf; with edge annotations)
   additional-properties  Expand to additionalProperties schema
@@ -94,6 +94,7 @@ ANALYSIS STAGES
   cross-tag          Component schemas used by operations across multiple tags
   shared-refs        Schemas shared by ALL operations in result set
   shared-refs(N)     Schemas shared by at least N operations
+  duplicates         Schemas sharing the same content hash (at least 2 copies)
 
 FILTER & TRANSFORM STAGES
 --------------------------
@@ -231,10 +232,12 @@ members, items, path). Use 'parent' to navigate back to the source schema.
   Field             Type     Description
   ─────             ────     ───────────
   via               string   Structural edge kind: property, items, allOf, oneOf, ref, ...
-  key               string   Structural edge label: property name, array index, etc.
-  from              string   Source schema name (the schema containing the relationship)
+  edge              string   Structural edge label: property name, array index, pattern, etc.
+  traversal         string   Qualified traversal path from seed (e.g. "User/allOf/BaseModel")
+  schema            string   Clean immediate parent schema name (last segment of traversal path)
   seed              string   Seed schema name (the schema that initiated the traversal)
-  bfsDepth         int      BFS depth from seed
+  hops             int      BFS distance from seed
+  isRequired       bool     Whether the property is in the parent schema's required array
   direction        string   → (outgoing) or ← (incoming) — set by bidi traversals (refs, path)
 
 PARAMETER FIELDS
@@ -312,7 +315,7 @@ Available from components | where(kind == "security-scheme").
   Field               Type     Description
   ─────               ────     ───────────
   name                string   Security scheme name (component key)
-  schemeType          string   Scheme type: apiKey, http, oauth2, openIdConnect, mutualTLS
+  type                string   Scheme type: apiKey, http, oauth2, openIdConnect, mutualTLS (alias: schemeType)
   in                  string   API key location: header, query, cookie (apiKey only)
   scheme              string   HTTP auth scheme: bearer, basic, etc. (http only)
   bearerFormat       string   Bearer token format hint, e.g. JWT (http only)
@@ -429,13 +432,13 @@ EXAMPLES
 Schema analysis:
 
   # Deeply nested component schemas
-  components.schemas | sort-by(depth, desc) | take(10) | select name, depth
+  schemas | where(isComponent) | sort-by(depth, desc) | take(10) | select name, depth
 
   # Most referenced schemas
-  components.schemas | sort-by(inDegree, desc) | take(10) | select name, inDegree
+  schemas | where(isComponent) | sort-by(inDegree, desc) | take(10) | select name, inDegree
 
   # Dead components — defined but never referenced
-  components.schemas | orphans | select name
+  schemas | where(isComponent) | orphans | select name
 
   # Circular references
   schemas | where(isCircular) | select name, location
@@ -444,10 +447,10 @@ Schema analysis:
   schemas | where(name == "Error") | blast-radius | length
 
   # Component schemas within 3 hops
-  schemas | where(name == "User") | refs(out, *) | where(isComponent and bfsDepth <= 3) | select name, bfsDepth
+  schemas | where(name == "User") | refs(out, *) | where(isComponent and hops <= 3) | select name, hops
 
   # Edge annotations — how a schema references others
-  schemas | where(name == "Pet") | refs(out) | select name, via, key, from
+  schemas | where(name == "Pet") | refs(out) | select name, via, edge, traversal
 
   # All transitive dependencies (full closure)
   schemas | where(name == "Pet") | refs(out, *) | where(isComponent) | select name
@@ -456,10 +459,10 @@ Schema analysis:
   schemas | where(properties contains "email") | select name
 
   # Schemas with properties matching a pattern (via traversal)
-  schemas | properties | where(key matches "(?i)date") | parent | unique | select name
+  schemas | properties | where(edge matches "(?i)date") | parent | unique | select name
 
   # Schemas with names starting with "Error"
-  components.schemas | where(name startswith "Error") | select name, type
+  schemas | where(isComponent and name startswith "Error") | select name, type
 
 Operations & navigation:
 
@@ -490,7 +493,7 @@ Operations & navigation:
 Security:
 
   # List all security schemes
-  components.security-schemes | select name, type, scheme
+  components | where(kind == "security-scheme") | select name, type, scheme
 
   # Operations using OAuth2
   operations | security | where(schemeType == "oauth2") | select schemeName, scopes, operation
@@ -501,16 +504,22 @@ Security:
 Content auditing:
 
   # OneOf unions missing discriminator
-  components.schemas | where(unionWidth > 0 and not has(discriminator)) | select name, unionWidth
+  schemas | where(isComponent and unionWidth > 0 and not has(discriminator)) | select name, unionWidth
 
   # Schemas missing descriptions
-  components.schemas | where(not has(description)) | select name, type
+  schemas | where(isComponent and not has(description)) | select name, type
 
   # Operations missing error responses
   operations | where(not hasErrorResponse) | select name, method, path
 
-  # Duplicate inline schemas (same hash)
-  schemas | where(isInline) | group-by(hash) | where(count > 1)
+  # Duplicate inline schemas — find and inspect
+  schemas | where(isInline) | duplicates | select name, type, hash, propertyCount
+
+  # Duplicate inline schemas — group by hash to see counts
+  schemas | where(isInline) | duplicates | group-by(hash)
+
+  # Duplicate inline schemas — inspect shapes via properties
+  schemas | where(isInline) | duplicates | properties | select edge, name, type, traversal | unique
 
 Webhooks, servers, tags, callbacks & links:
 
@@ -534,7 +543,7 @@ Webhooks, servers, tags, callbacks & links:
   schemas | where(has(patternProperties)) | pattern-properties
 
   # Schemas with default values
-  schemas | properties | where(has(default)) | select from, key, default
+  schemas | properties | where(has(default)) | select traversal, edge, default
 
   # Operations with extensions
   operations | where(has(x_speakeasy_name_override)) | select name, x_speakeasy_name_override

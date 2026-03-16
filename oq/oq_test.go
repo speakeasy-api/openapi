@@ -402,20 +402,20 @@ func TestExecute_Path_EdgeAnnotations_Success(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Path from Pet to Address should have edge annotations on intermediate/final nodes
-	result, err := oq.Execute(`schemas | path(Pet, Address) | select name, via, key, from, bfsDepth`, g)
+	result, err := oq.Execute(`schemas | path(Pet, Address) | select name, via, edge, traversal, hops`, g)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(result.Rows), 3, "path should have at least 3 nodes")
 
 	// First node (Pet) has no edge annotation
 	first := result.Rows[0]
 	assert.Empty(t, oq.FieldValuePublic(first, "via", g).Str, "first node should have no via")
-	assert.Equal(t, 0, oq.FieldValuePublic(first, "bfsDepth", g).Int, "first node should have bfsDepth 0")
+	assert.Equal(t, 0, oq.FieldValuePublic(first, "hops", g).Int, "first node should have hops 0")
 
 	// Second node should have edge annotations from Pet
 	second := result.Rows[1]
 	assert.NotEmpty(t, oq.FieldValuePublic(second, "via", g).Str, "second node should have via")
-	assert.Equal(t, "Pet", oq.FieldValuePublic(second, "from", g).Str, "second node should come from Pet")
-	assert.Equal(t, 1, oq.FieldValuePublic(second, "bfsDepth", g).Int, "second node should have bfsDepth 1")
+	assert.Equal(t, "Pet", oq.FieldValuePublic(second, "traversal", g).Str, "second node should come from Pet")
+	assert.Equal(t, 1, oq.FieldValuePublic(second, "hops", g).Int, "second node should have hops 1")
 
 	// Last node (Address) should have edge annotations
 	last := result.Rows[len(result.Rows)-1]
@@ -557,7 +557,7 @@ func TestExecute_EdgeAnnotations_Success(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
 
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs(out) | select name, via, key, from`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "Pet") | refs(out) | select name, via, edge, traversal`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "references from Pet should have results")
 
@@ -565,8 +565,8 @@ func TestExecute_EdgeAnnotations_Success(t *testing.T) {
 	for _, row := range result.Rows {
 		kind := oq.FieldValuePublic(row, "via", g)
 		assert.NotEmpty(t, kind.Str, "via should be set")
-		from := oq.FieldValuePublic(row, "from", g)
-		assert.Equal(t, "Pet", from.Str, "from should be Pet")
+		from := oq.FieldValuePublic(row, "traversal", g)
+		assert.Equal(t, "Pet", from.Str, "traversal should be Pet")
 	}
 }
 
@@ -1040,7 +1040,7 @@ func TestExecute_FieldValue_EdgeCases(t *testing.T) {
 	assert.NotEmpty(t, result.Rows, "should have operation rows")
 
 	// Test edge fields on non-traversal rows (should be empty strings)
-	result, err = oq.Execute("schemas | where(isComponent) | take(1) | select name, via, key, from", g)
+	result, err = oq.Execute("schemas | where(isComponent) | take(1) | select name, via, edge, traversal", g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "should have schema rows")
 	viaVal := oq.FieldValuePublic(result.Rows[0], "via", g)
@@ -1327,7 +1327,7 @@ func TestExecute_CyclicSpec_EdgeAnnotations(t *testing.T) {
 	g := loadCyclicGraph(t)
 
 	// Test references to cover edgeKindString branches
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "NodeA") | refs(out) | select name, via, key`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "NodeA") | refs(out) | select name, via, edge`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows, "NodeA should have outgoing refs")
 
@@ -2437,15 +2437,15 @@ func TestExecute_ReferencedByResolvesWrappers_Success(t *testing.T) {
 	// Via should be the structural edge kind (property, items, etc.), not 'ref'
 	// Key should be the structural label (e.g. 'owner'), not the $ref URI
 	for _, row := range result.Rows {
-		from := oq.FieldValuePublic(row, "from", g)
+		from := oq.FieldValuePublic(row, "traversal", g)
 		name := oq.FieldValuePublic(row, "name", g)
-		assert.Equal(t, name.Str, from.Str, "from should match the resolved node name")
+		assert.Equal(t, name.Str, from.Str, "traversal should match the resolved node name")
 
 		via := oq.FieldValuePublic(row, "via", g)
 		assert.NotEqual(t, "ref", via.Str, "via should be structural (property/items/allOf), not 'ref'")
 
-		key := oq.FieldValuePublic(row, "key", g)
-		assert.NotContains(t, key.Str, "#/components", "key should be structural label, not $ref URI")
+		key := oq.FieldValuePublic(row, "edge", g)
+		assert.NotContains(t, key.Str, "#/components", "edge should be structural label, not $ref URI")
 	}
 }
 
@@ -2794,7 +2794,7 @@ func TestExecute_FieldsIntrospection_Success(t *testing.T) {
 		expect string
 	}{
 		{"operations | fields", "method"},
-		{"schemas | where(isComponent) | fields", "bfsDepth"},
+		{"schemas | where(isComponent) | fields", "hops"},
 		{"schemas | where(isComponent) | fields", "seed"},
 		{"operations | where(operationId == \"listPets\") | parameters | fields", "in"},
 		{"operations | where(operationId == \"listPets\") | responses | fields", "statusCode"},
@@ -3436,7 +3436,7 @@ func TestEdgeKindString_CyclicSpec(t *testing.T) {
 	g := loadCyclicGraph(t)
 
 	// Get refs(out) from ALL schemas (including inline) to capture allOf, anyOf, items edges
-	result, err := oq.Execute(`schemas | refs(out) | select name, via, key`, g)
+	result, err := oq.Execute(`schemas | refs(out) | select name, via, edge`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows)
 
@@ -3997,7 +3997,7 @@ func TestPropertiesStar_Recursive(t *testing.T) {
 	g := loadCyclicGraph(t)
 
 	// properties(*) recursively collects properties through allOf, oneOf, anyOf
-	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "NodeA") | properties(*) | select name, via, from`, g)
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "NodeA") | properties(*) | select name, via, traversal`, g)
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Rows)
 }
@@ -4412,7 +4412,7 @@ func TestExecute_SchemaDefaultField(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Pet.status has default: available
-	result, err := oq.Execute(`schemas | where(name == "Pet") | properties | where(key == "status") | select key, default`, g)
+	result, err := oq.Execute(`schemas | where(name == "Pet") | properties | where(edge == "status") | select edge, default`, g)
 	require.NoError(t, err)
 	require.NotEmpty(t, result.Rows)
 	def := oq.FieldValuePublic(result.Rows[0], "default", g)
@@ -4424,7 +4424,7 @@ func TestExecute_SchemaEnumField(t *testing.T) {
 	g := loadTestGraph(t)
 
 	// Pet.status has enum values
-	result, err := oq.Execute(`schemas | where(name == "Pet") | properties | where(key == "status") | select key, enum, enumCount`, g)
+	result, err := oq.Execute(`schemas | where(name == "Pet") | properties | where(edge == "status") | select edge, enum, enumCount`, g)
 	require.NoError(t, err)
 	require.NotEmpty(t, result.Rows)
 	enumCount := oq.FieldValuePublic(result.Rows[0], "enumCount", g)
@@ -4641,4 +4641,85 @@ func TestExecute_ComponentDefaultField(t *testing.T) {
 		def := oq.FieldValuePublic(result.Rows[0], "default", g)
 		assert.Equal(t, "20", def.Str)
 	}
+}
+
+func TestExecute_SecuritySchemeTypeAlias(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`components | where(kind == "security-scheme")`, g)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Rows)
+
+	row := result.Rows[0]
+
+	// "type" should work as alias for "schemeType"
+	typ := oq.FieldValuePublic(row, "type", g)
+	assert.Equal(t, "http", typ.Str)
+
+	// "schemeType" should still work
+	schemeType := oq.FieldValuePublic(row, "schemeType", g)
+	assert.Equal(t, "http", schemeType.Str)
+
+	// Both should return the same value
+	assert.Equal(t, typ.Str, schemeType.Str)
+}
+
+func TestExecute_Duplicates_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// Get all inline schemas
+	allInline, err := oq.Execute(`schemas | where(isInline)`, g)
+	require.NoError(t, err)
+
+	// Get duplicates
+	result, err := oq.Execute(`schemas | where(isInline) | duplicates`, g)
+	require.NoError(t, err)
+
+	// Duplicates should be a subset of inline schemas
+	assert.LessOrEqual(t, len(result.Rows), len(allInline.Rows))
+
+	// Every row in duplicates should share its hash with at least one other row
+	hashCounts := make(map[string]int)
+	for _, row := range result.Rows {
+		h := oq.FieldValuePublic(row, "hash", g)
+		if h.Str != "" {
+			hashCounts[h.Str]++
+		}
+	}
+	for hash, count := range hashCounts {
+		assert.Greater(t, count, 1, "hash %s should appear more than once in duplicates result", hash)
+	}
+}
+
+func TestExecute_Duplicates_AllSchemas(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// duplicates works on any schema set, not just inline
+	result, err := oq.Execute(`schemas | duplicates`, g)
+	require.NoError(t, err)
+
+	// Verify all returned rows are schema rows
+	for _, row := range result.Rows {
+		assert.Equal(t, oq.SchemaResult, row.Kind)
+	}
+}
+
+func TestExecute_Duplicates_Composable(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	// duplicates should be composable with downstream stages
+	_, err := oq.Execute(`schemas | where(isInline) | duplicates | select name, type, hash`, g)
+	require.NoError(t, err)
+
+	// Should work with properties traversal
+	_, err = oq.Execute(`schemas | where(isInline) | duplicates | properties | select edge, name`, g)
+	require.NoError(t, err)
+
+	// Should work with group-by on the result
+	_, err = oq.Execute(`schemas | where(isInline) | duplicates | group-by(hash)`, g)
+	require.NoError(t, err)
 }

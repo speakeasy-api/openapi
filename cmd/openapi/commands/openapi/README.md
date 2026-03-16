@@ -1218,8 +1218,8 @@ openapi spec query 'operations | where(not hasErrorResponse) | select name, meth
 # Blast radius — what breaks if I change a schema?
 openapi spec query 'schemas | where(name == "Error") | blast-radius | length' ./spec.yaml
 
-# Duplicate inline schemas
-openapi spec query 'schemas | where(not isComponent) | group-by(hash) | where(count > 1)' ./spec.yaml
+# Duplicate inline schemas — find and inspect their shapes
+openapi spec query 'schemas | where(isInline) | duplicates | select name, type, hash, propertyCount' ./spec.yaml
 
 # Navigate to a single schema by name
 openapi spec query 'schemas | where(name == "Pet") | explain' ./spec.yaml
