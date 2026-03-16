@@ -22,18 +22,15 @@ responses, content types, and headers.`,
 	Example: `Queries are pipelines: source | stage | stage | ...
 
 Pipeline stages:
-  Source:      schemas, operations, webhooks, servers, tags,
-               components.schemas, components.parameters,
-               components.responses, components.request-bodies, components.headers,
-               components.security-schemes
+  Source:      schemas, operations, components, webhooks, servers, tags, security
   Navigation:  parameters, responses, request-body, content-types, headers,
                callbacks, links, to-schema, operation, security
-  Traversal:   refs-out, refs-out(*), refs-in, refs-in(*),
+  Traversal:   refs, refs(*), refs(out), refs(out, *), refs(in), refs(in, *),
                properties, properties(*), members, items,
                additional-properties, pattern-properties,
                parent, to-operations, to-schemas,
                path(A, B), neighbors, neighbors(*), blast-radius
-  Analysis:    orphans, leaves, cycles, clusters, cross-tag, shared-refs
+  Analysis:    orphans, leaves, cycles, clusters, cross-tag, shared-refs, duplicates
   Filter:      where(expr), select <fields>, sort-by(field, desc), take(N), last(N),
                sample(N), highest(N, field), lowest(N, field), unique,
                group-by(field), group-by(field, name_field), length
@@ -50,8 +47,8 @@ Operators: ==, !=, >, <, >=, <=, and, or, not, // (or default), has(),
   openapi spec query 'operations | security | group-by(schemeType, operation)' spec.yaml
   openapi spec query 'schemas | where(isComponent) | sort-by(depth, desc) | take(10) | select name, depth' spec.yaml
   openapi spec query 'schemas | where(properties contains "email") | select name' spec.yaml
-  openapi spec query 'operations | where(name == "createUser") | request-body | content-types | to-schema | refs-out(*) | where(isComponent) | to-yaml' spec.yaml
-  openapi spec query 'components.security-schemes | select name, type, scheme' spec.yaml
+  openapi spec query 'operations | where(name == "createUser") | request-body | content-types | to-schema | refs(out, *) | where(isComponent) | to-yaml' spec.yaml
+  openapi spec query 'components | where(kind == "security-scheme") | select name, type, scheme' spec.yaml
   cat spec.yaml | openapi spec query 'schemas | length'
 
 For the full query language reference, run: openapi spec query-reference`,

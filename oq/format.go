@@ -458,16 +458,16 @@ func resolveDefaultFields(rows []Row) []string {
 	// traversal-oriented defaults instead of overview defaults.
 	if firstKind == SchemaResult && hasEdgeAnnotations(rows) {
 		if hasBidiAnnotations(rows) {
-			return []string{"name", "direction", "via", "key", "bfsDepth"}
+			return []string{"name", "direction", "via", "edge", "hops"}
 		}
-		return []string{"from", "key", "type", "bfsDepth"}
+		return []string{"schema", "edge", "type", "hops"}
 	}
 
 	return defaultFieldsForKind(firstKind)
 }
 
 // expandStarFields replaces "*" in a field list with the context-aware defaults.
-// e.g., ["*", "bfsDepth"] → ["name", "type", "depth", "inDegree", "outDegree", "bfsDepth"]
+// e.g., ["*", "hops"] → ["name", "type", "depth", "inDegree", "outDegree", "hops"]
 func expandStarFields(fields []string, rows []Row) []string {
 	hasStar := false
 	for _, f := range fields {
@@ -495,7 +495,7 @@ func expandStarFields(fields []string, rows []Row) []string {
 // hasEdgeAnnotations returns true if any row has populated edge fields.
 func hasEdgeAnnotations(rows []Row) bool {
 	for _, row := range rows {
-		if row.Via != "" || row.From != "" {
+		if row.EdgeKind != "" || row.Traversal != "" {
 			return true
 		}
 	}
@@ -531,7 +531,7 @@ func defaultFieldsForKind(kind ResultKind) []string {
 	case HeaderResult:
 		return []string{"name", "required", "statusCode", "operation"}
 	case SecuritySchemeResult:
-		return []string{"name", "schemeType", "in", "scheme"}
+		return []string{"name", "type", "in", "scheme"}
 	case SecurityRequirementResult:
 		return []string{"schemeName", "schemeType", "scopes", "operation"}
 	case ServerResult:

@@ -401,6 +401,9 @@ func parseStage(s string) (Stage, error) {
 	case "pattern-properties":
 		return Stage{Kind: StagePatternProperties}, nil
 
+	case "duplicates":
+		return Stage{Kind: StageDuplicates}, nil
+
 	default:
 		return Stage{}, fmt.Errorf("unknown stage: %q", keyword)
 	}

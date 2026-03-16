@@ -50,7 +50,7 @@ source | stage | stage | ... | terminal
 | `refs(out)` / `refs(out, *)` | Outgoing refs only: 1-hop or closure |
 | `refs(in)` / `refs(in, *)` | Incoming refs only: 1-hop or closure |
 | `refs(N)` / `refs(out, N)` | Depth-limited to N hops |
-| `properties` / `properties(*)` | Property sub-schemas (allOf-flattening). `properties(*)` recursively expands through `$ref`, `oneOf`, `anyOf` with qualified `from` paths |
+| `properties` / `properties(*)` | Property sub-schemas (allOf-flattening). `properties(*)` recursively expands through `$ref`, `oneOf`, `anyOf` with qualified `traversal` paths |
 | `members` | allOf/oneOf/anyOf children, or expand group rows into schemas |
 | `items` | Array items schema (with edge annotations) |
 | `additional-properties` | Expand to additionalProperties schema |
@@ -88,6 +88,7 @@ Navigate into the internal structure of operations. These stages produce new row
 | `clusters` | Weakly connected component grouping |
 | `cross-tag` | Schemas used by operations across multiple tags |
 | `shared-refs` | Schemas shared by ALL operations in result set |
+| `duplicates` | Schemas sharing the same content hash (at least 2 copies) |
 
 ### Filter & Transform Stages
 
@@ -183,10 +184,12 @@ Available on rows produced by traversal stages (`refs`, `properties`, `members`,
 | Field | Type | Description |
 |-------|------|-------------|
 | `via` | string | Structural edge kind: property, items, allOf, oneOf, ref, ... |
-| `key` | string | Structural edge label: property name, array index, etc. |
-| `from` | string | Source schema name (the schema containing the relationship) |
+| `edge` | string | Structural edge label: property name, array index, pattern, etc. |
+| `traversal` | string | Qualified traversal path from seed (e.g. "User/allOf/BaseModel") |
+| `schema` | string | Clean immediate parent schema name (last segment of traversal path) |
 | `seed` | string | Seed schema name (the schema that initiated the traversal) |
-| `bfsDepth` | int | BFS depth from seed |
+| `hops` | int | BFS distance from seed |
+| `isRequired` | bool | Whether the property is in the parent schema's required array |
 | `direction` | string | `→` (outgoing) or `←` (incoming) — set by bidi traversals (`refs`, `path`) |
 
 ### Parameter Fields
@@ -378,13 +381,13 @@ schemas | where(name matches "Error.*") | select name, path
 schemas | group-by(type)
 
 # Edge annotations — how does Pet reference other schemas?
-schemas | where(isComponent) | where(name == "Pet") | refs(out) | select name, via, key, from
+schemas | where(isComponent) | where(name == "Pet") | refs(out) | select name, via, edge, traversal
 
 # Blast radius — what breaks if Error changes?
 schemas | where(isComponent) | where(name == "Error") | blast-radius | length
 
 # 1-hop bidirectional refs (with direction arrows)
-schemas | where(isComponent) | where(name == "Pet") | refs | select name, direction, via, key
+schemas | where(isComponent) | where(name == "Pet") | refs | select name, direction, via, edge
 
 # Orphaned schemas
 schemas | where(isComponent) | orphans | select name
@@ -466,7 +469,7 @@ schemas | where(has(additionalProperties)) | additional-properties
 schemas | where(has(patternProperties)) | pattern-properties
 
 # Schemas with default values
-schemas | properties | where(has(default)) | select from, key, default
+schemas | properties | where(has(default)) | select traversal, edge, default
 
 # Extension fields (use underscores for dashes in expressions)
 operations | where(has(x_speakeasy_name_override)) | select name, x_speakeasy_name_override

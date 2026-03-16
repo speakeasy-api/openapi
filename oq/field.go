@@ -115,22 +115,25 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		case "tagCount":
 			return expr.IntVal(schemaTagCount(row.SchemaIdx, g))
 		case "via":
-			return expr.StringVal(row.Via)
-		case "key":
-			return expr.StringVal(row.Key)
-		case "from":
-			return expr.StringVal(row.From)
+			return expr.StringVal(row.EdgeKind)
+		case "edge":
+			return expr.StringVal(row.EdgeLabel)
+		case "traversal":
+			return expr.StringVal(row.Traversal)
+		case "schema":
+			// Clean immediate parent schema name — last segment of traversal path
+			return expr.StringVal(traversalSchema(row.Traversal))
 		case "seed":
-			return expr.StringVal(row.Target)
-		case "bfsDepth":
-			return expr.IntVal(row.BFSDepth)
+			return expr.StringVal(row.Seed)
+		case "hops":
+			return expr.IntVal(row.Hops)
 		case "direction":
 			return expr.StringVal(row.Direction)
 		case "isRequired":
-			// Check if this property's key appears in the parent schema's required array.
+			// Check if this property's edge label appears in the parent schema's required array.
 			// Only meaningful on property edge rows (from traversal stages).
-			if row.Via == "property" && row.Key != "" {
-				return expr.BoolVal(isPropertyRequired(row.Key, row.From, g))
+			if row.EdgeKind == "property" && row.EdgeLabel != "" {
+				return expr.BoolVal(isPropertyRequired(row.EdgeLabel, row.Traversal, g))
 			}
 			return expr.BoolVal(false)
 		case "properties":
@@ -192,11 +195,11 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 			}
 			return expr.IntVal(0)
 		case "via":
-			return expr.StringVal(row.Via)
-		case "key":
-			return expr.StringVal(row.Key)
-		case "from":
-			return expr.StringVal(row.From)
+			return expr.StringVal(row.EdgeKind)
+		case "edge":
+			return expr.StringVal(row.EdgeLabel)
+		case "traversal":
+			return expr.StringVal(row.Traversal)
 		default:
 			return operationContentField(o, name)
 		}
@@ -327,7 +330,7 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		switch name {
 		case "name":
 			return expr.StringVal(row.SchemeName)
-		case "schemeType":
+		case "type", "schemeType":
 			return expr.StringVal(string(ss.GetType()))
 		case "in":
 			return expr.StringVal(string(ss.GetIn()))
@@ -342,6 +345,7 @@ func fieldValue(row Row, name string, g *graph.SchemaGraph) expr.Value {
 		case "deprecated":
 			return expr.BoolVal(ss.Deprecated != nil && *ss.Deprecated)
 		}
+		return extensionFieldValue(ss.Extensions, name)
 	case SecurityRequirementResult:
 		switch name {
 		case "schemeName":
@@ -791,6 +795,19 @@ var schemaPresenceProbes = map[string]func(*oas3.Schema) bool{
 	"propertyNames":         func(s *oas3.Schema) bool { return s.PropertyNames != nil },
 	"unevaluatedItems":      func(s *oas3.Schema) bool { return s.UnevaluatedItems != nil },
 	"unevaluatedProperties": func(s *oas3.Schema) bool { return s.UnevaluatedProperties != nil },
+}
+
+// traversalSchema extracts the clean immediate parent schema name from a traversal path.
+// For simple paths like "User", returns "User".
+// For qualified paths like "User/allOf/BaseModel", returns "BaseModel" (last segment).
+func traversalSchema(traversal string) string {
+	if traversal == "" {
+		return ""
+	}
+	if idx := strings.LastIndex(traversal, "/"); idx >= 0 {
+		return traversal[idx+1:]
+	}
+	return traversal
 }
 
 // isPropertyRequired checks if a property key is in the parent schema's required array.
