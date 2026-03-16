@@ -163,6 +163,12 @@ func init() {
 	rootCmd.AddCommand(arazzoCmds)
 	rootCmd.AddCommand(overlayCmds)
 
+	// Top-level shortcut: openapi oq → openapi spec query
+	oqShortcut := *openapiCmd.OqCmd()
+	oqShortcut.Use = "oq <query> [input-file]"
+	oqShortcut.Aliases = nil // no aliases at top level
+	rootCmd.AddCommand(&oqShortcut)
+
 	// Global flags
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
 }

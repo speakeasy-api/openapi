@@ -2,6 +2,9 @@ package openapi
 
 import "github.com/spf13/cobra"
 
+// OqCmd returns the oq query command for use as a top-level shortcut.
+func OqCmd() *cobra.Command { return queryCmd }
+
 // Apply adds OpenAPI commands to the provided root command
 func Apply(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(validateCmd)
