@@ -131,7 +131,7 @@ The CLI provides four main command groups:
   - `localize` - Localize an OpenAPI specification by copying external references to a target directory
   - `optimize` - Optimize an OpenAPI specification by deduplicating inline schemas
   - `sanitize` - Remove unwanted elements from an OpenAPI specification
-  - `snip` - Remove selected operations from an OpenAPI specification (interactive or CLI)
+  - `snip` - Remove or filter operations in an OpenAPI specification (interactive or CLI)
   - `upgrade` - Upgrade an OpenAPI specification to the latest supported version
   - `validate` - Validate an OpenAPI specification document
   - `query` - Query an OpenAPI specification using the [oq pipeline language](./oq/README.md) to answer structural and semantic questions about schemas and operations
