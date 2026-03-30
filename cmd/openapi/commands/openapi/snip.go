@@ -24,8 +24,8 @@ var (
 
 var snipCmd = &cobra.Command{
 	Use:   "snip <input-file> [output-file]",
-	Short: "Remove operations from an OpenAPI specification",
-	Long: `Remove selected operations from an OpenAPI specification and clean up unused components.
+	Short: "Remove or filter operations in an OpenAPI specification",
+	Long: `Remove or filter operations in an OpenAPI specification and clean up unused components.
 
 Stdin is supported in CLI mode — either pipe data directly or use '-' explicitly:
   cat spec.yaml | openapi spec snip --operationId deleteUser
@@ -37,12 +37,16 @@ This command can operate in two modes:
    Launch a terminal UI to browse and select operations for removal.
    - Navigate with j/k or arrow keys
    - Press Space to select/deselect operations
-   - Press 'a' to select all, 'A' to deselect all  
+   - Press 'a' to select all, 'A' to deselect all
    - Press 'w' to write the result
    - Press 'q' or Esc to cancel
 
-2. Command-Line Mode (--operationId or --operation flags):
-   Remove operations specified via flags without launching the UI.
+2. Command-Line Mode (flags specified):
+   Remove or filter operations specified via flags without launching the UI.
+   - Remove mode (--operationId, --operation): remove the specified operations.
+   - Filter mode (--keepOperationId, --keepOperation): filter the spec down to
+     only the specified operations, removing everything else.
+   Remove and filter flags cannot be combined.
 
 Output options:
 - No output file: writes to stdout (pipe-friendly)
@@ -70,6 +74,12 @@ Examples:
 
   # CLI mode - mixed operation IDs and path:method
   openapi spec snip --operationId deleteUser --operation /admin:GET ./spec.yaml
+
+  # CLI mode - filter to only specific operations (remove everything else)
+  openapi spec snip --keepOperationId getUser --keepOperationId listUsers ./spec.yaml
+
+  # CLI mode - filter by path:method
+  openapi spec snip --keepOperation /users:GET,/users/{id}:GET ./spec.yaml
 
   # CLI mode - write to stdout for piping
   openapi spec snip --operation /internal/debug:GET ./spec.yaml > ./public-spec.yaml`,

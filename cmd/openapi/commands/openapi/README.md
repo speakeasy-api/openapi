@@ -1078,7 +1078,7 @@ What the explorer provides:
 
 ### `snip`
 
-Remove selected operations from an OpenAPI specification and automatically clean up unused components.
+Remove or filter operations in an OpenAPI specification and automatically clean up unused components.
 
 ```bash
 # Interactive mode - browse and select operations via TUI
@@ -1100,6 +1100,12 @@ openapi spec snip --operation /users/{id}:DELETE,/admin:GET ./spec.yaml
 # CLI mode - mixed approaches
 openapi spec snip --operationId deleteUser --operation /admin:GET ./spec.yaml
 
+# CLI mode - filter to only specific operations (remove everything else)
+openapi spec snip --keepOperationId getUser --keepOperationId listUsers ./spec.yaml
+
+# CLI mode - filter by path:method
+openapi spec snip --keepOperation /users:GET,/users/{id}:GET ./spec.yaml
+
 # Write in-place (CLI mode only)
 openapi spec snip -w --operation /internal/debug:GET ./spec.yaml
 ```
@@ -1116,10 +1122,10 @@ openapi spec snip -w --operation /internal/debug:GET ./spec.yaml
 
 **Command-Line Mode** (operation flags specified):
 
-- Remove operations specified via flags without UI
-- Supports `--operationId` for operation IDs
-- Supports `--operation` for path:method pairs
-- Both flags support comma-separated values or multiple flags
+- **Remove mode** (`--operationId`, `--operation`): remove the specified operations
+- **Filter mode** (`--keepOperationId`, `--keepOperation`): filter the spec down to only the specified operations, removing everything else
+- Remove and filter flags cannot be combined
+- All flags support comma-separated values or multiple flags
 
 **What snip does:**
 
