@@ -22,7 +22,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v3
+        uses: jdx/mise-action@v4
         with:
           experimental: true
 
@@ -58,7 +58,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v3
+        uses: jdx/mise-action@v4
 
       # Verify Docker is available for testcontainers (Ubuntu only)
       - name: Verify Docker availability
@@ -112,7 +112,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v3
+        uses: jdx/mise-action@v4
 
       # Verify Docker is available for testcontainers
       - name: Verify Docker availability
@@ -208,7 +208,7 @@ jobs:
             coverage-summary.md
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.out
@@ -230,7 +230,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v3
+        uses: jdx/mise-action@v4
 
       - name: Build project
         run: mise run build
@@ -251,7 +251,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v3
+        uses: jdx/mise-action@v4
 
       - name: Build project
         run: go build -v ./...
@@ -273,7 +273,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v3
+        uses: jdx/mise-action@v4
 
       - name: Run CLI integration tests
         run: mise run test-cli
