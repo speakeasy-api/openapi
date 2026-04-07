@@ -101,6 +101,90 @@ func TestTerminalPrompter_Choice_Skip(t *testing.T) {
 	assert.ErrorIs(t, err, validation.ErrSkipFix, "should return ErrSkipFix")
 }
 
+func TestTerminalPrompter_Choice_SkipRule(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("r\n")
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "pick",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptChoice,
+				Message: "Choose:",
+				Choices: []string{"a", "b"},
+			},
+		},
+	}
+
+	_, err := prompter.PromptFix(finding, f)
+	require.Error(t, err, "should return error on skip rule")
+	assert.ErrorIs(t, err, validation.ErrSkipRule, "should return ErrSkipRule")
+}
+
+func TestTerminalPrompter_Choice_Exit(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("e\n")
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "pick",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptChoice,
+				Message: "Choose:",
+				Choices: []string{"a", "b"},
+			},
+		},
+	}
+
+	_, err := prompter.PromptFix(finding, f)
+	require.Error(t, err, "should return error on exit")
+	assert.ErrorIs(t, err, validation.ErrExitInteractive, "should return ErrExitInteractive")
+}
+
+func TestTerminalPrompter_Choice_Escape(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("\x1b\n")
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "pick",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptChoice,
+				Message: "Choose:",
+				Choices: []string{"a", "b"},
+			},
+		},
+	}
+
+	_, err := prompter.PromptFix(finding, f)
+	require.Error(t, err, "should return error on escape")
+	assert.ErrorIs(t, err, validation.ErrExitInteractive, "should return ErrExitInteractive")
+}
+
 func TestTerminalPrompter_FreeText_Success(t *testing.T) {
 	t.Parallel()
 
@@ -153,6 +237,114 @@ func TestTerminalPrompter_FreeText_Skip(t *testing.T) {
 	_, err := prompter.PromptFix(finding, f)
 	require.Error(t, err, "should return error on skip")
 	assert.ErrorIs(t, err, validation.ErrSkipFix, "should return ErrSkipFix")
+}
+
+func TestTerminalPrompter_FreeText_SkipRule(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("r\n")
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "add value",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptFreeText,
+				Message: "Enter value",
+			},
+		},
+	}
+
+	_, err := prompter.PromptFix(finding, f)
+	require.Error(t, err, "should return error on skip rule")
+	assert.ErrorIs(t, err, validation.ErrSkipRule, "should return ErrSkipRule")
+}
+
+func TestTerminalPrompter_FreeText_Exit(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("e\n")
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "add value",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptFreeText,
+				Message: "Enter value",
+			},
+		},
+	}
+
+	_, err := prompter.PromptFix(finding, f)
+	require.Error(t, err, "should return error on exit")
+	assert.ErrorIs(t, err, validation.ErrExitInteractive, "should return ErrExitInteractive")
+}
+
+func TestTerminalPrompter_FreeText_Escape(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("\x1b\n")
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "add value",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptFreeText,
+				Message: "Enter value",
+			},
+		},
+	}
+
+	_, err := prompter.PromptFix(finding, f)
+	require.Error(t, err, "should return error on escape")
+	assert.ErrorIs(t, err, validation.ErrExitInteractive, "should return ErrExitInteractive")
+}
+
+func TestTerminalPrompter_FreeText_LiteralEscapeForReservedValue(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("\\e\n")
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "add value",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptFreeText,
+				Message: "Enter value",
+			},
+		},
+	}
+
+	responses, err := prompter.PromptFix(finding, f)
+	require.NoError(t, err, "PromptFix should allow literal reserved values with escape prefix")
+	assert.Equal(t, []string{"e"}, responses, "should return literal input without leading escape prefix")
 }
 
 func TestTerminalPrompter_Choice_InvalidThenValid(t *testing.T) {

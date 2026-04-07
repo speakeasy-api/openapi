@@ -74,10 +74,12 @@ type mockPrompter struct {
 	responses []string
 	err       error
 	called    bool
+	callCount int
 }
 
 func (p *mockPrompter) PromptFix(_ *validation.Error, _ validation.Fix) ([]string, error) {
 	p.called = true
+	p.callCount++
 	return p.responses, p.err
 }
 
@@ -178,6 +180,64 @@ func TestEngine_ModeInteractive_UserSkips(t *testing.T) {
 	assert.Empty(t, result.Applied, "should not apply skipped fix")
 	assert.Len(t, result.Skipped, 1, "should record skipped fix")
 	assert.False(t, f.applied, "fix should not have been applied")
+}
+
+func TestEngine_ModeInteractive_SkipRuleSkipsRemainingSameRule(t *testing.T) {
+	t.Parallel()
+
+	f1 := &mockInteractiveFix{
+		description: "needs input 1",
+		prompts:     []validation.Prompt{{Type: validation.PromptFreeText, Message: "enter value"}},
+	}
+	f2 := &mockInteractiveFix{
+		description: "needs input 2",
+		prompts:     []validation.Prompt{{Type: validation.PromptFreeText, Message: "enter value"}},
+	}
+	fOtherRule := &mockFix{description: "other rule fix"}
+
+	prompter := &mockPrompter{err: validation.ErrSkipRule}
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeInteractive}, prompter, nil)
+	result, err := engine.ProcessErrors(t.Context(), &openapi.OpenAPI{}, []error{
+		makeError("test-rule", 1, 1, "issue 1", f1),
+		makeError("test-rule", 2, 1, "issue 2", f2),
+		makeError("other-rule", 3, 1, "issue 3", fOtherRule),
+	})
+
+	require.NoError(t, err, "ProcessErrors should not fail")
+	assert.Len(t, result.Applied, 1, "should still apply fixes from other rules")
+	assert.True(t, fOtherRule.applied, "other rule fix should have been applied")
+	assert.Len(t, result.Skipped, 2, "should skip current and remaining fixes for the rule")
+	assert.False(t, f1.applied, "first skipped fix should not be applied")
+	assert.False(t, f2.applied, "remaining same-rule fix should not be applied")
+	assert.True(t, prompter.called, "prompter should have been called")
+	assert.Equal(t, 1, prompter.callCount, "prompter should only be called for the first same-rule fix")
+}
+
+func TestEngine_ModeInteractive_ExitReturnsPartialResults(t *testing.T) {
+	t.Parallel()
+
+	fApplied := &mockFix{description: "auto fix before exit"}
+	fExit := &mockInteractiveFix{
+		description: "needs input",
+		prompts:     []validation.Prompt{{Type: validation.PromptFreeText, Message: "enter value"}},
+	}
+	fNotProcessed := &mockFix{description: "after exit"}
+
+	prompter := &mockPrompter{err: validation.ErrExitInteractive}
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeInteractive}, prompter, nil)
+	result, err := engine.ProcessErrors(t.Context(), &openapi.OpenAPI{}, []error{
+		makeError("rule-a", 1, 1, "issue 1", fApplied),
+		makeError("rule-b", 2, 1, "issue 2", fExit),
+		makeError("rule-c", 3, 1, "issue 3", fNotProcessed),
+	})
+
+	require.NoError(t, err, "ProcessErrors should not fail")
+	require.Len(t, result.Applied, 1, "should keep already-applied fixes")
+	assert.True(t, fApplied.applied, "first fix should be applied")
+	assert.False(t, fExit.applied, "interactive fix should not be applied after exit")
+	assert.False(t, fNotProcessed.applied, "fixes after exit should not be processed")
+	assert.Empty(t, result.Failed, "exit should not be treated as failure")
+	assert.Equal(t, 1, prompter.callCount, "prompter should only be called once before exiting")
 }
 
 func TestEngine_DryRun(t *testing.T) {

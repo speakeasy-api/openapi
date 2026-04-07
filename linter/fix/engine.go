@@ -157,10 +157,21 @@ func (e *Engine) ProcessErrors(ctx context.Context, doc *openapi.OpenAPI, errs [
 
 	result := &Result{}
 	modified := make(map[conflictKey]bool)
+	skippedRules := make(map[string]bool)
 
 	for _, fe := range fixable {
 		fix := fe.fix
 		vErr := fe.vErr
+
+		// Skip any remaining fixes for rules the user opted to skip.
+		if skippedRules[vErr.Rule] {
+			result.Skipped = append(result.Skipped, SkippedFix{
+				Error:  vErr,
+				Fix:    fix,
+				Reason: SkipUser,
+			})
+			continue
+		}
 
 		// Check for conflicts at the same location
 		key := conflictKey{Line: vErr.GetLineNumber(), Column: vErr.GetColumnNumber(), Rule: vErr.Rule}
@@ -203,6 +214,18 @@ func (e *Engine) ProcessErrors(ctx context.Context, doc *openapi.OpenAPI, errs [
 						Reason: SkipUser,
 					})
 					continue
+				}
+				if errors.Is(err, validation.ErrSkipRule) {
+					skippedRules[vErr.Rule] = true
+					result.Skipped = append(result.Skipped, SkippedFix{
+						Error:  vErr,
+						Fix:    fix,
+						Reason: SkipUser,
+					})
+					continue
+				}
+				if errors.Is(err, validation.ErrExitInteractive) {
+					return result, nil
 				}
 				result.Failed = append(result.Failed, FailedFix{
 					Error: vErr, Fix: fix, FixError: err,

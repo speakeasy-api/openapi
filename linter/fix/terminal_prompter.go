@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/speakeasy-api/openapi/validation"
 )
@@ -66,6 +67,8 @@ func (p *TerminalPrompter) promptChoice(prompt validation.Prompt) (string, error
 		p.writef("    [%d] %s\n", j+1, choice)
 	}
 	p.writef("    [s] Skip\n")
+	p.writef("    [r] Skip remaining fixes for this rule\n")
+	p.writef("    [e] Exit interactive fixing\n")
 
 	for {
 		if prompt.Default != "" {
@@ -80,8 +83,17 @@ func (p *TerminalPrompter) promptChoice(prompt validation.Prompt) (string, error
 		}
 		line = strings.TrimSpace(line)
 
-		if line == "s" || line == "skip" {
+		switch strings.ToLower(line) {
+		case "s", "skip":
 			return "", validation.ErrSkipFix
+		case "r":
+			return "", validation.ErrSkipRule
+		case "e", "exit":
+			return "", validation.ErrExitInteractive
+		}
+
+		if isEscapeInput(line) {
+			return "", validation.ErrExitInteractive
 		}
 
 		if line == "" && prompt.Default != "" {
@@ -90,7 +102,7 @@ func (p *TerminalPrompter) promptChoice(prompt validation.Prompt) (string, error
 
 		idx, err := strconv.Atoi(line)
 		if err != nil || idx < 1 || idx > len(prompt.Choices) {
-			p.writef("  Invalid choice: %s (enter 1-%d or s to skip)\n", line, len(prompt.Choices))
+			p.writef("  Invalid choice: %s (enter 1-%d, s, r, e, or Escape)\n", line, len(prompt.Choices))
 			continue
 		}
 
@@ -103,7 +115,7 @@ func (p *TerminalPrompter) promptFreeText(prompt validation.Prompt) (string, err
 	if prompt.Default != "" {
 		p.writef(" (default: %s)", prompt.Default)
 	}
-	p.writef(" [s to skip]: ")
+	p.writef(" [s=skip, r=skip rule, e=exit; prefix \\ for literal]: ")
 
 	line, err := p.reader.ReadString('\n')
 	if err != nil {
@@ -111,8 +123,21 @@ func (p *TerminalPrompter) promptFreeText(prompt validation.Prompt) (string, err
 	}
 	line = strings.TrimSpace(line)
 
-	if line == "s" || line == "skip" {
-		return "", validation.ErrSkipFix
+	if strings.HasPrefix(line, "\\") {
+		line = strings.TrimPrefix(line, "\\")
+	} else {
+		switch strings.ToLower(line) {
+		case "s", "skip":
+			return "", validation.ErrSkipFix
+		case "r":
+			return "", validation.ErrSkipRule
+		case "e", "exit":
+			return "", validation.ErrExitInteractive
+		}
+
+		if isEscapeInput(line) {
+			return "", validation.ErrExitInteractive
+		}
 	}
 
 	if line == "" && prompt.Default != "" {
@@ -124,6 +149,15 @@ func (p *TerminalPrompter) promptFreeText(prompt validation.Prompt) (string, err
 	}
 
 	return line, nil
+}
+
+func isEscapeInput(line string) bool {
+	if line == "" {
+		return false
+	}
+
+	r, size := utf8.DecodeRuneInString(line)
+	return r == '\x1b' && size == len(line)
 }
 
 func (p *TerminalPrompter) Confirm(message string) (bool, error) {
