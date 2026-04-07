@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
@@ -599,19 +600,37 @@ func cleanUnknownPropertiesFromModel(model any) error {
 	return nil
 }
 
+func isNilAny(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return rv.IsNil()
+	default:
+		return false
+	}
+}
+
 // getCoreModelFromAny attempts to extract a core model from various wrapper types
 func getCoreModelFromAny(model any) any {
+	if isNilAny(model) {
+		return nil
+	}
+
 	// Try direct core getter
 	type coreGetter interface {
 		GetCoreAny() any
 	}
 
 	var directCore any
-	if coreModel, ok := model.(coreGetter); ok {
+	if coreModel, ok := model.(coreGetter); ok && !isNilAny(coreModel) {
 		directCore = coreModel.GetCoreAny()
-		if directCore != nil {
+		if !isNilAny(directCore) {
 			if coreModeler, ok := directCore.(marshaller.CoreModeler); ok {
-				if len(coreModeler.GetUnknownProperties()) > 0 {
+				if !isNilAny(coreModeler) && len(coreModeler.GetUnknownProperties()) > 0 {
 					return directCore
 				}
 			} else {
@@ -625,11 +644,11 @@ func getCoreModelFromAny(model any) any {
 		GetNavigableNode() (any, error)
 	}
 
-	if navigable, ok := model.(navigableNoder); ok {
+	if navigable, ok := model.(navigableNoder); ok && !isNilAny(navigable) {
 		inner, err := navigable.GetNavigableNode()
-		if err == nil && inner != nil {
+		if err == nil && !isNilAny(inner) {
 			// Recursively try to get core from the inner value
-			if innerCore := getCoreModelFromAny(inner); innerCore != nil {
+			if innerCore := getCoreModelFromAny(inner); !isNilAny(innerCore) {
 				return innerCore
 			}
 		}
@@ -641,7 +660,7 @@ func getCoreModelFromAny(model any) any {
 // getRootNodeFromAny attempts to extract the root yaml.Node from various OpenAPI types.
 // This is used for node-to-operation mapping during indexing.
 func getRootNodeFromAny(model any) *yaml.Node {
-	if model == nil {
+	if isNilAny(model) {
 		return nil
 	}
 
@@ -650,7 +669,7 @@ func getRootNodeFromAny(model any) *yaml.Node {
 		GetRootNode() *yaml.Node
 	}
 
-	if getter, ok := model.(rootNodeGetter); ok {
+	if getter, ok := model.(rootNodeGetter); ok && !isNilAny(getter) {
 		return getter.GetRootNode()
 	}
 
@@ -659,17 +678,17 @@ func getRootNodeFromAny(model any) *yaml.Node {
 		GetNavigableNode() (any, error)
 	}
 
-	if navigable, ok := model.(navigableNoder); ok {
+	if navigable, ok := model.(navigableNoder); ok && !isNilAny(navigable) {
 		inner, err := navigable.GetNavigableNode()
-		if err == nil && inner != nil {
+		if err == nil && !isNilAny(inner) {
 			// Recursively try to get root node from the inner value
 			return getRootNodeFromAny(inner)
 		}
 	}
 
 	// Try to get core model and extract root node from there
-	if core := getCoreModelFromAny(model); core != nil {
-		if getter, ok := core.(rootNodeGetter); ok {
+	if core := getCoreModelFromAny(model); !isNilAny(core) {
+		if getter, ok := core.(rootNodeGetter); ok && !isNilAny(getter) {
 			return getter.GetRootNode()
 		}
 	}
