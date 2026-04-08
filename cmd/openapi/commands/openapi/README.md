@@ -73,7 +73,7 @@ openapi spec lint -d rule-id-1 -d rule-id-2 ./spec.yaml
 # Auto-apply non-interactive fixes
 openapi spec lint --fix ./spec.yaml
 
-# Interactive fix mode (s=skip, r=skip rule, e/Esc=exit)
+# Interactive fix mode (s=skip, r=skip rule, e/Esc then Enter=exit)
 openapi spec lint --fix-interactive ./spec.yaml
 
 # Preview fixes without writing changes
@@ -82,16 +82,16 @@ openapi spec lint --fix-interactive --dry-run ./spec.yaml
 
 **Flags:**
 
-| Flag                | Short | Description                                                                                                                                            |
-| ------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--format`          | `-f`  | Output format: `text` (default) or `json`                                                                                                              |
-| `--config`          | `-c`  | Path to lint configuration file                                                                                                                        |
-| `--ruleset`         | `-r`  | Ruleset to use (default: `all`)                                                                                                                        |
-| `--disable`         | `-d`  | Rules to disable (can be specified multiple times)                                                                                                     |
-| `--summary`         |       | Print a per-rule summary table of findings                                                                                                             |
-| `--fix`             |       | Automatically apply non-interactive fixes and write back                                                                                               |
-| `--fix-interactive` |       | Apply all fixes, prompting for interactive ones (`s`=skip, `r`=skip rule, `e`/Esc=exit; text prompts support `\` prefix for literal reserved controls) |
-| `--dry-run`         |       | Show what fixes would be applied without changing the file (requires `--fix` or `--fix-interactive`)                                                   |
+| Flag                | Short | Description                                                                                                                                                       |
+| ------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--format`          | `-f`  | Output format: `text` (default) or `json`                                                                                                                         |
+| `--config`          | `-c`  | Path to lint configuration file                                                                                                                                   |
+| `--ruleset`         | `-r`  | Ruleset to use (default: `all`)                                                                                                                                   |
+| `--disable`         | `-d`  | Rules to disable (can be specified multiple times)                                                                                                                |
+| `--summary`         |       | Print a per-rule summary table of findings                                                                                                                        |
+| `--fix`             |       | Automatically apply non-interactive fixes and write back                                                                                                          |
+| `--fix-interactive` |       | Apply all fixes, prompting for interactive ones (`s`=skip, `r`=skip rule, `e`/Esc then Enter=exit; text prompts support `\` prefix for literal reserved controls) |
+| `--dry-run`         |       | Show what fixes would be applied without changing the file (requires `--fix` or `--fix-interactive`)                                                              |
 
 **What lint checks:**
 

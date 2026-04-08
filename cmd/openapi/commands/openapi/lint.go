@@ -99,7 +99,7 @@ func init() {
 	lintCmd.Flags().StringSliceVarP(&lintDisableRules, "disable", "d", nil, "Rule IDs to disable (can be repeated)")
 	lintCmd.Flags().BoolVar(&lintSummary, "summary", false, "Print a per-rule summary table of findings")
 	lintCmd.Flags().BoolVar(&lintFix, "fix", false, "Automatically apply non-interactive fixes and write back")
-	lintCmd.Flags().BoolVar(&lintFixInteractive, "fix-interactive", false, "Apply all fixes, prompting for interactive ones (s=skip, r=skip rule, e/Esc=exit; text prompts: prefix \\ for literal)")
+	lintCmd.Flags().BoolVar(&lintFixInteractive, "fix-interactive", false, "Apply all fixes, prompting for interactive ones (s=skip, r=skip rule, e/Esc then Enter=exit; text prompts: prefix \\ for literal)")
 	lintCmd.Flags().BoolVar(&lintDryRun, "dry-run", false, "Show what fixes would be applied without changing the file (requires --fix or --fix-interactive)")
 }
 
