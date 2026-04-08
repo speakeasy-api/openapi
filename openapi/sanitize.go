@@ -607,7 +607,7 @@ func isNilAny(v any) bool {
 
 	rv := reflect.ValueOf(v)
 	switch rv.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Slice:
 		return rv.IsNil()
 	default:
 		return false
@@ -626,11 +626,11 @@ func getCoreModelFromAny(model any) any {
 	}
 
 	var directCore any
-	if coreModel, ok := model.(coreGetter); ok && !isNilAny(coreModel) {
+	if coreModel, ok := model.(coreGetter); ok {
 		directCore = coreModel.GetCoreAny()
 		if !isNilAny(directCore) {
 			if coreModeler, ok := directCore.(marshaller.CoreModeler); ok {
-				if !isNilAny(coreModeler) && len(coreModeler.GetUnknownProperties()) > 0 {
+				if len(coreModeler.GetUnknownProperties()) > 0 {
 					return directCore
 				}
 			} else {
@@ -644,7 +644,7 @@ func getCoreModelFromAny(model any) any {
 		GetNavigableNode() (any, error)
 	}
 
-	if navigable, ok := model.(navigableNoder); ok && !isNilAny(navigable) {
+	if navigable, ok := model.(navigableNoder); ok {
 		inner, err := navigable.GetNavigableNode()
 		if err == nil && !isNilAny(inner) {
 			// Recursively try to get core from the inner value
@@ -669,7 +669,7 @@ func getRootNodeFromAny(model any) *yaml.Node {
 		GetRootNode() *yaml.Node
 	}
 
-	if getter, ok := model.(rootNodeGetter); ok && !isNilAny(getter) {
+	if getter, ok := model.(rootNodeGetter); ok {
 		return getter.GetRootNode()
 	}
 
@@ -678,7 +678,7 @@ func getRootNodeFromAny(model any) *yaml.Node {
 		GetNavigableNode() (any, error)
 	}
 
-	if navigable, ok := model.(navigableNoder); ok && !isNilAny(navigable) {
+	if navigable, ok := model.(navigableNoder); ok {
 		inner, err := navigable.GetNavigableNode()
 		if err == nil && !isNilAny(inner) {
 			// Recursively try to get root node from the inner value
@@ -688,7 +688,7 @@ func getRootNodeFromAny(model any) *yaml.Node {
 
 	// Try to get core model and extract root node from there
 	if core := getCoreModelFromAny(model); !isNilAny(core) {
-		if getter, ok := core.(rootNodeGetter); ok && !isNilAny(getter) {
+		if getter, ok := core.(rootNodeGetter); ok {
 			return getter.GetRootNode()
 		}
 	}
