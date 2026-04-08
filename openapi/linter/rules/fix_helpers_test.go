@@ -293,6 +293,15 @@ func TestAddLicenseURLFix(t *testing.T) {
 		_, _, found := yml.GetMapElementNodes(ctx, licenseNode, "url")
 		assert.False(t, found)
 	})
+
+	t.Run("apply updates model when root node is unavailable", func(t *testing.T) {
+		t.Parallel()
+		doc := &openapi.OpenAPI{Info: openapi.Info{License: &openapi.License{Name: "MIT"}}}
+		f := &addLicenseURLFix{url: "https://opensource.org/licenses/MIT"}
+		require.NoError(t, f.Apply(doc))
+		require.NotNil(t, doc.Info.License.URL)
+		assert.Equal(t, "https://opensource.org/licenses/MIT", *doc.Info.License.URL)
+	})
 }
 
 func TestAddContactPropertyFix(t *testing.T) {
@@ -346,6 +355,15 @@ func TestAddContactPropertyFix(t *testing.T) {
 
 		_, _, found := yml.GetMapElementNodes(ctx, contactNode, "email")
 		assert.False(t, found)
+	})
+
+	t.Run("apply updates model when root node is unavailable", func(t *testing.T) {
+		t.Parallel()
+		doc := &openapi.OpenAPI{Info: openapi.Info{Contact: &openapi.Contact{}}}
+		f := &addContactPropertyFix{property: "email", value: "support@example.com"}
+		require.NoError(t, f.Apply(doc))
+		require.NotNil(t, doc.Info.Contact.Email)
+		assert.Equal(t, "support@example.com", *doc.Info.Contact.Email)
 	})
 }
 
@@ -537,6 +555,15 @@ func TestAddLicenseFix(t *testing.T) {
 		_, _, found := yml.GetMapElementNodes(ctx, infoNode, "license")
 		assert.False(t, found)
 	})
+
+	t.Run("apply updates model when root node is unavailable", func(t *testing.T) {
+		t.Parallel()
+		doc := &openapi.OpenAPI{Info: openapi.Info{}}
+		f := &addLicenseFix{licenseName: "MIT"}
+		require.NoError(t, f.Apply(doc))
+		require.NotNil(t, doc.Info.License)
+		assert.Equal(t, "MIT", doc.Info.License.Name)
+	})
 }
 
 func TestSetIntegerFormatFix(t *testing.T) {
@@ -685,6 +712,20 @@ func TestAddContactFix(t *testing.T) {
 
 		_, _, found := yml.GetMapElementNodes(ctx, infoNode, "contact")
 		assert.False(t, found)
+	})
+
+	t.Run("apply updates model when root node is unavailable", func(t *testing.T) {
+		t.Parallel()
+		doc := &openapi.OpenAPI{Info: openapi.Info{}}
+		f := &addContactFix{name: "Support", url: "https://support.example.com", email: "support@example.com"}
+		require.NoError(t, f.Apply(doc))
+		require.NotNil(t, doc.Info.Contact)
+		require.NotNil(t, doc.Info.Contact.Name)
+		assert.Equal(t, "Support", *doc.Info.Contact.Name)
+		require.NotNil(t, doc.Info.Contact.URL)
+		assert.Equal(t, "https://support.example.com", *doc.Info.Contact.URL)
+		require.NotNil(t, doc.Info.Contact.Email)
+		assert.Equal(t, "support@example.com", *doc.Info.Contact.Email)
 	})
 }
 

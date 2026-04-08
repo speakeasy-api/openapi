@@ -2,19 +2,24 @@ package fix
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"unicode/utf8"
 
 	"github.com/speakeasy-api/openapi/validation"
+	"golang.org/x/term"
 )
 
 // TerminalPrompter implements Prompter using stdin/stdout for terminal interaction.
 type TerminalPrompter struct {
 	reader *bufio.Reader
 	writer io.Writer
+	input  io.Reader
 }
 
 // NewTerminalPrompter creates a new terminal-based prompter.
@@ -22,6 +27,7 @@ func NewTerminalPrompter(in io.Reader, out io.Writer) *TerminalPrompter {
 	return &TerminalPrompter{
 		reader: bufio.NewReader(in),
 		writer: out,
+		input:  in,
 	}
 }
 
@@ -77,8 +83,11 @@ func (p *TerminalPrompter) promptChoice(prompt validation.Prompt) (string, error
 			p.writef("  > ")
 		}
 
-		line, err := p.reader.ReadString('\n')
+		line, err := p.readPromptLine()
 		if err != nil {
+			if errors.Is(err, validation.ErrExitInteractive) {
+				return "", err
+			}
 			return "", fmt.Errorf("reading input: %w", err)
 		}
 		line = strings.TrimSpace(line)
@@ -117,14 +126,17 @@ func (p *TerminalPrompter) promptFreeText(prompt validation.Prompt) (string, err
 	}
 	p.writef(" [s=skip, r=skip rule, e=exit; prefix \\ for literal]: ")
 
-	line, err := p.reader.ReadString('\n')
+	line, err := p.readPromptLine()
 	if err != nil {
+		if errors.Is(err, validation.ErrExitInteractive) {
+			return "", err
+		}
 		return "", fmt.Errorf("reading input: %w", err)
 	}
 	line = strings.TrimSpace(line)
 
-	if strings.HasPrefix(line, "\\") {
-		line = strings.TrimPrefix(line, "\\")
+	if unescaped, ok := unescapeReservedControlInput(line); ok {
+		line = unescaped
 	} else {
 		switch strings.ToLower(line) {
 		case "s", "skip":
@@ -149,6 +161,62 @@ func (p *TerminalPrompter) promptFreeText(prompt validation.Prompt) (string, err
 	}
 
 	return line, nil
+}
+
+func (p *TerminalPrompter) readPromptLine() (string, error) {
+	if f, ok := p.input.(*os.File); ok {
+		fd := int(f.Fd())
+		if term.IsTerminal(fd) {
+			state, err := term.MakeRaw(fd)
+			if err == nil {
+				defer func() {
+					_ = term.Restore(fd, state)
+				}()
+
+				var b [1]byte
+				if _, readErr := syscall.Read(fd, b[:]); readErr != nil {
+					return "", readErr
+				}
+
+				first := b[0]
+				if first == 0x1b {
+					return "", validation.ErrExitInteractive
+				}
+
+				var sb strings.Builder
+				sb.WriteByte(first)
+				for first != '\n' {
+					if _, readErr := syscall.Read(fd, b[:]); readErr != nil {
+						return "", readErr
+					}
+					next := b[0]
+					sb.WriteByte(next)
+					first = next
+				}
+				return sb.String(), nil
+			}
+		}
+	}
+
+	return p.reader.ReadString('\n')
+}
+
+func unescapeReservedControlInput(line string) (string, bool) {
+	if !strings.HasPrefix(line, "\\") {
+		return "", false
+	}
+
+	remainder := strings.TrimPrefix(line, "\\")
+	switch strings.ToLower(remainder) {
+	case "s", "skip", "r", "e", "exit":
+		return remainder, true
+	}
+
+	if isEscapeInput(remainder) {
+		return remainder, true
+	}
+
+	return "", false
 }
 
 func isEscapeInput(line string) bool {

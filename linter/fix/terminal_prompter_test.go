@@ -347,6 +347,60 @@ func TestTerminalPrompter_FreeText_LiteralEscapeForReservedValue(t *testing.T) {
 	assert.Equal(t, []string{"e"}, responses, "should return literal input without leading escape prefix")
 }
 
+func TestTerminalPrompter_FreeText_PreservesLeadingBackslashForNonReservedValue(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("\\temp\\file\n")
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "add value",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptFreeText,
+				Message: "Enter value",
+			},
+		},
+	}
+
+	responses, err := prompter.PromptFix(finding, f)
+	require.NoError(t, err, "PromptFix should preserve non-command values that start with backslash")
+	assert.Equal(t, []string{"\\temp\\file"}, responses, "leading backslash should be preserved for non-reserved values")
+}
+
+func TestTerminalPrompter_FreeText_SingleBackslashPreserved(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("\\\n")
+	output := &bytes.Buffer{}
+	prompter := fix.NewTerminalPrompter(input, output)
+
+	finding := &validation.Error{
+		UnderlyingError: errors.New("issue"),
+		Node:            &yaml.Node{Line: 1, Column: 1},
+		Rule:            "test-rule",
+	}
+	f := &mockInteractiveFix{
+		description: "add value",
+		prompts: []validation.Prompt{
+			{
+				Type:    validation.PromptFreeText,
+				Message: "Enter value",
+			},
+		},
+	}
+
+	responses, err := prompter.PromptFix(finding, f)
+	require.NoError(t, err, "single backslash should be treated as literal text")
+	assert.Equal(t, []string{"\\"}, responses, "single backslash should not be converted into empty input")
+}
+
 func TestTerminalPrompter_Choice_InvalidThenValid(t *testing.T) {
 	t.Parallel()
 
