@@ -6,8 +6,8 @@ require (
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/speakeasy-api/openapi v1.21.1-0.20260315141218-511fc1aff0dc
-	github.com/speakeasy-api/openapi/openapi/linter/customrules v0.0.0-20260315141218-511fc1aff0dc
+	github.com/speakeasy-api/openapi v1.22.1-0.20260408022107-7a9aee7c092c
+	github.com/speakeasy-api/openapi/openapi/linter/customrules v0.0.0-20260408022107-7a9aee7c092c
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.11.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -45,5 +45,5 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 )
