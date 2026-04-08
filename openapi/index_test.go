@@ -1220,6 +1220,52 @@ paths:
 	assert.Len(t, idx.InlinePathItems, 2, "should have 2 inline path items")
 }
 
+func TestBuildIndex_InvalidPathsEntries_NoPanicAndValidationErrors_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yaml := `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /api/v1/foo: []
+  foo: bar
+`
+
+	doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(yaml))
+	require.NoError(t, err, "unmarshal should succeed")
+	require.NotNil(t, doc, "document should still be created")
+	require.NotEmpty(t, validationErrs, "invalid paths entries should produce validation errors")
+
+	var validationErrMessages []string
+	for _, validationErr := range validationErrs {
+		validationErrMessages = append(validationErrMessages, validationErr.Error())
+	}
+
+	require.Len(t, validationErrMessages, 2, "should report both invalid path entries")
+	assert.Contains(t, validationErrMessages[0], "validation-type-mismatch", "should classify invalid path entries as type mismatch")
+	assert.Contains(t, validationErrMessages[0], "paths./api/v1/foo", "should point to the invalid path key")
+	assert.Contains(t, validationErrMessages[0], "expected `object`, got sequence", "should explain that array path item values are invalid")
+	assert.Contains(t, validationErrMessages[1], "validation-type-mismatch", "should classify invalid path entries as type mismatch")
+	assert.Contains(t, validationErrMessages[1], "paths.foo", "should point to the invalid non-path key")
+	assert.Contains(t, validationErrMessages[1], "expected `object`, got scalar", "should explain that scalar path item values are invalid")
+
+	var idx *openapi.Index
+	assert.NotPanics(t, func() {
+		idx = openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+			RootDocument:   doc,
+			TargetDocument: doc,
+			TargetLocation: "test.yaml",
+		})
+	}, "indexing invalid paths entries should not panic")
+
+	require.NotNil(t, idx, "index should not be nil")
+	// Type mismatch validation errors for invalid path entries are surfaced by Unmarshal;
+	// BuildIndex should remain panic-free and produce a usable index for callers.
+}
+
 func TestBuildIndex_Parameters_Success(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
