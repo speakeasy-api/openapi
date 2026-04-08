@@ -161,6 +161,9 @@ openapi spec lint ./spec.yaml
 # Lint with custom configuration
 openapi spec lint --config lint.yaml ./spec.yaml
 
+# Interactive lint fixing
+openapi spec lint --fix-interactive ./spec.yaml
+
 # Bundle external references into components section
 openapi spec bundle ./spec.yaml ./bundled-spec.yaml
 

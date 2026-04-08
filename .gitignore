@@ -15,3 +15,5 @@ dist/
 CLAUDE.md
 
 go.work.sum
+
+.mcp.json

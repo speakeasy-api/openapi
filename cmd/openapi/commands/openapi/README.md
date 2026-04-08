@@ -69,16 +69,29 @@ openapi spec lint -c ./lint.yaml ./spec.yaml
 
 # Lint with specific rules disabled
 openapi spec lint -d rule-id-1 -d rule-id-2 ./spec.yaml
+
+# Auto-apply non-interactive fixes
+openapi spec lint --fix ./spec.yaml
+
+# Interactive fix mode (s=skip, r=skip rule, e/Esc then Enter=exit)
+openapi spec lint --fix-interactive ./spec.yaml
+
+# Preview fixes without writing changes
+openapi spec lint --fix-interactive --dry-run ./spec.yaml
 ```
 
 **Flags:**
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--format` | `-f` | Output format: `text` (default) or `json` |
-| `--config` | `-c` | Path to lint configuration file |
-| `--ruleset` | `-r` | Ruleset to use (default: `all`) |
-| `--disable` | `-d` | Rules to disable (can be specified multiple times) |
+| Flag                | Short | Description                                                                                                                                                       |
+| ------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--format`          | `-f`  | Output format: `text` (default) or `json`                                                                                                                         |
+| `--config`          | `-c`  | Path to lint configuration file                                                                                                                                   |
+| `--ruleset`         | `-r`  | Ruleset to use (default: `all`)                                                                                                                                   |
+| `--disable`         | `-d`  | Rules to disable (can be specified multiple times)                                                                                                                |
+| `--summary`         |       | Print a per-rule summary table of findings                                                                                                                        |
+| `--fix`             |       | Automatically apply non-interactive fixes and write back                                                                                                          |
+| `--fix-interactive` |       | Apply all fixes, prompting for interactive ones (`s`=skip, `r`=skip rule, `e`/Esc then Enter=exit; text prompts support `\` prefix for literal reserved controls) |
+| `--dry-run`         |       | Show what fixes would be applied without changing the file (requires `--fix` or `--fix-interactive`)                                                              |
 
 **What lint checks:**
 
@@ -142,30 +155,30 @@ output_format: text
 
 **Configuration Options:**
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `extends` | `string[]` | Rulesets to extend from (`all`, `recommended`, `security`) |
-| `rules` | `RuleEntry[]` | Individual rule configurations |
-| `categories` | `map[string]CategoryConfig` | Category-level configurations |
-| `custom_rules` | `CustomRulesConfig` | Custom TypeScript/JavaScript rules |
-| `output_format` | `string` | Output format (`text` or `json`) |
+| Option          | Type                        | Description                                                |
+| --------------- | --------------------------- | ---------------------------------------------------------- |
+| `extends`       | `string[]`                  | Rulesets to extend from (`all`, `recommended`, `security`) |
+| `rules`         | `RuleEntry[]`               | Individual rule configurations                             |
+| `categories`    | `map[string]CategoryConfig` | Category-level configurations                              |
+| `custom_rules`  | `CustomRulesConfig`         | Custom TypeScript/JavaScript rules                         |
+| `output_format` | `string`                    | Output format (`text` or `json`)                           |
 
 **Available Rulesets:**
 
-| Ruleset | Description |
-|---------|-------------|
-| `all` | All available rules (default) |
+| Ruleset       | Description                                                        |
+| ------------- | ------------------------------------------------------------------ |
+| `all`         | All available rules (default)                                      |
 | `recommended` | Balanced ruleset - semantic rules, essential style, basic security |
-| `security` | Comprehensive OWASP security rules |
+| `security`    | Comprehensive OWASP security rules                                 |
 
 **Rule Entry Options:**
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `id` | `string` | Exact rule ID to configure |
-| `match` | `string` | Regex pattern to match rule IDs |
-| `severity` | `string` | `error`, `warning`, or `hint` |
-| `disabled` | `bool` | Set to `true` to disable the rule |
+| Option     | Type     | Description                       |
+| ---------- | -------- | --------------------------------- |
+| `id`       | `string` | Exact rule ID to configure        |
+| `match`    | `string` | Regex pattern to match rule IDs   |
+| `severity` | `string` | `error`, `warning`, or `hint`     |
+| `disabled` | `bool`   | Set to `true` to disable the rule |
 
 #### Custom Rules
 
@@ -266,16 +279,16 @@ openapi spec lint -c ./lint.yaml ./spec.yaml
 
 Your rule class must implement the `RuleRunner` interface:
 
-| Method | Required | Description |
-|--------|----------|-------------|
-| `id()` | Yes | Unique rule identifier |
-| `category()` | Yes | Rule category (e.g., `style`, `security`) |
-| `description()` | Yes | Full description of the rule |
-| `summary()` | Yes | Short summary for output |
-| `link()` | No | URL to documentation |
-| `defaultSeverity()` | No | Default severity (`error`, `warning`, `hint`) |
-| `versions()` | No | OpenAPI versions this rule applies to |
-| `run()` | Yes | Execute the rule and return validation errors |
+| Method              | Required | Description                                   |
+| ------------------- | -------- | --------------------------------------------- |
+| `id()`              | Yes      | Unique rule identifier                        |
+| `category()`        | Yes      | Rule category (e.g., `style`, `security`)     |
+| `description()`     | Yes      | Full description of the rule                  |
+| `summary()`         | Yes      | Short summary for output                      |
+| `link()`            | No       | URL to documentation                          |
+| `defaultSeverity()` | No       | Default severity (`error`, `warning`, `hint`) |
+| `versions()`        | No       | OpenAPI versions this rule applies to         |
+| `run()`             | Yes      | Execute the rule and return validation errors |
 
 **Accessing Document Data:**
 
@@ -1245,10 +1258,10 @@ openapi spec query --format json 'schemas | where(isComponent) | take(5)' ./spec
 
 **Flags:**
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--format` | | Output format: `table` (default), `json`, `markdown`, or `toon` |
-| `--file` | `-f` | Read query from file instead of argument |
+| Flag       | Short | Description                                                     |
+| ---------- | ----- | --------------------------------------------------------------- |
+| `--format` |       | Output format: `table` (default), `json`, `markdown`, or `toon` |
+| `--file`   | `-f`  | Read query from file instead of argument                        |
 
 For the full query language reference, run `openapi spec query-reference`.
 

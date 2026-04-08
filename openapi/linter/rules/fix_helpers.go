@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/speakeasy-api/openapi/openapi"
+	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
@@ -170,7 +171,36 @@ func (f *addContactFix) SetInput(responses []string) error {
 	return nil
 }
 
-func (f *addContactFix) Apply(doc any) error { return nil }
+func (f *addContactFix) Apply(doc any) error {
+	oasDoc, ok := doc.(*openapi.OpenAPI)
+	if !ok {
+		return nil
+	}
+
+	if f.name == "" && f.url == "" && f.email == "" {
+		return nil
+	}
+
+	info := oasDoc.GetInfo()
+	if info == nil {
+		return nil
+	}
+
+	if info.Contact == nil {
+		info.Contact = &openapi.Contact{}
+	}
+	if f.name != "" {
+		info.Contact.Name = pointer.From(f.name)
+	}
+	if f.url != "" {
+		info.Contact.URL = pointer.From(f.url)
+	}
+	if f.email != "" {
+		info.Contact.Email = pointer.From(f.email)
+	}
+
+	return nil
+}
 
 func (f *addContactFix) ApplyNode(_ *yaml.Node) error {
 	if f.infoNode == nil || f.infoNode.Kind != yaml.MappingNode {
@@ -221,7 +251,27 @@ func (f *addLicenseFix) SetInput(responses []string) error {
 	return nil
 }
 
-func (f *addLicenseFix) Apply(doc any) error { return nil }
+func (f *addLicenseFix) Apply(doc any) error {
+	oasDoc, ok := doc.(*openapi.OpenAPI)
+	if !ok {
+		return nil
+	}
+
+	if f.licenseName == "" {
+		return nil
+	}
+
+	info := oasDoc.GetInfo()
+	if info == nil {
+		return nil
+	}
+
+	if info.License == nil {
+		info.License = &openapi.License{}
+	}
+	info.License.Name = f.licenseName
+	return nil
+}
 
 func (f *addLicenseFix) ApplyNode(_ *yaml.Node) error {
 	if f.infoNode == nil || f.infoNode.Kind != yaml.MappingNode || f.licenseName == "" {
@@ -258,7 +308,24 @@ func (f *addLicenseURLFix) SetInput(responses []string) error {
 	return nil
 }
 
-func (f *addLicenseURLFix) Apply(doc any) error { return nil }
+func (f *addLicenseURLFix) Apply(doc any) error {
+	oasDoc, ok := doc.(*openapi.OpenAPI)
+	if !ok {
+		return nil
+	}
+
+	if f.url == "" {
+		return nil
+	}
+
+	info := oasDoc.GetInfo()
+	if info == nil || info.License == nil {
+		return nil
+	}
+
+	info.License.URL = pointer.From(f.url)
+	return nil
+}
 
 func (f *addLicenseURLFix) ApplyNode(_ *yaml.Node) error {
 	if f.licenseNode == nil || f.licenseNode.Kind != yaml.MappingNode || f.url == "" {
@@ -333,7 +400,31 @@ func (f *addContactPropertyFix) SetInput(responses []string) error {
 	return nil
 }
 
-func (f *addContactPropertyFix) Apply(doc any) error { return nil }
+func (f *addContactPropertyFix) Apply(doc any) error {
+	oasDoc, ok := doc.(*openapi.OpenAPI)
+	if !ok {
+		return nil
+	}
+
+	if f.value == "" {
+		return nil
+	}
+
+	info := oasDoc.GetInfo()
+	if info == nil || info.Contact == nil {
+		return nil
+	}
+
+	switch f.property {
+	case "name":
+		info.Contact.Name = pointer.From(f.value)
+	case "url":
+		info.Contact.URL = pointer.From(f.value)
+	case "email":
+		info.Contact.Email = pointer.From(f.value)
+	}
+	return nil
+}
 
 func (f *addContactPropertyFix) ApplyNode(_ *yaml.Node) error {
 	if f.contactNode == nil || f.contactNode.Kind != yaml.MappingNode || f.value == "" {
