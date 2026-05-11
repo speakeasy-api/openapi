@@ -6,7 +6,7 @@ replace github.com/speakeasy-api/openapi => ../../../
 
 require (
 	github.com/dop251/goja v0.0.0-20260106131823-651366fbe6e3
-	github.com/evanw/esbuild v0.27.2
+	github.com/evanw/esbuild v0.28.0
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/speakeasy-api/openapi v1.22.1-0.20260408022107-7a9aee7c092c
 	github.com/stretchr/testify v1.11.1
@@ -21,6 +21,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.36.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 )
