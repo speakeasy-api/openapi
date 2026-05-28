@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
+	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
@@ -863,7 +864,7 @@ func (i *Index) indexSchema(ctx context.Context, loc Locations, schema *oas3.JSO
 			i.resolutionErrs = append(i.resolutionErrs, validation.NewValidationErrorWithDocumentLocation(
 				validation.SeverityError,
 				"resolution-json-schema",
-				err,
+				schemaResolutionError(schema, err),
 				getSchemaErrorNode(schema),
 				i.documentPathForSchema(schema),
 			))
@@ -2586,6 +2587,26 @@ func getRefTarget(schema *oas3.JSONSchemaReferenceable) string {
 	}
 
 	return info.AbsoluteReference.String()
+}
+
+func schemaResolutionError(schema *oas3.JSONSchemaReferenceable, err error) error {
+	if schema == nil || err == nil {
+		return err
+	}
+
+	ref := schema.GetReference()
+	if ref == "" {
+		return err
+	}
+
+	if errors.Is(err, jsonpointer.ErrNotFound) {
+		return fmt.Errorf("reference not found: %s", ref)
+	}
+	if errors.Is(err, jsonpointer.ErrInvalidPath) {
+		return fmt.Errorf("invalid reference path: %s", ref)
+	}
+
+	return err
 }
 
 // getSchemaErrorNode returns an appropriate YAML node for error reporting.

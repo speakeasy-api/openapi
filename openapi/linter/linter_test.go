@@ -331,6 +331,59 @@ paths:
 	}, resolutionErrors)
 }
 
+func TestOpenAPILinter_IndexResolutionErrorsSanitizeMissingInternalSchemaReference(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yamlInput := `
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentList'
+components:
+  schemas: {}
+`
+
+	config := &linter.Config{
+		Extends: []string{},
+		Rules: []linter.RuleEntry{
+			{
+				ID:       "semantic-path-params",
+				Disabled: pointer.From(false),
+			},
+		},
+	}
+
+	lntr, err := openapiLinter.NewLinter(config)
+	require.NoError(t, err)
+
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(yamlInput))
+	require.NoError(t, err)
+
+	output, err := lntr.Lint(ctx, linter.NewDocumentInfo(doc, "/spec/openapi.yaml"), nil, nil)
+	require.NoError(t, err)
+
+	var resolutionErrors []string
+	for _, result := range output.Results {
+		resolutionErrors = append(resolutionErrors, result.Error())
+	}
+
+	assert.Equal(t, []string{
+		"[16:17] error resolution-json-schema reference not found: #/components/schemas/ContentList",
+	}, resolutionErrors)
+}
+
 func TestOpenAPILinter_IndexCircularReferenceErrorsExposed(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

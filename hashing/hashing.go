@@ -111,7 +111,7 @@ func toHashableString(v any) string {
 		case *yaml.Node:
 			builder.WriteString(yamlNodeToHashableString(v))
 		default:
-			builder.WriteString(fmt.Sprintf("%v", v))
+			fmt.Fprintf(&builder, "%v", v)
 		}
 	}
 

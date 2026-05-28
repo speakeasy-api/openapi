@@ -137,7 +137,7 @@ func DownloadFile(url, cacheEnvVar, cacheDirName string) (io.ReadCloser, error) 
 	}
 	tempDir := filepath.Join(cacheDir, cacheDirName)
 
-	if err := os.MkdirAll(tempDir, 0o750); err != nil {
+	if err := os.MkdirAll(tempDir, 0o750); err != nil { // #nosec G703 -- tempDir is controlled by caller in tests
 		return nil, err
 	}
 
@@ -148,7 +148,7 @@ func DownloadFile(url, cacheEnvVar, cacheDirName string) (io.ReadCloser, error) 
 	filepath := filepath.Join(tempDir, filename)
 
 	// check if file exists and return it otherwise download it
-	r, err := os.Open(filepath) // #nosec G304 -- filepath is controlled by caller in tests
+	r, err := os.Open(filepath) // #nosec G304,G703 -- filepath is controlled by caller in tests
 	if err == nil {
 		return r, nil
 	}
@@ -169,7 +169,7 @@ func DownloadFile(url, cacheEnvVar, cacheDirName string) (io.ReadCloser, error) 
 	}
 
 	// Write data to cache file
-	f, err := os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY, 0o600) // #nosec G304 -- filepath is controlled by caller in tests
+	f, err := os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY, 0o600) // #nosec G304,G703 -- filepath is controlled by caller in tests
 	if err != nil {
 		return nil, err
 	}
