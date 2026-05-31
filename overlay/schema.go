@@ -4,7 +4,7 @@ import (
 	"bytes"
 
 	"github.com/speakeasy-api/openapi/internal/version"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // Version constants for the Overlay specification

@@ -7,7 +7,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/graph"
 	"github.com/speakeasy-api/openapi/oq/expr"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // FormatTable formats a result as a simple table string.

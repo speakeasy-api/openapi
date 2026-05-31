@@ -9,7 +9,7 @@ import (
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // addErrorResponseFix adds a skeleton error response to an operation's responses node.

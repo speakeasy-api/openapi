@@ -13,7 +13,7 @@ import (
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // MapGetter interface for syncing operations

@@ -7,7 +7,7 @@ import (
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath/config"
 	"github.com/speakeasy-api/openapi/internal/version"
 	"github.com/vmware-labs/yaml-jsonpath/pkg/yamlpath"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // Queryable is an interface for querying YAML nodes using JSONPath expressions.
