@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // LoadConfig loads lint configuration from a YAML reader.

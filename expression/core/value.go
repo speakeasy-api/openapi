@@ -1,5 +1,5 @@
 package core
 
-import "gopkg.in/yaml.v3"
+import "go.yaml.in/yaml/v3"
 
 type ValueOrExpression = *yaml.Node

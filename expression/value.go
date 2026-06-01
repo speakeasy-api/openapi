@@ -1,7 +1,7 @@
 package expression
 
 import (
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // ValueOrExpression represents a raw value or expression in the Arazzo document.
