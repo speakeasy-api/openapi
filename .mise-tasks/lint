@@ -3,17 +3,22 @@ set -euo pipefail
 
 echo "🔍 Running linting checks..."
 
-GOLANGCI_VERSION=$(golangci-lint --version | grep -oP 'golangci-lint has version \K[0-9.]+' || echo "unknown")
+GOLANGCI_VERSION=$(golangci-lint --version | sed -nE 's/.*golangci-lint has version ([0-9.]+).*/\1/p')
+GOLANGCI_VERSION=${GOLANGCI_VERSION:-unknown}
 echo "🧹 Running golangci-lint v${GOLANGCI_VERSION} (includes go vet)..."
 golangci-lint run
 
 echo "🛡️  Running nilaway..."
-if command -v nilaway >/dev/null 2>&1; then
-    nilaway -test=false ./...
-else
+NILAWAY_BIN=$(command -v nilaway || true)
+if [ -z "$NILAWAY_BIN" ]; then
     echo "⚠️  nilaway not found, installing..."
     go install go.uber.org/nilaway/cmd/nilaway@8ad05f0
-    nilaway -test=false ./...
+    GO_BIN=$(go env GOBIN)
+    if [ -z "$GO_BIN" ]; then
+        GO_BIN="$(go env GOPATH)/bin"
+    fi
+    NILAWAY_BIN="$GO_BIN/nilaway"
 fi
+"$NILAWAY_BIN" -test=false ./...
 
 echo "✅ All linting checks passed!"

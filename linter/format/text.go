@@ -91,7 +91,7 @@ func (f *TextFormatter) Format(results []error) (string, error) {
 
 	if len(results) > 0 {
 		sb.WriteString("\n")
-		sb.WriteString(fmt.Sprintf("✖ %d problems (%d errors, %d warnings, %d hints)\n", len(results), errorCount, warningCount, hintCount))
+		fmt.Fprintf(&sb, "✖ %d problems (%d errors, %d warnings, %d hints)\n", len(results), errorCount, warningCount, hintCount)
 	}
 
 	return sb.String(), nil

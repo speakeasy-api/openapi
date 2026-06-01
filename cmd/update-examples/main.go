@@ -236,7 +236,7 @@ func generateReadmeContent(examples []ExampleInfo) string {
 
 	// Generate content in the order examples appear in the file
 	for _, example := range examples {
-		content.WriteString(fmt.Sprintf("## %s\n\n", example.Title))
+		fmt.Fprintf(&content, "## %s\n\n", example.Title)
 
 		// Add description if available
 		if example.Description != "" {
@@ -279,5 +279,5 @@ func updateReadmeFile(filename, newContent string) error {
 	newFileContent := before + "\n\n" + newContent + after
 
 	// Write the updated content
-	return os.WriteFile(filename, []byte(newFileContent), 0600)
+	return os.WriteFile(filename, []byte(newFileContent), 0600) // #nosec G703 -- filename is a trusted repository README path from local tooling
 }

@@ -33,7 +33,7 @@ func resolveModulePath(path string, searchPaths []string) (string, error) {
 	}
 
 	if filepath.IsAbs(path) {
-		if _, err := os.Stat(path); err == nil {
+		if _, err := os.Stat(path); err == nil { // #nosec G703 -- module path is an explicit user-provided query input
 			return path, nil
 		}
 	}
@@ -47,7 +47,7 @@ func resolveModulePath(path string, searchPaths []string) (string, error) {
 
 	for _, dir := range allPaths {
 		full := filepath.Join(dir, path)
-		if _, err := os.Stat(full); err == nil {
+		if _, err := os.Stat(full); err == nil { // #nosec G703 -- module path is resolved from configured search paths
 			return full, nil
 		}
 	}

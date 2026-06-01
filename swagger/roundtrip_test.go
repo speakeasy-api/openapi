@@ -80,6 +80,9 @@ func TestSwagger_RoundTrip(t *testing.T) {
 			s, validationErrs, err := swagger.Unmarshal(ctx, tee, swagger.WithSkipValidation())
 			require.NoError(t, err)
 			assert.Empty(t, validationErrs)
+			if !strings.HasPrefix(tt.location, "testdata/") && (s.GetSwagger() == "" || s.GetInfo().GetTitle() == "") {
+				t.Skipf("external fixture did not return a valid Swagger document: %s", tt.location)
+			}
 
 			outBuf := bytes.NewBuffer([]byte{})
 

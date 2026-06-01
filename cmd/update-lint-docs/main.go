@@ -81,7 +81,7 @@ func generateRulesTable(docGen *linter.DocGenerator[*openapi.OpenAPI]) string {
 		desc := strings.ReplaceAll(doc.Description, "|", "\\|")
 		// Replace newlines with spaces
 		desc = strings.ReplaceAll(desc, "\n", " ")
-		content.WriteString(fmt.Sprintf("| <a name=\"%s\"></a>`%s` | %s | %s |\n", doc.ID, doc.ID, doc.DefaultSeverity, desc))
+		fmt.Fprintf(&content, "| <a name=\"%s\"></a>`%s` | %s | %s |\n", doc.ID, doc.ID, doc.DefaultSeverity, desc)
 	}
 
 	return content.String()
@@ -114,7 +114,7 @@ func updateReadmeFile(filename, newContent string) error {
 	newFileContent := before + "\n\n" + newContent + "\n" + after
 
 	// Write the updated content
-	return os.WriteFile(filename, []byte(newFileContent), 0600)
+	return os.WriteFile(filename, []byte(newFileContent), 0600) // #nosec G703 -- filename is a trusted repository README path from local tooling
 }
 
 func updateRuleLinks() error {
@@ -170,7 +170,7 @@ func updateRuleLinks() error {
 
 		// Only write if content changed
 		if newContent != content {
-			if err := os.WriteFile(filePath, []byte(newContent), 0600); err != nil {
+			if err := os.WriteFile(filePath, []byte(newContent), 0600); err != nil { // #nosec G703 -- filePath is constrained to local linter rule source files
 				return fmt.Errorf("failed to write %s: %w", filePath, err)
 			}
 			updatedCount++
