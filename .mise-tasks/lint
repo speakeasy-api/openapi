@@ -3,10 +3,11 @@ set -euo pipefail
 
 echo "🔍 Running linting checks..."
 
-GOLANGCI_VERSION=$(golangci-lint --version | sed -nE 's/.*golangci-lint has version ([0-9.]+).*/\1/p')
+GOLANGCI_LINT=(mise exec -- golangci-lint)
+GOLANGCI_VERSION=$("${GOLANGCI_LINT[@]}" --version | sed -nE 's/.*golangci-lint has version ([0-9.]+).*/\1/p')
 GOLANGCI_VERSION=${GOLANGCI_VERSION:-unknown}
 echo "🧹 Running golangci-lint v${GOLANGCI_VERSION} (includes go vet)..."
-golangci-lint run
+"${GOLANGCI_LINT[@]}" run
 
 echo "🛡️  Running nilaway..."
 NILAWAY_BIN=$(command -v nilaway || true)

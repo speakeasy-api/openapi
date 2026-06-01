@@ -52,6 +52,9 @@ linters:
         linters:
           - gosec
   settings:
+    govet:
+      disable:
+        - inline
     errcheck:
       exclude-functions:
         - (io.Closer).Close
