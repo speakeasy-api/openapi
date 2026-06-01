@@ -30,7 +30,7 @@
 - **Remove, Update, and Copy Actions**: Support for remove actions (pruning nodes), update actions (merging values), and copy actions (duplicating or moving nodes)
 - **Flexible Input/Output**: Works with both YAML and JSON formats
 - **Batch Operations**: Apply multiple modifications to large numbers of nodes in a single operation
-- **YAML v1.2 Support**: Uses [gopkg.in/yaml.v3](https://pkg.go.dev/gopkg.in/yaml.v3) for YAML v1.2 parsing (superset of JSON)
+- **YAML v1.2 Support**: Uses [go.yaml.in/yaml/v3](https://pkg.go.dev/go.yaml.in/yaml/v3) for YAML v1.2 parsing (superset of JSON)
 
 ## About OpenAPI Overlays
 

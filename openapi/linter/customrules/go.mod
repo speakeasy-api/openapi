@@ -10,7 +10,7 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/speakeasy-api/openapi v1.22.1-0.20260408022107-7a9aee7c092c
 	github.com/stretchr/testify v1.11.1
-	gopkg.in/yaml.v3 v3.0.1
+	go.yaml.in/yaml/v3 v3.0.4
 )
 
 require (
@@ -23,4 +23,5 @@ require (
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
