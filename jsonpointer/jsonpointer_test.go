@@ -368,6 +368,14 @@ func TestGetTarget_Error(t *testing.T) {
 			wantErr: errors.New("not found -- slice is nil at /0"),
 		},
 		{
+			name: "nil source",
+			args: args{
+				source:  nil,
+				pointer: JSONPointer("/key1"),
+			},
+			wantErr: errors.New("not found -- source is nil at /key1"),
+		},
+		{
 			name: "nil struct",
 			args: args{
 				source:  (*TestStruct)(nil),
