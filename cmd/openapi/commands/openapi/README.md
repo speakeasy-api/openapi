@@ -1260,7 +1260,7 @@ openapi spec query --format json 'schemas | where(isComponent) | take(5)' ./spec
 
 | Flag       | Short | Description                                                     |
 | ---------- | ----- | --------------------------------------------------------------- |
-| `--format` |       | Output format: `table` (default), `json`, `markdown`, or `toon` |
+| `--format` |       | Output format: `table` (default), `json`, `markdown`, `toon`, or `gcf` |
 | `--file`   | `-f`  | Read query from file instead of argument                        |
 
 For the full query language reference, run `openapi spec query-reference`.

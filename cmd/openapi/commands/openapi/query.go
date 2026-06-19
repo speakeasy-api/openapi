@@ -36,7 +36,7 @@ Pipeline stages:
                group-by(field), group-by(field, name_field), length
   Variables:   let $var = expr
   Functions:   def name: body;  def name($p): body;  include "file.oq";
-  Output:      to-yaml, format(table|json|markdown|toon)
+  Output:      to-yaml, format(table|json|markdown|toon|gcf)
   Meta:        explain, fields
 
 Operators: ==, !=, >, <, >=, <=, and, or, not, // (or default), has(),

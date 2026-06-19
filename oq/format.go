@@ -223,8 +223,7 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 }
 
 // FormatGCF formats a result using GCF (Graph Compact Format).
-// GCF uses positional pipe-delimited rows with inline schemas, achieving
-// higher LLM comprehension accuracy than TOON or JSON (90.7% vs 68.5% vs 53.6%).
+// GCF uses positional pipe-delimited rows with inline schemas.
 // See https://gcformat.com
 func FormatGCF(result *Result, g *graph.SchemaGraph) string {
 	if result.Explain != "" {

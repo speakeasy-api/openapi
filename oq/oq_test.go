@@ -1412,6 +1412,98 @@ func TestFormatToon_Explain(t *testing.T) {
 	assert.Contains(t, toon, "Source: schemas", "toon should render explain output")
 }
 
+func TestFormatGCF_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | where(isComponent) | take(3) | select name, type", g)
+	require.NoError(t, err)
+
+	out := oq.FormatGCF(result, g)
+	assert.Contains(t, out, "GCF profile=generic", "gcf should have profile header")
+	assert.Contains(t, out, "{name,type}", "gcf should declare field names")
+	assert.Contains(t, out, "object", "gcf should include object type value")
+}
+
+func TestFormatGCF_Count_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | length", g)
+	require.NoError(t, err)
+
+	out := oq.FormatGCF(result, g)
+	assert.Contains(t, out, "count=", "gcf count should use key=value format")
+}
+
+func TestFormatGCF_Groups_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | where(isComponent) | group-by(type)", g)
+	require.NoError(t, err)
+
+	out := oq.FormatGCF(result, g)
+	assert.Contains(t, out, "GCF profile=generic", "gcf should have profile header")
+	assert.Contains(t, out, "{count,key,names}", "gcf should declare group fields")
+}
+
+func TestFormatGCF_Empty_Success(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute(`schemas | where(isComponent) | where(name == "NonExistent")`, g)
+	require.NoError(t, err)
+
+	out := oq.FormatGCF(result, g)
+	assert.Contains(t, out, "GCF profile=generic", "empty gcf should still have profile header")
+}
+
+func TestFormatGCF_BoolAndIntFields(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | where(isComponent) | take(1) | select name, depth, isComponent", g)
+	require.NoError(t, err)
+
+	out := oq.FormatGCF(result, g)
+	assert.NotEmpty(t, out, "gcf output should not be empty")
+	assert.Contains(t, out, "GCF profile=generic", "gcf should have profile header")
+}
+
+func TestFormatGCF_SpecialChars(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | where(isComponent) | take(1) | select name, hash, location", g)
+	require.NoError(t, err)
+
+	out := oq.FormatGCF(result, g)
+	assert.Contains(t, out, "GCF profile=generic", "gcf should have profile header")
+	assert.Contains(t, out, "{hash,location,name}", "gcf should declare fields with special-char values")
+}
+
+func TestFormatGCF_Explain(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | where(depth > 0) | explain", g)
+	require.NoError(t, err)
+
+	out := oq.FormatGCF(result, g)
+	assert.Contains(t, out, "Source: schemas", "gcf should render explain output as-is")
+}
+
+func TestFormatGCF_InlinePipeline(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+
+	result, err := oq.Execute("schemas | where(isComponent) | take(3) | format(gcf)", g)
+	require.NoError(t, err)
+
+	assert.Equal(t, "gcf", result.FormatHint, "format(gcf) should set FormatHint")
+}
+
 func TestFormatMarkdown_Explain(t *testing.T) {
 	t.Parallel()
 	g := loadTestGraph(t)
