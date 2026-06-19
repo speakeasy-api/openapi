@@ -350,10 +350,22 @@ func toonValue(v expr.Value) string {
 	case expr.KindBool:
 		return strconv.FormatBool(v.Bool)
 	case expr.KindArray:
-		return toonEscape(strings.Join(v.Arr, ";"))
+		return toonArrayValue(v.Arr)
 	default:
 		return "null"
 	}
+}
+
+func toonArrayValue(values []string) string {
+	parts := make([]string, len(values))
+	for i, value := range values {
+		if strings.Contains(value, ";") {
+			parts[i] = toonQuote(value)
+			continue
+		}
+		parts[i] = toonEscape(value)
+	}
+	return strings.Join(parts, ";")
 }
 
 // toonEscape quotes a string if it needs escaping for TOON format.
@@ -387,7 +399,10 @@ func toonEscape(s string) string {
 	if !needsQuote {
 		return s
 	}
-	// Quote with escaping
+	return toonQuote(s)
+}
+
+func toonQuote(s string) string {
 	var sb strings.Builder
 	sb.WriteByte('"')
 	for _, ch := range s {
