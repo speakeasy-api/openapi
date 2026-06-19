@@ -127,6 +127,9 @@ func getTarget(source any, currentPart navigationPart, stack []navigationPart, c
 	}
 
 	sourceType := reflect.TypeOf(source)
+	if sourceType == nil {
+		return nil, nil, ErrNotFound.Wrap(fmt.Errorf("source is nil at %s", currentPath))
+	}
 	sourceElemType := sourceType
 
 	if sourceType.Kind() == reflect.Ptr {
