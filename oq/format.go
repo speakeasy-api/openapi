@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	gcf "github.com/blackwell-systems/gcf-go"
 	"github.com/speakeasy-api/openapi/graph"
 	"github.com/speakeasy-api/openapi/oq/expr"
 	"gopkg.in/yaml.v3"
@@ -219,6 +220,54 @@ func FormatToon(result *Result, g *graph.SchemaGraph) string {
 	}
 
 	return sb.String()
+}
+
+// FormatGCF formats a result using GCF (Graph Compact Format).
+// GCF uses positional pipe-delimited rows with inline schemas, achieving
+// higher LLM comprehension accuracy than TOON or JSON (90.7% vs 68.5% vs 53.6%).
+// See https://gcformat.com
+func FormatGCF(result *Result, g *graph.SchemaGraph) string {
+	if result.Explain != "" {
+		return result.Explain
+	}
+
+	if result.IsCount {
+		return gcf.EncodeGeneric(map[string]interface{}{"count": result.Count})
+	}
+
+	syncGroupsFromRows(result)
+
+	if len(result.Rows) == 0 {
+		return gcf.EncodeGeneric([]interface{}{})
+	}
+
+	fields := result.Fields
+	if len(fields) == 0 {
+		fields = resolveDefaultFields(result.Rows)
+	}
+
+	rows := make([]interface{}, 0, len(result.Rows))
+	for _, row := range result.Rows {
+		m := make(map[string]interface{}, len(fields))
+		for _, f := range fields {
+			v := fieldValue(row, f, g)
+			switch v.Kind {
+			case expr.KindString:
+				m[f] = v.Str
+			case expr.KindInt:
+				m[f] = v.Int
+			case expr.KindBool:
+				m[f] = v.Bool
+			case expr.KindArray:
+				m[f] = v.Arr
+			default:
+				m[f] = nil
+			}
+		}
+		rows = append(rows, m)
+	}
+
+	return gcf.EncodeGeneric(rows)
 }
 
 // FormatYAML formats results as raw YAML from the underlying schema/operation objects.

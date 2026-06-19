@@ -1,6 +1,6 @@
 module github.com/speakeasy-api/openapi
 
-go 1.25.0
+go 1.26.1
 
 require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
@@ -13,6 +13,7 @@ require (
 )
 
 require (
+	github.com/blackwell-systems/gcf-go v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dlclark/regexp2 v1.11.4 // indirect
 	github.com/dprotaso/go-yit v0.0.0-20191028211022-135eb7262960 // indirect
