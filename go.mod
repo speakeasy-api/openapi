@@ -3,6 +3,7 @@ module github.com/speakeasy-api/openapi
 go 1.25.0
 
 require (
+	github.com/blackwell-systems/gcf-go v1.2.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/speakeasy-api/jsonpath v0.6.3
 	github.com/stretchr/testify v1.11.1

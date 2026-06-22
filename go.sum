@@ -1,3 +1,5 @@
+github.com/blackwell-systems/gcf-go v1.2.2 h1:oPc9VbC5DDMPek/RMWO3zVcImVr3QTOcCIgBOLcjNRk=
+github.com/blackwell-systems/gcf-go v1.2.2/go.mod h1:E4fW1kxdrIoWxlI4iwZL8mh7BvdLTkE88NyijtGGcZc=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

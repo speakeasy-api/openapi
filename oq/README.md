@@ -113,7 +113,7 @@ Navigate into the internal structure of operations. These stages produce new row
 |-------|-------------|
 | `explain` | Print query plan |
 | `fields` | List available fields |
-| `format(fmt)` | Set output format (table/json/markdown/toon) |
+| `format(fmt)` | Set output format (table/json/markdown/toon/gcf) |
 | `to-yaml` | Output raw YAML nodes from underlying spec objects |
 
 The `to-yaml` stage uses `path` (JSON pointer) as the wrapper key for each emitted node, giving full attribution to the source location in the spec.
@@ -349,6 +349,7 @@ openapi spec query 'schemas | take(5) | format(markdown)' spec.yaml
 | `json` | JSON array |
 | `markdown` | Markdown table |
 | `toon` | [TOON](https://github.com/toon-format/toon) tabular format |
+| `gcf` | [GCF](https://gcformat.com) pipe-delimited format with inline schemas |
 
 ## Examples
 

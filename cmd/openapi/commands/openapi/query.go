@@ -36,7 +36,7 @@ Pipeline stages:
                group-by(field), group-by(field, name_field), length
   Variables:   let $var = expr
   Functions:   def name: body;  def name($p): body;  include "file.oq";
-  Output:      to-yaml, format(table|json|markdown|toon)
+  Output:      to-yaml, format(table|json|markdown|toon|gcf)
   Meta:        explain, fields
 
 Operators: ==, !=, >, <, >=, <=, and, or, not, // (or default), has(),
@@ -60,7 +60,7 @@ var queryOutputFormat string
 var queryFromFile string
 
 func init() {
-	queryCmd.Flags().StringVar(&queryOutputFormat, "format", "table", "output format: table, json, markdown, or toon")
+	queryCmd.Flags().StringVar(&queryOutputFormat, "format", "table", "output format: table, json, markdown, toon, or gcf")
 	queryCmd.Flags().StringVarP(&queryFromFile, "file", "f", "", "read query from file instead of argument")
 
 	// Custom help template: Usage + Flags together, then Examples last
@@ -167,6 +167,8 @@ func queryOpenAPI(ctx context.Context, processor *OpenAPIProcessor, queryStr str
 		output = oq.FormatMarkdown(result, g)
 	case "toon":
 		output = oq.FormatToon(result, g)
+	case "gcf":
+		output = oq.FormatGCF(result, g)
 	default:
 		output = oq.FormatTable(result, g)
 	}

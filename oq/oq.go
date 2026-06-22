@@ -85,7 +85,7 @@ type Result struct {
 	Count      int
 	Groups     []GroupResult
 	Explain    string // human-readable pipeline explanation
-	FormatHint string // format preference from format stage (table, json, markdown, toon)
+	FormatHint string // format preference from format stage (table, json, markdown, toon, gcf)
 	EmitYAML   bool   // emit raw YAML nodes instead of formatted output
 }
 
