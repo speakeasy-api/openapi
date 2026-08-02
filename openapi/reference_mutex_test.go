@@ -69,15 +69,20 @@ func TestEnsureMutex_CopiedReference(t *testing.T) {
 // reentrant, so a pointer whose prefix named the reference being resolved
 // blocked forever on a lock its own goroutine held.
 //
-// Each case below is a document that hung before the fix. The expected result
-// is an unresolved-reference error, which is what every other pointer that
-// names nothing already produced.
+// Each case below is a document that hung before the fix.
+//
+// Resolution is only half of it. A pointer that names a reference already in
+// the chain also leaves that reference's resolution cache pointing back into
+// the chain, so every case asserts GetObject afterwards: walking a cycle there
+// exhausts the goroutine stack, which aborts the test binary outright rather
+// than failing a single case.
 func TestResolveAllReferences_PointerTraversingItsOwnReference(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		spec string
+		name        string
+		spec        string
+		expectedErr string
 	}{
 		{
 			name: "prefix names the reference being resolved",
@@ -86,6 +91,7 @@ info: {title: t, version: "1"}
 paths:
   /a: {$ref: '#/paths/~1a/t'}
 `,
+			expectedErr: "unresolved reference",
 		},
 		{
 			name: "prefix names the reference and the pointer resolves",
@@ -96,6 +102,7 @@ paths:
     $ref: '#/paths/~1a/get'
     get: {operationId: a, responses: {"200": {description: ok}}}
 `,
+			expectedErr: "unresolved reference",
 		},
 		{
 			name: "prefix reaches the in-flight reference through a resolved one",
@@ -105,6 +112,7 @@ paths:
   /a: {$ref: '#/paths/~1b'}
   /b: {$ref: '#/paths/~1a/t'}
 `,
+			expectedErr: "unresolved reference",
 		},
 		{
 			name: "components spelling",
@@ -116,6 +124,7 @@ components:
   pathItems:
     A: {$ref: '#/components/pathItems/A/t'}
 `,
+			expectedErr: "unresolved reference",
 		},
 		{
 			name: "webhooks spelling",
@@ -125,13 +134,13 @@ paths: {}
 webhooks:
   onA: {$ref: '#/webhooks/onA/t'}
 `,
+			expectedErr: "unresolved reference",
 		},
 		{
 			// GetJSONPointer trims the pointer, so this names /a and the
-			// reference resolves to itself. Before the fix the resolution cache
-			// pointed at its own reference and GetObject's delegation at the end
-			// of the cache-hit branch recursed until the stack was exhausted,
-			// taking the process with it rather than failing the test.
+			// reference resolves to itself. The tracker reports that, but the
+			// reference is left holding a resolution cache that points at
+			// itself, so it is GetObject below that this case guards.
 			name: "reference resolving to itself via a trimmed pointer",
 			spec: `openapi: 3.1.0
 info: {title: t, version: "1"}
@@ -140,6 +149,25 @@ paths:
     $ref: '#/paths/~1a '
     get: {operationId: a, responses: {"200": {description: ok}}}
 `,
+			expectedErr: "circular reference detected: test.yaml#/paths/~1a -> test.yaml#/paths/~1a",
+		},
+		{
+			// Same shape one hop wider: /a's cache points at /b and /b's points
+			// back at /a. The tracker only notices on the third hop, by which
+			// point both caches are published, so neither reference is a
+			// self-reference and the cycle only shows up when walking them.
+			name: "two references resolving to each other via trimmed pointers",
+			spec: `openapi: 3.1.0
+info: {title: t, version: "1"}
+paths:
+  /a:
+    $ref: '#/paths/~1b '
+    get: {operationId: a, responses: {"200": {description: ok}}}
+  /b:
+    $ref: '#/paths/~1a '
+    get: {operationId: b, responses: {"200": {description: ok}}}
+`,
+			expectedErr: "circular reference detected: test.yaml#/paths/~1b -> test.yaml#/paths/~1a -> test.yaml#/paths/~1b",
 		},
 	}
 
@@ -166,11 +194,93 @@ paths:
 
 			select {
 			case got := <-done:
-				assert.True(t, got.err != nil || len(got.resolveErrs) > 0,
-					"a pointer that names nothing should report an error")
+				require.Error(t, got.err)
+				assert.Contains(t, got.err.Error(), tt.expectedErr)
+				assert.Empty(t, got.resolveErrs)
 			case <-time.After(30 * time.Second):
 				t.Fatal("ResolveAllReferences deadlocked resolving a reference whose pointer traverses itself")
 			}
+
+			// None of these resolved, so none of them have an object. Reaching
+			// that verdict must not walk a cycle.
+			for path, pathItem := range doc.Paths.All() {
+				assert.Nil(t, pathItem.GetObject(), "path %s should have no resolved object", path)
+			}
+			for name, webhook := range doc.Webhooks.All() {
+				assert.Nil(t, webhook.GetObject(), "webhook %s should have no resolved object", name)
+			}
+		})
+	}
+}
+
+// TestGetObject_ChainWalking covers the two ends of GetObject's chain walk: a
+// chain of references that terminates has to be followed all the way to the
+// object, and one that does not terminate has to give up.
+func TestGetObject_ChainWalking(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		spec        string
+		expectedOp  string
+		expectedErr string
+	}{
+		{
+			name: "multi-hop chain reaches the object",
+			spec: `openapi: 3.1.0
+info: {title: t, version: "1"}
+paths:
+  /a: {$ref: '#/components/pathItems/A'}
+components:
+  pathItems:
+    A: {$ref: '#/components/pathItems/B'}
+    B: {$ref: '#/components/pathItems/C'}
+    C: {get: {operationId: c, responses: {"200": {description: ok}}}}
+`,
+			expectedOp: "c",
+		},
+		{
+			name: "circular chain reports no object",
+			spec: `openapi: 3.1.0
+info: {title: t, version: "1"}
+paths:
+  /a: {$ref: '#/components/pathItems/A'}
+components:
+  pathItems:
+    A: {$ref: '#/components/pathItems/B'}
+    B: {$ref: '#/components/pathItems/A'}
+`,
+			expectedErr: "circular reference detected",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := t.Context()
+			doc, _, err := Unmarshal(ctx, strings.NewReader(tt.spec))
+			require.NoError(t, err)
+
+			_, err = doc.ResolveAllReferences(ctx, ResolveAllOptions{
+				OpenAPILocation:     "test.yaml",
+				DisableExternalRefs: true,
+			})
+
+			pathItem, ok := doc.Paths.Get("/a")
+			require.True(t, ok)
+
+			if tt.expectedErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+				assert.Nil(t, pathItem.GetObject())
+				return
+			}
+
+			require.NoError(t, err)
+			obj := pathItem.GetObject()
+			require.NotNil(t, obj)
+			assert.Equal(t, tt.expectedOp, obj.Get().GetOperationID())
 		})
 	}
 }

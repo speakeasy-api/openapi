@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -290,15 +291,38 @@ func (r *Reference[T, V, C]) GetObject() *T {
 		return r.Object
 	}
 
-	r.ensureMutex()
-	r.cacheMutex.RLock()
-	defer r.cacheMutex.RUnlock()
+	// Walk the resolution chain rather than recursing through it. A reference
+	// whose pointer names a reference already in the chain publishes a cache
+	// entry that closes the loop: a reference can resolve to itself, and two
+	// references can resolve to each other. Recursing through that exhausts the
+	// goroutine stack, so track what has been seen and report the reference as
+	// unresolved instead.
+	//
+	// The array sizes the common case; deeper chains grow onto the heap.
+	var backing [8]*Reference[T, V, C]
+	seen := backing[:0]
 
-	if (r.referenceResolutionCache != nil && r.referenceResolutionCache.Object != nil) || r.circularErrorFound {
-		if r.referenceResolutionCache != nil && r.referenceResolutionCache.Object != nil {
-			return r.referenceResolutionCache.Object.GetObject()
+	for current := r; current != nil; {
+		if !current.IsReference() {
+			return current.Object
 		}
+
+		if slices.Contains(seen, current) {
+			return nil
+		}
+		seen = append(seen, current)
+
+		current.ensureMutex()
+		current.cacheMutex.RLock()
+		cache := current.referenceResolutionCache
+		current.cacheMutex.RUnlock()
+
+		if cache == nil {
+			return nil
+		}
+		current = cache.Object
 	}
+
 	return nil
 }
 
@@ -649,8 +673,13 @@ func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.Co
 		} else {
 			topLevel = ref
 		}
-		nextRef.SetParent(ref)
-		nextRef.SetTopLevelParent(topLevel)
+		// A reference can resolve to itself, in which case parenting it to
+		// itself would make GetParent/GetTopLevelParent loop for anyone walking
+		// the chain. The recursive call below reports it as circular.
+		if nextRef != ref {
+			nextRef.SetParent(ref)
+			nextRef.SetTopLevelParent(topLevel)
+		}
 
 		// For chained resolutions, we need to use the resolved document from the previous step
 		// The ResolveResult.ResolvedDocument should be used as the new TargetDocument
