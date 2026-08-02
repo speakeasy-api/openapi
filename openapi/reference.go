@@ -533,18 +533,24 @@ func (r *Reference[T, V, C]) resolve(ctx context.Context, opts references.Resolv
 	}
 	r.cacheMutex.RUnlock()
 
-	// Need to resolve (with write lock)
+	// Need to resolve. Take the write lock only for the double-check, then
+	// release it: references.Resolve navigates the document and calls GetObject
+	// on references it traverses, which takes a read lock. sync.RWMutex is not
+	// reentrant, so holding the write lock across that call self-deadlocks when
+	// the traversal reaches this reference (directly or via a cache forward).
 	r.cacheMutex.Lock()
-	defer r.cacheMutex.Unlock()
 
 	// Double-check after acquiring write lock
 	if r.referenceResolutionCache != nil {
+		defer r.cacheMutex.Unlock()
 		if r.referenceResolutionCache.Object.IsReference() {
 			return nil, r.referenceResolutionCache.Object, r.validationErrsCache, nil
 		} else {
 			return r.referenceResolutionCache.Object.Object, nil, r.validationErrsCache, nil
 		}
 	}
+
+	r.cacheMutex.Unlock()
 
 	rootDoc, ok := opts.RootDocument.(*OpenAPI)
 	if !ok {
@@ -563,6 +569,16 @@ func (r *Reference[T, V, C]) resolve(ctx context.Context, opts references.Resolv
 	result, validationErrs, err := references.Resolve(ctx, *r.Reference, unmarshaler[T, V, C](rootDoc), resolveOpts)
 	if err != nil {
 		return nil, nil, validationErrs, err
+	}
+
+	// Re-acquire to publish the result.
+	r.cacheMutex.Lock()
+	defer r.cacheMutex.Unlock()
+	if r.referenceResolutionCache != nil {
+		if r.referenceResolutionCache.Object.IsReference() {
+			return nil, r.referenceResolutionCache.Object, r.validationErrsCache, nil
+		}
+		return r.referenceResolutionCache.Object.Object, nil, r.validationErrsCache, nil
 	}
 
 	r.referenceResolutionCache = result
