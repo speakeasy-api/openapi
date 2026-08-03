@@ -11,18 +11,18 @@ jobs:
     name: Lint and Format Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Setup Go with caching
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: "go.work"
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@v4.2.3
         with:
           experimental: true
 
@@ -47,18 +47,18 @@ jobs:
     needs: [lint]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Setup Go with caching
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: "go.work"
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@v4.2.3
 
       # Verify Docker is available for testcontainers (Ubuntu only)
       - name: Verify Docker availability
@@ -73,7 +73,7 @@ jobs:
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
       - name: Cache downloaded test files
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/speakeasy-api_arazzo
           key: arazzo-test-files-${{ steps.date.outputs.date }}
@@ -101,18 +101,18 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Setup Go with caching
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: "go.work"
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@v4.2.3
 
       # Verify Docker is available for testcontainers
       - name: Verify Docker availability
@@ -126,7 +126,7 @@ jobs:
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
       - name: Cache downloaded test files
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/speakeasy-api_arazzo
           key: arazzo-test-files-${{ steps.date.outputs.date }}
@@ -219,18 +219,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Setup Go with caching
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: "go.work"
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@v4.2.3
 
       - name: Build project
         run: mise run build
@@ -240,18 +240,18 @@ jobs:
     runs-on: windows-latest
     needs: [lint]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Setup Go with caching
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: "go.work"
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@v4.2.3
 
       - name: Build project
         run: go build -v ./...
@@ -262,18 +262,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Setup Go with caching
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: "go.work"
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@v4.2.3
 
       - name: Run CLI integration tests
         run: mise run test-cli
