@@ -557,24 +557,25 @@ func (r *Reference[T, V, C]) resolve(ctx context.Context, opts references.Resolv
 	}
 	r.cacheMutex.RUnlock()
 
-	// Need to resolve. Take the write lock only for the double-check, then
-	// release it: references.Resolve navigates the document and calls GetObject
-	// on references it traverses, which takes a read lock. sync.RWMutex is not
-	// reentrant, so holding the write lock across that call self-deadlocks when
-	// the traversal reaches this reference (directly or via a cache forward).
+	// Need to resolve, and that has to happen with the lock released:
+	// references.Resolve navigates the document and calls GetObject on
+	// references it traverses, which takes a read lock. sync.RWMutex is not
+	// reentrant, so holding this reference's lock across that call
+	// self-deadlocks when the traversal reaches it, directly or via a cache
+	// forward.
 	r.cacheMutex.Lock()
-
-	// Double-check after acquiring write lock
-	if r.referenceResolutionCache != nil {
-		defer r.cacheMutex.Unlock()
-		if r.referenceResolutionCache.Object.IsReference() {
-			return nil, r.referenceResolutionCache.Object, r.validationErrsCache, nil
-		} else {
-			return r.referenceResolutionCache.Object.Object, nil, r.validationErrsCache, nil
-		}
-	}
-
+	cache := r.referenceResolutionCache
+	cachedErrs := r.validationErrsCache
 	r.cacheMutex.Unlock()
+
+	// Double-check: another goroutine may have published between the read above
+	// and here.
+	if cache != nil {
+		if cache.Object.IsReference() {
+			return nil, cache.Object, cachedErrs, nil
+		}
+		return cache.Object.Object, nil, cachedErrs, nil
+	}
 
 	rootDoc, ok := opts.RootDocument.(*OpenAPI)
 	if !ok {
