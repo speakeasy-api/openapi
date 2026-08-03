@@ -202,15 +202,35 @@ paths:
 			}
 
 			// None of these resolved, so none of them have an object. Reaching
-			// that verdict must not walk a cycle.
+			// that verdict must not walk a cycle, and neither must walking the
+			// parent links the failed resolution left behind.
 			for path, pathItem := range doc.Paths.All() {
 				assert.Nil(t, pathItem.GetObject(), "path %s should have no resolved object", path)
+				assertParentLinksTerminate(t, path, pathItem)
 			}
 			for name, webhook := range doc.Webhooks.All() {
 				assert.Nil(t, webhook.GetObject(), "webhook %s should have no resolved object", name)
+				assertParentLinksTerminate(t, name, webhook)
 			}
 		})
 	}
+}
+
+// assertParentLinksTerminate walks the parent links a resolution attempt left
+// on ref and fails if they lead back to a reference already walked. A failed
+// resolution still publishes links, and callers reach them through the public
+// GetParent and GetTopLevelParent.
+func assertParentLinksTerminate(t *testing.T, label string, ref *ReferencedPathItem) {
+	t.Helper()
+
+	seen := map[*ReferencedPathItem]bool{}
+	for current := ref; current != nil; current = current.GetParent() {
+		require.False(t, seen[current], "%s: parent links cycle", label)
+		seen[current] = true
+	}
+
+	// The top-level parent is the head of the chain, never the reference itself.
+	assert.NotSame(t, ref, ref.GetTopLevelParent(), "%s: top-level parent points at itself", label)
 }
 
 // TestGetObject_ChainWalking covers the two ends of GetObject's chain walk: a

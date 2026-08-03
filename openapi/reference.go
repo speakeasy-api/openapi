@@ -235,7 +235,7 @@ func (r *Reference[T, V, C]) Resolve(ctx context.Context, opts ResolveOptions) (
 		DisableExternalRefs: opts.DisableExternalRefs,
 		VirtualFS:           opts.VirtualFS,
 		HTTPClient:          opts.HTTPClient,
-	}, []string{})
+	}, []string{}, nil)
 }
 
 // IsReference returns true if the reference is a reference (via $ref) to an object as opposed to an inline object.
@@ -615,8 +615,15 @@ func (r *Reference[T, V, C]) resolve(ctx context.Context, opts references.Resolv
 	}
 }
 
-// resolveObjectWithTracking recursively resolves references while tracking visited references to detect cycles
-func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, ref *Reference[T, V, C], opts references.ResolveOptions, referenceChain []string) ([]error, error) {
+// resolveObjectWithTracking recursively resolves references while tracking visited references to detect cycles.
+//
+// referenceChain holds the absolute reference of every hop so far and is what
+// reports a circular reference. resolvedChain holds the reference values behind
+// those hops, which the absolute references cannot stand in for: a pointer can
+// name a reference that is already in the chain, so the same value can appear
+// under two different absolute references. Parent links are only safe to set
+// for a value that is not already in the chain.
+func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, ref *Reference[T, V, C], opts references.ResolveOptions, referenceChain []string, resolvedChain []*Reference[T, V, C]) ([]error, error) {
 	// If this is not a reference, return the inline object
 	if !ref.IsReference() {
 		return nil, nil
@@ -651,6 +658,9 @@ func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.Co
 	newChain := referenceChain
 	newChain = append(newChain, absRef)
 
+	newResolvedChain := resolvedChain
+	newResolvedChain = append(newResolvedChain, ref)
+
 	// Resolve the current reference
 	obj, nextRef, validationErrs, err := ref.resolve(ctx, opts)
 	if err != nil {
@@ -673,10 +683,13 @@ func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.Co
 		} else {
 			topLevel = ref
 		}
-		// A reference can resolve to itself, in which case parenting it to
-		// itself would make GetParent/GetTopLevelParent loop for anyone walking
-		// the chain. The recursive call below reports it as circular.
-		if nextRef != ref {
+		// Only link a reference the chain has not already been through. A
+		// pointer can name a reference that is already resolving (its own, or
+		// one an earlier hop went through), and parenting that reference to its
+		// own descendant closes a loop in the links GetParent and
+		// GetTopLevelParent expose to callers. The recursive call below reports
+		// the cycle; leaving the links alone keeps them walkable meanwhile.
+		if !slices.Contains(newResolvedChain, nextRef) {
 			nextRef.SetParent(ref)
 			nextRef.SetTopLevelParent(topLevel)
 		}
@@ -691,7 +704,7 @@ func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.Co
 
 		opts.TargetDocument = targetDoc
 		opts.TargetLocation = targetLoc
-		return resolveObjectWithTracking(ctx, nextRef, opts, newChain)
+		return resolveObjectWithTracking(ctx, nextRef, opts, newChain, newResolvedChain)
 	}
 
 	return validationErrs, fmt.Errorf("unable to resolve reference: %s", ref.GetReference())

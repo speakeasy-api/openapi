@@ -408,7 +408,7 @@ func TestResolveObjectWithTracking_CircularReference(t *testing.T) {
 		TargetLocation: "/test.yaml",
 		RootDocument:   &OpenAPI{}, // Empty document for this test
 		TargetDocument: &OpenAPI{}, // Empty document for this test
-	}, referenceChain)
+	}, referenceChain, nil)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "circular reference detected")
