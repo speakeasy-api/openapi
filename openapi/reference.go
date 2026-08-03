@@ -235,7 +235,7 @@ func (r *Reference[T, V, C]) Resolve(ctx context.Context, opts ResolveOptions) (
 		DisableExternalRefs: opts.DisableExternalRefs,
 		VirtualFS:           opts.VirtualFS,
 		HTTPClient:          opts.HTTPClient,
-	}, []string{}, nil)
+	}, []string{})
 }
 
 // IsReference returns true if the reference is a reference (via $ref) to an object as opposed to an inline object.
@@ -616,15 +616,8 @@ func (r *Reference[T, V, C]) resolve(ctx context.Context, opts references.Resolv
 	}
 }
 
-// resolveObjectWithTracking recursively resolves references while tracking visited references to detect cycles.
-//
-// referenceChain holds the absolute reference of every hop so far and is what
-// reports a circular reference. resolvedChain holds the reference values behind
-// those hops, which the absolute references cannot stand in for: a pointer can
-// name a reference that is already in the chain, so the same value can appear
-// under two different absolute references. Parent links are only safe to set
-// for a value that is not already in the chain.
-func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, ref *Reference[T, V, C], opts references.ResolveOptions, referenceChain []string, resolvedChain []*Reference[T, V, C]) ([]error, error) {
+// resolveObjectWithTracking recursively resolves references while tracking visited references to detect cycles
+func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, ref *Reference[T, V, C], opts references.ResolveOptions, referenceChain []string) ([]error, error) {
 	// If this is not a reference, return the inline object
 	if !ref.IsReference() {
 		return nil, nil
@@ -659,9 +652,6 @@ func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.Co
 	newChain := referenceChain
 	newChain = append(newChain, absRef)
 
-	newResolvedChain := resolvedChain
-	newResolvedChain = append(newResolvedChain, ref)
-
 	// Resolve the current reference
 	obj, nextRef, validationErrs, err := ref.resolve(ctx, opts)
 	if err != nil {
@@ -684,13 +674,19 @@ func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.Co
 		} else {
 			topLevel = ref
 		}
-		// Only link a reference the chain has not already been through. A
-		// pointer can name a reference that is already resolving (its own, or
-		// one an earlier hop went through), and parenting that reference to its
-		// own descendant closes a loop in the links GetParent and
-		// GetTopLevelParent expose to callers. The recursive call below reports
-		// the cycle; leaving the links alone keeps them walkable meanwhile.
-		if !slices.Contains(newResolvedChain, nextRef) {
+		// Only link a reference that is not already an ancestor of this one.
+		// A pointer can name a reference the chain has been through (its own,
+		// or one an earlier hop went through), and parenting that reference to
+		// its own descendant closes a loop in the links GetParent and
+		// GetTopLevelParent expose to callers.
+		//
+		// Ancestry is read from the links rather than from this call's chain,
+		// because each member of a cycle can be resolved by a separate call:
+		// resolving /a leaves b.parent = a, and resolving /b afterwards starts
+		// a fresh chain that would otherwise add a.parent = b on top of it.
+		// The recursive call below reports the cycle either way; leaving the
+		// links alone keeps them walkable meanwhile.
+		if !isAncestor(ref, nextRef) && topLevel != nextRef {
 			nextRef.SetParent(ref)
 			nextRef.SetTopLevelParent(topLevel)
 		}
@@ -705,10 +701,33 @@ func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.Co
 
 		opts.TargetDocument = targetDoc
 		opts.TargetLocation = targetLoc
-		return resolveObjectWithTracking(ctx, nextRef, opts, newChain, newResolvedChain)
+		return resolveObjectWithTracking(ctx, nextRef, opts, newChain)
 	}
 
 	return validationErrs, fmt.Errorf("unable to resolve reference: %s", ref.GetReference())
+}
+
+// isAncestor reports whether candidate is ref itself or is reachable from ref by
+// following parent links, which is what makes candidate unsafe to parent to ref.
+//
+// The links are already acyclic, so the walk terminates; the seen set is there
+// so that a graph left cyclic by an older version stops the walk rather than
+// hanging the caller.
+func isAncestor[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ref, candidate *Reference[T, V, C]) bool {
+	var backing [8]*Reference[T, V, C]
+	seen := backing[:0]
+
+	for current := ref; current != nil; current = current.GetParent() {
+		if current == candidate {
+			return true
+		}
+		if slices.Contains(seen, current) {
+			return false
+		}
+		seen = append(seen, current)
+	}
+
+	return false
 }
 
 // joinReferenceChain joins the reference chain with arrows to show the circular path

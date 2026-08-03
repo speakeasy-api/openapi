@@ -233,6 +233,59 @@ func assertParentLinksTerminate(t *testing.T, label string, ref *ReferencedPathI
 	assert.NotSame(t, ref, ref.GetTopLevelParent(), "%s: top-level parent points at itself", label)
 }
 
+// TestResolve_SeparateCallsOverCycle covers the parent links when each member of
+// a cycle is resolved by its own call to the public Resolve.
+//
+// ResolveAllReferences walks the document once and skips references already
+// marked resolved, so it never revisits the second member. Resolve has no such
+// guard: it starts a fresh chain every time, and the links from the earlier call
+// are the only record that the two references already descend from each other.
+func TestResolve_SeparateCallsOverCycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	doc, _, err := Unmarshal(ctx, strings.NewReader(`openapi: 3.1.0
+info: {title: t, version: "1"}
+paths:
+  /a:
+    $ref: '#/paths/~1b '
+    get: {operationId: a, responses: {"200": {description: ok}}}
+  /b:
+    $ref: '#/paths/~1a '
+    get: {operationId: b, responses: {"200": {description: ok}}}
+`))
+	require.NoError(t, err)
+
+	pathA, ok := doc.Paths.Get("/a")
+	require.True(t, ok)
+	pathB, ok := doc.Paths.Get("/b")
+	require.True(t, ok)
+
+	opts := ResolveOptions{
+		RootDocument:        doc,
+		TargetDocument:      doc,
+		TargetLocation:      "test.yaml",
+		DisableExternalRefs: true,
+	}
+
+	// Both report the cycle; it is what they leave behind that matters.
+	_, err = pathA.Resolve(ctx, opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "circular reference detected")
+
+	_, err = pathB.Resolve(ctx, opts)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "circular reference detected")
+
+	assertParentLinksTerminate(t, "/a", pathA)
+	assertParentLinksTerminate(t, "/b", pathB)
+
+	// The second call must not parent /a under its own descendant.
+	assert.NotSame(t, pathB, pathA.GetParent(), "/a should not be parented under /b")
+	assert.Nil(t, pathA.GetObject(), "/a should have no resolved object")
+	assert.Nil(t, pathB.GetObject(), "/b should have no resolved object")
+}
+
 // TestGetObject_ChainWalking covers the two ends of GetObject's chain walk: a
 // chain of references that terminates has to be followed all the way to the
 // object, and one that does not terminate has to give up.
