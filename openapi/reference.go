@@ -401,6 +401,8 @@ func (r *Reference[T, V, C]) GetParent() *Reference[T, V, C] {
 	if r == nil {
 		return nil
 	}
+	referenceParentMutex.RLock()
+	defer referenceParentMutex.RUnlock()
 	return r.parent
 }
 
@@ -417,6 +419,8 @@ func (r *Reference[T, V, C]) GetTopLevelParent() *Reference[T, V, C] {
 	if r == nil {
 		return nil
 	}
+	referenceParentMutex.RLock()
+	defer referenceParentMutex.RUnlock()
 	return r.topLevelParent
 }
 
@@ -430,6 +434,8 @@ func (r *Reference[T, V, C]) SetParent(parent *Reference[T, V, C]) {
 	if r == nil {
 		return
 	}
+	referenceParentMutex.Lock()
+	defer referenceParentMutex.Unlock()
 	r.parent = parent
 }
 
@@ -443,6 +449,8 @@ func (r *Reference[T, V, C]) SetTopLevelParent(topLevelParent *Reference[T, V, C
 	if r == nil {
 		return
 	}
+	referenceParentMutex.Lock()
+	defer referenceParentMutex.Unlock()
 	r.topLevelParent = topLevelParent
 }
 
@@ -665,31 +673,8 @@ func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.Co
 
 	// If we got another reference, recursively resolve it with the resolved document as the new target
 	if nextRef != nil {
-		// Set parent links for the resolved reference
-		// The resolved reference's parent is the current reference
-		// The top-level parent is either the current reference's top-level parent, or the current reference if it's the top-level
-		var topLevel *Reference[T, V, C]
-		if ref.topLevelParent != nil {
-			topLevel = ref.topLevelParent
-		} else {
-			topLevel = ref
-		}
-		// Only link a reference that is not already an ancestor of this one.
-		// A pointer can name a reference the chain has been through (its own,
-		// or one an earlier hop went through), and parenting that reference to
-		// its own descendant closes a loop in the links GetParent and
-		// GetTopLevelParent expose to callers.
-		//
-		// Ancestry is read from the links rather than from this call's chain,
-		// because each member of a cycle can be resolved by a separate call:
-		// resolving /a leaves b.parent = a, and resolving /b afterwards starts
-		// a fresh chain that would otherwise add a.parent = b on top of it.
-		// The recursive call below reports the cycle either way; leaving the
-		// links alone keeps them walkable meanwhile.
-		if !isAncestor(ref, nextRef) && topLevel != nextRef {
-			nextRef.SetParent(ref)
-			nextRef.SetTopLevelParent(topLevel)
-		}
+		// Record that nextRef was reached by resolving ref.
+		linkResolvedParent(ref, nextRef)
 
 		// For chained resolutions, we need to use the resolved document from the previous step
 		// The ResolveResult.ResolvedDocument should be used as the new TargetDocument
@@ -707,17 +692,54 @@ func resolveObjectWithTracking[T any, V interfaces.Validator[T], C marshaller.Co
 	return validationErrs, fmt.Errorf("unable to resolve reference: %s", ref.GetReference())
 }
 
-// isAncestor reports whether candidate is ref itself or is reachable from ref by
-// following parent links, which is what makes candidate unsafe to parent to ref.
+// linkResolvedParent records that nextRef was reached by resolving ref: nextRef's
+// parent becomes ref, and its top-level parent becomes the head of ref's chain.
 //
-// The links are already acyclic, so the walk terminates; the seen set is there
-// so that a graph left cyclic by an older version stops the walk rather than
-// hanging the caller.
-func isAncestor[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ref, candidate *Reference[T, V, C]) bool {
+// The link is skipped when nextRef is already an ancestor of ref, because
+// parenting a reference to its own descendant closes a loop in the links that
+// GetParent and GetTopLevelParent expose to callers. A pointer can name a
+// reference the chain has been through -- its own, or one an earlier hop went
+// through -- and each member of a cycle can be resolved by a separate call, so
+// ancestry is read from the links rather than from any one call's chain. The
+// resolution tracker reports the cycle either way; leaving the links alone keeps
+// them walkable meanwhile.
+//
+// The check and both writes are one critical section. Resolvers running
+// concurrently would otherwise each see no ancestry and then publish opposite
+// edges, rebuilding exactly the cycle the check exists to prevent.
+func linkResolvedParent[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ref, nextRef *Reference[T, V, C]) {
+	if ref == nil || nextRef == nil {
+		return
+	}
+
+	referenceParentMutex.Lock()
+	defer referenceParentMutex.Unlock()
+
+	topLevel := ref.topLevelParent
+	if topLevel == nil {
+		topLevel = ref
+	}
+
+	if topLevel == nextRef || isAncestorLocked(ref, nextRef) {
+		return
+	}
+
+	nextRef.parent = ref
+	nextRef.topLevelParent = topLevel
+}
+
+// isAncestorLocked reports whether candidate is ref itself or is reachable from
+// ref by following parent links, which is what makes candidate unsafe to parent
+// to ref. Callers must hold referenceParentMutex; the walk reads the fields
+// directly rather than through GetParent, which would deadlock on it.
+//
+// The links are acyclic, so the walk terminates; the seen set is there so that a
+// graph left cyclic by an older version stops the walk rather than hanging.
+func isAncestorLocked[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ref, candidate *Reference[T, V, C]) bool {
 	var backing [8]*Reference[T, V, C]
 	seen := backing[:0]
 
-	for current := ref; current != nil; current = current.GetParent() {
+	for current := ref; current != nil; current = current.parent {
 		if current == candidate {
 			return true
 		}
@@ -766,6 +788,17 @@ func unmarshaler[T any, V interfaces.Validator[T], C marshaller.CoreModeler](_ *
 // referenceInitGlobalMutex serializes initialization of per-Reference mutexes
 // to avoid data races on r.initMutex when ensureMutex is called concurrently.
 var referenceInitGlobalMutex sync.Mutex
+
+// referenceParentMutex guards the parent and topLevelParent links of every
+// Reference.
+//
+// The links form one graph rather than per-reference state: deciding whether an
+// edge is safe to add means reading links that belong to other references, so a
+// per-reference lock could not make that check and the write that follows it a
+// single operation. One lock over the graph can. The links are only touched
+// when a reference is resolved or when a caller builds a chain by hand, so the
+// contention this trades for is negligible against the work of resolving.
+var referenceParentMutex sync.RWMutex
 
 // ensureMutex initializes the mutex if it's nil (lazy initialization).
 // Uses sync.Once (pointer) to guarantee thread-safe single initialization

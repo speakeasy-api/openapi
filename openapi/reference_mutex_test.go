@@ -152,6 +152,25 @@ paths:
 			expectedErr: "circular reference detected: test.yaml#/paths/~1a -> test.yaml#/paths/~1a",
 		},
 		{
+			// Three nodes, so the cycle closes a hop beyond anything a
+			// pairwise check would notice.
+			name: "three references forming a cycle via trimmed pointers",
+			spec: `openapi: 3.1.0
+info: {title: t, version: "1"}
+paths:
+  /a:
+    $ref: '#/paths/~1b '
+    get: {operationId: a, responses: {"200": {description: ok}}}
+  /b:
+    $ref: '#/paths/~1c '
+    get: {operationId: b, responses: {"200": {description: ok}}}
+  /c:
+    $ref: '#/paths/~1a '
+    get: {operationId: c, responses: {"200": {description: ok}}}
+`,
+			expectedErr: "circular reference detected: test.yaml#/paths/~1b -> test.yaml#/paths/~1c -> test.yaml#/paths/~1a -> test.yaml#/paths/~1b",
+		},
+		{
 			// Same shape one hop wider: /a's cache points at /b and /b's points
 			// back at /a. The tracker only notices on the third hop, by which
 			// point both caches are published, so neither reference is a
@@ -243,23 +262,70 @@ func assertParentLinksTerminate(t *testing.T, label string, ref *ReferencedPathI
 func TestResolve_SeparateCallsOverCycle(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
-	doc, _, err := Unmarshal(ctx, strings.NewReader(`openapi: 3.1.0
-info: {title: t, version: "1"}
-paths:
-  /a:
-    $ref: '#/paths/~1b '
-    get: {operationId: a, responses: {"200": {description: ok}}}
-  /b:
-    $ref: '#/paths/~1a '
-    get: {operationId: b, responses: {"200": {description: ok}}}
-`))
-	require.NoError(t, err)
+	tests := []struct {
+		name  string
+		spec  string
+		order []string
+	}{
+		{
+			name:  "two-node cycle, /a first",
+			spec:  twoNodeCycleSpec,
+			order: []string{"/a", "/b"},
+		},
+		{
+			name:  "two-node cycle, /b first",
+			spec:  twoNodeCycleSpec,
+			order: []string{"/b", "/a"},
+		},
+		{
+			name:  "three-node cycle, every member in turn",
+			spec:  threeNodeCycleSpec,
+			order: []string{"/a", "/b", "/c"},
+		},
+	}
 
-	pathA, ok := doc.Paths.Get("/a")
-	require.True(t, ok)
-	pathB, ok := doc.Paths.Get("/b")
-	require.True(t, ok)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := t.Context()
+			doc, _, err := Unmarshal(ctx, strings.NewReader(tt.spec))
+			require.NoError(t, err)
+
+			opts := ResolveOptions{
+				RootDocument:        doc,
+				TargetDocument:      doc,
+				TargetLocation:      "test.yaml",
+				DisableExternalRefs: true,
+			}
+
+			// Every call reports the cycle; it is what they leave behind that matters.
+			for _, path := range tt.order {
+				ref, ok := doc.Paths.Get(path)
+				require.True(t, ok)
+
+				_, err := ref.Resolve(ctx, opts)
+				require.Error(t, err, "resolving %s", path)
+				assert.Contains(t, err.Error(), "circular reference detected")
+			}
+
+			for path, ref := range doc.Paths.All() {
+				assertParentLinksTerminate(t, path, ref)
+				assert.Nil(t, ref.GetObject(), "%s should have no resolved object", path)
+			}
+		})
+	}
+}
+
+// TestResolve_ValidChainParentLinks pins the parent links a chain that resolves
+// cleanly is expected to leave, so that guarding against cycles cannot quietly
+// start dropping legitimate links. Resolving twice must not disturb them.
+func TestResolve_ValidChainParentLinks(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	doc, _, err := Unmarshal(ctx, strings.NewReader(validChainSpec))
+	require.NoError(t, err)
 
 	opts := ResolveOptions{
 		RootDocument:        doc,
@@ -268,23 +334,164 @@ paths:
 		DisableExternalRefs: true,
 	}
 
-	// Both report the cycle; it is what they leave behind that matters.
-	_, err = pathA.Resolve(ctx, opts)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "circular reference detected")
+	root, ok := doc.Paths.Get("/a")
+	require.True(t, ok)
+	hopA, ok := doc.Components.PathItems.Get("A")
+	require.True(t, ok)
+	hopB, ok := doc.Components.PathItems.Get("B")
+	require.True(t, ok)
 
-	_, err = pathB.Resolve(ctx, opts)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "circular reference detected")
+	for i := range 2 {
+		_, err := root.Resolve(ctx, opts)
+		require.NoError(t, err, "resolve %d", i+1)
 
-	assertParentLinksTerminate(t, "/a", pathA)
-	assertParentLinksTerminate(t, "/b", pathB)
+		obj := root.GetObject()
+		require.NotNil(t, obj, "resolve %d", i+1)
+		assert.Equal(t, "c", obj.Get().GetOperationID(), "resolve %d", i+1)
 
-	// The second call must not parent /a under its own descendant.
-	assert.NotSame(t, pathB, pathA.GetParent(), "/a should not be parented under /b")
-	assert.Nil(t, pathA.GetObject(), "/a should have no resolved object")
-	assert.Nil(t, pathB.GetObject(), "/b should have no resolved object")
+		// /a heads the chain, so it has no parent of its own.
+		assert.Nil(t, root.GetParent())
+		assert.Nil(t, root.GetTopLevelParent())
+
+		assert.Same(t, root, hopA.GetParent())
+		assert.Same(t, root, hopA.GetTopLevelParent())
+
+		assert.Same(t, hopA, hopB.GetParent())
+		assert.Same(t, root, hopB.GetTopLevelParent())
+	}
 }
+
+// TestResolve_ConcurrentCallsOverCycle starts both members of a cycle resolving
+// together. Each resolver decides whether an edge is safe by reading links that
+// the other is writing, so the check and the write have to be one operation: two
+// resolvers that both see no ancestry would otherwise publish opposite edges and
+// rebuild the cycle between them.
+func TestResolve_ConcurrentCallsOverCycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	doc, _, err := Unmarshal(ctx, strings.NewReader(twoNodeCycleSpec))
+	require.NoError(t, err)
+
+	opts := ResolveOptions{
+		RootDocument:        doc,
+		TargetDocument:      doc,
+		TargetLocation:      "test.yaml",
+		DisableExternalRefs: true,
+	}
+
+	pathA, ok := doc.Paths.Get("/a")
+	require.True(t, ok)
+	pathB, ok := doc.Paths.Get("/b")
+	require.True(t, ok)
+
+	// A barrier, so both resolvers are inside the check at the same time.
+	// Sequencing them would not exercise anything the tests above do not.
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+
+	for _, ref := range []*ReferencedPathItem{pathA, pathB} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, _ = ref.Resolve(ctx, opts)
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+
+	for path, ref := range doc.Paths.All() {
+		assertParentLinksTerminate(t, path, ref)
+		assert.Nil(t, ref.GetObject(), "%s should have no resolved object", path)
+	}
+}
+
+// TestResolve_ConcurrentCallsSameReference resolves one valid reference from many
+// goroutines at once. Releasing the lock during resolution lets the work happen
+// more than once; every caller still has to end up with the resolved object.
+func TestResolve_ConcurrentCallsSameReference(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	doc, _, err := Unmarshal(ctx, strings.NewReader(validChainSpec))
+	require.NoError(t, err)
+
+	opts := ResolveOptions{
+		RootDocument:        doc,
+		TargetDocument:      doc,
+		TargetLocation:      "test.yaml",
+		DisableExternalRefs: true,
+	}
+
+	root, ok := doc.Paths.Get("/a")
+	require.True(t, ok)
+
+	const resolvers = 16
+
+	start := make(chan struct{})
+	errs := make([]error, resolvers)
+	objs := make([]*PathItem, resolvers)
+
+	var wg sync.WaitGroup
+	for i := range resolvers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, errs[i] = root.Resolve(ctx, opts)
+			objs[i] = root.GetObject()
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+
+	for i := range resolvers {
+		require.NoError(t, errs[i], "resolver %d", i)
+		require.NotNil(t, objs[i], "resolver %d", i)
+		assert.Equal(t, "c", objs[i].Get().GetOperationID(), "resolver %d", i)
+	}
+
+	assertParentLinksTerminate(t, "/a", root)
+}
+
+const twoNodeCycleSpec = `openapi: 3.1.0
+info: {title: t, version: "1"}
+paths:
+  /a:
+    $ref: '#/paths/~1b '
+    get: {operationId: a, responses: {"200": {description: ok}}}
+  /b:
+    $ref: '#/paths/~1a '
+    get: {operationId: b, responses: {"200": {description: ok}}}
+`
+
+const threeNodeCycleSpec = `openapi: 3.1.0
+info: {title: t, version: "1"}
+paths:
+  /a:
+    $ref: '#/paths/~1b '
+    get: {operationId: a, responses: {"200": {description: ok}}}
+  /b:
+    $ref: '#/paths/~1c '
+    get: {operationId: b, responses: {"200": {description: ok}}}
+  /c:
+    $ref: '#/paths/~1a '
+    get: {operationId: c, responses: {"200": {description: ok}}}
+`
+
+const validChainSpec = `openapi: 3.1.0
+info: {title: t, version: "1"}
+paths:
+  /a: {$ref: '#/components/pathItems/A'}
+components:
+  pathItems:
+    A: {$ref: '#/components/pathItems/B'}
+    B: {$ref: '#/components/pathItems/C'}
+    C: {get: {operationId: c, responses: {"200": {description: ok}}}}
+`
 
 // TestGetObject_ChainWalking covers the two ends of GetObject's chain walk: a
 // chain of references that terminates has to be followed all the way to the
