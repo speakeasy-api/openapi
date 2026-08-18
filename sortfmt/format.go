@@ -4,7 +4,10 @@
 // maps under paths, properties, and schemas, and sorts selected arrays by a
 // stable display key. It intentionally changes the order of parameters and
 // composition arrays, so callers should opt in only when sorted output is more
-// important than preserving authored array order.
+// important than preserving authored array order. Selected arrays whose sort
+// keys have different JSON types return an error, matching Python's ordering
+// behavior. Format also rejects lone UTF-16 surrogate escapes rather than
+// silently replacing them with a different character.
 package sortfmt
 
 import (
@@ -17,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
 )
@@ -87,6 +91,10 @@ func Format(r io.Reader, w io.Writer) error {
 }
 
 func parseJSON(data []byte) (*yaml.Node, error) {
+	if !utf8.Valid(data) {
+		return nil, errors.New("parse JSON document: input is not valid UTF-8")
+	}
+
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
 
@@ -102,6 +110,10 @@ func parseJSON(data []byte) (*yaml.Node, error) {
 		return nil, fmt.Errorf("parse JSON document: %w", err)
 	}
 
+	if offset, ok := findLoneSurrogateEscape(data); ok {
+		return nil, fmt.Errorf("parse JSON document: lone surrogate escape at byte %d is not supported", offset)
+	}
+
 	content, err := jsonValueToNode(value)
 	if err != nil {
 		return nil, fmt.Errorf("parse JSON document: %w", err)
@@ -111,6 +123,68 @@ func parseJSON(data []byte) (*yaml.Node, error) {
 		Kind:    yaml.DocumentNode,
 		Content: []*yaml.Node{content},
 	}, nil
+}
+
+func findLoneSurrogateEscape(data []byte) (int, bool) {
+	inString := false
+	for i := 0; i < len(data); i++ {
+		switch data[i] {
+		case '"':
+			inString = !inString
+		case '\\':
+			if !inString || i+1 >= len(data) {
+				continue
+			}
+			if data[i+1] != 'u' {
+				i++
+				continue
+			}
+
+			codePoint, ok := parseHexCodeUnit(data, i+2)
+			if !ok {
+				continue
+			}
+			switch {
+			case codePoint >= 0xd800 && codePoint <= 0xdbff:
+				nextEscape := i + 6
+				if nextEscape+5 >= len(data) || data[nextEscape] != '\\' || data[nextEscape+1] != 'u' {
+					return i, true
+				}
+				lowSurrogate, validLow := parseHexCodeUnit(data, nextEscape+2)
+				if !validLow || lowSurrogate < 0xdc00 || lowSurrogate > 0xdfff {
+					return i, true
+				}
+				i = nextEscape + 5
+			case codePoint >= 0xdc00 && codePoint <= 0xdfff:
+				return i, true
+			default:
+				i += 5
+			}
+		}
+	}
+	return 0, false
+}
+
+func parseHexCodeUnit(data []byte, start int) (uint16, bool) {
+	if start+4 > len(data) {
+		return 0, false
+	}
+
+	var result uint16
+	for _, digit := range data[start : start+4] {
+		result <<= 4
+		switch {
+		case digit >= '0' && digit <= '9':
+			result |= uint16(digit - '0')
+		case digit >= 'a' && digit <= 'f':
+			result |= uint16(digit-'a') + 10
+		case digit >= 'A' && digit <= 'F':
+			result |= uint16(digit-'A') + 10
+		default:
+			return 0, false
+		}
+	}
+	return result, true
 }
 
 func jsonValueToNode(value any) (*yaml.Node, error) {
@@ -164,7 +238,7 @@ func Sort(node *yaml.Node) error {
 
 func sortNode(node *yaml.Node, parentKey string) error {
 	if node == nil {
-		return nil
+		return errors.New("cannot sort a nil node")
 	}
 
 	switch node.Kind {
@@ -197,10 +271,14 @@ func sortMapping(node *yaml.Node, parentKey string) error {
 	byKey := make(map[string]mappingPair, len(node.Content)/2)
 	for i := 0; i < len(node.Content); i += 2 {
 		keyNode := node.Content[i]
+		valueNode := node.Content[i+1]
+		if keyNode == nil || valueNode == nil {
+			return errors.New("mapping contains a nil key or value")
+		}
 		if keyNode.Kind != yaml.ScalarNode || keyNode.Tag != "!!str" {
 			return errors.New("JSON object key must be a string")
 		}
-		byKey[keyNode.Value] = mappingPair{key: keyNode, value: node.Content[i+1]}
+		byKey[keyNode.Value] = mappingPair{key: keyNode, value: valueNode}
 	}
 
 	pairs := make([]mappingPair, 0, len(byKey))
@@ -243,7 +321,10 @@ func sortMapping(node *yaml.Node, parentKey string) error {
 }
 
 func sortSequence(node *yaml.Node, parentKey string) error {
-	for _, child := range node.Content {
+	for i, child := range node.Content {
+		if child == nil {
+			return fmt.Errorf("%s item %d is nil", parentKey, i)
+		}
 		if err := sortNode(child, parentKey); err != nil {
 			return err
 		}
@@ -287,7 +368,7 @@ func sortSequence(node *yaml.Node, parentKey string) error {
 		return less
 	})
 	if comparisonErr != nil {
-		return comparisonErr
+		return fmt.Errorf("sort %s items: %w", parentKey, comparisonErr)
 	}
 	for i, item := range items {
 		node.Content[i] = item.node
@@ -402,7 +483,11 @@ func pythonRepr(node *yaml.Node) (string, error) {
 		case "!!str":
 			return quotePythonString(node.Value), nil
 		case "!!bool":
-			if node.Value == "true" {
+			value, err := boolValue(node.Value)
+			if err != nil {
+				return "", err
+			}
+			if value {
 				return "True", nil
 			}
 			return "False", nil
@@ -417,6 +502,17 @@ func pythonRepr(node *yaml.Node) (string, error) {
 		}
 	default:
 		return "", fmt.Errorf("unsupported YAML node kind %d", node.Kind)
+	}
+}
+
+func boolValue(value string) (bool, error) {
+	switch value {
+	case "true", "True", "TRUE":
+		return true, nil
+	case "false", "False", "FALSE":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid boolean value %q", value)
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestFormat_MatchesSortedJSONStyle(t *testing.T) {
@@ -163,6 +164,65 @@ func TestFormat_SortsArrayValuedTypeKeys(t *testing.T) {
 	assert.Equal(t, expected, output.String(), "array-valued types should use Python list ordering")
 }
 
+func TestFormat_MixedSortKeyKindsMatchReferenceError(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	err := Format(
+		strings.NewReader(`{"oneOf":[{"type":"string"},{"type":["string","null"]}]}`),
+		&output,
+	)
+	require.ErrorContains(t, err, "sort oneOf items", "mixed Python sort-key types should fail")
+	assert.Empty(t, output.String(), "sorting errors should not produce partial output")
+}
+
+func TestFormat_RejectsLoneSurrogateEscapes(t *testing.T) {
+	t.Parallel()
+
+	inputs := []string{
+		`{"a":"\ud83d"}`,
+		`{"a":"\ude00"}`,
+		`{"a":"\ude00\ud83d"}`,
+		`{"\ud83d":1}`,
+	}
+	for _, input := range inputs {
+		t.Run(input, func(t *testing.T) {
+			t.Parallel()
+
+			var output bytes.Buffer
+			err := Format(strings.NewReader(input), &output)
+			require.ErrorContains(t, err, "lone surrogate escape")
+			assert.Empty(t, output.String(), "parse errors should not produce output")
+		})
+	}
+}
+
+func TestFormat_AcceptsPairedAndEscapedSurrogates(t *testing.T) {
+	t.Parallel()
+
+	inputs := []string{
+		`{"a":"\ud83d\ude00"}`,
+		`{"a":"\uD83D\uDE00"}`,
+		`{"a":"C:\\ud83d"}`,
+	}
+	for _, input := range inputs {
+		t.Run(input, func(t *testing.T) {
+			t.Parallel()
+
+			var output bytes.Buffer
+			require.NoError(t, Format(strings.NewReader(input), &output))
+		})
+	}
+}
+
+func TestFormat_RejectsInvalidUTF8(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	err := Format(bytes.NewReader([]byte{'{', '"', 'a', '"', ':', '"', 0xff, '"', '}'}), &output)
+	require.ErrorContains(t, err, "input is not valid UTF-8")
+}
+
 func TestFormat_MatchesPythonFallbackSortKeys(t *testing.T) {
 	t.Parallel()
 
@@ -250,6 +310,97 @@ func TestPythonFloat_Success(t *testing.T) {
 			actual, err := pythonFloat(tt.value)
 			require.NoError(t, err, "float formatting should succeed")
 			assert.Equal(t, tt.expected, actual, "float should use Python repr formatting")
+		})
+	}
+}
+
+func TestWrite_BooleanSpellings(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		value    string
+		expected string
+	}{
+		{value: "true", expected: "true\n"},
+		{value: "True", expected: "true\n"},
+		{value: "TRUE", expected: "true\n"},
+		{value: "false", expected: "false\n"},
+		{value: "False", expected: "false\n"},
+		{value: "FALSE", expected: "false\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			t.Parallel()
+
+			var output bytes.Buffer
+			err := Write(&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: tt.value}, &output)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, output.String())
+		})
+	}
+}
+
+func TestWrite_InvalidBooleanReturnsError(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	err := Write(&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "yes"}, &output)
+	require.ErrorContains(t, err, "invalid boolean value")
+}
+
+func TestPythonRepr_BooleanSpellings(t *testing.T) {
+	t.Parallel()
+
+	trueValue, err := pythonRepr(&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "TRUE"})
+	require.NoError(t, err)
+	assert.Equal(t, "True", trueValue)
+
+	falseValue, err := pythonRepr(&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "False"})
+	require.NoError(t, err)
+	assert.Equal(t, "False", falseValue)
+}
+
+func TestSort_NilNodesReturnErrors(t *testing.T) {
+	t.Parallel()
+
+	stringNode := func(value string) *yaml.Node {
+		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value}
+	}
+	tests := map[string]*yaml.Node{
+		"root":           nil,
+		"mapping key":    {Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{nil, stringNode("value")}},
+		"mapping value":  {Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{stringNode("key"), nil}},
+		"sequence child": {Kind: yaml.SequenceNode, Tag: "!!seq", Content: []*yaml.Node{nil}},
+	}
+	for name, node := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.NotPanics(t, func() {
+				require.Error(t, Sort(node))
+			})
+		})
+	}
+}
+
+func TestWrite_NilMappingEntriesReturnErrors(t *testing.T) {
+	t.Parallel()
+
+	stringNode := func(value string) *yaml.Node {
+		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value}
+	}
+	tests := map[string]*yaml.Node{
+		"key":   {Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{nil, stringNode("value")}},
+		"value": {Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{stringNode("key"), nil}},
+	}
+	for name, node := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.NotPanics(t, func() {
+				var output bytes.Buffer
+				require.Error(t, Write(node, &output))
+			})
 		})
 	}
 }

@@ -77,6 +77,10 @@ func (w *jsonWriter) writeMapping(node *yaml.Node, depth int) error {
 	w.writeString("{\n")
 	for i := 0; i < len(node.Content); i += 2 {
 		keyNode := node.Content[i]
+		valueNode := node.Content[i+1]
+		if keyNode == nil || valueNode == nil {
+			return errors.New("mapping contains a nil key or value")
+		}
 		if keyNode.Kind != yaml.ScalarNode || keyNode.Tag != "!!str" {
 			return errors.New("JSON object key must be a string")
 		}
@@ -84,7 +88,7 @@ func (w *jsonWriter) writeMapping(node *yaml.Node, depth int) error {
 		w.writeIndent(depth + 1)
 		w.writeString(quoteJSONString(keyNode.Value))
 		w.writeString(": ")
-		if err := w.writeNode(node.Content[i+1], depth+1); err != nil {
+		if err := w.writeNode(valueNode, depth+1); err != nil {
 			return err
 		}
 		if i+2 < len(node.Content) {
@@ -124,7 +128,11 @@ func (w *jsonWriter) writeScalar(node *yaml.Node) error {
 	case "!!str":
 		w.writeString(quoteJSONString(node.Value))
 	case "!!bool":
-		if node.Value == "true" {
+		value, err := boolValue(node.Value)
+		if err != nil {
+			return err
+		}
+		if value {
 			w.writeString("true")
 		} else {
 			w.writeString("false")
