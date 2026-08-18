@@ -259,6 +259,11 @@ func TestFormat_EdgeCaseGolden(t *testing.T) {
 	err = Format(input, &actual)
 	require.NoError(t, err, "edge-case formatting should succeed")
 	assert.Equal(t, expected, actual.Bytes(), "edge-case output should match the reference golden")
+
+	var idempotent bytes.Buffer
+	err = Format(bytes.NewReader(expected), &idempotent)
+	require.NoError(t, err, "reference-formatted output should be accepted")
+	assert.Equal(t, expected, idempotent.Bytes(), "reference-formatted output should be idempotent")
 }
 
 func TestFormat_ReferenceParity(t *testing.T) {

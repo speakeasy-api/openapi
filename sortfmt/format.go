@@ -309,13 +309,14 @@ func sortMapping(node *yaml.Node, parentKey string) error {
 		return left < right
 	})
 
-	node.Content = node.Content[:0]
+	sortedContent := make([]*yaml.Node, 0, len(pairs)*2)
 	for _, pair := range pairs {
 		if err := sortNode(pair.value, pair.key.Value); err != nil {
 			return err
 		}
-		node.Content = append(node.Content, pair.key, pair.value)
+		sortedContent = append(sortedContent, pair.key, pair.value)
 	}
+	node.Content = sortedContent
 
 	return nil
 }
