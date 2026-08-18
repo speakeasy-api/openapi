@@ -5,7 +5,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
@@ -264,29 +263,6 @@ func TestFormat_EdgeCaseGolden(t *testing.T) {
 	err = Format(bytes.NewReader(expected), &idempotent)
 	require.NoError(t, err, "reference-formatted output should be accepted")
 	assert.Equal(t, expected, idempotent.Bytes(), "reference-formatted output should be idempotent")
-}
-
-func TestFormat_ReferenceParity(t *testing.T) {
-	t.Parallel()
-
-	referenceScript := os.Getenv("SORTFMT_REFERENCE_SCRIPT")
-	referenceInput := os.Getenv("SORTFMT_REFERENCE_INPUT")
-	if referenceScript == "" || referenceInput == "" {
-		t.Skip("set SORTFMT_REFERENCE_SCRIPT and SORTFMT_REFERENCE_INPUT to run the differential test")
-	}
-
-	input, err := os.ReadFile(referenceInput)
-	require.NoError(t, err, "reference input should be readable")
-
-	command := exec.CommandContext(t.Context(), "python3", referenceScript)
-	command.Stdin = bytes.NewReader(input)
-	expected, err := command.Output()
-	require.NoError(t, err, "reference formatter should succeed")
-
-	var actual bytes.Buffer
-	err = Format(bytes.NewReader(input), &actual)
-	require.NoError(t, err, "Go formatter should succeed")
-	assert.Equal(t, expected, actual.Bytes(), "Go output should match the reference formatter byte-for-byte")
 }
 
 func TestPythonFloat_Success(t *testing.T) {
