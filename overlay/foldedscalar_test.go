@@ -1,6 +1,7 @@
 package overlay_test
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -113,6 +114,21 @@ actions:
 		doc = formatted
 		assert.Equal(t, want, updateDescription(t, doc), "value changed after %d round trips", i+1)
 	}
+}
+
+// A nil overlay serializes as "null"; stabilizing must not change that.
+func TestFormatToleratesNilOverlay(t *testing.T) {
+	t.Parallel()
+
+	var o *overlay.Overlay
+
+	formatted, err := o.ToString()
+	require.NoError(t, err)
+	assert.Equal(t, "null\n", formatted)
+
+	var buf bytes.Buffer
+	require.NoError(t, o.Format(&buf))
+	assert.Equal(t, "null\n", buf.String())
 }
 
 func indent(doc string, prefix string) string {

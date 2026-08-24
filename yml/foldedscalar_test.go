@@ -170,6 +170,32 @@ func TestStabilizeFoldedScalars_ToleratesNilNodes(t *testing.T) {
 	})
 }
 
+// An anchored scalar is an ordinary node in the tree, so aliases pointing at it need
+// no special handling: stabilizing the anchor definition covers every reference to it.
+func TestStabilizeFoldedScalars_HandlesAnchoredScalars(t *testing.T) {
+	t.Parallel()
+
+	doc := "a: &anchor >-\n  one\n   more indented\nb: *anchor\n"
+
+	var want struct {
+		A string `yaml:"a"`
+		B string `yaml:"b"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(doc), &want))
+
+	for i := range 30 {
+		doc = roundTrip(t, doc, true)
+
+		var got struct {
+			A string `yaml:"a"`
+			B string `yaml:"b"`
+		}
+		require.NoError(t, yaml.Unmarshal([]byte(doc), &got))
+		assert.Equal(t, want, got, "value changed after %d round trips", i+1)
+		assert.Contains(t, doc, "*anchor", "alias should be preserved")
+	}
+}
+
 // Fails once gopkg.in/yaml.v3 fixes the emitter, at which point StabilizeFoldedScalars can go.
 func TestFoldedScalarGrowsWithoutStabilizer(t *testing.T) {
 	t.Parallel()
