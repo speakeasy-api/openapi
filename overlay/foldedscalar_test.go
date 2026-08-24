@@ -193,6 +193,20 @@ func TestStabilizeFoldedScalarsLeavesStableStylesAlone(t *testing.T) {
 	}
 }
 
+func TestStabilizeFoldedScalarsToleratesNilNodes(t *testing.T) {
+	t.Parallel()
+
+	assert.NotPanics(t, func() { stabilizeFoldedScalars(nil) })
+
+	// A hand-built tree may carry nil children; recursion must not panic.
+	assert.NotPanics(t, func() {
+		stabilizeFoldedScalars(&yaml.Node{
+			Kind:    yaml.MappingNode,
+			Content: []*yaml.Node{nil, nil},
+		})
+	})
+}
+
 func TestHasMoreIndentedLine(t *testing.T) {
 	t.Parallel()
 
