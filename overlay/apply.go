@@ -30,6 +30,8 @@ func (o *Overlay) ApplyTo(root *yaml.Node) error {
 		}
 	}
 
+	stabilizeFoldedScalars(root)
+
 	return nil
 }
 
@@ -84,6 +86,9 @@ func (o *Overlay) ApplyToStrict(root *yaml.Node) ([]string, error) {
 	if len(multiError) > 0 {
 		return warnings, fmt.Errorf("error applying overlay (strict): %v", strings.Join(multiError, ","))
 	}
+
+	stabilizeFoldedScalars(root)
+
 	return warnings, nil
 }
 
