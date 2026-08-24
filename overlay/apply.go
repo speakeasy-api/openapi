@@ -6,6 +6,7 @@ import (
 
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath/config"
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath/token"
+	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
 
@@ -30,7 +31,7 @@ func (o *Overlay) ApplyTo(root *yaml.Node) error {
 		}
 	}
 
-	stabilizeFoldedScalars(root)
+	yml.StabilizeFoldedScalars(root)
 
 	return nil
 }
@@ -87,7 +88,7 @@ func (o *Overlay) ApplyToStrict(root *yaml.Node) ([]string, error) {
 		return warnings, fmt.Errorf("error applying overlay (strict): %v", strings.Join(multiError, ","))
 	}
 
-	stabilizeFoldedScalars(root)
+	yml.StabilizeFoldedScalars(root)
 
 	return warnings, nil
 }

@@ -177,6 +177,8 @@ func (c *CoreModel) Marshal(ctx context.Context, w io.Writer) error {
 			resetNodeStylesForYAML(nodeToMarshal, cfg)
 		}
 
+		yml.StabilizeFoldedScalars(nodeToMarshal)
+
 		enc := yaml.NewEncoder(w)
 		enc.SetIndent(cfg.Indentation)
 		if err := enc.Encode(nodeToMarshal); err != nil {
