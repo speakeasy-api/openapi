@@ -8,6 +8,7 @@ import (
 	gcf "github.com/blackwell-systems/gcf-go"
 	"github.com/speakeasy-api/openapi/graph"
 	"github.com/speakeasy-api/openapi/oq/expr"
+	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
 
@@ -310,6 +311,8 @@ func FormatYAML(result *Result, g *graph.SchemaGraph) string {
 				node,
 			},
 		}
+		yml.StabilizeFoldedScalars(wrapper)
+
 		data, err := yaml.Marshal(wrapper)
 		if err != nil {
 			sb.WriteString("# error marshalling: " + err.Error() + "\n")
