@@ -1,5 +1,5 @@
-github.com/blackwell-systems/gcf-go v1.5.0 h1:ZOWyxvRF1TZOmzPYXVO1dOTU6VRslNaJgnzSDDh8hL4=
-github.com/blackwell-systems/gcf-go v1.5.0/go.mod h1:hYxLOn6JHzNNNH7wfgRXWETX2lMtRtjG8FEX45I6SAI=
+github.com/blackwell-systems/gcf-go v1.7.1 h1:hpdCf/GHXS/CrsXsHnnIw6hXBHhtC2dopGOdiFMnsc4=
+github.com/blackwell-systems/gcf-go v1.7.1/go.mod h1:hYxLOn6JHzNNNH7wfgRXWETX2lMtRtjG8FEX45I6SAI=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
