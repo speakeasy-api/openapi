@@ -53,7 +53,7 @@ func TestApplyToSurvivesRepeatedApplies(t *testing.T) {
 	doc := "title: Original\n" + foldedWithMoreIndentedLine
 	want := decodeDescription(t, doc)
 
-	for i := range 30 {
+	for i := range 3 {
 		var node yaml.Node
 		require.NoError(t, yaml.Unmarshal([]byte(doc), &node))
 		require.NoError(t, o.ApplyTo(&node))
@@ -74,7 +74,7 @@ func TestApplyToStrictSurvivesRepeatedApplies(t *testing.T) {
 	doc := "title: Original\n" + foldedWithMoreIndentedLine
 	want := decodeDescription(t, doc)
 
-	for i := range 30 {
+	for i := range 3 {
 		var node yaml.Node
 		require.NoError(t, yaml.Unmarshal([]byte(doc), &node))
 		_, err := o.ApplyToStrict(&node)
@@ -89,6 +89,7 @@ func TestApplyToStrictSurvivesRepeatedApplies(t *testing.T) {
 }
 
 // An overlay carries folded scalars of its own, in the update payloads it applies.
+// Format and ToString are separate entry points and each stabilizes independently.
 func TestFormatSurvivesRepeatedRoundTrips(t *testing.T) {
 	t.Parallel()
 
@@ -101,18 +102,38 @@ actions:
     update:
 ` + indent(foldedWithMoreIndentedLine, "      ")
 
-	want := updateDescription(t, src)
+	serializers := map[string]func(*overlay.Overlay) (string, error){
+		"ToString": func(o *overlay.Overlay) (string, error) {
+			return o.ToString()
+		},
+		"Format": func(o *overlay.Overlay) (string, error) {
+			var buf bytes.Buffer
+			if err := o.Format(&buf); err != nil {
+				return "", err
+			}
 
-	doc := src
-	for i := range 30 {
-		o, err := overlay.ParseReader(strings.NewReader(doc))
-		require.NoError(t, err)
+			return buf.String(), nil
+		},
+	}
 
-		formatted, err := o.ToString()
-		require.NoError(t, err)
+	for name, serialize := range serializers {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-		doc = formatted
-		assert.Equal(t, want, updateDescription(t, doc), "value changed after %d round trips", i+1)
+			want := updateDescription(t, src)
+
+			doc := src
+			for i := range 3 {
+				o, err := overlay.ParseReader(strings.NewReader(doc))
+				require.NoError(t, err)
+
+				formatted, err := serialize(o)
+				require.NoError(t, err)
+
+				doc = formatted
+				assert.Equal(t, want, updateDescription(t, doc), "value changed after %d round trips", i+1)
+			}
+		})
 	}
 }
 

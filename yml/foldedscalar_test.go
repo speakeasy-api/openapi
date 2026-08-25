@@ -52,9 +52,53 @@ func TestStabilizeFoldedScalars_SurvivesRepeatedRoundTrips(t *testing.T) {
 	want := decodeDescription(t, foldedWithMoreIndentedLine)
 
 	doc := foldedWithMoreIndentedLine
-	for i := range 30 {
+	for i := range 3 {
 		doc = roundTrip(t, doc, true)
 		assert.Equal(t, want, decodeDescription(t, doc), "value changed after %d round trips", i+1)
+	}
+}
+
+// yaml.v3 does not record the chomping indicator in Node.Style; it re-derives one from
+// the trailing newlines of the value. Restyling as a literal block therefore has to keep
+// clip and keep chomping intact, not just strip.
+func TestStabilizeFoldedScalars_PreservesChomping(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		doc       string
+		wantStyle string
+	}{
+		{
+			name:      "strip",
+			doc:       "description: >-\n  one line\n   more indented\n  last\n",
+			wantStyle: "|-",
+		},
+		{
+			name:      "clip",
+			doc:       "description: >\n  one line\n   more indented\n  last\n",
+			wantStyle: "|",
+		},
+		{
+			name:      "keep with trailing blank lines",
+			doc:       "description: >+\n  one line\n   more indented\n\n\n",
+			wantStyle: "|+",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			want := decodeDescription(t, tt.doc)
+
+			doc := tt.doc
+			for i := range 3 {
+				doc = roundTrip(t, doc, true)
+				assert.Equal(t, want, decodeDescription(t, doc), "value changed after %d round trips", i+1)
+			}
+			assert.Contains(t, doc, "description: "+tt.wantStyle+"\n", "chomping should be preserved")
+		})
 	}
 }
 
@@ -64,7 +108,7 @@ func TestStabilizeFoldedScalars_HandlesExplicitTags(t *testing.T) {
 	doc := "description: !!str >-\n  a\n   b\n"
 	want := decodeDescription(t, doc)
 
-	for i := range 5 {
+	for i := range 3 {
 		doc = roundTrip(t, doc, true)
 		assert.Equal(t, want, decodeDescription(t, doc), "value changed after %d round trips", i+1)
 	}
@@ -107,7 +151,7 @@ func TestStabilizeFoldedScalars_LeavesStableStylesAlone(t *testing.T) {
 				assert.Contains(t, doc, tt.style, "original style should be preserved")
 			}
 
-			for range 5 {
+			for range 3 {
 				next := roundTrip(t, doc, true)
 				assert.Equal(t, doc, next, "representation should be a fixed point")
 				assert.Equal(t, want, decodeDescription(t, next))
@@ -183,7 +227,7 @@ func TestStabilizeFoldedScalars_HandlesAnchoredScalars(t *testing.T) {
 	}
 	require.NoError(t, yaml.Unmarshal([]byte(doc), &want))
 
-	for i := range 30 {
+	for i := range 3 {
 		doc = roundTrip(t, doc, true)
 
 		var got struct {

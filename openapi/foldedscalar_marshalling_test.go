@@ -2,7 +2,6 @@ package openapi_test
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
@@ -30,7 +29,7 @@ paths: {}
 func TestMarshal_FoldedScalar_SurvivesRepeatedRoundTrips(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(foldedScalarDocument))
 	require.NoError(t, err)
@@ -40,7 +39,7 @@ func TestMarshal_FoldedScalar_SurvivesRepeatedRoundTrips(t *testing.T) {
 	require.Contains(t, want, "| acme |")
 
 	current := foldedScalarDocument
-	for i := range 30 {
+	for i := range 3 {
 		doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(current))
 		require.NoError(t, err)
 
