@@ -1,0 +1,45 @@
+{
+  "z": "\u007f café 😀 <>& /\b\t\n\f\r",
+  "openapi": "3.0.0",
+  "paths": {
+    "/z": {},
+    "/A": {},
+    "/a": {}
+  },
+  "properties": {
+    "z": {"type": "string"},
+    "A": {"type": "string"},
+    "a": {"type": "string"}
+  },
+  "required": [true, false, null, 10, 2, 1e7, "z", "a"],
+  "parameters": [
+    {"name": "z"},
+    {"$ref": "#/parameters/shared"},
+    {"type": "array"},
+    {"name": "a"}
+  ],
+  "oneOf": [
+    {"description": "z", "default": true},
+    {"description": "a", "default": null},
+    {"description": "\u2028", "default": "a'b"},
+    {"description": "\u0080", "default": "a\"b"},
+    false,
+    true,
+    2,
+    10,
+    null
+  ],
+  "numbers": {
+    "negativeZeroInteger": -0,
+    "negativeZeroFloat": -0.0,
+    "largeInteger": 123456789012345678901234567890,
+    "fixedUpper": 1e15,
+    "scientificUpper": 1e16,
+    "fixedLower": 1e-4,
+    "scientificLower": 1e-5,
+    "trimmed": 1.5000,
+    "precise": 1.2345678901234567
+  },
+  "duplicate": "first",
+  "duplicate": "last"
+}

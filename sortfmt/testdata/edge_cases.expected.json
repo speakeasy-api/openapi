@@ -1,0 +1,79 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/A": {},
+    "/a": {},
+    "/z": {}
+  },
+  "parameters": [
+    {
+      "$ref": "#/parameters/shared"
+    },
+    {
+      "name": "a"
+    },
+    {
+      "type": "array"
+    },
+    {
+      "name": "z"
+    }
+  ],
+  "properties": {
+    "A": {
+      "type": "string"
+    },
+    "a": {
+      "type": "string"
+    },
+    "z": {
+      "type": "string"
+    }
+  },
+  "required": [
+    10,
+    10000000.0,
+    2,
+    false,
+    null,
+    true,
+    "a",
+    "z"
+  ],
+  "duplicate": "last",
+  "numbers": {
+    "fixedLower": 0.0001,
+    "fixedUpper": 1000000000000000.0,
+    "largeInteger": 123456789012345678901234567890,
+    "negativeZeroFloat": -0.0,
+    "negativeZeroInteger": 0,
+    "precise": 1.2345678901234567,
+    "scientificLower": 1e-05,
+    "scientificUpper": 1e+16,
+    "trimmed": 1.5
+  },
+  "oneOf": [
+    10,
+    2,
+    false,
+    null,
+    true,
+    {
+      "description": "\u2028",
+      "default": "a'b"
+    },
+    {
+      "description": "\u0080",
+      "default": "a\"b"
+    },
+    {
+      "description": "a",
+      "default": null
+    },
+    {
+      "description": "z",
+      "default": true
+    }
+  ],
+  "z": "\u007f caf\u00e9 \ud83d\ude00 <>& /\b\t\n\f\r"
+}
