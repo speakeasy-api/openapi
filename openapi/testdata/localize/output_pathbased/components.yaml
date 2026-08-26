@@ -2,6 +2,12 @@ components:
     schemas:
         User:
             type: object
+            # The last row is deliberately indented further: that is what makes yaml.v3
+            # inject a line break into a folded scalar on encode.
+            description: |-
+                ### User
+                | Field | Kind | | ----- | ---- |
+                 | id | string |
             required:
                 - id
                 - name

@@ -14,6 +14,7 @@ import (
 	"github.com/speakeasy-api/openapi/references"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/system"
+	"github.com/speakeasy-api/openapi/yml"
 	"gopkg.in/yaml.v3"
 )
 
@@ -581,6 +582,8 @@ func rewriteInternalReferences(content []byte, originalRef string, storage *loca
 	}
 
 	// Marshal back to YAML
+	yml.StabilizeFoldedScalars(&node)
+
 	updatedContent, err := yaml.Marshal(&node)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal updated YAML: %w", err)

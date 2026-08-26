@@ -65,6 +65,8 @@ func Format(path string) error {
 
 // Format writes the file back out as YAML.
 func (o *Overlay) Format(w io.Writer) error {
+	o.stabilizeFoldedScalars()
+
 	enc := yaml.NewEncoder(w)
 	enc.SetIndent(2)
 	return enc.Encode(o)
