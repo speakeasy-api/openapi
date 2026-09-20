@@ -1,6 +1,7 @@
 package rules_test
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -425,6 +426,8 @@ func TestOwaspNoCredentialsInURLRule_FlagsCredentialNames(t *testing.T) {
 		"authToken", "auth_token", "userPassword", "user_password",
 		"api-key", "api_key", "apiKey", "apikey", "APIKey", "X-API-Key", "x-api-key",
 		"secretKey", "secret_key", "apiSecret", "mySecret",
+		"myapikey", "salesapikey", "mysecretkey", "MyAPIKey",
+		"mytoken", "mysecret", "oldpassword",
 	}
 
 	for _, name := range names {
@@ -447,8 +450,9 @@ func TestOwaspNoCredentialsInURLRule_AllowsDescriptiveNames(t *testing.T) {
 		"secretName", "secretId", "secretRef", "secretVersion",
 		"tokenId", "tokenType", "token_type", "tokenCount", "tokenExpiry", "tokenTTL",
 		"passwordHint", "passwordResetId",
-		"key", "keyName", "sortKey", "apiKeyName", "apiVersion", "monkey",
+		"key", "keyName", "sortKey", "apiKeyName", "apiVersion", "monkey", "turkey",
 		"userId", "filter",
+		"no", "on", "null", // YAML reserved words stay plain strings in the fixture
 	}
 
 	for _, name := range names {
@@ -468,6 +472,8 @@ func lintQueryParameterName(t *testing.T, name string) []error {
 	t.Helper()
 	ctx := t.Context()
 
+	// Double-quote the name so `:`, spaces and reserved words (no, on, null) stay plain
+	// strings; Go's escapes are all valid YAML double-quoted escapes.
 	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(`
 openapi: 3.1.0
 info:
@@ -477,7 +483,7 @@ paths:
   /things:
     get:
       parameters:
-        - name: `+name+`
+        - name: `+strconv.Quote(name)+`
           in: query
           schema:
             type: string
@@ -492,6 +498,9 @@ paths:
 		TargetDocument: doc,
 		TargetLocation: "test.yaml",
 	})
+	params := idx.GetAllParameters()
+	require.Len(t, params, 1)
+	require.Equal(t, name, params[0].Node.GetObject().GetName(), "fixture should carry the name unchanged")
 	docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
 
 	rule := &rules.OwaspNoCredentialsInURLRule{}

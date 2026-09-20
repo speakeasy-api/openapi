@@ -20,8 +20,9 @@ const RuleOwaspNoCredentialsInURL = "owasp-no-credentials-in-url"
 // tokenId and secretName merely describe one.
 var credentialWords = []string{"secret", "token", "password", "passwd", "pwd"}
 
-// keyQualifiers turn a trailing "key" into a credential (api-key, secretKey); "key" on
-// its own is a lookup key, not a credential (keyName, sortKey).
+// keyQualifiers turn a trailing "key" into a credential, whether the qualifier is its
+// own word (api-key, secretKey) or glued on (apikey, myapikey); "key" on its own is a
+// lookup key, not a credential (keyName, sortKey).
 var keyQualifiers = []string{"api", "secret"}
 
 // looksLikeCredential reports whether a parameter name reads as a credential rather
@@ -33,14 +34,18 @@ func looksLikeCredential(name string) bool {
 	}
 	head := words[len(words)-1]
 
-	// Suffix rather than equality so glued names (accesstoken, clientsecret) still match.
+	// Suffix rather than equality so glued names (accesstoken, clientsecret, myapikey)
+	// still match.
 	for _, w := range credentialWords {
 		if strings.HasSuffix(head, w) {
 			return true
 		}
 	}
 	for _, q := range keyQualifiers {
-		if head == q+"key" || (head == "key" && len(words) > 1 && words[len(words)-2] == q) {
+		if strings.HasSuffix(head, q+"key") {
+			return true
+		}
+		if head == "key" && len(words) > 1 && words[len(words)-2] == q {
 			return true
 		}
 	}
