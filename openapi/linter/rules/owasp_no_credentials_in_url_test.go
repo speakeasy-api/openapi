@@ -21,6 +21,27 @@ func TestOwaspNoCredentialsInURLRule_ValidCases(t *testing.T) {
 		yaml string
 	}{
 		{
+			name: "secretPath names a path to a secret, not a credential",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /files/{secretPath}:
+    get:
+      parameters:
+        - name: secretPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+`,
+		},
+		{
 			name: "safe query parameter names",
 			yaml: `
 openapi: 3.1.0
@@ -229,6 +250,29 @@ paths:
 			expectedParam: "client_secret",
 		},
 		{
+			name: "clientSecret in path parameter",
+			yaml: `
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /oauth/{clientSecret}:
+    get:
+      parameters:
+        - name: clientSecret
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+`,
+			expectedCount: 1,
+			expectedParam: "clientSecret",
+		},
+		{
 			name: "access_token in query parameter",
 			yaml: `
 openapi: 3.1.0
@@ -369,4 +413,87 @@ func TestOwaspNoCredentialsInURLRule_RuleMetadata(t *testing.T) {
 	assert.NotEmpty(t, rule.Link())
 	assert.Equal(t, validation.SeverityError, rule.DefaultSeverity())
 	assert.Nil(t, rule.Versions())
+}
+
+func TestOwaspNoCredentialsInURLRule_FlagsCredentialNames(t *testing.T) {
+	t.Parallel()
+
+	names := []string{
+		"secret", "token", "password", "passwd", "pwd", "TOKEN", "token2",
+		"clientSecret", "client_secret", "client-secret", "ClientSecret", "clientsecret",
+		"access_token", "accessToken", "accesstoken", "refresh_token", "id_token", "idToken",
+		"authToken", "auth_token", "userPassword", "user_password",
+		"api-key", "api_key", "apiKey", "apikey", "APIKey", "X-API-Key", "x-api-key",
+		"secretKey", "secret_key", "apiSecret", "mySecret",
+	}
+
+	for _, name := range names {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			errs := lintQueryParameterName(t, name)
+
+			require.Len(t, errs, 1, "should flag %q as a credential", name)
+			assert.Contains(t, errs[0].Error(), "`"+name+"`", "should name the offending parameter")
+		})
+	}
+}
+
+func TestOwaspNoCredentialsInURLRule_AllowsDescriptiveNames(t *testing.T) {
+	t.Parallel()
+
+	names := []string{
+		"secretPath", "secret_path", "secret-path", "secretpath", "mySecretPath",
+		"secretName", "secretId", "secretRef", "secretVersion",
+		"tokenId", "tokenType", "token_type", "tokenCount", "tokenExpiry", "tokenTTL",
+		"passwordHint", "passwordResetId",
+		"key", "keyName", "sortKey", "apiKeyName", "apiVersion", "monkey",
+		"userId", "filter",
+	}
+
+	for _, name := range names {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			errs := lintQueryParameterName(t, name)
+
+			assert.Empty(t, errs, "should not flag %q, which only refers to a credential", name)
+		})
+	}
+}
+
+// lintQueryParameterName runs the rule over a document whose only parameter is a query
+// parameter with the given name.
+func lintQueryParameterName(t *testing.T, name string) []error {
+	t.Helper()
+	ctx := t.Context()
+
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(`
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      parameters:
+        - name: `+name+`
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+`))
+	require.NoError(t, err)
+
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument:   doc,
+		TargetDocument: doc,
+		TargetLocation: "test.yaml",
+	})
+	docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
+
+	rule := &rules.OwaspNoCredentialsInURLRule{}
+	return rule.Run(ctx, docInfo, &linter.RuleConfig{})
 }
