@@ -197,7 +197,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "ctrl+d":
-			if !m.showHelp {
+			if !m.showHelp && len(m.operations) > 0 {
 				maxItems := len(m.operations) - 1
 				newCursorPos := m.cursor + scrollHalfScreenLines
 
@@ -388,6 +388,7 @@ func (m *Model) ensureCursorVisible() {
 	// If the cursor item extends beyond available content height, scroll down
 	if linesUsed > contentHeight {
 		// Find the minimum scroll offset that keeps cursor visible
+		found := false
 		for newScrollOffset := m.scrollOffset + 1; newScrollOffset <= m.cursor; newScrollOffset++ {
 			testLinesUsed := 0
 
@@ -403,8 +404,16 @@ func (m *Model) ensureCursorVisible() {
 
 			if testLinesUsed <= contentHeight {
 				m.scrollOffset = newScrollOffset
+				found = true
 				break
 			}
+		}
+
+		// Nothing fits when the indicator and the cursor row compete for a single
+		// line, or the cursor item is taller than the content area. Show the cursor
+		// row at the top rather than leaving it off-screen.
+		if !found {
+			m.scrollOffset = m.cursor
 		}
 	}
 
