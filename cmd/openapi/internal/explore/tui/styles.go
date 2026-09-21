@@ -1,6 +1,10 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"image/color"
+
+	"charm.land/lipgloss/v2"
+)
 
 // Color palette
 const (
@@ -18,23 +22,23 @@ const (
 )
 
 // methodColors maps HTTP methods to their display colors
-var methodColors = map[string]lipgloss.Color{
-	"GET":     colorGreen,
-	"POST":    colorBlue,
-	"PUT":     colorYellow,
-	"DELETE":  colorRed,
-	"PATCH":   colorPurple,
-	"HEAD":    colorGray,
-	"OPTIONS": colorGray,
-	"TRACE":   colorGray,
+var methodColors = map[string]color.Color{
+	"GET":     lipgloss.Color(colorGreen),
+	"POST":    lipgloss.Color(colorBlue),
+	"PUT":     lipgloss.Color(colorYellow),
+	"DELETE":  lipgloss.Color(colorRed),
+	"PATCH":   lipgloss.Color(colorPurple),
+	"HEAD":    lipgloss.Color(colorGray),
+	"OPTIONS": lipgloss.Color(colorGray),
+	"TRACE":   lipgloss.Color(colorGray),
 }
 
 // GetMethodColor returns the color for a given HTTP method
-func GetMethodColor(method string) lipgloss.Color {
-	if color, ok := methodColors[method]; ok {
-		return color
+func GetMethodColor(method string) color.Color {
+	if c, ok := methodColors[method]; ok {
+		return c
 	}
-	return colorGray
+	return lipgloss.Color(colorGray)
 }
 
 // Common styles

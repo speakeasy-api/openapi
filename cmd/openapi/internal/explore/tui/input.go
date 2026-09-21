@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // InputModel is a simple text input TUI for getting file paths
@@ -26,7 +26,7 @@ func NewInputModel(prompt, defaultValue string) InputModel {
 	ti.SetValue(defaultValue)
 	ti.Focus()
 	ti.CharLimit = 256
-	ti.Width = 60
+	ti.SetWidth(60)
 
 	return InputModel{
 		textInput: ti,
@@ -47,12 +47,12 @@ func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEnter:
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "enter":
 			m.submitted = true
 			return m, tea.Quit
-		case tea.KeyCtrlC, tea.KeyEsc:
+		case "ctrl+c", "esc":
 			m.cancelled = true
 			return m, tea.Quit
 		}
@@ -63,7 +63,7 @@ func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the input
-func (m InputModel) View() string {
+func (m InputModel) View() tea.View {
 	style := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(colorThemePurple)).
@@ -83,7 +83,7 @@ func (m InputModel) View() string {
 		m.textInput.View(),
 		helpStyle.Render("Enter: confirm • Esc: cancel"))
 
-	return lipgloss.Place(80, 24, lipgloss.Center, lipgloss.Center, style.Render(content))
+	return tea.NewView(lipgloss.Place(80, 24, lipgloss.Center, lipgloss.Center, style.Render(content)))
 }
 
 // GetValue returns the submitted value
