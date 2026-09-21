@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
 
 jobs:
   lint:
@@ -298,12 +300,3 @@ jobs:
             exit 1
           fi
           echo "All checks passed successfully"
-
-  # Add this temporary job to satisfy the phantom check TODO remove once GitHub stops expecting it
-  test-and-build:
-    name: test-and-build # Exact name match
-    runs-on: ubuntu-latest
-    if: always() # Always run
-    steps:
-      - name: Satisfy phantom check
-        run: echo "This job exists only to satisfy the phantom test-and-build status check. It will be removed once GitHub stops expecting it."
