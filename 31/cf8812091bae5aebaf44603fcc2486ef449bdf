@@ -1,0 +1,90 @@
+go.mod
+  h_9630b74bdac540 3,7,9,11-12,21-23
+cmd/openapi/go.mod
+  h_9630b74bdac540 3,6-10,12,19-21,23-26,30,34-35,38,43-46
+.github/workflows/ci.yaml
+  h_9630b74bdac540 8-9,27,63,117,235,256,278
+.github/workflows/dependabot-tidy.yml
+  h_9630b74bdac540 29
+.github/workflows/release.yaml
+  h_9630b74bdac540 23
+cmd/openapi/commands/openapi/explore.go
+  h_9630b74bdac540 11,84
+cmd/openapi/commands/openapi/snip.go
+  h_9630b74bdac540 10,305
+cmd/openapi/go.sum
+  h_9630b74bdac540 1-6,11-12,15-22,25-32,42-43,61-64,78-79,84-87,95-96,102-103,107-108,110-111,114-115,117-118
+cmd/openapi/internal/explore/tui/input.go
+  h_9630b74bdac540 8-10,29,50-52,55,66,86
+cmd/openapi/internal/explore/tui/model.go
+  h_9630b74bdac540 7,169,200,247,297,299-301,327-329,391,407,411-417
+cmd/openapi/internal/explore/tui/model_keys_test.go
+  h_9630b74bdac540 1-572
+cmd/openapi/internal/explore/tui/styles.go
+  h_9630b74bdac540 3-7,25-33,37-39,41
+cmd/openapi/internal/explore/tui/view.go
+  h_9630b74bdac540 8
+go.sum
+  h_9630b74bdac540 32-33,41-42,45-46,48-49,51-52,54-55,57-58
+jsonschema/oas3/tests/go.mod
+  h_9630b74bdac540 3,7-8,23,25-26,29,31-32,36-37,39,46-47,49-50,53-61
+jsonschema/oas3/tests/go.sum
+  h_9630b74bdac540 29-30,33-36,43-44,49-50,55-56,63-66,69-70,85-88,95-102,107-124,128-134
+jsonschema/oas3/tests/testsuite
+  h_9630b74bdac540 1
+marshaller/coremodel.go
+  h_9630b74bdac540 180-181
+openapi/foldedscalar_marshalling_test.go
+  h_9630b74bdac540 1-52
+openapi/linter/converter/tests/go.mod
+  h_9630b74bdac540 3,11-13,19,22-26
+openapi/linter/converter/tests/go.sum
+  h_9630b74bdac540 7-8,19-20,23-28,30-33
+openapi/linter/customrules/go.mod
+  h_9630b74bdac540 3,9,11-12,20-24
+openapi/linter/customrules/go.sum
+  h_9630b74bdac540 8-9,20-21,24-29,31-34
+openapi/linter/rules/owasp_no_credentials_in_url.go
+  h_9630b74bdac540 6-7,18-87,138,140
+openapi/linter/rules/owasp_no_credentials_in_url_internal_test.go
+  h_9630b74bdac540 1-41
+openapi/linter/rules/owasp_no_credentials_in_url_test.go
+  h_9630b74bdac540 4,24-44,253-275,418-508
+openapi/localize.go
+  h_9630b74bdac540 17,585-586
+openapi/testdata/localize/input/components.yaml
+  h_9630b74bdac540 5-12
+openapi/testdata/localize/output_counter/components.yaml
+  h_9630b74bdac540 5-10
+openapi/testdata/localize/output_pathbased/components.yaml
+  h_9630b74bdac540 5-10
+oq/foldedscalar_format_test.go
+  h_9630b74bdac540 1-114
+oq/format.go
+  h_9630b74bdac540 11,314-315
+overlay/apply.go
+  h_9630b74bdac540 9,34-35,90-92
+overlay/foldedscalar.go
+  h_9630b74bdac540 1-17
+overlay/foldedscalar_test.go
+  h_9630b74bdac540 1-179
+overlay/parse.go
+  h_9630b74bdac540 68-69
+overlay/schema.go
+  h_9630b74bdac540 67-68
+yml/foldedscalar.go
+  h_9630b74bdac540 1-46
+yml/foldedscalar_test.go
+  h_9630b74bdac540 1-251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "31cf8812091bae5aebaf44603fcc2486ef449bdf",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
