@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/speakeasy-api/openapi/cmd/openapi/internal/explore"
 )
 
@@ -166,7 +166,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			if m.showHelp {
@@ -197,7 +197,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "ctrl+d":
-			if !m.showHelp {
+			if !m.showHelp && len(m.operations) > 0 {
 				maxItems := len(m.operations) - 1
 				newCursorPos := m.cursor + scrollHalfScreenLines
 
@@ -244,7 +244,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.lastKeyAt = now
 			}
 
-		case " ":
+		case "space":
 			if !m.showHelp && m.cursor < len(m.operations) {
 				if m.config.Selection.Enabled {
 					// In selection mode, space toggles selection
@@ -294,9 +294,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the current state (required by bubbletea)
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	if m.showHelp {
-		return m.renderHelpModal()
+		v := tea.NewView(m.renderHelpModal())
+		v.AltScreen = true
+		return v
 	}
 
 	var s strings.Builder
@@ -322,7 +324,9 @@ func (m Model) View() string {
 
 	s.WriteString(footer)
 
-	return s.String()
+	v := tea.NewView(s.String())
+	v.AltScreen = true
+	return v
 }
 
 // calculateContentHeight returns the available height for content
@@ -384,6 +388,7 @@ func (m *Model) ensureCursorVisible() {
 	// If the cursor item extends beyond available content height, scroll down
 	if linesUsed > contentHeight {
 		// Find the minimum scroll offset that keeps cursor visible
+		found := false
 		for newScrollOffset := m.scrollOffset + 1; newScrollOffset <= m.cursor; newScrollOffset++ {
 			testLinesUsed := 0
 
@@ -399,8 +404,16 @@ func (m *Model) ensureCursorVisible() {
 
 			if testLinesUsed <= contentHeight {
 				m.scrollOffset = newScrollOffset
+				found = true
 				break
 			}
+		}
+
+		// Nothing fits when the indicator and the cursor row compete for a single
+		// line, or the cursor item is taller than the content area. Show the cursor
+		// row at the top rather than leaving it off-screen.
+		if !found {
+			m.scrollOffset = m.cursor
 		}
 	}
 

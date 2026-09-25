@@ -64,6 +64,8 @@ func (o *Overlay) IsV110OrLater() bool {
 }
 
 func (o *Overlay) ToString() (string, error) {
+	o.stabilizeFoldedScalars()
+
 	buf := bytes.NewBuffer([]byte{})
 	decoder := yaml.NewEncoder(buf)
 	decoder.SetIndent(2)

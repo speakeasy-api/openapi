@@ -3,7 +3,8 @@ package rules
 import (
 	"context"
 	"fmt"
-	"regexp"
+	"strings"
+	"unicode"
 
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -14,10 +15,76 @@ import (
 //nolint:gosec
 const RuleOwaspNoCredentialsInURL = "owasp-no-credentials-in-url"
 
-// credentialPattern matches parameter names that look like credentials
-// Matches: client_secret, clientsecret, token, access_token, accesstoken, refresh_token, refreshtoken,
-// id_token, idtoken, password, secret, api-key, apikey (case insensitive)
-var credentialPattern = regexp.MustCompile(`(?i)^.*(client_?secret|token|access_?token|refresh_?token|id_?token|password|secret|api-?key).*$`)
+// credentialWords flag a parameter when one of them is the head (last) word of its
+// name: clientSecret, access_token and userPassword are credentials, while secretPath,
+// tokenId and secretName merely describe one.
+var credentialWords = []string{"secret", "token", "password", "passwd", "pwd"}
+
+// keyQualifiers turn a trailing "key" into a credential, whether the qualifier is its
+// own word (api-key, secretKey) or glued on (apikey, myapikey); "key" on its own is a
+// lookup key, not a credential (keyName, sortKey).
+var keyQualifiers = []string{"api", "secret"}
+
+// looksLikeCredential reports whether a parameter name reads as a credential rather
+// than as something that refers to one.
+func looksLikeCredential(name string) bool {
+	words := splitParamName(name)
+	if len(words) == 0 {
+		return false
+	}
+	head := words[len(words)-1]
+
+	// Suffix rather than equality so glued names (accesstoken, clientsecret, myapikey)
+	// still match.
+	for _, w := range credentialWords {
+		if strings.HasSuffix(head, w) {
+			return true
+		}
+	}
+	for _, q := range keyQualifiers {
+		if strings.HasSuffix(head, q+"key") {
+			return true
+		}
+		if head == "key" && len(words) > 1 && words[len(words)-2] == q {
+			return true
+		}
+	}
+	return false
+}
+
+// splitParamName breaks a parameter name into lowercase words on `_`, `-`, `.`, digits
+// and camelCase boundaries. Acronym runs split before their last capital, so APIKey
+// becomes [api key] and userID becomes [user id].
+func splitParamName(name string) []string {
+	var (
+		words []string
+		cur   []rune
+	)
+	flush := func() {
+		if len(cur) > 0 {
+			words = append(words, strings.ToLower(string(cur)))
+			cur = cur[:0]
+		}
+	}
+
+	runes := []rune(name)
+	for i, r := range runes {
+		if !unicode.IsLetter(r) {
+			flush()
+			continue
+		}
+		if unicode.IsUpper(r) && len(cur) > 0 {
+			prev := runes[i-1]
+			nextIsLower := i+1 < len(runes) && unicode.IsLower(runes[i+1])
+			if unicode.IsLower(prev) || nextIsLower {
+				flush()
+			}
+		}
+		cur = append(cur, r)
+	}
+	flush()
+	return words
+}
 
 type OwaspNoCredentialsInURLRule struct{}
 
@@ -68,9 +135,9 @@ func (r *OwaspNoCredentialsInURLRule) Run(ctx context.Context, docInfo *linter.D
 			return
 		}
 
-		// Check if the parameter name matches the credential pattern
+		// Check if the parameter name reads as a credential
 		paramName := paramObj.GetName()
-		if credentialPattern.MatchString(paramName) {
+		if looksLikeCredential(paramName) {
 			// Get the root node to find the name key
 			if rootNode := paramObj.GetRootNode(); rootNode != nil {
 				_, nameValueNode, found := yml.GetMapElementNodes(ctx, rootNode, "name")

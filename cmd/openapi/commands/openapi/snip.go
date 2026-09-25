@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/speakeasy-api/openapi/cmd/openapi/internal/explore"
 	"github.com/speakeasy-api/openapi/cmd/openapi/internal/explore/tui"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -302,7 +302,7 @@ func runSnipInteractive(ctx context.Context, inputFile, outputFile string) error
 
 	// Create and run the TUI
 	m := tui.NewModelWithConfig(operations, docTitle, docVersion, config)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 
 	finalModel, err := p.Run()
 	if err != nil {

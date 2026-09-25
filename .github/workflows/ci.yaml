@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
 
 jobs:
   lint:
@@ -22,7 +24,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v4.2.5
+        uses: jdx/mise-action@v4.3.0
         with:
           experimental: true
 
@@ -58,7 +60,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v4.2.5
+        uses: jdx/mise-action@v4.3.0
 
       # Verify Docker is available for testcontainers (Ubuntu only)
       - name: Verify Docker availability
@@ -112,7 +114,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v4.2.5
+        uses: jdx/mise-action@v4.3.0
 
       # Verify Docker is available for testcontainers
       - name: Verify Docker availability
@@ -230,7 +232,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v4.2.5
+        uses: jdx/mise-action@v4.3.0
 
       - name: Build project
         run: mise run build
@@ -251,7 +253,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v4.2.5
+        uses: jdx/mise-action@v4.3.0
 
       - name: Build project
         run: go build -v ./...
@@ -273,7 +275,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v4.2.5
+        uses: jdx/mise-action@v4.3.0
 
       - name: Run CLI integration tests
         run: mise run test-cli
@@ -298,12 +300,3 @@ jobs:
             exit 1
           fi
           echo "All checks passed successfully"
-
-  # Add this temporary job to satisfy the phantom check TODO remove once GitHub stops expecting it
-  test-and-build:
-    name: test-and-build # Exact name match
-    runs-on: ubuntu-latest
-    if: always() # Always run
-    steps:
-      - name: Satisfy phantom check
-        run: echo "This job exists only to satisfy the phantom test-and-build status check. It will be removed once GitHub stops expecting it."
