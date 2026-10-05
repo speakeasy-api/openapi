@@ -219,6 +219,11 @@ jobs:
             coverage-summary.md
             main-coverage.log
 
+      - name: Setup Python for Codecov
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
@@ -226,6 +231,7 @@ jobs:
           files: ./coverage.out
           disable_search: true
           fail_ci_if_error: true
+          use_pypi: true
 
   # Build jobs (run in parallel)
   build-ubuntu:
