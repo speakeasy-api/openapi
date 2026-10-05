@@ -2,16 +2,22 @@
 set -euo pipefail
 
 # Script to format Go coverage output as a markdown table
-# Usage: ./format-coverage.sh coverage.out [current-coverage] [main-coverage]
+# Usage: ./format-coverage.sh coverage.out [current-coverage] [main-coverage] [main-status]
 
 COVERAGE_FILE="${1:-coverage.out}"
 CURRENT_COVERAGE="${2:-}"
 MAIN_COVERAGE="${3:-}"
+MAIN_STATUS="${4:-}"
 
 if [ ! -f "$COVERAGE_FILE" ]; then
     echo "Error: Coverage file '$COVERAGE_FILE' not found"
     exit 1
 fi
+
+NORMALIZED_FILE=$(mktemp)
+trap 'rm -f "$NORMALIZED_FILE"' EXIT
+bash "$(dirname "$0")/normalize-coverage.sh" "$COVERAGE_FILE" > "$NORMALIZED_FILE"
+COVERAGE_FILE="$NORMALIZED_FILE"
 
 # Start markdown output
 echo "## 📊 Test Coverage Report"
@@ -19,10 +25,10 @@ echo ""
 
 # Show current and main coverage if provided
 if [ -n "$CURRENT_COVERAGE" ]; then
-    echo "**Current Coverage:** \`$CURRENT_COVERAGE\`"
+    echo "**Current Statement Coverage:** \`$CURRENT_COVERAGE\`"
     
     if [ -n "$MAIN_COVERAGE" ]; then
-        echo "**Main Branch Coverage:** \`$MAIN_COVERAGE\`"
+        echo "**Main Branch Statement Coverage:** \`$MAIN_COVERAGE\`"
         echo ""
         
         # Calculate difference
@@ -41,51 +47,32 @@ if [ -n "$CURRENT_COVERAGE" ]; then
                 echo "**Coverage Change:** ✅ No change"
             fi
         fi
+    elif [ -n "$MAIN_STATUS" ]; then
+        echo "**Main Branch Statement Coverage:** unavailable ($MAIN_STATUS). Comparison omitted."
     fi
 fi
 
 echo ""
-echo "### Coverage by Package"
+echo "### Statement Coverage by Package"
+echo ""
+echo "Go measures covered statements. Codecov measures fully covered lines, so its percentage can differ."
 echo ""
 
 # Create table header
 echo "| Package | Coverage |"
 echo "|---------|----------|"
 
-# Parse coverage and group by package
-go tool cover -func="$COVERAGE_FILE" | grep -E '\.go:[0-9]+:' | \
-awk -F: '{
-    # Extract package path from filename
-    split($1, parts, "/");
-    pkg = "";
-    for(i=1; i<length(parts); i++) {
-        if(pkg != "") pkg = pkg "/";
-        pkg = pkg parts[i];
-    }
-    
-    # Extract coverage percentage from the last field
-    split($0, line, /[[:space:]]+/);
-    coverage = line[length(line)];
-    
-    # Store coverage by package
-    if(pkg in packages) {
-        packages[pkg] = packages[pkg] "," coverage;
-    } else {
-        packages[pkg] = coverage;
-    }
+# Count statements, not averages of function percentages, from normalized blocks.
+awk '
+NR > 1 {
+    pkg = $1;
+    sub(/\/[^\/]+$/, "", pkg);
+    totals[pkg] += $2;
+    if($3 > 0) covered[pkg] += $2;
 }
 END {
-    for(pkg in packages) {
-        # Calculate average coverage for package
-        split(packages[pkg], covs, ",");
-        sum = 0;
-        count = 0;
-        for(i in covs) {
-            gsub(/%/, "", covs[i]);
-            sum += covs[i];
-            count++;
-        }
-        avg = (count > 0) ? sum/count : 0;
+    for(pkg in totals) {
+        avg = (totals[pkg] > 0) ? 100 * covered[pkg] / totals[pkg] : 0;
         
         # Format package name (remove common prefix)
         display_pkg = pkg;
@@ -100,7 +87,7 @@ END {
         # Output with coverage value for sorting
         printf "%.1f|`%s`|%s\n", avg, display_pkg, emoji;
     }
-}' | sort -n | awk -F'|' '{
+}' "$COVERAGE_FILE" | sort -n | awk -F'|' '{
     # Re-format after sorting by coverage
     printf "| %s | %s %.1f%% |\n", $2, $3, $1;
 }'

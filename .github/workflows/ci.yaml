@@ -151,45 +151,53 @@ jobs:
         if: github.event_name == 'pull_request'
         id: main-coverage
         run: |
-          # Store current working directory
           CURRENT_DIR=$(pwd)
-
-          # Fetch main branch with shallow clone for speed
+          MAIN_DIR="$RUNNER_TEMP/main-branch"
           git fetch --depth=1 origin main:main
+          git worktree add "$MAIN_DIR" main
+          trap 'cd "$CURRENT_DIR"; git worktree remove --force "$MAIN_DIR"' EXIT
+          cd "$MAIN_DIR"
 
-          # Checkout main branch in a temporary directory
-          git worktree add /tmp/main-branch main
-
-          # Initialize submodules in the main branch worktree
-          cd /tmp/main-branch
-          git submodule update --init --recursive || echo "Submodule initialization failed, continuing without submodules"
-          cd "$CURRENT_DIR"
-
-          # Run tests on main branch to get coverage (with timeout)
-          cd /tmp/main-branch
-          timeout 300 go test -coverprofile=main-coverage.out -covermode=atomic ./... > /dev/null 2>&1 || echo "Main branch tests failed or timed out"
-
-          if [ -f main-coverage.out ]; then
-            # Filter out cmd and tests folders from main branch coverage (same as current branch)
-            grep -v -E '/cmd/|/tests/' main-coverage.out > main-coverage.filtered.out || true
-            mv main-coverage.filtered.out main-coverage.out
-            
-            MAIN_COVERAGE=$(go tool cover -func=main-coverage.out | grep total | awk '{print $3}' || echo "0.0%")
-            echo "main-coverage=$MAIN_COVERAGE" >> $GITHUB_OUTPUT
-            echo "Main branch coverage: $MAIN_COVERAGE"
-            
-            # Copy main coverage file back to current directory
-            cp main-coverage.out "$CURRENT_DIR/main-coverage.out"
-          else
-            echo "main-coverage=0.0%" >> $GITHUB_OUTPUT
-            echo "Could not get main branch coverage"
+          if ! git submodule update --init --recursive; then
+            echo "::warning::Main coverage unavailable: submodule initialization failed"
+            echo "main-status=submodule initialization failed" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-          # Return to original directory
-          cd "$CURRENT_DIR"
+          if timeout 900 go test -race -coverpkg=./... -coverprofile=main-coverage.out -covermode=atomic ./... ./jsonschema/oas3/tests/... ./openapi/linter/customrules/... ./openapi/linter/converter/tests/... > "$CURRENT_DIR/main-coverage.log" 2>&1; then
+            TEST_STATUS=0
+          else
+            TEST_STATUS=$?
+          fi
 
-          # Clean up worktree (force removal to handle modified files)
-          git worktree remove --force /tmp/main-branch || rm -rf /tmp/main-branch
+          if [ "$TEST_STATUS" -ne 0 ]; then
+            if [ "$TEST_STATUS" -eq 124 ]; then
+              REASON="tests timed out after 900 seconds"
+            else
+              REASON="tests failed with exit code $TEST_STATUS"
+            fi
+            echo "::warning::Main coverage unavailable: $REASON"
+            echo "main-status=$REASON" >> "$GITHUB_OUTPUT"
+            tail -n 100 "$CURRENT_DIR/main-coverage.log"
+            exit 0
+          fi
+
+          if [ ! -s main-coverage.out ]; then
+            echo "::warning::Main coverage unavailable: no coverage profile generated"
+            echo "main-status=no coverage profile generated" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          bash "$CURRENT_DIR/.github/scripts/normalize-coverage.sh" main-coverage.out > main-coverage.filtered.out
+          mv main-coverage.filtered.out main-coverage.out
+          if MAIN_COVERAGE=$(go tool cover -func=main-coverage.out | awk '/^total:/ {print $NF}') && [ -n "$MAIN_COVERAGE" ]; then
+            echo "main-coverage=$MAIN_COVERAGE" >> "$GITHUB_OUTPUT"
+            echo "Main branch coverage: $MAIN_COVERAGE"
+            cp main-coverage.out "$CURRENT_DIR/main-coverage.out"
+          else
+            echo "::warning::Main coverage unavailable: coverage profile could not be read"
+            echo "main-status=coverage profile could not be read" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Generate coverage summary
         id: coverage-summary
@@ -198,7 +206,8 @@ jobs:
           CURRENT_COV="${{ steps.coverage.outputs.coverage }}"
           MAIN_COV="${{ steps.main-coverage.outputs.main-coverage }}"
 
-          ./.github/scripts/format-coverage.sh coverage.out "$CURRENT_COV" "$MAIN_COV" > coverage-summary.md
+          MAIN_STATUS="${{ steps.main-coverage.outputs.main-status }}"
+          ./.github/scripts/format-coverage.sh coverage.out "$CURRENT_COV" "$MAIN_COV" "$MAIN_STATUS" > coverage-summary.md
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7
@@ -208,12 +217,21 @@ jobs:
             coverage.out
             coverage.html
             coverage-summary.md
+            main-coverage.log
+
+      - name: Setup Python for Codecov
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.out
+          disable_search: true
+          fail_ci_if_error: true
+          use_pypi: true
 
   # Build jobs (run in parallel)
   build-ubuntu:

@@ -2,14 +2,106 @@ package openapi_test
 
 import (
 	"bytes"
+	"errors"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSanitize_ConfigRead_Error(t *testing.T) {
+	t.Parallel()
+	readErr := errors.New("config read failed")
+	_, err := openapi.LoadSanitizeConfig(iotest.ErrReader(readErr))
+	require.ErrorIs(t, err, readErr, "config reader failures should preserve their cause")
+}
+
+func TestSanitize_ConfigFileOptions_Success(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "sanitize.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("keepUnusedComponents: true\nextensionPatterns:\n  keep: [x-public-*]\n"), 0o600), "config fixture should be created")
+	config, err := openapi.LoadSanitizeConfigFromFile(path)
+	require.NoError(t, err, "config should load from disk")
+	assert.Equal(t, &openapi.SanitizeOptions{KeepUnusedComponents: true, ExtensionPatterns: &openapi.ExtensionFilter{Keep: []string{"x-public-*"}}}, config, "file options should be parsed exactly")
+}
+
+func TestSanitize_InvalidAndUnmatchedPatterns_Success(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name     string
+		filter   *openapi.ExtensionFilter
+		keys     []string
+		warnings []string
+	}{
+		{"whitelist", &openapi.ExtensionFilter{Keep: []string{"[", "x-absent", "x-keep"}}, []string{"x-keep"}, []string{"invalid keep pattern '[' was skipped", "keep pattern 'x-absent' did not match any extensions in the document"}},
+		{"blacklist", &openapi.ExtensionFilter{Remove: []string{"[", "x-absent", "x-remove"}}, []string{"x-keep", "x-other"}, []string{"invalid remove pattern '[' was skipped", "remove pattern 'x-absent' did not match any extensions in the document"}},
+		{"combined", &openapi.ExtensionFilter{Keep: []string{"[", "x-absent", "x-keep"}, Remove: []string{"[", "x-absent", "x-keep", "x-remove"}}, []string{"x-keep", "x-other"}, []string{"invalid keep pattern '[' was skipped", "keep pattern 'x-absent' did not match any extensions in the document", "invalid remove pattern '[' was skipped", "remove pattern 'x-absent' did not match any extensions in the document"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			doc := unmarshalOpenAPI(t, t.Context(), "openapi: 3.1.0\ninfo: {title: Filters, version: '1'}\npaths: {}\nx-keep: true\nx-remove: true\nx-other: true\n")
+			result, err := openapi.Sanitize(t.Context(), doc, &openapi.SanitizeOptions{ExtensionPatterns: tt.filter, KeepUnusedComponents: true, KeepUnknownProperties: true})
+			require.NoError(t, err, "invalid patterns should produce warnings without failing sanitization")
+			assert.ElementsMatch(t, tt.warnings, result.Warnings, "invalid and unmatched patterns should be reported separately")
+			assert.ElementsMatch(t, tt.keys, slices.Collect(doc.Extensions.Keys()), "keep patterns should override matching remove patterns")
+		})
+	}
+}
+
+func TestSanitize_UnknownPropertiesInReusableObjects_Success(t *testing.T) {
+	t.Parallel()
+	const source = `openapi: 3.1.0
+info: {title: Reusable objects, version: '1'}
+paths: {}
+components:
+  schemas:
+    Boolean: true
+    String: {type: string, rogueField: rogue}
+  responses:
+    Object: {description: response, rogueField: rogue}
+    Alias: {$ref: '#/components/responses/Object'}
+  parameters:
+    Object: {name: id, in: query, schema: {type: string}, rogueField: rogue}
+    Alias: {$ref: '#/components/parameters/Object'}
+  requestBodies:
+    Object: {content: {application/json: {schema: {type: string}}}, rogueField: rogue}
+    Alias: {$ref: '#/components/requestBodies/Object'}
+  headers:
+    Object: {schema: {type: string}, rogueField: rogue}
+    Alias: {$ref: '#/components/headers/Object'}
+  examples:
+    Object: {value: example, rogueField: rogue}
+    Alias: {$ref: '#/components/examples/Object'}
+  links:
+    Object: {operationId: getItem, rogueField: rogue}
+    Alias: {$ref: '#/components/links/Object'}
+  callbacks:
+    Object: {}
+    Alias: {$ref: '#/components/callbacks/Object'}
+  pathItems:
+    Object: {summary: Path}
+    Alias: {$ref: '#/components/pathItems/Object'}
+  securitySchemes:
+    Object: {type: http, scheme: bearer, rogueField: rogue}
+    Alias: {$ref: '#/components/securitySchemes/Object'}
+`
+	doc := unmarshalOpenAPI(t, t.Context(), source)
+	_, err := openapi.Sanitize(t.Context(), doc, &openapi.SanitizeOptions{KeepUnusedComponents: true})
+	require.NoError(t, err, "all reusable object kinds should support unknown-property cleanup")
+	var output bytes.Buffer
+	require.NoError(t, openapi.Marshal(t.Context(), doc, &output), "sanitized document should marshal")
+	assert.NotContains(t, output.String(), "rogue", "unknown fields should be removed from every object")
+	for _, section := range []string{"responses", "parameters", "requestBodies", "headers", "examples", "links", "callbacks", "pathItems", "securitySchemes"} {
+		assert.Contains(t, output.String(), "#/components/"+section+"/Object", "aliases should remain untouched while their object definitions are sanitized")
+	}
+	assert.Contains(t, output.String(), "Boolean: true", "boolean schemas should survive cleanup")
+}
 
 func TestSanitize_RemoveAllExtensions_Success(t *testing.T) {
 	t.Parallel()

@@ -3,6 +3,8 @@ package linter_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"strconv"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/linter"
@@ -253,6 +255,72 @@ func TestDocGenerator_WriteMarkdown_WithVersions(t *testing.T) {
 
 	output := buf.String()
 	assert.Contains(t, output, "**Applies to:** 3.1.0, 3.2.0")
+}
+
+func TestDocGenerator_WriteMarkdown_OptionalSectionsAndErrors(t *testing.T) {
+	t.Parallel()
+
+	registry := linter.NewRegistry[*MockDoc]()
+	registry.Register(&configurableDocumentedRule{documentedMockRule: documentedMockRule{
+		mockRule: mockRule{
+			id: "full-rule", category: "style", summary: "Rule summary", description: "Rule description",
+			link: "https://example.com/rule", defaultSeverity: validation.SeverityWarning, versions: []string{"3.1.0"},
+		},
+		goodExample: "good: true", badExample: "bad: true", rationale: "Rule rationale", fixAvailable: true,
+	}})
+	generator := linter.NewDocGenerator(registry)
+	writeErr := errors.New("documentation writer failed")
+	complete := &docFailureWriter{err: writeErr}
+	require.NoError(t, generator.WriteMarkdown(complete), "fully documented rules should render")
+	for _, section := range []string{"**Auto-fix available:** Yes", "#### Rationale", "Rule rationale", "#### ❌ Incorrect", "bad: true", "#### ✅ Correct", "good: true", "#### Configuration", "| Option | Type | Default | Description |", "[Documentation →](https://example.com/rule)"} {
+		assert.Contains(t, complete.String(), section, "optional section should be included")
+	}
+
+	for failAt := 1; failAt <= complete.calls; failAt++ {
+		t.Run("write_"+strconv.Itoa(failAt), func(t *testing.T) {
+			t.Parallel()
+			writer := &docFailureWriter{failAt: failAt, err: writeErr}
+			err := generator.WriteMarkdown(writer)
+			require.ErrorIs(t, err, writeErr, "each failed write should preserve the original error")
+			assert.Equal(t, failAt, writer.calls, "documentation generation should stop immediately after a write failure")
+		})
+	}
+}
+
+func TestDocGenerator_WriteJSON_Error(t *testing.T) {
+	t.Parallel()
+
+	generator := linter.NewDocGenerator(linter.NewRegistry[*MockDoc]())
+	writeErr := errors.New("JSON writer failed")
+	writer := &docFailureWriter{failAt: 1, err: writeErr}
+	require.ErrorIs(t, generator.WriteJSON(writer), writeErr, "JSON generation should preserve writer errors")
+}
+
+type docFailureWriter struct {
+	bytes.Buffer
+	calls  int
+	failAt int
+	err    error
+}
+
+func (w *docFailureWriter) Write(data []byte) (int, error) {
+	w.calls++
+	if w.calls == w.failAt {
+		return 0, w.err
+	}
+	return w.Buffer.Write(data)
+}
+
+type configurableDocumentedRule struct {
+	documentedMockRule
+}
+
+func (r *configurableDocumentedRule) ConfigSchema() map[string]any {
+	return map[string]any{"enabled": map[string]any{"type": "boolean"}}
+}
+
+func (r *configurableDocumentedRule) ConfigDefaults() map[string]any {
+	return map[string]any{"enabled": true}
 }
 
 // documentedMockRule implements DocumentedRule interface

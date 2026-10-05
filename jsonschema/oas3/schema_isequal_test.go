@@ -338,6 +338,103 @@ func TestSchema_IsEqual_Error(t *testing.T) {
 	}
 }
 
+func TestSchema_IsEqual_MismatchFields(t *testing.T) {
+	t.Parallel()
+
+	child := func(title string) *JSONSchema[Referenceable] {
+		return NewJSONSchemaFromSchema[Referenceable](&Schema{Title: pointer.From(title)})
+	}
+	value := func(text string) values.Value {
+		return &yaml.Node{Kind: yaml.ScalarNode, Value: text}
+	}
+
+	tests := []struct {
+		name  string
+		left  *Schema
+		right *Schema
+	}{
+		{name: "exclusive maximum", left: &Schema{ExclusiveMaximum: NewExclusiveMaximumFromFloat64(1)}, right: &Schema{ExclusiveMaximum: NewExclusiveMaximumFromFloat64(2)}},
+		{name: "exclusive minimum", left: &Schema{ExclusiveMinimum: NewExclusiveMinimumFromFloat64(1)}, right: &Schema{ExclusiveMinimum: NewExclusiveMinimumFromFloat64(2)}},
+		{name: "all of", left: &Schema{AllOf: []*JSONSchema[Referenceable]{child("left")}}, right: &Schema{AllOf: []*JSONSchema[Referenceable]{child("right")}}},
+		{name: "one of", left: &Schema{OneOf: []*JSONSchema[Referenceable]{child("left")}}, right: &Schema{OneOf: []*JSONSchema[Referenceable]{child("right")}}},
+		{name: "any of", left: &Schema{AnyOf: []*JSONSchema[Referenceable]{child("left")}}, right: &Schema{AnyOf: []*JSONSchema[Referenceable]{child("right")}}},
+		{name: "prefix items", left: &Schema{PrefixItems: []*JSONSchema[Referenceable]{child("left")}}, right: &Schema{PrefixItems: []*JSONSchema[Referenceable]{child("right")}}},
+		{name: "contains", left: &Schema{Contains: child("left")}, right: &Schema{Contains: child("right")}},
+		{name: "if", left: &Schema{If: child("left")}, right: &Schema{If: child("right")}},
+		{name: "else", left: &Schema{Else: child("left")}, right: &Schema{Else: child("right")}},
+		{name: "then", left: &Schema{Then: child("left")}, right: &Schema{Then: child("right")}},
+		{name: "not", left: &Schema{Not: child("left")}, right: &Schema{Not: child("right")}},
+		{name: "property names", left: &Schema{PropertyNames: child("left")}, right: &Schema{PropertyNames: child("right")}},
+		{name: "unevaluated items", left: &Schema{UnevaluatedItems: child("left")}, right: &Schema{UnevaluatedItems: child("right")}},
+		{name: "unevaluated properties", left: &Schema{UnevaluatedProperties: child("left")}, right: &Schema{UnevaluatedProperties: child("right")}},
+		{name: "items", left: &Schema{Items: child("left")}, right: &Schema{Items: child("right")}},
+		{name: "additional properties", left: &Schema{AdditionalProperties: child("left")}, right: &Schema{AdditionalProperties: child("right")}},
+		{name: "dependent schemas", left: &Schema{DependentSchemas: sequencedmap.New(sequencedmap.NewElem("key", child("left")))}, right: &Schema{DependentSchemas: sequencedmap.New(sequencedmap.NewElem("key", child("right")))}},
+		{name: "pattern properties", left: &Schema{PatternProperties: sequencedmap.New(sequencedmap.NewElem("key", child("left")))}, right: &Schema{PatternProperties: sequencedmap.New(sequencedmap.NewElem("key", child("right")))}},
+		{name: "properties", left: &Schema{Properties: sequencedmap.New(sequencedmap.NewElem("key", child("left")))}, right: &Schema{Properties: sequencedmap.New(sequencedmap.NewElem("key", child("right")))}},
+		{name: "defs", left: &Schema{Defs: sequencedmap.New(sequencedmap.NewElem("key", child("left")))}, right: &Schema{Defs: sequencedmap.New(sequencedmap.NewElem("key", child("right")))}},
+		{name: "minimum contains", left: &Schema{MinContains: pointer.From(int64(1))}, right: &Schema{MinContains: pointer.From(int64(2))}},
+		{name: "maximum contains", left: &Schema{MaxContains: pointer.From(int64(1))}, right: &Schema{MaxContains: pointer.From(int64(2))}},
+		{name: "anchor", left: &Schema{Anchor: pointer.From("left")}, right: &Schema{Anchor: pointer.From("right")}},
+		{name: "multiple of", left: &Schema{MultipleOf: pointer.From(1.0)}, right: &Schema{MultipleOf: pointer.From(2.0)}},
+		{name: "maximum", left: &Schema{Maximum: pointer.From(1.0)}, right: &Schema{Maximum: pointer.From(2.0)}},
+		{name: "maximum length", left: &Schema{MaxLength: pointer.From(int64(1))}, right: &Schema{MaxLength: pointer.From(int64(2))}},
+		{name: "minimum length", left: &Schema{MinLength: pointer.From(int64(1))}, right: &Schema{MinLength: pointer.From(int64(2))}},
+		{name: "pattern", left: &Schema{Pattern: pointer.From("left")}, right: &Schema{Pattern: pointer.From("right")}},
+		{name: "content encoding", left: &Schema{ContentEncoding: pointer.From("left")}, right: &Schema{ContentEncoding: pointer.From("right")}},
+		{name: "content media type", left: &Schema{ContentMediaType: pointer.From("left")}, right: &Schema{ContentMediaType: pointer.From("right")}},
+		{name: "content schema", left: &Schema{ContentSchema: child("left")}, right: &Schema{ContentSchema: child("right")}},
+		{name: "format", left: &Schema{Format: pointer.From("left")}, right: &Schema{Format: pointer.From("right")}},
+		{name: "maximum items", left: &Schema{MaxItems: pointer.From(int64(1))}, right: &Schema{MaxItems: pointer.From(int64(2))}},
+		{name: "minimum items", left: &Schema{MinItems: pointer.From(int64(1))}, right: &Schema{MinItems: pointer.From(int64(2))}},
+		{name: "unique items", left: &Schema{UniqueItems: pointer.From(true)}, right: &Schema{UniqueItems: pointer.From(false)}},
+		{name: "maximum properties", left: &Schema{MaxProperties: pointer.From(int64(1))}, right: &Schema{MaxProperties: pointer.From(int64(2))}},
+		{name: "minimum properties", left: &Schema{MinProperties: pointer.From(int64(1))}, right: &Schema{MinProperties: pointer.From(int64(2))}},
+		{name: "read only", left: &Schema{ReadOnly: pointer.From(true)}, right: &Schema{ReadOnly: pointer.From(false)}},
+		{name: "write only", left: &Schema{WriteOnly: pointer.From(true)}, right: &Schema{WriteOnly: pointer.From(false)}},
+		{name: "deprecated", left: &Schema{Deprecated: pointer.From(true)}, right: &Schema{Deprecated: pointer.From(false)}},
+		{name: "schema dialect", left: &Schema{Schema: pointer.From("left")}, right: &Schema{Schema: pointer.From("right")}},
+		{name: "examples", left: &Schema{Examples: []values.Value{value("left")}}, right: &Schema{Examples: []values.Value{value("right")}}},
+		{name: "enum", left: &Schema{Enum: []values.Value{value("left")}}, right: &Schema{Enum: []values.Value{value("right")}}},
+		{name: "default", left: &Schema{Default: value("left")}, right: &Schema{Default: value("right")}},
+		{name: "const", left: &Schema{Const: value("left")}, right: &Schema{Const: value("right")}},
+		{name: "example", left: &Schema{Example: value("left")}, right: &Schema{Example: value("right")}},
+		{name: "discriminator", left: &Schema{Discriminator: &Discriminator{PropertyName: "left"}}, right: &Schema{Discriminator: &Discriminator{PropertyName: "right"}}},
+		{name: "XML", left: &Schema{XML: &XML{Name: pointer.From("left")}}, right: &Schema{XML: &XML{Name: pointer.From("right")}}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.False(t, tt.left.IsEqual(tt.right), "schemas differing in %s should not be equal", tt.name)
+		})
+	}
+}
+
+func TestSchema_ShallowCopy_PopulatedCollections(t *testing.T) {
+	t.Parallel()
+
+	child := NewJSONSchemaFromSchema[Referenceable](&Schema{Title: pointer.From("child")})
+	property := NewJSONSchemaFromSchema[Referenceable](&Schema{Title: pointer.From("property")})
+	schema := &Schema{
+		AllOf:            []*JSONSchema[Referenceable]{child},
+		Required:         []string{"name"},
+		DependentSchemas: sequencedmap.New(sequencedmap.NewElem("dependency", child)),
+		Properties:       sequencedmap.New(sequencedmap.NewElem("name", property)),
+	}
+
+	copied := schema.ShallowCopy()
+	assert.NotSame(t, schema, copied)
+	assert.Same(t, child, copied.AllOf[0], "slice elements remain shared in a shallow copy")
+	copied.AllOf[0] = property
+	copied.Required[0] = "changed"
+	copied.Properties.Set("other", child)
+	assert.Same(t, child, schema.AllOf[0], "slice backing storage should be independent")
+	assert.Equal(t, []string{"name"}, schema.Required, "copied string slices should be independent")
+	assert.Equal(t, 1, schema.Properties.Len(), "copied maps should be independent")
+	assert.Equal(t, 2, copied.Properties.Len())
+}
+
 func TestSchema_IsEqual_WithComplexTypes(t *testing.T) {
 	t.Parallel()
 
