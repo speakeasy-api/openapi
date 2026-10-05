@@ -1,0 +1,19 @@
+.github/README.md
+  h_9630b74bdac540 1-76
+.mise.toml
+  h_9630b74bdac540 2,6-7
+  h_9630b74bdac540 8
+.github/workflows/update-submodule-dependencies.yaml
+  h_9630b74bdac540 14,91-102,107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8e89a744f687d894fb2c8a33ef97964bb657baf0",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
