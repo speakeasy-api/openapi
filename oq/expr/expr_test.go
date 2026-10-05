@@ -831,6 +831,86 @@ func TestContains_ArrayValue(t *testing.T) {
 	assert.False(t, e.Eval(row).Bool)
 }
 
+func TestEval_FunctionContracts_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		want  expr.Value
+	}{
+		{`upper()`, expr.NullVal()},
+		{`len()`, expr.NullVal()},
+		{`count("a", "b")`, expr.NullVal()},
+		{`trim()`, expr.NullVal()},
+		{`startswith("a")`, expr.NullVal()},
+		{`endswith("a")`, expr.NullVal()},
+		{`contains("a")`, expr.NullVal()},
+		{`replace("a", "b")`, expr.NullVal()},
+		{`split("a")`, expr.NullVal()},
+		{`split("a", ",", 0, 1)`, expr.NullVal()},
+		{`contains(split("a,b", ","), "b")`, expr.BoolVal(true)},
+		{`contains(split("a,b", ","), "c")`, expr.BoolVal(false)},
+		{`not split("a,b", ",")`, expr.BoolVal(false)},
+		{`not empty`, expr.BoolVal(true)},
+		{`upper(split("a,b", ","))`, expr.StringVal("A, B")},
+		{`false + 3`, expr.IntVal(3)},
+		{`missing == true`, expr.BoolVal(false)},
+		{`matches(name, '^Pe')`, expr.BoolVal(true)},
+		{`"prefix \(len(name)) suffix"`, expr.StringVal("prefix 3 suffix")},
+		{`"\(len(name))"`, expr.IntVal(3)},
+		{`'\(name)'`, expr.StringVal(`\(name)`)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+			parsed, err := expr.Parse(tt.input)
+			require.NoError(t, err, "expression should parse")
+			assert.Equal(t, tt.want, parsed.Eval(testRow{"name": expr.StringVal("Pet"), "empty": expr.ArrayVal(nil)}), "expression should preserve its value kind and contents")
+		})
+	}
+}
+
+func TestParse_MalformedOperands_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input   string
+		message string
+	}{
+		{`true or`, `unexpected token: ""`},
+		{`true and`, `unexpected token: ""`},
+		{`name contains`, `unexpected token: ""`},
+		{`name startswith`, `unexpected token: ""`},
+		{`name endswith`, `unexpected token: ""`},
+		{`name default`, `unexpected token: ""`},
+		{`1 +`, `unexpected token: ""`},
+		{`1 *`, `unexpected token: ""`},
+		{`not`, `unexpected token: ""`},
+		{`(`, `unexpected token: ""`},
+		{`(true`, `expected ")", got ""`},
+		{`has name`, `expected "(", got "name"`},
+		{`matches name`, `expected "(", got "name"`},
+		{`matches(name "Pet")`, `expected ",", got "\"Pet\""`},
+		{`matches(name, "[")`, `invalid regex "[": error parsing regexp: missing closing ]: ` + "`[`"},
+		{`"Pet" matches "Pet"`, "matches requires a field on the left side"},
+		{`replace("a" "b")`, `expected ",", got "\"b\""`},
+		{`upper(,)`, `unexpected token: ","`},
+		{`upper(`, `expected ")", got ""`},
+		{`if`, `unexpected token: ""`},
+		{`if true then`, `unexpected token: ""`},
+		{`if false then 1 elif`, `unexpected token: ""`},
+		{`if false then 1 else`, `unexpected token: ""`},
+		{`"before \(1 +) after"`, `interpolation error: unexpected token: ""`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+			_, err := expr.Parse(tt.input)
+			require.EqualError(t, err, tt.message, "malformed operand should report its parse error")
+		})
+	}
+}
+
 func TestParse_EdgeCases(t *testing.T) {
 	t.Parallel()
 

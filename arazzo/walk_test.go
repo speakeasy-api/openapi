@@ -1,7 +1,10 @@
 package arazzo_test
 
 import (
+	"bytes"
 	"errors"
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/arazzo"
@@ -12,6 +15,34 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestWalk_StopAtEachNode_Success(t *testing.T) {
+	t.Parallel()
+
+	input, err := os.ReadFile("testdata/ordering/input.arazzo.yaml")
+	require.NoError(t, err, "walk fixture should load")
+	doc, _, err := arazzo.Unmarshal(t.Context(), bytes.NewReader(input))
+	require.NoError(t, err, "walk fixture should unmarshal")
+	var locations []string
+	for item := range arazzo.Walk(t.Context(), doc) {
+		locations = append(locations, item.Location.ToJSONPointer().String())
+	}
+	require.NotEmpty(t, locations, "fixture should contain traversal nodes")
+
+	for stopAt, location := range locations {
+		t.Run(strconv.Itoa(stopAt)+":"+location, func(t *testing.T) {
+			t.Parallel()
+			freshDoc, _, err := arazzo.Unmarshal(t.Context(), bytes.NewReader(input))
+			require.NoError(t, err, "each traversal should have its own document")
+			var visited []string
+			arazzo.Walk(t.Context(), freshDoc)(func(item arazzo.WalkItem) bool {
+				visited = append(visited, item.Location.ToJSONPointer().String())
+				return len(visited) <= stopAt
+			})
+			assert.Equal(t, locations[:stopAt+1], visited, "a false yield must stop every ancestor without visiting later nodes")
+		})
+	}
+}
 
 func TestWalk_Success(t *testing.T) {
 	t.Parallel()

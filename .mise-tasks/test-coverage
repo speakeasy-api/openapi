@@ -1,136 +1,36 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 
-# Use provided packages or default to all packages
-PACKAGES="${@:-./...}"
+PACKAGES=("$@")
+if [ ${#PACKAGES[@]} -eq 0 ]; then
+    PACKAGES=(./... ./jsonschema/oas3/tests/... ./openapi/linter/customrules/... ./openapi/linter/converter/tests/...)
+fi
 
 echo "🧪 Running tests with coverage using gotestsum..."
-if ! gotestsum --format testname -- -race -coverprofile=coverage.out -covermode=atomic ${PACKAGES}; then
-    echo "❌ Tests failed!"
-    exit 1
-fi
+# Count library code exercised by tests in other packages, not just its own tests.
+gotestsum --format testname -- -race -coverpkg=./... -coverprofile=coverage.out -covermode=atomic "${PACKAGES[@]}"
 
-# Filter out cmd and tests folders from coverage report
-if [ -f coverage.out ]; then
-    echo "🔧 Filtering cmd and tests folders from coverage report..."
-    grep -v -E '/cmd/|/tests/' coverage.out > coverage.filtered.out || true
-    # Keep original for reference, use filtered for reporting
-    mv coverage.filtered.out coverage.out
-fi
-
-echo ""
-echo "## 📊 Test Coverage Report"
-echo ""
-
-echo "### Coverage by Package"
-echo "\`\`\`"
-go tool cover -func=coverage.out
-echo "\`\`\`"
-echo ""
-
-echo "### 🎯 Functions with 0% Coverage"
-echo ""
-echo "| File:Function                                                          | Coverage |"
-echo "|------------------------------------------------------------------------|----------|"
-
-# Show functions with 0% coverage
-go tool cover -func=coverage.out | awk '
-/^github\.com/ && !/total/ {
-    # Extract file and function name
-    split($1, parts, ":")
-    file_func = parts[1] ":" parts[2]
-    
-    # Extract coverage percentage from last field
-    gsub(/%/, "", $NF)
-    coverage = $NF + 0
-    
-    # Show functions with 0% coverage
-    if (coverage == 0) {
-        printf "| %-70s | %7.1f%% |\n", file_func, coverage
-    }
-}' | head -30
-
-echo ""
-echo "### 🔍 Functions with Low Coverage (< 50%)"
-echo ""
-echo "| File:Function                                                          | Coverage |"
-echo "|------------------------------------------------------------------------|----------|"
-
-# Show functions with low coverage (>0% and <50%)
-go tool cover -func=coverage.out | awk '
-/^github\.com/ && !/total/ {
-    # Extract file and function name
-    split($1, parts, ":")
-    file_func = parts[1] ":" parts[2]
-    
-    # Extract coverage percentage from last field
-    gsub(/%/, "", $NF)
-    coverage = $NF + 0
-    
-    # Show functions with less than 50% coverage (but not 0%)
-    if (coverage > 0 && coverage < 50) {
-        printf "| %-70s | %7.1f%% |\n", file_func, coverage
-    }
-}' | head -30
-
-echo ""
-echo "### 📋 Packages Needing Improvement (< 80%)"
-echo ""
-echo "| Package                                                       | Coverage | Priority        |"
-echo "|---------------------------------------------------------------|----------|-----------------|"
-
-# Show packages that need improvement
-go tool cover -func=coverage.out | awk '
-/^github\.com/ && !/total/ {
-    # Extract package name
-    split($1, parts, "/")
-    pkg_path = ""
-    for (i = 1; i <= length(parts); i++) {
-        if (i > 1) pkg_path = pkg_path "/"
-        pkg_path = pkg_path parts[i]
-        if (parts[i+1] ~ /\.go:/) break
-    }
-    
-    # Extract coverage percentage from last field
-    gsub(/%/, "", $NF)
-    coverage = $NF + 0
-    
-    # Accumulate coverage for each package
-    if (pkg_path in pkg_total) {
-        pkg_total[pkg_path] += coverage
-        pkg_count[pkg_path]++
-    } else {
-        pkg_total[pkg_path] = coverage
-        pkg_count[pkg_path] = 1
-    }
+# Keep the existing library scope and merge repeated cross-package blocks.
+echo "🔧 Filtering cmd and tests folders and merging coverage blocks..."
+awk '
+NR == 1 { mode = $0; next }
+$1 !~ /\/cmd\/|\/tests\// {
+    statements[$1] = $2;
+    hits[$1] += $3;
 }
 END {
-    for (pkg in pkg_total) {
-        avg_coverage = pkg_total[pkg] / pkg_count[pkg]
-        if (avg_coverage < 80) {
-            priority = "🔴 High"
-            if (avg_coverage > 60) priority = "🟡 Medium"
-            if (avg_coverage > 40) priority = "🟠 Medium-High"
-            if (avg_coverage == 0) priority = "🚨 Critical"
-            printf "| %-61s | %7.1f%% | %-14s |\n", pkg, avg_coverage, priority
-        }
-    }
-}' | sort -k4,4n | head -15
+    print mode;
+    for (block in statements) print block, statements[block], hits[block];
+}' coverage.out > coverage.filtered.out
+mv coverage.filtered.out coverage.out
 
+CURRENT_COV=$(go tool cover -func=coverage.out | awk '/^total:/ {print $NF}')
 echo ""
-echo "---"
+./.github/scripts/format-coverage.sh coverage.out "$CURRENT_COV"
+echo ""
+echo "## 🎯 **TOTAL STATEMENT COVERAGE: \`$CURRENT_COV\`**"
 echo ""
 
-# Extract and display total coverage at the bottom for visibility
-CURRENT_COV=$(go tool cover -func=coverage.out | tail -1 | awk '{print $NF}')
-echo "## 🎯 **TOTAL COVERAGE: \`$CURRENT_COV\`**"
-echo ""
-echo "- 🧪 All tests completed"
-echo "- 📈 Full coverage report available in coverage.html"
-echo "- 📄 Function-level details in coverage.out"
-echo ""
-
-# Generate HTML report
 go tool cover -html=coverage.out -o coverage.html
 echo "📊 Coverage report generated: coverage.html"
 echo "✅ Tests with coverage completed!"

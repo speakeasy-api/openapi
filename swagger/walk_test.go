@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/extensions"
@@ -31,6 +32,32 @@ func loadSwaggerDocument(ctx context.Context) (*swagger.Swagger, error) {
 	}
 
 	return s, nil
+}
+
+func TestWalkSwagger_StopAtEachNode_Success(t *testing.T) {
+	t.Parallel()
+
+	doc, err := loadSwaggerDocument(t.Context())
+	require.NoError(t, err, "walk fixture should load")
+	var locations []string
+	for item := range swagger.Walk(t.Context(), doc) {
+		locations = append(locations, item.Location.ToJSONPointer().String())
+	}
+	require.NotEmpty(t, locations, "fixture should contain traversal nodes")
+
+	for stopAt, location := range locations {
+		t.Run(strconv.Itoa(stopAt)+":"+location, func(t *testing.T) {
+			t.Parallel()
+			freshDoc, err := loadSwaggerDocument(t.Context())
+			require.NoError(t, err, "each traversal should have its own document")
+			var visited []string
+			swagger.Walk(t.Context(), freshDoc)(func(item swagger.WalkItem) bool {
+				visited = append(visited, item.Location.ToJSONPointer().String())
+				return len(visited) <= stopAt
+			})
+			assert.Equal(t, locations[:stopAt+1], visited, "a false yield must stop every ancestor without visiting later nodes")
+		})
+	}
 }
 
 func TestWalkSwagger_Success(t *testing.T) {

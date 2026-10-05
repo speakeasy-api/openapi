@@ -3,7 +3,9 @@ package openapi_test
 import (
 	"context"
 	"errors"
+	"iter"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/extensions"
@@ -32,6 +34,99 @@ func loadOpenAPIDocument(ctx context.Context) (*openapi.OpenAPI, error) {
 	}
 
 	return o, nil
+}
+
+func TestWalkOpenAPI_StopAtEachNode_Success(t *testing.T) {
+	t.Parallel()
+
+	doc, err := loadOpenAPIDocument(t.Context())
+	require.NoError(t, err, "walk fixture should load")
+	var locations []string
+	for item := range openapi.Walk(t.Context(), doc) {
+		locations = append(locations, item.Location.ToJSONPointer().String())
+	}
+	require.NotEmpty(t, locations, "fixture should contain traversal nodes")
+
+	for stopAt, location := range locations {
+		t.Run(strconv.Itoa(stopAt)+":"+location, func(t *testing.T) {
+			t.Parallel()
+			freshDoc, err := loadOpenAPIDocument(t.Context())
+			require.NoError(t, err, "each traversal should have its own document")
+			var visited []string
+			openapi.Walk(t.Context(), freshDoc)(func(item openapi.WalkItem) bool {
+				visited = append(visited, item.Location.ToJSONPointer().String())
+				return len(visited) <= stopAt
+			})
+			assert.Equal(t, locations[:stopAt+1], visited, "a false yield must stop every ancestor without visiting later nodes")
+		})
+	}
+}
+
+func checkDetachedWalk[T any](t *testing.T, root *T, count int) {
+	t.Helper()
+	visited := 0
+	for item := range openapi.Walk(t.Context(), root) {
+		visited++
+		assert.Nil(t, item.OpenAPI, "detached walks should not claim a containing document")
+		require.NoError(t, item.Match(openapi.Matcher{}), "detached models and optional extensions should be supported by the matcher")
+	}
+	assert.Equal(t, count, visited, "detached walk should visit exactly the root and its children")
+	stopped := 0
+	openapi.Walk(t.Context(), root)(func(item openapi.WalkItem) bool {
+		stopped++
+		assert.Equal(t, "/", item.Location.ToJSONPointer().String(), "the requested model should be the traversal root")
+		require.NoError(t, item.Match(openapi.Matcher{Any: func(model any) error {
+			assert.Same(t, root, model, "the first item should be the requested model")
+			return nil
+		}}), "the root should match its model")
+		return false
+	})
+	assert.Equal(t, 1, stopped, "a false yield should stop before any child model")
+}
+
+func TestWalk_DetachedMetadataRoots_Success(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		run  func(*testing.T)
+	}{
+		{"info with children", func(t *testing.T) {
+			t.Helper()
+			checkDetachedWalk(t, &openapi.Info{Contact: &openapi.Contact{}, License: &openapi.License{}}, 6)
+		}},
+		{"contact", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.Contact{}, 1) }},
+		{"license", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.License{}, 1) }},
+		{"external docs", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &oas3.ExternalDocumentation{}, 2) }},
+		{"tag", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.Tag{}, 2) }},
+		{"server", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.Server{}, 2) }},
+		{"server variable", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.ServerVariable{}, 2) }},
+		{"security requirement", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.SecurityRequirement{}, 1) }},
+		{"paths", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.Paths{}, 2) }},
+		{"operation", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.Operation{}, 4) }},
+		{"responses", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.Responses{}, 2) }},
+		{"media type", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.MediaType{}, 2) }},
+		{"encoding", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.Encoding{}, 2) }},
+		{"components", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.Components{}, 2) }},
+		{"oauth flows", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.OAuthFlows{}, 2) }},
+		{"oauth flow", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &openapi.OAuthFlow{}, 2) }},
+		{"extensions", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &extensions.Extensions{}, 1) }},
+		{"discriminator", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &oas3.Discriminator{}, 1) }},
+		{"xml", func(t *testing.T) { t.Helper(); checkDetachedWalk(t, &oas3.XML{}, 1) }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tt.run(t)
+		})
+	}
+}
+
+func TestWalk_NilRoot_ReturnsEmpty(t *testing.T) {
+	t.Parallel()
+	var root *openapi.Info
+	for range openapi.Walk(t.Context(), root) {
+		t.Fatal("a nil starting point must not yield a model")
+	}
 }
 
 func TestWalkOpenAPI_Success(t *testing.T) {
@@ -1201,4 +1296,104 @@ func TestWalkAdditionalOperations_Success(t *testing.T) {
 	assert.Contains(t, matchedLocations, "/paths/~1custom~1{id}/additionalOperations/COPY", "Should visit additional COPY operation")
 	assert.Contains(t, matchedLocations, "/paths/~1custom~1{id}/additionalOperations/PURGE", "Should visit additional PURGE operation")
 	assert.Contains(t, matchedLocations, "/paths/~1standard/get", "Should visit standard operation on path without additionalOperations")
+}
+
+func TestWalkComponentStartingPoints_Success(t *testing.T) {
+	t.Parallel()
+
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
+	require.NoError(t, err)
+	components := openAPIDoc.Components
+	require.NotNil(t, components)
+
+	schema, exists := components.Schemas.Get("User")
+	require.True(t, exists)
+	response, exists := components.Responses.Get("ErrorResponse")
+	require.True(t, exists)
+	parameter, exists := components.Parameters.Get("UserIdParam")
+	require.True(t, exists)
+	example, exists := components.Examples.Get("UserExample")
+	require.True(t, exists)
+	requestBody, exists := components.RequestBodies.Get("UserRequest")
+	require.True(t, exists)
+	header, exists := components.Headers.Get("X-Rate-Limit")
+	require.True(t, exists)
+	securityScheme, exists := components.SecuritySchemes.Get("apiKey")
+	require.True(t, exists)
+	link, exists := components.Links.Get("GetUserByUserId")
+	require.True(t, exists)
+	callback, exists := components.Callbacks.Get("UserCallback")
+	require.True(t, exists)
+	pathItem, exists := components.PathItems.Get("UserPath")
+	require.True(t, exists)
+
+	tests := []struct {
+		name  string
+		start any
+		walk  func(context.Context) iter.Seq[openapi.WalkItem]
+	}{
+		{name: "schema", start: schema, walk: func(ctx context.Context) iter.Seq[openapi.WalkItem] { return openapi.Walk(ctx, schema) }},
+		{name: "response", start: response, walk: func(ctx context.Context) iter.Seq[openapi.WalkItem] { return openapi.Walk(ctx, response) }},
+		{name: "parameter", start: parameter, walk: func(ctx context.Context) iter.Seq[openapi.WalkItem] { return openapi.Walk(ctx, parameter) }},
+		{name: "example", start: example, walk: func(ctx context.Context) iter.Seq[openapi.WalkItem] { return openapi.Walk(ctx, example) }},
+		{name: "request body", start: requestBody, walk: func(ctx context.Context) iter.Seq[openapi.WalkItem] { return openapi.Walk(ctx, requestBody) }},
+		{name: "header", start: header, walk: func(ctx context.Context) iter.Seq[openapi.WalkItem] { return openapi.Walk(ctx, header) }},
+		{name: "security scheme", start: securityScheme, walk: func(ctx context.Context) iter.Seq[openapi.WalkItem] { return openapi.Walk(ctx, securityScheme) }},
+		{name: "link", start: link, walk: func(ctx context.Context) iter.Seq[openapi.WalkItem] { return openapi.Walk(ctx, link) }},
+		{name: "callback", start: callback, walk: func(ctx context.Context) iter.Seq[openapi.WalkItem] { return openapi.Walk(ctx, callback) }},
+		{name: "path item", start: pathItem, walk: func(ctx context.Context) iter.Seq[openapi.WalkItem] { return openapi.Walk(ctx, pathItem) }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			start := tt.start
+			first := true
+			visited := 0
+			for item := range tt.walk(t.Context()) {
+				visited++
+				assert.Nil(t, item.OpenAPI, "component walks are detached from the containing document")
+				if first {
+					first = false
+					assert.Equal(t, "/", string(item.Location.ToJSONPointer()), "the starting component is the walk root")
+					err := item.Match(openapi.Matcher{
+						Any: func(model any) error {
+							assert.IsType(t, start, model, "the first yielded model should be the requested component")
+							return nil
+						},
+					})
+					require.NoError(t, err)
+				}
+			}
+			assert.False(t, first, "the component should be yielded")
+			assert.Positive(t, visited, "the component walk should visit at least its starting node")
+		})
+	}
+}
+
+func TestWalkComponentStartingPoint_TerminateAtNestedSchema(t *testing.T) {
+	t.Parallel()
+
+	openAPIDoc, err := loadOpenAPIDocument(t.Context())
+	require.NoError(t, err)
+	requestBody, exists := openAPIDoc.Components.RequestBodies.Get("UserRequest")
+	require.True(t, exists)
+
+	visited := []string{}
+	for item := range openapi.Walk(t.Context(), requestBody) {
+		location := string(item.Location.ToJSONPointer())
+		visited = append(visited, location)
+		err := item.Match(openapi.Matcher{
+			Schema: func(*oas3.JSONSchema[oas3.Referenceable]) error {
+				return walk.ErrTerminate
+			},
+		})
+		if errors.Is(err, walk.ErrTerminate) {
+			break
+		}
+		require.NoError(t, err)
+	}
+
+	assert.Equal(t, []string{"/", "/content/application~1json", "/content/application~1json/schema"}, visited)
 }

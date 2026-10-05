@@ -207,6 +207,10 @@ Avoid using `min`, `max`, `new`, `len`, `cap`, `copy`, `delete`, `error`, `any` 
 
 - Convert `if-else if` chains to `switch` statements when comparing the same variable.
 
+### thelper: Mark Test Helper Closures
+
+Functions accepting `*testing.T` outside a `t.Run` callback must start with `t.Helper()`. This includes anonymous functions stored in table-driven test cases, even when they only call another helper.
+
 ## Testing
 
 Follow these testing conventions when writing Go tests in this project. Run newly added or modified test immediately after changes to make sure they work as expected before continuing with more work.

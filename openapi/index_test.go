@@ -21,6 +21,104 @@ func unmarshalOpenAPI(t *testing.T, ctx context.Context, yaml string) *openapi.O
 	return o
 }
 
+func assertExternalIndexNodes[T openapi.ReferenceNode](t *testing.T, nodes []*openapi.IndexNode[T]) {
+	t.Helper()
+	require.Len(t, nodes, 1, "index should classify one resolved external object")
+	assert.Empty(t, nodes[0].Location, "external object should be indexed at the external document root")
+	assert.False(t, nodes[0].Node.IsReference(), "external category should contain the resolved object, not the reference")
+}
+
+func TestBuildIndex_ExternalComponentAliasChains_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	vfs := NewMockVirtualFS()
+	vfs.AddFile("/api/aliases.yaml", `
+Response: {$ref: 'objects.yaml#/Response'}
+Parameter: {$ref: 'objects.yaml#/Parameter'}
+Example: {$ref: 'objects.yaml#/Example'}
+RequestBody: {$ref: 'objects.yaml#/RequestBody'}
+Header: {$ref: 'objects.yaml#/Header'}
+Link: {$ref: 'objects.yaml#/Link'}
+Callback: {$ref: 'objects.yaml#/Callback'}
+PathItem: {$ref: 'objects.yaml#/PathItem'}
+SecurityScheme: {$ref: 'objects.yaml#/SecurityScheme'}
+`)
+	vfs.AddFile("/api/objects.yaml", `
+Response: {description: external response}
+Parameter:
+  name: id
+  in: query
+  schema: {type: integer}
+Example: {value: external example}
+RequestBody: {content: {application/json: {schema: {type: string}}}}
+Header: {schema: {type: string}}
+Link: {operationId: externalOperation}
+Callback: {}
+PathItem:
+  summary: External path
+  description: Resolved through alias
+  get:
+    operationId: externalOperation
+    responses:
+      '200': {description: path response}
+SecurityScheme: {type: http, scheme: bearer}
+`)
+	doc := unmarshalOpenAPI(t, ctx, `
+openapi: 3.1.0
+info: {title: External components, version: 1.0.0}
+paths: {}
+components:
+  responses:
+    Shared: {$ref: 'aliases.yaml#/Response'}
+  parameters:
+    Shared: {$ref: 'aliases.yaml#/Parameter'}
+  examples:
+    Shared: {$ref: 'aliases.yaml#/Example'}
+  requestBodies:
+    Shared: {$ref: 'aliases.yaml#/RequestBody'}
+  headers:
+    Shared: {$ref: 'aliases.yaml#/Header'}
+  links:
+    Shared: {$ref: 'aliases.yaml#/Link'}
+  callbacks:
+    Shared: {$ref: 'aliases.yaml#/Callback'}
+  pathItems:
+    Shared: {$ref: 'aliases.yaml#/PathItem'}
+  securitySchemes:
+    Shared: {$ref: 'aliases.yaml#/SecurityScheme'}
+`)
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{RootDocument: doc, TargetDocument: doc, TargetLocation: "/api/openapi.yaml", VirtualFS: vfs})
+	require.Empty(t, idx.GetAllErrors(), "external component alias chains should resolve without errors")
+	assertExternalIndexNodes(t, idx.ExternalResponses)
+	assertExternalIndexNodes(t, idx.ExternalParameters)
+	assertExternalIndexNodes(t, idx.ExternalExamples)
+	assertExternalIndexNodes(t, idx.ExternalRequestBodies)
+	assertExternalIndexNodes(t, idx.ExternalHeaders)
+	assertExternalIndexNodes(t, idx.ExternalLinks)
+	assertExternalIndexNodes(t, idx.ExternalCallbacks)
+	assertExternalIndexNodes(t, idx.ExternalPathItems)
+	assert.Empty(t, idx.ComponentResponses, "referenced components are not local object definitions")
+	assert.Empty(t, idx.ComponentParameters, "referenced parameters are not local object definitions")
+	assert.Equal(t, "external response", idx.ExternalResponses[0].Node.GetObject().Description, "index should contain the final response, not its alias")
+	require.NotNil(t, idx.ExternalExamples[0].Node.GetObject().Value, "resolved example should contain a value")
+	assert.Equal(t, "external example", idx.ExternalExamples[0].Node.GetObject().Value.Value, "index should contain the final example value")
+	assert.Equal(t, "externalOperation", idx.ExternalLinks[0].Node.GetObject().GetOperationID(), "index should contain the final link target")
+	assert.Equal(t, "integer", string(idx.ExternalParameters[0].Node.GetObject().Schema.GetLeft().GetType()[0]), "final parameter should retain its schema")
+	assert.Equal(t, "bearer", doc.Components.SecuritySchemes.GetOrZero("Shared").GetObject().GetScheme(), "security scheme alias should resolve")
+	assert.Equal(t, "aliases.yaml#/Response", string(doc.Components.Responses.GetOrZero("Shared").GetReference()), "resolving an alias should preserve the original reference")
+
+	actualRefs := make(map[string]string)
+	for _, ref := range idx.GetAllReferences() {
+		actualRefs[ref.Location.ToJSONPointer().String()] = string(ref.Node.GetReference())
+	}
+	for section, target := range map[string]string{
+		"responses": "Response", "parameters": "Parameter", "examples": "Example", "requestBodies": "RequestBody",
+		"headers": "Header", "links": "Link", "callbacks": "Callback", "pathItems": "PathItem", "securitySchemes": "SecurityScheme",
+	} {
+		assert.Equal(t, "aliases.yaml#/"+target, actualRefs["/components/"+section+"/Shared"], "index should preserve original reference and its main-document location")
+	}
+}
+
 func TestBuildIndex_EmptyDoc_Success(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

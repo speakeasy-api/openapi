@@ -167,7 +167,7 @@ jobs:
 
           # Run tests on main branch to get coverage (with timeout)
           cd /tmp/main-branch
-          timeout 300 go test -coverprofile=main-coverage.out -covermode=atomic ./... > /dev/null 2>&1 || echo "Main branch tests failed or timed out"
+          timeout 300 go test -race -coverpkg=./... -coverprofile=main-coverage.out -covermode=atomic ./... ./jsonschema/oas3/tests/... ./openapi/linter/customrules/... ./openapi/linter/converter/tests/... > /dev/null 2>&1 || echo "Main branch tests failed or timed out"
 
           if [ -f main-coverage.out ]; then
             # Filter out cmd and tests folders from main branch coverage (same as current branch)
@@ -214,6 +214,8 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.out
+          disable_search: true
+          fail_ci_if_error: true
 
   # Build jobs (run in parallel)
   build-ubuntu:

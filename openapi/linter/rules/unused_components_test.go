@@ -171,6 +171,107 @@ security:
 	assert.ElementsMatch(t, expectedErrors, errMsgs)
 }
 
+func TestUnusedComponentRule_ComponentKinds_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		component  string
+		definition string
+		paths      string
+	}{
+		{
+			component:  "parameters",
+			definition: `{"name":"id","in":"query","schema":{"type":"string"}}`,
+			paths:      `{"/pets":{"get":{"parameters":[{"$ref":"#/components/parameters/Test"}],"responses":{"200":{"description":"ok"}}}}}`,
+		},
+		{
+			component:  "responses",
+			definition: `{"description":"ok"}`,
+			paths:      `{"/pets":{"get":{"responses":{"200":{"$ref":"#/components/responses/Test"}}}}}`,
+		},
+		{
+			component:  "requestBodies",
+			definition: `{"content":{"application/json":{"schema":{"type":"string"}}}}`,
+			paths:      `{"/pets":{"post":{"requestBody":{"$ref":"#/components/requestBodies/Test"},"responses":{"200":{"description":"ok"}}}}}`,
+		},
+		{
+			component:  "headers",
+			definition: `{"schema":{"type":"string"}}`,
+			paths:      `{"/pets":{"get":{"responses":{"200":{"description":"ok","headers":{"Test":{"$ref":"#/components/headers/Test"}}}}}}}`,
+		},
+		{
+			component:  "examples",
+			definition: `{"value":"example"}`,
+			paths:      `{"/pets":{"get":{"responses":{"200":{"description":"ok","content":{"application/json":{"examples":{"Test":{"$ref":"#/components/examples/Test"}}}}}}}}}`,
+		},
+		{
+			component:  "links",
+			definition: `{"operationId":"getPets"}`,
+			paths:      `{"/pets":{"get":{"operationId":"getPets","responses":{"200":{"description":"ok","links":{"Test":{"$ref":"#/components/links/Test"}}}}}}}`,
+		},
+		{
+			component:  "callbacks",
+			definition: `{"{$request.body#/url}":{"post":{"responses":{"200":{"description":"ok"}}}}}`,
+			paths:      `{"/pets":{"post":{"callbacks":{"Test":{"$ref":"#/components/callbacks/Test"}},"responses":{"200":{"description":"ok"}}}}}`,
+		},
+		{
+			component:  "pathItems",
+			definition: `{"get":{"responses":{"200":{"description":"ok"}}}}`,
+			paths:      `{"/pets":{"$ref":"#/components/pathItems/Test"}}`,
+		},
+		{
+			component:  "securitySchemes",
+			definition: `{"type":"apiKey","in":"header","name":"X-API-Key"}`,
+			paths:      `{"/pets":{"get":{"security":[{"Test":[]}],"responses":{"200":{"description":"ok"}}}}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.component, func(t *testing.T) {
+			t.Parallel()
+
+			t.Run("unreferenced component is reported", func(t *testing.T) {
+				t.Parallel()
+				ctx := t.Context()
+				input := `{"openapi":"3.1.0","info":{"title":"Test","version":"1.0.0"},"paths":{},"components":{"` + tt.component + `":{"Test":` + tt.definition + `}}}`
+				doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(input))
+				require.NoError(t, err, "component document should unmarshal")
+				docInfo := createDocInfoWithIndexUnusedComponents(t, ctx, doc, "test.json")
+				errs := (&rules.UnusedComponentRule{}).Run(ctx, docInfo, &linter.RuleConfig{})
+				require.Len(t, errs, 1, "the unused component should produce one diagnostic")
+				assert.Contains(t, errs[0].Error(), "`#/components/"+tt.component+"/Test` is potentially unused", "diagnostic should identify the component")
+				var diagnostic *validation.Error
+				require.ErrorAs(t, errs[0], &diagnostic, "diagnostic should expose a validation error")
+				assert.Equal(t, validation.SeverityWarning, diagnostic.Severity, "unused components should be warnings")
+				assert.NotNil(t, diagnostic.Fix, "unused components should offer a removal fix")
+			})
+
+			t.Run("referenced component is retained", func(t *testing.T) {
+				t.Parallel()
+				ctx := t.Context()
+				input := `{"openapi":"3.1.0","info":{"title":"Test","version":"1.0.0"},"paths":` + tt.paths + `,"components":{"` + tt.component + `":{"Test":` + tt.definition + `}}}`
+				doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(input))
+				require.NoError(t, err, "referenced component document should unmarshal")
+				docInfo := createDocInfoWithIndexUnusedComponents(t, ctx, doc, "test.json")
+				errs := (&rules.UnusedComponentRule{}).Run(ctx, docInfo, &linter.RuleConfig{})
+				assert.Empty(t, errs, "references should mark each component kind as used")
+			})
+
+			t.Run("usage extension retains component", func(t *testing.T) {
+				t.Parallel()
+				ctx := t.Context()
+				definition := strings.TrimSuffix(tt.definition, "}") + `,"x-used":true}`
+				input := `{"openapi":"3.1.0","info":{"title":"Test","version":"1.0.0"},"paths":{},"components":{"` + tt.component + `":{"Test":` + definition + `}}}`
+				doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(input))
+				require.NoError(t, err, "explicitly used component document should unmarshal")
+				docInfo := createDocInfoWithIndexUnusedComponents(t, ctx, doc, "test.json")
+				errs := (&rules.UnusedComponentRule{}).Run(ctx, docInfo, &linter.RuleConfig{})
+				assert.Empty(t, errs, "usage extensions should apply to every component kind")
+			})
+		})
+	}
+}
+
 func TestUnusedComponentRule_RuleMetadata(t *testing.T) {
 	t.Parallel()
 

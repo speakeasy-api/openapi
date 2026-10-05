@@ -1419,6 +1419,68 @@ func extractSchemaFromOpenAPI(openAPIDoc *openapi.OpenAPI, pointer string) (*oas
 	return schema, nil
 }
 
+func TestInline_AdditionalKeywordReferences_Success(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+		"type": "object",
+		"properties": {
+			"matches": {"contains": {"$ref": "#/$defs/Text"}},
+			"prefix": {"prefixItems": [{"$ref": "#/$defs/Text"}]},
+			"conditional": {
+				"if": {"$ref": "#/$defs/Text"},
+				"then": {"$ref": "#/$defs/Text"},
+				"else": {"$ref": "#/$defs/Text"}
+			},
+			"dependent": {"dependentSchemas": {"enabled": {"$ref": "#/$defs/Text"}}},
+			"patterned": {"patternProperties": {"^x-": {"$ref": "#/$defs/Text"}}},
+			"names": {"propertyNames": {"$ref": "#/$defs/Text"}},
+			"unevaluated": {
+				"unevaluatedItems": {"$ref": "#/$defs/Text"},
+				"unevaluatedProperties": {"$ref": "#/$defs/Text"}
+			},
+			"negated": {"not": {"$ref": "#/$defs/Text"}}
+		},
+		"$defs": {"Text": {"type": "string", "minLength": 1}}
+	}`
+	expected := `{
+		"type": "object",
+		"properties": {
+			"matches": {"contains": {"type": "string", "minLength": 1}},
+			"prefix": {"prefixItems": [{"type": "string", "minLength": 1}]},
+			"conditional": {
+				"if": {"type": "string", "minLength": 1},
+				"then": {"type": "string", "minLength": 1},
+				"else": {"type": "string", "minLength": 1}
+			},
+			"dependent": {"dependentSchemas": {"enabled": {"type": "string", "minLength": 1}}},
+			"patterned": {"patternProperties": {"^x-": {"type": "string", "minLength": 1}}},
+			"names": {"propertyNames": {"type": "string", "minLength": 1}},
+			"unevaluated": {
+				"unevaluatedItems": {"type": "string", "minLength": 1},
+				"unevaluatedProperties": {"type": "string", "minLength": 1}
+			},
+			"negated": {"not": {"type": "string", "minLength": 1}}
+		}
+	}`
+
+	schema, err := parseJSONToSchema(t.Context(), input)
+	require.NoError(t, err, "failed to parse input schema")
+
+	inlined, err := oas3.Inline(t.Context(), schema, oas3.InlineOptions{
+		ResolveOptions: oas3.ResolveOptions{
+			TargetLocation: "schema.json",
+			RootDocument:   schema,
+		},
+		RemoveUnusedDefs: true,
+	})
+	require.NoError(t, err, "inlining should succeed")
+
+	actual, err := schemaToJSON(t.Context(), inlined)
+	require.NoError(t, err, "failed to marshal inlined schema")
+	assert.JSONEq(t, expected, actual, "references in schema-bearing keywords should be inlined")
+}
+
 func TestInline_EmailParser_PagerDuty_Success(t *testing.T) {
 	t.Parallel()
 

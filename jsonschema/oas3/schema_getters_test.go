@@ -13,6 +13,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func TestSchema_NilOptionalGetters_ReturnDefaults(t *testing.T) {
+	t.Parallel()
+	var schema *oas3.Schema
+	assert.Nil(t, schema.GetContentSchema(), "nil schemas should have no content schema")
+	assert.Nil(t, schema.GetMinProperties(), "nil schemas should have no property count constraint")
+	assert.Nil(t, schema.GetRequired(), "nil schemas should have no required properties")
+	assert.Nil(t, schema.GetEnum(), "nil schemas should have no enum values")
+	assert.False(t, schema.GetReadOnly(), "nil schemas should not be read-only")
+	assert.False(t, schema.GetWriteOnly(), "nil schemas should not be write-only")
+	assert.False(t, schema.GetDeprecated(), "nil schemas should not be deprecated")
+}
+
 func TestSchema_GetExclusiveMaximum_Success(t *testing.T) {
 	t.Parallel()
 
@@ -808,4 +820,54 @@ func TestSchema_GetMaxProperties_Success(t *testing.T) {
 	maxProps := int64(5)
 	schemaWithMaxProps := &oas3.Schema{MaxProperties: &maxProps}
 	assert.Equal(t, &maxProps, schemaWithMaxProps.GetMaxProperties())
+}
+
+func TestSchema_IsReferenceOnly(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		schema   *oas3.Schema
+		expected bool
+	}{
+		{name: "nil schema", schema: nil},
+		{name: "schema without reference", schema: &oas3.Schema{Title: pointer.From("title")}},
+		{name: "reference only", schema: &oas3.Schema{Ref: pointer.From(references.Reference("#/components/schemas/User"))}, expected: true},
+		{name: "reference with sibling field", schema: &oas3.Schema{Ref: pointer.From(references.Reference("#/components/schemas/User")), Title: pointer.From("User")}},
+		{name: "reference with populated map", schema: &oas3.Schema{Ref: pointer.From(references.Reference("#/components/schemas/User")), Properties: sequencedmap.New(sequencedmap.NewElem("name", oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{})))}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, tt.schema.IsReferenceOnly(), "reference-only result should match schema contents")
+		})
+	}
+}
+
+func TestSchema_GetParent_Success(t *testing.T) {
+	t.Parallel()
+
+	var nilSchema *oas3.Schema
+	assert.Nil(t, nilSchema.GetParent())
+
+	schema := &oas3.Schema{}
+	assert.Nil(t, schema.GetParent())
+
+	parent := oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{Title: pointer.From("parent")})
+	schema.SetParent(parent)
+	assert.Same(t, parent, schema.GetParent(), "getter should return the parent set on the schema")
+}
+
+func TestSchema_GetEffectiveBaseURI_Success(t *testing.T) {
+	t.Parallel()
+
+	var nilSchema *oas3.Schema
+	assert.Empty(t, nilSchema.GetEffectiveBaseURI())
+
+	schema := &oas3.Schema{}
+	assert.Empty(t, schema.GetEffectiveBaseURI())
+
+	schema.SetEffectiveBaseURI("https://example.com/schemas/user")
+	assert.Equal(t, "https://example.com/schemas/user", schema.GetEffectiveBaseURI())
 }

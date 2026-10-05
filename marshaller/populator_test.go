@@ -6,8 +6,87 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/marshaller/tests"
 	"github.com/speakeasy-api/openapi/marshaller/tests/core"
+	"github.com/speakeasy-api/openapi/yml"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
+
+func TestPopulateWithContext_YAMLNode_Success(t *testing.T) {
+	t.Parallel()
+
+	t.Run("node value to pointer", func(t *testing.T) {
+		t.Parallel()
+		source := yml.CreateStringNode("value")
+		var target *yaml.Node
+		require.NoError(t, marshaller.PopulateWithContext(*source, &target, nil), "node values should populate pointer targets")
+		assert.Equal(t, source, target, "node metadata should be copied")
+		assert.NotSame(t, source, target, "a value source should produce a distinct node")
+	})
+	t.Run("node pointer to value", func(t *testing.T) {
+		t.Parallel()
+		source := yml.CreateStringNode("value")
+		var target yaml.Node
+		require.NoError(t, marshaller.PopulateWithContext(source, &target, nil), "node pointers should populate value targets")
+		assert.Equal(t, *source, target, "node metadata should be copied")
+	})
+	t.Run("node pointer to double pointer", func(t *testing.T) {
+		t.Parallel()
+		source := yml.CreateStringNode("value")
+		var target **yaml.Node
+		require.NoError(t, marshaller.PopulateWithContext(source, &target, nil), "double pointer targets should be supported")
+		require.NotNil(t, target, "target pointer should be initialised")
+		assert.Same(t, source, *target, "pointer sources should retain the node identity")
+	})
+}
+
+func TestPopulateWithContext_NilValues_Success(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil pointer clears scalar", func(t *testing.T) {
+		t.Parallel()
+		var source *string
+		target := "old value"
+		require.NoError(t, marshaller.PopulateWithContext(source, &target, nil), "nil pointers should reset scalar targets")
+		assert.Empty(t, target, "nil sources should clear stale scalar values")
+	})
+	t.Run("nil node value clears scalar", func(t *testing.T) {
+		t.Parallel()
+		target := "old value"
+		require.NoError(t, marshaller.PopulateWithContext(marshaller.Node[any]{}, &target, nil), "nil node values should be supported")
+		assert.Empty(t, target, "nil node values should clear stale scalar values")
+	})
+	t.Run("nil model source leaves target untouched", func(t *testing.T) {
+		t.Parallel()
+		var source *struct{ Value string }
+		target := struct{ Value string }{Value: "retained"}
+		require.NoError(t, marshaller.PopulateModelWithContext(source, &target, nil), "absent model sources should be ignored")
+		assert.Equal(t, "retained", target.Value, "absent model sources should not alter the target")
+	})
+}
+
+func TestPopulateWithContext_Conversion_Error(t *testing.T) {
+	t.Parallel()
+
+	t.Run("incompatible scalar", func(t *testing.T) {
+		t.Parallel()
+		var target int
+		err := marshaller.PopulateWithContext(map[string]string{"key": "value"}, &target, nil)
+		require.ErrorContains(t, err, "cannot convert", "incompatible source types should be reported")
+	})
+	t.Run("incompatible slice element", func(t *testing.T) {
+		t.Parallel()
+		var target []int
+		err := marshaller.PopulateWithContext([]map[string]string{{"key": "value"}}, &target, nil)
+		require.ErrorContains(t, err, "cannot convert", "slice element conversion errors should propagate")
+	})
+	t.Run("model source is not a struct", func(t *testing.T) {
+		t.Parallel()
+		var target struct{ Value string }
+		err := marshaller.PopulateModelWithContext(42, &target, nil)
+		require.ErrorContains(t, err, "expected `struct`, got `int`", "model population should reject scalar sources")
+	})
+}
 
 func TestPopulation_PrimitiveTypes_Success(t *testing.T) {
 	t.Parallel()
