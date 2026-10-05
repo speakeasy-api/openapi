@@ -29,11 +29,11 @@ func (f *localizeTestFS) Open(name string) (fs.File, error) {
 	if f.openErr != nil {
 		return nil, f.openErr
 	}
-	return f.MapFS.Open(name)
+	return f.MapFS.Open(filepath.ToSlash(name))
 }
 
 func (f *localizeTestFS) MkdirAll(name string, mode fs.FileMode) error {
-	f.MapFS[name] = &fstest.MapFile{Mode: mode | fs.ModeDir}
+	f.MapFS[filepath.ToSlash(name)] = &fstest.MapFile{Mode: mode | fs.ModeDir}
 	return nil
 }
 
@@ -41,7 +41,7 @@ func (f *localizeTestFS) WriteFile(name string, content []byte, mode fs.FileMode
 	if f.writeErr != nil {
 		return f.writeErr
 	}
-	f.MapFS[name] = &fstest.MapFile{Data: content, Mode: mode}
+	f.MapFS[filepath.ToSlash(name)] = &fstest.MapFile{Data: content, Mode: mode}
 	return nil
 }
 

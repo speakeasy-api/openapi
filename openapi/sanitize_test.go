@@ -15,11 +15,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSanitize_ConfigReadAndFile_Success(t *testing.T) {
+func TestSanitize_ConfigRead_Error(t *testing.T) {
 	t.Parallel()
 	readErr := errors.New("config read failed")
 	_, err := openapi.LoadSanitizeConfig(iotest.ErrReader(readErr))
 	require.ErrorIs(t, err, readErr, "config reader failures should preserve their cause")
+}
+
+func TestSanitize_ConfigFileOptions_Success(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "sanitize.yaml")
 	require.NoError(t, os.WriteFile(path, []byte("keepUnusedComponents: true\nextensionPatterns:\n  keep: [x-public-*]\n"), 0o600), "config fixture should be created")
 	config, err := openapi.LoadSanitizeConfigFromFile(path)

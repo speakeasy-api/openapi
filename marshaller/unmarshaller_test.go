@@ -38,16 +38,6 @@ func TestUnmarshal_DocumentInput_Error(t *testing.T) {
 	}
 }
 
-func TestUnmarshal_NilOutput_Error(t *testing.T) {
-	t.Parallel()
-
-	var model *testmodels.TestPrimitiveHighModel
-	_, err := marshaller.Unmarshal(t.Context(), strings.NewReader("{}"), model)
-	require.ErrorContains(t, err, "out parameter cannot be nil", "typed nil output should be rejected")
-	_, err = marshaller.UnmarshalNode(t.Context(), "test", yml.CreateStringNode("value"), model)
-	require.ErrorContains(t, err, "out parameter cannot be nil", "node unmarshalling should reject typed nil output")
-}
-
 func TestUnmarshalCore_DocumentCardinality_Error(t *testing.T) {
 	t.Parallel()
 

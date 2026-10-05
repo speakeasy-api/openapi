@@ -209,7 +209,7 @@ Avoid using `min`, `max`, `new`, `len`, `cap`, `copy`, `delete`, `error`, `any` 
 
 ### thelper: Mark Test Helper Closures
 
-Functions accepting `*testing.T` outside a `t.Run` callback must start with `t.Helper()`. This includes anonymous functions stored in table-driven test cases, even when they only call another helper.
+Test helper functions accepting `*testing.T` must start with `t.Helper()`. This includes anonymous helper closures stored in table-driven test cases, even when they only call another helper. Top-level `TestXxx` functions and `t.Run` callbacks are test entry points, not helpers, and do not need `t.Helper()`.
 
 ## Testing
 

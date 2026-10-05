@@ -196,9 +196,15 @@ components:
 	assert.Equal(t, "#/components/schemas/Value", string(body.Content.GetOrZero("application/json").Schema.GetRef()), "request body schema should be localized")
 	assert.Equal(t, "#/components/schemas/Value", string(body.Content.GetOrZero("application/jsonl").ItemSchema.GetRef()), "request body item schema should be localized")
 	assert.Equal(t, 1, doc.Components.Schemas.Len(), "shared source schema should be bundled only once")
-	assert.Equal(t, "trace-id", doc.Components.Examples.GetOrZero("Sample").GetObject().Value.Value, "example content should be preserved")
-	assert.Equal(t, "nextPage", doc.Components.Links.GetOrZero("Next").GetObject().GetOperationID(), "link content should be preserved")
-	assert.Equal(t, "X-Token", doc.Components.SecuritySchemes.GetOrZero("Token").GetObject().GetName(), "security scheme content should be preserved")
+	example := doc.Components.Examples.GetOrZero("Sample").GetObject()
+	require.NotNil(t, example, "example object should be bundled")
+	assert.Equal(t, "trace-id", example.Value.Value, "example content should be preserved")
+	link := doc.Components.Links.GetOrZero("Next").GetObject()
+	require.NotNil(t, link, "link object should be bundled")
+	assert.Equal(t, "nextPage", link.GetOperationID(), "link content should be preserved")
+	scheme := doc.Components.SecuritySchemes.GetOrZero("Token").GetObject()
+	require.NotNil(t, scheme, "security scheme object should be bundled")
+	assert.Equal(t, "X-Token", scheme.GetName(), "security scheme content should be preserved")
 
 	var output bytes.Buffer
 	require.NoError(t, openapi.Marshal(ctx, doc, &output), "marshal bundled document")

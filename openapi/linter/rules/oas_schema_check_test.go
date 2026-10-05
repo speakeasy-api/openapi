@@ -54,22 +54,7 @@ paths: {}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := t.Context()
-
-			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
-			require.NoError(t, err)
-
-			rule := &OASSchemaCheckRule{}
-			config := &linter.RuleConfig{}
-
-			idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
-				RootDocument:   doc,
-				TargetDocument: doc,
-				TargetLocation: "test.yaml",
-			})
-			docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
-
-			errs := rule.Run(ctx, docInfo, config)
+			errs := runOASSchemaCheckTest(t, tt.yaml)
 			assert.Empty(t, errs)
 		})
 	}
@@ -137,22 +122,7 @@ paths: {}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := t.Context()
-
-			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
-			require.NoError(t, err)
-
-			rule := &OASSchemaCheckRule{}
-			config := &linter.RuleConfig{}
-
-			idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
-				RootDocument:   doc,
-				TargetDocument: doc,
-				TargetLocation: "test.yaml",
-			})
-			docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
-
-			errs := rule.Run(ctx, docInfo, config)
+			errs := runOASSchemaCheckTest(t, tt.yaml)
 			assert.Len(t, errs, tt.expected)
 		})
 	}
@@ -201,22 +171,7 @@ paths: {}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := t.Context()
-
-			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
-			require.NoError(t, err)
-
-			rule := &OASSchemaCheckRule{}
-			config := &linter.RuleConfig{}
-
-			idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
-				RootDocument:   doc,
-				TargetDocument: doc,
-				TargetLocation: "test.yaml",
-			})
-			docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
-
-			errs := rule.Run(ctx, docInfo, config)
+			errs := runOASSchemaCheckTest(t, tt.yaml)
 			assert.Empty(t, errs)
 		})
 	}
@@ -268,22 +223,7 @@ paths: {}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := t.Context()
-
-			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
-			require.NoError(t, err)
-
-			rule := &OASSchemaCheckRule{}
-			config := &linter.RuleConfig{}
-
-			idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
-				RootDocument:   doc,
-				TargetDocument: doc,
-				TargetLocation: "test.yaml",
-			})
-			docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
-
-			errs := rule.Run(ctx, docInfo, config)
+			errs := runOASSchemaCheckTest(t, tt.yaml)
 			assert.Len(t, errs, tt.expected)
 		})
 	}
@@ -336,22 +276,7 @@ paths: {}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := t.Context()
-
-			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
-			require.NoError(t, err)
-
-			rule := &OASSchemaCheckRule{}
-			config := &linter.RuleConfig{}
-
-			idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
-				RootDocument:   doc,
-				TargetDocument: doc,
-				TargetLocation: "test.yaml",
-			})
-			docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
-
-			errs := rule.Run(ctx, docInfo, config)
+			errs := runOASSchemaCheckTest(t, tt.yaml)
 			assert.Len(t, errs, tt.expected)
 		})
 	}
@@ -407,22 +332,7 @@ paths: {}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := t.Context()
-
-			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yaml))
-			require.NoError(t, err)
-
-			rule := &OASSchemaCheckRule{}
-			config := &linter.RuleConfig{}
-
-			idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
-				RootDocument:   doc,
-				TargetDocument: doc,
-				TargetLocation: "test.yaml",
-			})
-			docInfo := linter.NewDocumentInfoWithIndex(doc, "test.yaml", idx)
-
-			errs := rule.Run(ctx, docInfo, config)
+			errs := runOASSchemaCheckTest(t, tt.yaml)
 			assert.Len(t, errs, tt.expected)
 		})
 	}

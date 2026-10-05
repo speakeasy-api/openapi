@@ -46,7 +46,6 @@ func TestExecute_TypeMismatchedStages_ReturnEmpty(t *testing.T) {
 		`schemas | to-schemas`, `schemas | parameters`, `schemas | responses`,
 		`schemas | request-body`, `schemas | callbacks`, `schemas | links`,
 		`schemas | operation`, `schemas | security`,
-		`schemas | where(false) | shared-refs`, `schemas | where(false) | members`,
 		`operations | group-by(method, operationId) | members`,
 	} {
 		t.Run(query, func(t *testing.T) {
@@ -54,6 +53,23 @@ func TestExecute_TypeMismatchedStages_ReturnEmpty(t *testing.T) {
 			result, err := oq.Execute(query, g)
 			require.NoError(t, err, "unsupported row types should be skipped")
 			assert.Empty(t, result.Rows, "navigation should not invent rows for unrelated objects")
+		})
+	}
+}
+
+func TestExecute_EmptyInputStages_ReturnEmpty(t *testing.T) {
+	t.Parallel()
+	g := loadTestGraph(t)
+	for _, query := range []string{
+		`schemas | where(false) | shared-refs`,
+		`operations | where(false) | shared-refs`,
+		`schemas | where(false) | members`,
+	} {
+		t.Run(query, func(t *testing.T) {
+			t.Parallel()
+			result, err := oq.Execute(query, g)
+			require.NoError(t, err, "empty input should be accepted")
+			assert.Empty(t, result.Rows, "empty input should not produce rows")
 		})
 	}
 }

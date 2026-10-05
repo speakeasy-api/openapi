@@ -2,16 +2,22 @@
 set -euo pipefail
 
 # Script to format Go coverage output as a markdown table
-# Usage: ./format-coverage.sh coverage.out [current-coverage] [main-coverage]
+# Usage: ./format-coverage.sh coverage.out [current-coverage] [main-coverage] [main-status]
 
 COVERAGE_FILE="${1:-coverage.out}"
 CURRENT_COVERAGE="${2:-}"
 MAIN_COVERAGE="${3:-}"
+MAIN_STATUS="${4:-}"
 
 if [ ! -f "$COVERAGE_FILE" ]; then
     echo "Error: Coverage file '$COVERAGE_FILE' not found"
     exit 1
 fi
+
+NORMALIZED_FILE=$(mktemp)
+trap 'rm -f "$NORMALIZED_FILE"' EXIT
+bash "$(dirname "$0")/normalize-coverage.sh" "$COVERAGE_FILE" > "$NORMALIZED_FILE"
+COVERAGE_FILE="$NORMALIZED_FILE"
 
 # Start markdown output
 echo "## 📊 Test Coverage Report"
@@ -41,6 +47,8 @@ if [ -n "$CURRENT_COVERAGE" ]; then
                 echo "**Coverage Change:** ✅ No change"
             fi
         fi
+    elif [ -n "$MAIN_STATUS" ]; then
+        echo "**Main Branch Statement Coverage:** unavailable ($MAIN_STATUS). Comparison omitted."
     fi
 fi
 
@@ -54,20 +62,15 @@ echo ""
 echo "| Package | Coverage |"
 echo "|---------|----------|"
 
-# Count statements, not averages of function percentages. Cross-package profiles
-# can repeat blocks, so combine their hits before counting each block once.
+# Count statements, not averages of function percentages, from normalized blocks.
 awk '
 NR > 1 {
-    statements[$1] = $2;
-    hits[$1] += $3;
+    pkg = $1;
+    sub(/\/[^\/]+$/, "", pkg);
+    totals[pkg] += $2;
+    if($3 > 0) covered[pkg] += $2;
 }
 END {
-    for(block in statements) {
-        pkg = block;
-        sub(/\/[^\/]+$/, "", pkg);
-        totals[pkg] += statements[block];
-        if(hits[block] > 0) covered[pkg] += statements[block];
-    }
     for(pkg in totals) {
         avg = (totals[pkg] > 0) ? 100 * covered[pkg] / totals[pkg] : 0;
         
