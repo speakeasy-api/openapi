@@ -1,6 +1,10 @@
 [tools]
+go = "1.26.0"
 golangci-lint = "2.12.2"
 gotestsum = "latest"
+
+[env]
+GOTOOLCHAIN = "local"
 
 [tasks.setup-vscode-symlinks]
 description = "Create VSCode symlinks for tools not automatically handled by mise-vscode"
