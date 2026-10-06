@@ -44,6 +44,8 @@
     <a href="https://github.com/speakeasy-api/openapi/actions/workflows/ci.yaml"><img alt="Security" src="https://img.shields.io/badge/security-scanned-green.svg?style=for-the-badge&logo=security"></a>
     <!-- CI Badge -->
     <a href="https://github.com/speakeasy-api/openapi/actions/workflows/ci.yaml"><img alt="GitHub Action: CI" src="https://img.shields.io/github/actions/workflow/status/speakeasy-api/openapi/ci.yaml?style=for-the-badge"></a>
+    <!-- Coverage Badge -->
+    <a href="https://app.codecov.io/gh/speakeasy-api/openapi"><img alt="Code coverage" src="https://img.shields.io/codecov/c/github/speakeasy-api/openapi/main?style=for-the-badge"></a>
     <!-- Line Break --><br/>
     <!-- Go Version Badge -->
     <a href="https://golang.org/"><img alt="Go Version" src="https://img.shields.io/badge/go-1.24.3+-00ADD8.svg?style=for-the-badge&logo=go"></a>
