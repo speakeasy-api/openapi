@@ -6,7 +6,7 @@ import (
 	"github.com/speakeasy-api/openapi/yml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // The trailing table row is indented one space further than the rows above it,
@@ -240,7 +240,7 @@ func TestStabilizeFoldedScalars_HandlesAnchoredScalars(t *testing.T) {
 	}
 }
 
-// Fails once gopkg.in/yaml.v3 fixes the emitter, at which point StabilizeFoldedScalars can go.
+// Fails once go.yaml.in/yaml/v3 fixes the emitter, at which point StabilizeFoldedScalars can go.
 func TestFoldedScalarGrowsWithoutStabilizer(t *testing.T) {
 	t.Parallel()
 

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // Write serializes a sorted YAML node using the JSON representation produced

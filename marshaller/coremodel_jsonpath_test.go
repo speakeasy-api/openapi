@@ -7,7 +7,9 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
+	legacyYaml "gopkg.in/yaml.v3"
+	"unsafe"
 )
 
 func TestCoreModel_GetJSONPath_Success(t *testing.T) {
@@ -178,12 +180,13 @@ func findNodeByJSONPath(t *testing.T, rootNode *yaml.Node, jsonPath string) *yam
 	require.NoError(t, err, "JSONPath should be valid: %s", jsonPath)
 
 	// Query the YAML node directly
-	result := path.Query(rootNode)
+	legacyRoot := (*legacyYaml.Node)(unsafe.Pointer(rootNode))
+	result := path.Query(legacyRoot)
 	require.NotEmpty(t, result, "JSONPath query should return results: %s", jsonPath)
 
 	// The result should be a slice of *yaml.Node, so return the first one
 	if len(result) > 0 {
-		return result[0]
+		return (*yaml.Node)(unsafe.Pointer(result[0]))
 	}
 	return nil
 }
@@ -196,7 +199,8 @@ func verifyJSONPathWorks(t *testing.T, rootNode *yaml.Node, jsonPath string, exp
 	path, err := jsonpath.NewPath(jsonPath)
 	require.NoError(t, err, "generated JSONPath should be valid: %s", jsonPath)
 
-	result := path.Query(rootNode)
+	legacyRoot := (*legacyYaml.Node)(unsafe.Pointer(rootNode))
+	result := path.Query(legacyRoot)
 	require.NotEmpty(t, result, "JSONPath query should return results: %s", jsonPath)
 
 	// Special case for root node: the query might return the document node
@@ -210,8 +214,9 @@ func verifyJSONPathWorks(t *testing.T, rootNode *yaml.Node, jsonPath string, exp
 	// Verify the result contains our expected node
 	// The result is a slice of nodes, so we check if our target node is in there
 	found := false
+	legacyExpected := (*legacyYaml.Node)(unsafe.Pointer(expectedNode))
 	for _, node := range result {
-		if node == expectedNode {
+		if node == legacyExpected {
 			found = true
 			break
 		}

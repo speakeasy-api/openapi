@@ -19,7 +19,7 @@ import (
 	"github.com/speakeasy-api/openapi/validation"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // custom file to cover for missing openapi 3.0 json schema

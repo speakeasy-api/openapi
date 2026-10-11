@@ -3,7 +3,7 @@ package yml
 import (
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // Block indentation is stripped on decode, so leading whitespace means more-indented.
@@ -23,7 +23,7 @@ func hasMoreIndentedLine(value string) bool {
 // StabilizeFoldedScalars restyles folded block scalars that contain a more-indented
 // line as literal blocks, leaving every other node untouched.
 //
-// gopkg.in/yaml.v3 injects a line break before a more-indented line in a folded scalar
+// go.yaml.in/yaml/v3 injects a line break before a more-indented line in a folded scalar
 // on every encode, so a document that is decoded and re-encoded repeatedly accumulates
 // blank lines inside such scalars. The break lands inside the scalar, so it becomes part
 // of the decoded value rather than cosmetic whitespace. Literal blocks reproduce their
