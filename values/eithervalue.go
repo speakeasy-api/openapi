@@ -108,10 +108,6 @@ func (e *EitherValue[L, LCore, R, RCore]) PopulateWithContext(source any, ctx *m
 	e.SetCoreAny(ec)
 
 	if ec.IsLeft {
-		if handled, err := e.populateLeftFromCorePointer(ec, ctx); handled {
-			return err
-		}
-
 		if err := marshaller.PopulateWithContext(ec.Left, &e.Left, ctx); err != nil {
 			return fmt.Errorf("failed to populate left: %w", err)
 		}
@@ -125,34 +121,6 @@ func (e *EitherValue[L, LCore, R, RCore]) PopulateWithContext(source any, ctx *m
 	}
 
 	return nil
-}
-
-// populateLeftFromCorePointer populates a context-aware Left value directly from a
-// pointer to its struct core. The generic marshaller.PopulateWithContext path boxes
-// copies of the core struct (twice per value), which dominates allocation for large
-// cores such as JSON Schema; context-aware populators all accept a pointer to their core.
-// It reports false when the fast path does not apply and the generic path should be used.
-func (e *EitherValue[L, LCore, R, RCore]) populateLeftFromCorePointer(ec *core.EitherValue[LCore, RCore], ctx *marshaller.PopulationContext) (bool, error) {
-	if reflect.TypeFor[LCore]().Kind() != reflect.Struct {
-		return false, nil
-	}
-
-	left := marshaller.CreateInstance(reflect.TypeFor[L]())
-	populator, ok := left.Interface().(marshaller.ContextAwarePopulator)
-	if !ok {
-		return false, nil
-	}
-	leftPtr, ok := left.Interface().(*L)
-	if !ok {
-		return false, nil
-	}
-
-	e.Left = leftPtr
-	if err := populator.PopulateWithContext(&ec.Left.Value, ctx); err != nil {
-		return true, fmt.Errorf("failed to populate left: %w", err)
-	}
-
-	return true, nil
 }
 
 // GetNavigableNode implements the NavigableNoder interface to return the held value for JSON pointer navigation

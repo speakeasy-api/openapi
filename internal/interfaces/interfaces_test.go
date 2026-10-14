@@ -8,6 +8,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -230,32 +231,55 @@ func TestImplementsInterface_BuiltInTypes_Success(t *testing.T) {
 	}
 }
 
+// typeImplementsProber and its implementations are used only by
+// TestTypeImplements_MatchesReflect_Success so no other test can warm the
+// shared implements cache for these type pairs.
+type typeImplementsProber interface {
+	probeTypeImplements()
+}
+
+type typeImplementsPointerProbe struct{}
+
+func (*typeImplementsPointerProbe) probeTypeImplements() {}
+
+type typeImplementsValueProbe struct{}
+
+func (typeImplementsValueProbe) probeTypeImplements() {}
+
+type typeImplementsNonProbe struct{}
+
 func TestTypeImplements_MatchesReflect_Success(t *testing.T) {
 	t.Parallel()
 
-	coreModelType := reflect.TypeFor[CoreModel]()
-	seqMapType := reflect.TypeFor[SequencedMapInterface]()
+	proberType := reflect.TypeFor[typeImplementsProber]()
 
 	tests := []struct {
-		name  string
-		typ   reflect.Type
-		iface reflect.Type
+		name     string
+		typ      reflect.Type
+		expected bool
 	}{
-		{name: "pointer core model implements CoreModel", typ: reflect.TypeOf(&testCoreModelImpl{}), iface: coreModelType},
-		{name: "value core model does not implement CoreModel", typ: reflect.TypeOf(testCoreModelImpl{}), iface: coreModelType},
-		{name: "pointer sequenced map implements SequencedMapInterface", typ: reflect.TypeOf(&testSequencedMapImpl{}), iface: seqMapType},
-		{name: "non sequenced map does not implement SequencedMapInterface", typ: reflect.TypeOf(&testNonSequencedMap{}), iface: seqMapType},
-		{name: "string does not implement CoreModel", typ: reflect.TypeOf(""), iface: coreModelType},
+		{name: "pointer receiver type implements via pointer", typ: reflect.TypeFor[*typeImplementsPointerProbe](), expected: true},
+		{name: "pointer receiver type does not implement via value", typ: reflect.TypeFor[typeImplementsPointerProbe](), expected: false},
+		{name: "value receiver type implements via value", typ: reflect.TypeFor[typeImplementsValueProbe](), expected: true},
+		{name: "value receiver type implements via pointer", typ: reflect.TypeFor[*typeImplementsValueProbe](), expected: true},
+		{name: "unrelated type does not implement", typ: reflect.TypeFor[typeImplementsNonProbe](), expected: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			expected := tt.typ.Implements(tt.iface)
-			// Query twice so both the uncached and cached paths are exercised.
-			assert.Equal(t, expected, TypeImplements(tt.typ, tt.iface), "first lookup should match reflect")
-			assert.Equal(t, expected, TypeImplements(tt.typ, tt.iface), "cached lookup should match reflect")
+			// Clear the entry so the first lookup always takes the uncached path,
+			// including on repeated runs in the same process (-count > 1).
+			key := implementsKey{t: tt.typ, iface: proberType}
+			implementsCache.Delete(key)
+
+			assert.Equal(t, tt.expected, TypeImplements(tt.typ, proberType), "uncached lookup should match reflect")
+
+			cachedValue, cached := implementsCache.Load(key)
+			require.True(t, cached, "type pair should be cached after the first lookup")
+			assert.Equal(t, tt.expected, cachedValue, "cached entry should match reflect")
+			assert.Equal(t, tt.expected, TypeImplements(tt.typ, proberType), "cached lookup should match reflect")
 		})
 	}
 }
