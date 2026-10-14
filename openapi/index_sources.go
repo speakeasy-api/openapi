@@ -57,7 +57,7 @@ func (i *Index) NewDocumentLocationLookup() func(*yaml.Node) string {
 //
 // Lookup needs the cache owner (resolveOpts.RootDocument, or the indexed
 // document when unset) to expose CachedExternalDocuments, as *OpenAPI does.
-// For other references.RootDocument implementations it returns "" for every
+// For other references.ResolutionTarget implementations it returns "" for every
 // node, so findings fall back to the reference-site DocumentLocation set
 // during indexing.
 //
