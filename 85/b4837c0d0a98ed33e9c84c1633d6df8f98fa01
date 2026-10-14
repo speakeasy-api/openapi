@@ -1,0 +1,55 @@
+openapi/linter/README.md
+  h_9630b74bdac540 55
+openapi/index_sources.go
+  h_9630b74bdac540 58-63
+openapi/index_path_items_test.go
+  h_9630b74bdac540 67-151
+openapi/index.go
+  h_9630b74bdac540 278-280,284,286,288-290,292-293,297,300,1332-1336,1944
+  s_eae8d78910996c::t_8b723d9823d222 287
+openapi/linter/rules/owasp_define_error_responses_401.go
+  h_9630b74bdac540 59
+openapi/linter/rules/owasp_protection_global_safe.go
+  h_9630b74bdac540 74
+openapi/linter/rules/owasp_define_error_responses_500.go
+  h_9630b74bdac540 59
+openapi/utils.go
+  h_9630b74bdac540 185,201-202
+openapi/linter/rules/parameter_description.go
+  h_9630b74bdac540 76
+openapi/linter/rules/owasp_rate_limit.go
+  h_9630b74bdac540 70
+openapi/linter/rules/owasp_define_error_responses_429.go
+  h_9630b74bdac540 59
+openapi/linter/rules/owasp_protection_global_unsafe_strict.go
+  h_9630b74bdac540 67
+openapi/linter/rules/owasp_rate_limit_retry_after.go
+  h_9630b74bdac540 60
+openapi/linter/rules/owasp_define_error_validation.go
+  h_9630b74bdac540 58
+openapi/index_path_items.go
+  h_9630b74bdac540 49,61,63-65,68
+openapi/linter/rules/owasp_protection_global_unsafe.go
+  h_9630b74bdac540 74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "85b4837c0d0a98ed33e9c84c1633d6df8f98fa01",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  },
+  "sessions": {
+    "s_eae8d78910996c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cf35de0f-6246-41ae-b7cd-6f8020b9228e",
+        "model": "unknown"
+      },
+      "human_author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
