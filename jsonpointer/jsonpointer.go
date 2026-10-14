@@ -6,12 +6,12 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"unsafe"
 
 	"github.com/speakeasy-api/openapi/errors"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"go.yaml.in/yaml/v3"
 	gopkgyaml "gopkg.in/yaml.v3"
-	"unsafe"
 )
 
 const (
@@ -74,6 +74,10 @@ func (j JSONPointer) Validate() error {
 // WithStructTags can be used to set the type of struct tags to use when navigating structs.
 // If the struct implements any of the Navigable interfaces it will be used to navigate the source.
 func GetTarget(source any, pointer JSONPointer, opts ...option) (any, error) {
+	_, isLegacyPtr := source.(*gopkgyaml.Node)
+	_, isLegacyVal := source.(gopkgyaml.Node)
+	isLegacy := isLegacyPtr || isLegacyVal
+
 	o := getOptions(opts)
 
 	stack, err := pointer.getNavigationStack()
@@ -84,6 +88,12 @@ func GetTarget(source any, pointer JSONPointer, opts ...option) (any, error) {
 	target, _, err := getCurrentStackTarget(source, stack, "/", o)
 	if err != nil {
 		return nil, err
+	}
+
+	if isLegacy {
+		if node, ok := target.(*yaml.Node); ok {
+			return (*gopkgyaml.Node)(unsafe.Pointer(node)), nil //nolint:gosec // zero-copy conversion between identical Node memory layouts
+		}
 	}
 
 	return target, nil
@@ -109,10 +119,22 @@ func getCurrentStackTarget(source any, stack []navigationPart, currentPath strin
 			return getYamlNodeTarget(&yamlNode, navigationPart{}, []navigationPart{}, currentPath, o)
 		}
 		if legacyNode, ok := source.(*gopkgyaml.Node); ok {
-			return getYamlNodeTarget((*yaml.Node)(unsafe.Pointer(legacyNode)), navigationPart{}, []navigationPart{}, currentPath, o) //nolint:gosec // zero-copy conversion between identical Node memory layouts
+			res, st, err := getYamlNodeTarget((*yaml.Node)(unsafe.Pointer(legacyNode)), navigationPart{}, []navigationPart{}, currentPath, o) //nolint:gosec // zero-copy conversion between identical Node memory layouts
+			if err == nil {
+				if n, ok := res.(*yaml.Node); ok {
+					return (*gopkgyaml.Node)(unsafe.Pointer(n)), st, nil //nolint:gosec // zero-copy conversion between identical Node memory layouts
+				}
+			}
+			return res, st, err
 		}
 		if legacyNode, ok := source.(gopkgyaml.Node); ok {
-			return getYamlNodeTarget((*yaml.Node)(unsafe.Pointer(&legacyNode)), navigationPart{}, []navigationPart{}, currentPath, o) //nolint:gosec // zero-copy conversion between identical Node memory layouts
+			res, st, err := getYamlNodeTarget((*yaml.Node)(unsafe.Pointer(&legacyNode)), navigationPart{}, []navigationPart{}, currentPath, o) //nolint:gosec // zero-copy conversion between identical Node memory layouts
+			if err == nil {
+				if n, ok := res.(*yaml.Node); ok {
+					return (*gopkgyaml.Node)(unsafe.Pointer(n)), st, nil //nolint:gosec // zero-copy conversion between identical Node memory layouts
+				}
+			}
+			return res, st, err
 		}
 		return source, stack, nil
 	}
@@ -134,10 +156,22 @@ func getTarget(source any, currentPart navigationPart, stack []navigationPart, c
 		return getYamlNodeTarget(&yamlNode, currentPart, stack, currentPath, o)
 	}
 	if legacyNode, ok := source.(*gopkgyaml.Node); ok {
-		return getYamlNodeTarget((*yaml.Node)(unsafe.Pointer(legacyNode)), currentPart, stack, currentPath, o) //nolint:gosec // zero-copy conversion between identical Node memory layouts
+		res, st, err := getYamlNodeTarget((*yaml.Node)(unsafe.Pointer(legacyNode)), currentPart, stack, currentPath, o) //nolint:gosec // zero-copy conversion between identical Node memory layouts
+		if err == nil {
+			if n, ok := res.(*yaml.Node); ok {
+				return (*gopkgyaml.Node)(unsafe.Pointer(n)), st, nil //nolint:gosec // zero-copy conversion between identical Node memory layouts
+			}
+		}
+		return res, st, err
 	}
 	if legacyNode, ok := source.(gopkgyaml.Node); ok {
-		return getYamlNodeTarget((*yaml.Node)(unsafe.Pointer(&legacyNode)), currentPart, stack, currentPath, o) //nolint:gosec // zero-copy conversion between identical Node memory layouts
+		res, st, err := getYamlNodeTarget((*yaml.Node)(unsafe.Pointer(&legacyNode)), currentPart, stack, currentPath, o) //nolint:gosec // zero-copy conversion between identical Node memory layouts
+		if err == nil {
+			if n, ok := res.(*yaml.Node); ok {
+				return (*gopkgyaml.Node)(unsafe.Pointer(n)), st, nil //nolint:gosec // zero-copy conversion between identical Node memory layouts
+			}
+		}
+		return res, st, err
 	}
 
 	sourceType := reflect.TypeOf(source)

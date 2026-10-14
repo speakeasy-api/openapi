@@ -79,3 +79,69 @@ second: 2
 	assert.True(t, ok)
 	assert.Equal(t, 1, v)
 }
+
+type legacyCustomValue struct {
+	customField  string
+	receivedKind legacyyaml.Kind
+}
+
+func (v *legacyCustomValue) UnmarshalYAML(value *legacyyaml.Node) error {
+	v.receivedKind = value.Kind
+	v.customField = "custom:" + value.Value
+	return nil
+}
+
+func (v legacyCustomValue) MarshalYAML() (interface{}, error) {
+	return &legacyyaml.Node{
+		Kind:  legacyyaml.ScalarNode,
+		Value: v.customField,
+	}, nil
+}
+
+func TestSequencedMap_LegacyValueUnmarshaler(t *testing.T) {
+	t.Parallel()
+
+	yamlData := `first: alpha
+second: beta
+`
+	var m sequencedmap.Map[string, legacyCustomValue]
+	err := goyaml.Unmarshal([]byte(yamlData), &m)
+	require.NoError(t, err)
+	assert.Equal(t, 2, m.Len())
+
+	v1, ok := m.Get("first")
+	require.True(t, ok)
+	assert.Equal(t, "custom:alpha", v1.customField)
+	assert.Equal(t, legacyyaml.ScalarNode, v1.receivedKind)
+
+	v2, ok := m.Get("second")
+	require.True(t, ok)
+	assert.Equal(t, "custom:beta", v2.customField)
+	assert.Equal(t, legacyyaml.ScalarNode, v2.receivedKind)
+
+	marshaled, err := goyaml.Marshal(&m)
+	require.NoError(t, err)
+	assert.Equal(t, "first: custom:alpha\nsecond: custom:beta\n", string(marshaled))
+}
+
+func TestSequencedMap_LegacyPointerValueUnmarshalerWithAdapter(t *testing.T) {
+	t.Parallel()
+
+	yamlData := `first: alpha
+second: beta
+`
+	var m sequencedmap.Map[string, *legacyCustomValue]
+	err := legacyyaml.Unmarshal([]byte(yamlData), m.AsLegacyYAML())
+	require.NoError(t, err)
+	assert.Equal(t, 2, m.Len())
+
+	v1, ok := m.Get("first")
+	require.True(t, ok)
+	require.NotNil(t, v1)
+	assert.Equal(t, "custom:alpha", v1.customField)
+	assert.Equal(t, legacyyaml.ScalarNode, v1.receivedKind)
+
+	marshaled, err := legacyyaml.Marshal(m.AsLegacyYAML())
+	require.NoError(t, err)
+	assert.Equal(t, "first: custom:alpha\nsecond: custom:beta\n", string(marshaled))
+}

@@ -28,10 +28,18 @@ paths:
 	target, err := jsonpointer.GetTarget(&root, ptr)
 	require.NoError(t, err)
 	require.NotNil(t, target)
+	targetNode, ok := target.(*legacyyaml.Node)
+	require.True(t, ok, "expected *legacyyaml.Node from pointer input, got %T", target)
+	assert.Equal(t, legacyyaml.ScalarNode, targetNode.Kind)
+	assert.Equal(t, "Test API", targetNode.Value)
 
 	// Also test value struct version
 	target2, err := jsonpointer.GetTarget(root, ptr)
 	require.NoError(t, err)
 	require.NotNil(t, target2)
+	targetNode2, ok := target2.(*legacyyaml.Node)
+	require.True(t, ok, "expected *legacyyaml.Node from value input, got %T", target2)
+	assert.Equal(t, legacyyaml.ScalarNode, targetNode2.Kind)
+	assert.Equal(t, "Test API", targetNode2.Value)
 	assert.Equal(t, target, target2)
 }
