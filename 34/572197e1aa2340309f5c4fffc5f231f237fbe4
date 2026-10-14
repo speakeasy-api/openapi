@@ -1,0 +1,14 @@
+oq/oq_test.go
+  h_9630b74bdac540 1424-1425
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "34572197e1aa2340309f5c4fffc5f231f237fbe4",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
