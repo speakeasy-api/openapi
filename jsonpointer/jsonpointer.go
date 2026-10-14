@@ -10,6 +10,8 @@ import (
 	"github.com/speakeasy-api/openapi/errors"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"go.yaml.in/yaml/v3"
+	gopkgyaml "gopkg.in/yaml.v3"
+	"unsafe"
 )
 
 const (
@@ -106,6 +108,12 @@ func getCurrentStackTarget(source any, stack []navigationPart, currentPath strin
 		if yamlNode, ok := source.(yaml.Node); ok {
 			return getYamlNodeTarget(&yamlNode, navigationPart{}, []navigationPart{}, currentPath, o)
 		}
+		if legacyNode, ok := source.(*gopkgyaml.Node); ok {
+			return getYamlNodeTarget((*yaml.Node)(unsafe.Pointer(legacyNode)), navigationPart{}, []navigationPart{}, currentPath, o) //nolint:gosec // zero-copy conversion between identical Node memory layouts
+		}
+		if legacyNode, ok := source.(gopkgyaml.Node); ok {
+			return getYamlNodeTarget((*yaml.Node)(unsafe.Pointer(&legacyNode)), navigationPart{}, []navigationPart{}, currentPath, o) //nolint:gosec // zero-copy conversion between identical Node memory layouts
+		}
 		return source, stack, nil
 	}
 
@@ -124,6 +132,12 @@ func getTarget(source any, currentPart navigationPart, stack []navigationPart, c
 	}
 	if yamlNode, ok := source.(yaml.Node); ok {
 		return getYamlNodeTarget(&yamlNode, currentPart, stack, currentPath, o)
+	}
+	if legacyNode, ok := source.(*gopkgyaml.Node); ok {
+		return getYamlNodeTarget((*yaml.Node)(unsafe.Pointer(legacyNode)), currentPart, stack, currentPath, o) //nolint:gosec // zero-copy conversion between identical Node memory layouts
+	}
+	if legacyNode, ok := source.(gopkgyaml.Node); ok {
+		return getYamlNodeTarget((*yaml.Node)(unsafe.Pointer(&legacyNode)), currentPart, stack, currentPath, o) //nolint:gosec // zero-copy conversion between identical Node memory layouts
 	}
 
 	sourceType := reflect.TypeOf(source)

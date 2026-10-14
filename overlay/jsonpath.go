@@ -17,6 +17,10 @@ type Queryable interface {
 	Query(root *yaml.Node) []*yaml.Node
 }
 
+// Compile-time layout-compatibility guard verifying that go.yaml.in/yaml/v3.Node
+// and gopkg.in/yaml.v3.Node have identical memory footprints.
+const _ = unsafe.Sizeof(yaml.Node{}) == unsafe.Sizeof(legacyYaml.Node{})
+
 type rfcJSONPathQueryable struct {
 	path *jsonpath.JSONPath
 }
@@ -25,11 +29,11 @@ func (r rfcJSONPathQueryable) Query(root *yaml.Node) []*yaml.Node {
 	if r.path == nil {
 		return []*yaml.Node{}
 	}
-	legacyRoot := (*legacyYaml.Node)(unsafe.Pointer(root))
+	legacyRoot := (*legacyYaml.Node)(unsafe.Pointer(root)) //nolint:gosec // zero-copy conversion between identical Node memory layouts
 	legacyResults := r.path.Query(legacyRoot)
 	results := make([]*yaml.Node, len(legacyResults))
 	for i, n := range legacyResults {
-		results[i] = (*yaml.Node)(unsafe.Pointer(n))
+		results[i] = (*yaml.Node)(unsafe.Pointer(n)) //nolint:gosec // zero-copy conversion between identical Node memory layouts
 	}
 	return results
 }
@@ -42,12 +46,12 @@ func (y yamlPathQueryable) Query(root *yaml.Node) []*yaml.Node {
 	if y.path == nil {
 		return []*yaml.Node{}
 	}
-	legacyRoot := (*legacyYaml.Node)(unsafe.Pointer(root))
+	legacyRoot := (*legacyYaml.Node)(unsafe.Pointer(root)) //nolint:gosec // zero-copy conversion between identical Node memory layouts
 	// errors aren't actually possible from yamlpath.
 	legacyResults, _ := y.path.Find(legacyRoot)
 	results := make([]*yaml.Node, len(legacyResults))
 	for i, n := range legacyResults {
-		results[i] = (*yaml.Node)(unsafe.Pointer(n))
+		results[i] = (*yaml.Node)(unsafe.Pointer(n)) //nolint:gosec // zero-copy conversion between identical Node memory layouts
 	}
 	return results
 }

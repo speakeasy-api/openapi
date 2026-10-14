@@ -16,6 +16,8 @@ import (
 	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/yml"
 	"go.yaml.in/yaml/v3"
+	gopkgyaml "gopkg.in/yaml.v3"
+	"unsafe"
 )
 
 // OrderType represents the different ways to order iteration through the map
@@ -684,8 +686,11 @@ func (m *Map[K, V]) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// UnmarshalYAML implements the yaml.Unmarshaler interface for the Map type.
+// UnmarshalYAML implements the go.yaml.in/yaml/v3.Unmarshaler interface for the Map type.
 // It unmarshals YAML data into the sequenced map, preserving the order of keys.
+//
+// Callers decoding with the legacy gopkg.in/yaml.v3 package can wrap the map with
+// AsLegacyYAML() to preserve order-preserving decoding during migration.
 func (m *Map[K, V]) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind != yaml.MappingNode {
 		return fmt.Errorf("cannot unmarshal %s into sequencedmap.Map", value.ShortTag())
@@ -729,8 +734,11 @@ func (m *Map[K, V]) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-// MarshalYAML implements the yaml.Marshaler interface for the Map type.
+// MarshalYAML implements the go.yaml.in/yaml/v3.Marshaler interface for the Map type.
 // It marshals the sequenced map to YAML, preserving the order of keys.
+//
+// Callers encoding with the legacy gopkg.in/yaml.v3 package can wrap the map with
+// AsLegacyYAML() to emit valid mapping nodes during migration.
 func (m *Map[K, V]) MarshalYAML() (interface{}, error) {
 	if m == nil {
 		return nil, nil
@@ -750,6 +758,45 @@ func (m *Map[K, V]) MarshalYAML() (interface{}, error) {
 	}
 
 	return yml.CreateMapNode(context.Background(), content), nil
+}
+
+// LegacyYAMLAdapter wraps a Map to implement the Unmarshaler and Marshaler interfaces
+// for the legacy gopkg.in/yaml.v3 package during ecosystem migration.
+type LegacyYAMLAdapter[K comparable, V any] struct {
+	Map *Map[K, V]
+}
+
+// AsLegacyYAML returns an adapter that implements gopkg.in/yaml.v3's Marshaler and Unmarshaler.
+func (m *Map[K, V]) AsLegacyYAML() *LegacyYAMLAdapter[K, V] {
+	return &LegacyYAMLAdapter[K, V]{Map: m}
+}
+
+// NewLegacyYAMLAdapter creates a new legacy YAML adapter for the given map.
+func NewLegacyYAMLAdapter[K comparable, V any](m *Map[K, V]) *LegacyYAMLAdapter[K, V] {
+	return &LegacyYAMLAdapter[K, V]{Map: m}
+}
+
+// UnmarshalYAML implements gopkg.in/yaml.v3.Unmarshaler by delegating to Map.UnmarshalYAML.
+func (a *LegacyYAMLAdapter[K, V]) UnmarshalYAML(value *gopkgyaml.Node) error {
+	if a == nil || a.Map == nil {
+		return errors.New("cannot unmarshal into nil Map")
+	}
+	return a.Map.UnmarshalYAML((*yaml.Node)(unsafe.Pointer(value))) //nolint:gosec // zero-copy conversion between identical Node memory layouts
+}
+
+// MarshalYAML implements gopkg.in/yaml.v3.Marshaler by delegating to Map.MarshalYAML and returning *gopkg.in/yaml.v3.Node.
+func (a *LegacyYAMLAdapter[K, V]) MarshalYAML() (interface{}, error) {
+	if a == nil || a.Map == nil {
+		return nil, nil
+	}
+	res, err := a.Map.MarshalYAML()
+	if err != nil {
+		return nil, err
+	}
+	if node, ok := res.(*yaml.Node); ok {
+		return (*gopkgyaml.Node)(unsafe.Pointer(node)), nil //nolint:gosec // zero-copy conversion between identical Node memory layouts
+	}
+	return res, nil
 }
 
 // compareKeys provides a generic comparison function for keys

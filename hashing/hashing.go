@@ -10,6 +10,8 @@ import (
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"go.yaml.in/yaml/v3"
+	gopkgyaml "gopkg.in/yaml.v3"
+	"unsafe"
 )
 
 func Hash(v any) string {
@@ -79,6 +81,8 @@ func toHashableString(v any) string {
 		// Check if this is a yaml.Node
 		if node, ok := v.(yaml.Node); ok {
 			builder.WriteString(yamlNodeToHashableString(&node))
+		} else if legacyNode, ok := v.(gopkgyaml.Node); ok {
+			builder.WriteString(yamlNodeToHashableString((*yaml.Node)(unsafe.Pointer(&legacyNode)))) //nolint:gosec // zero-copy conversion between identical Node memory layouts
 		} else {
 			builder.WriteString(structToHashableString(v))
 		}
@@ -110,6 +114,8 @@ func toHashableString(v any) string {
 			builder.WriteString(strconv.FormatUint(v, 10))
 		case *yaml.Node:
 			builder.WriteString(yamlNodeToHashableString(v))
+		case *gopkgyaml.Node:
+			builder.WriteString(yamlNodeToHashableString((*yaml.Node)(unsafe.Pointer(v)))) //nolint:gosec // zero-copy conversion between identical Node memory layouts
 		default:
 			fmt.Fprintf(&builder, "%v", v)
 		}

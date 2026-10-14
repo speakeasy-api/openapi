@@ -12,8 +12,8 @@ import (
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
-	"golang.org/x/sync/errgroup"
 	"go.yaml.in/yaml/v3"
+	"golang.org/x/sync/errgroup"
 )
 
 // Pre-computed reflection types for performance (reusing from populator.go where possible)

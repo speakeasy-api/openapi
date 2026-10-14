@@ -17,9 +17,9 @@ import (
 	"github.com/speakeasy-api/openapi/jsonschema/oas3/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
+	"go.yaml.in/yaml/v3"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
-	"go.yaml.in/yaml/v3"
 )
 
 // custom file to cover for missing openapi 3.0 json schema
