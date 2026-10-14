@@ -55,6 +55,12 @@ func (i *Index) NewDocumentLocationLookup() func(*yaml.Node) string {
 // its filename, since it is not part of the root model the fix engine persists.
 // It never loads or resolves a document.
 //
+// Lookup needs the cache owner (resolveOpts.RootDocument, or the indexed
+// document when unset) to expose CachedExternalDocuments, as *OpenAPI does.
+// For other references.RootDocument implementations it returns "" for every
+// node, so findings fall back to the reference-site DocumentLocation set
+// during indexing.
+//
 // Like the other index lookups, the mapping assumes the index and its source
 // documents are not modified after construction. Concurrent lookups are safe.
 func (i *Index) GetDocumentLocation(node *yaml.Node) string {

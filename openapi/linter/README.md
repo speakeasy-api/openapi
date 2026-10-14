@@ -52,7 +52,7 @@ func main() {
 
 ## Referenced documents and diagnostics
 
-Linting follows supported references without requiring a bundling step. External findings retain the source file or URL and the original line/column through `validation.Error.DocumentLocation`; JSON output includes a `document` field. Source lookup uses parsed documents already cached by resolution and does not perform additional file or network reads.
+Linting follows supported references without requiring a bundling step. External findings retain the source file or URL in `validation.Error.DocumentLocation` and the original line/column on the error's YAML node; JSON output includes a `document` field. Source lookup uses parsed documents already cached by resolution and does not perform additional file or network reads.
 
 A shared external defect is not reported repeatedly just because several references reach it. Mounted operations remain distinct for path checks and operation-ID uniqueness. Reference-site annotations are checked at their own source, and recursive Path Item/callback graphs are bounded during indexing.
 

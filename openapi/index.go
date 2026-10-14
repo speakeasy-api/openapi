@@ -275,30 +275,29 @@ func IsWebhookLocation(loc Locations) bool {
 
 // ExtractOperationInfo extracts path/webhook name, method, and whether it's a webhook
 // from a location. Works for any location within an operation's subtree.
+//
+// For a callback operation, path is the callback's runtime expression and
+// method is the callback operation's own method, not the enclosing operation's.
 func ExtractOperationInfo(loc Locations) (path, method string, isWebhook bool) {
 	for i := len(loc) - 1; i >= 0; i-- {
 		l := loc[i]
-		parentType := GetParentType(l)
+		key := pointer.Value(l.ParentKey)
 
-		switch parentType {
-		case "Paths":
-			if l.ParentKey != nil {
-				path = *l.ParentKey
+		switch GetParentType(l) {
+		case "PathItem":
+			// The innermost Path Item owns the operation.
+			if method == "" {
+				method = key
 			}
-		case "PathItem", "ReferencedPathItem":
-			if l.ParentKey != nil {
-				method = *l.ParentKey
-			}
+		case "Paths", "Callback":
+			return key, method, false
 		}
 
 		if l.ParentField == "webhooks" {
-			isWebhook = true
-			if l.ParentKey != nil {
-				path = *l.ParentKey
-			}
+			return key, method, true
 		}
 	}
-	return
+	return path, method, isWebhook
 }
 
 // BuildIndex creates a new Index by walking the entire OpenAPI document.
@@ -1330,10 +1329,11 @@ func (i *Index) indexOperation(_ context.Context, loc Locations, operation *Oper
 		return
 	}
 
-	operationLocation := loc
-	if len(i.operationLocationPrefix) > 0 {
-		operationLocation = append(copyLocations(i.operationLocationPrefix), loc...)
-	}
+	// Always copy: the walker reuses location backing arrays, so a retained
+	// slice can be overwritten by later siblings (for example nested callbacks).
+	operationLocation := make(Locations, 0, len(i.operationLocationPrefix)+len(loc))
+	operationLocation = append(operationLocation, i.operationLocationPrefix...)
+	operationLocation = append(operationLocation, loc...)
 	indexNode := &IndexNode[*Operation]{
 		Node:     operation,
 		Location: operationLocation,
@@ -1941,7 +1941,7 @@ func (i *Index) indexReferencedCallback(ctx context.Context, loc Locations, call
 		// If resolved, explicitly walk the resolved content
 		resolved := callback.GetObject()
 		if resolved != nil {
-			i.walkReferencedCallback(ctx, resolved)
+			i.walkReferencedCallback(ctx, loc, resolved)
 		}
 		return
 	}

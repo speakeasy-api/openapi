@@ -67,7 +67,7 @@ func (r *OwaspRateLimitRule) Run(ctx context.Context, docInfo *linter.DocumentIn
 		path := ""
 		for _, loc := range opNode.Location {
 			switch openapi.GetParentType(loc) {
-			case "Paths":
+			case "Paths", "Callback":
 				if loc.ParentKey != nil {
 					path = *loc.ParentKey
 				}

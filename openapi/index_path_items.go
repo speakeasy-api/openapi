@@ -46,7 +46,7 @@ func (i *Index) walkReferencedPathItem(ctx context.Context, location Locations, 
 	_ = buildIndex(ctx, i, wrapped)
 }
 
-func (i *Index) walkReferencedCallback(ctx context.Context, resolved *Callback) {
+func (i *Index) walkReferencedCallback(ctx context.Context, location Locations, resolved *Callback) {
 	key := callbackTargetKey{node: resolved.GetRootNode()}
 	if key.node == nil {
 		key.object = resolved
@@ -58,9 +58,14 @@ func (i *Index) walkReferencedCallback(ctx context.Context, resolved *Callback) 
 		i.activeCallbackTargets = make(map[callbackTargetKey]bool)
 	}
 	i.activeCallbackTargets[key] = true
+	previousPrefix := i.operationLocationPrefix
 	previousOperation, previousDepth := i.currentOperation, i.operationLocationDepth
+	// Callback operations keep the location of the operation that mounts the
+	// callback, as inline callbacks do, so rules can report the full route.
+	i.operationLocationPrefix = append(copyLocations(previousPrefix), location...)
 	defer func() {
 		delete(i.activeCallbackTargets, key)
+		i.operationLocationPrefix = previousPrefix
 		i.currentOperation, i.operationLocationDepth = previousOperation, previousDepth
 	}()
 	wrapped := &ReferencedCallback{Object: resolved}
