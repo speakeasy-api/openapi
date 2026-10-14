@@ -39,24 +39,17 @@ func (r *PathParamsRule) Versions() []string {
 var pathParamRegex = regexp.MustCompile(`\{([^}]+)\}`)
 
 func (r *PathParamsRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*openapi.OpenAPI], config *linter.RuleConfig) []error {
-	if docInfo == nil || docInfo.Document == nil || docInfo.Index == nil {
+	if docInfo == nil || docInfo.Document == nil || docInfo.Index == nil || docInfo.Document.Paths.Len() == 0 {
 		return nil
 	}
 
 	var errs []error
 
-	// Use the pre-computed InlinePathItems index (path items from /paths)
-	// These are the only ones with path templates in their location parent key
-	for _, pathItemNode := range docInfo.Index.InlinePathItems {
-		refPathItem := pathItemNode.Node
-
-		// Extract path from location (parent key of the path item)
-		path := pathItemNode.Location.ParentKey()
-		if path == "" {
-			continue
-		}
-
-		pathItem := refPathItem.GetObject()
+	// Validate each path mount, not just inline targets. The index has already
+	// resolved references, but a shared target can be mounted under different
+	// templates and must be checked separately for each one.
+	for path, refPathItem := range docInfo.Document.Paths.All() {
+		pathItem := refPathItem.GetResolvedObject()
 		if pathItem == nil {
 			continue
 		}
@@ -67,7 +60,18 @@ func (r *PathParamsRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*
 		pathItemParams := getPathParameters(pathItem.Parameters)
 
 		// Iterate operations
-		for _, op := range pathItem.All() {
+		for method, op := range pathItem.All() {
+			// Referenced targets may be shared or live in another file. Attribute
+			// usage-specific findings to the mount and do not offer a target edit:
+			// the CLI currently writes fixes back to the main document only.
+			node := op.GetRootNode()
+			if refPathItem.IsReference() {
+				node = nil
+				if core := refPathItem.GetCore(); core != nil {
+					node = core.Reference.KeyNode
+				}
+			}
+
 			// Merge parameters
 			opParams := getPathParameters(op.Parameters)
 			effectiveParams := mergeParameters(pathItemParams, opParams)
@@ -76,19 +80,24 @@ func (r *PathParamsRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*
 			// 1. All template params must be in effectiveParams
 			for _, tmplParam := range templateParams {
 				if _, ok := effectiveParams[tmplParam]; !ok {
-					schemaType, schemaFormat := inferPathParamType(tmplParam)
-					errs = append(errs, &validation.Error{
+					finding := &validation.Error{
 						Severity:        config.GetSeverity(r.DefaultSeverity()),
 						Rule:            RuleSemanticPathParams,
 						UnderlyingError: fmt.Errorf("path parameter `{%s}` is not defined in operation parameters", tmplParam),
-						Node:            op.GetRootNode(),
-						Fix: &addPathParameterFix{
-							operationNode: op.GetRootNode(),
+						Node:            node,
+					}
+					if refPathItem.IsReference() {
+						finding.UnderlyingError = fmt.Errorf("path parameter `{%s}` is not defined in operation parameters for `%s %s`", tmplParam, strings.ToUpper(string(method)), path)
+					} else {
+						schemaType, schemaFormat := inferPathParamType(tmplParam)
+						finding.Fix = &addPathParameterFix{
+							operationNode: node,
 							paramName:     tmplParam,
 							schemaType:    schemaType,
 							schemaFormat:  schemaFormat,
-						},
-					})
+						}
+					}
+					errs = append(errs, finding)
 				}
 			}
 
@@ -102,11 +111,15 @@ func (r *PathParamsRule) Run(ctx context.Context, docInfo *linter.DocumentInfo[*
 					}
 				}
 				if !found {
+					message := fmt.Errorf("parameter `%s` is declared as path parameter but not used in path template `%s`", paramName, path)
+					if refPathItem.IsReference() {
+						message = fmt.Errorf("parameter `%s` is declared as path parameter but not used in path template `%s` for `%s`", paramName, path, strings.ToUpper(string(method)))
+					}
 					errs = append(errs, validation.NewValidationError(
 						config.GetSeverity(r.DefaultSeverity()),
 						RuleSemanticPathParams,
-						fmt.Errorf("parameter `%s` is declared as path parameter but not used in path template `%s`", paramName, path),
-						op.GetRootNode(),
+						message,
+						node,
 					))
 				}
 			}

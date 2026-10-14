@@ -9,6 +9,57 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func TestModel_CachedExternalDocuments_Success(t *testing.T) {
+	t.Parallel()
+	model := &marshaller.Model[core.TestPrimitiveModel]{}
+	model.InitCache()
+	first := &yaml.Node{Value: "first"}
+	second := &yaml.Node{Value: "second"}
+	model.StoreExternalDocumentInCache("/spec/first.yaml", first)
+	model.StoreExternalDocumentInCache("/spec/second.yaml", second)
+
+	actual := make(map[string]any)
+	for path, doc := range model.CachedExternalDocuments() {
+		actual[path] = doc
+	}
+	assert.Equal(t, map[string]any{"/spec/first.yaml": first, "/spec/second.yaml": second}, actual, "iteration should expose the existing parsed objects without reparsing")
+}
+
+func TestModel_CachedExternalDocuments_Empty(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		model *marshaller.Model[core.TestPrimitiveModel]
+	}{
+		{name: "nil model"},
+		{name: "uninitialised cache", model: &marshaller.Model[core.TestPrimitiveModel]{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var paths []string
+			for path := range tt.model.CachedExternalDocuments() {
+				paths = append(paths, path)
+			}
+			assert.Empty(t, paths, "absent caches should yield no documents")
+		})
+	}
+}
+
+func TestModel_CachedExternalDocuments_EarlyStop(t *testing.T) {
+	t.Parallel()
+	model := &marshaller.Model[core.TestPrimitiveModel]{}
+	model.InitCache()
+	model.StoreExternalDocumentInCache("first", &yaml.Node{})
+	model.StoreExternalDocumentInCache("second", &yaml.Node{})
+	count := 0
+	for range model.CachedExternalDocuments() {
+		count++
+		break
+	}
+	assert.Equal(t, 1, count, "iteration should stop when the consumer breaks")
+}
+
 // TestModel_GetPropertyNode_Success tests the GetPropertyNode method with valid inputs
 func TestModel_GetPropertyNode_Success(t *testing.T) {
 	t.Parallel()

@@ -739,6 +739,127 @@ paths:
 	assert.Equal(t, "[9:7] warning semantic-path-params path parameter `{userId}` is not defined in operation parameters", errs[0].Error())
 }
 
+func TestPathParamsRule_WebhooksAndCallbacks_NoPathTemplateFindings(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /subscribe:
+    post:
+      callbacks:
+        notification:
+          '{$request.body#/url}':
+            post:
+              responses:
+                '200':
+                  description: ok
+      responses:
+        '200':
+          description: ok
+webhooks:
+  notification:
+    post:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ok
+`))
+	require.NoError(t, err, "unmarshal should succeed")
+	docInfo := createDocInfoWithIndex(t, ctx, doc, "/spec/openapi.yaml")
+	errs := (&rules.PathParamsRule{}).Run(ctx, docInfo, &linter.RuleConfig{})
+	assert.Empty(t, errs, "callback expressions and webhook names are not /paths URL templates")
+}
+
+func TestPathParamsRule_UnresolvedPathItem_NoCascadingErrors(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /users/{id}:
+    $ref: '#/components/pathItems/Missing'
+`))
+	require.NoError(t, err, "unmarshal should succeed")
+	docInfo := createDocInfoWithIndex(t, ctx, doc, "/spec/openapi.yaml")
+	require.NotEmpty(t, docInfo.Index.GetResolutionErrors(), "the index should report the unresolved target")
+	errs := (&rules.PathParamsRule{}).Run(ctx, docInfo, &linter.RuleConfig{})
+	assert.Empty(t, errs, "an unresolved Path Item should not produce speculative parameter findings")
+}
+
+func TestPathParamsRule_ReferencedPathItems_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		paths    string
+		messages []string
+	}{
+		{
+			name: "internal path item reference",
+			paths: `  /users/{userId}:
+    $ref: '#/components/pathItems/User'
+`,
+			messages: []string{"path parameter `{userId}` is not defined in operation parameters for `GET /users/{userId}`"},
+		},
+		{
+			name: "shared target retains both path templates",
+			paths: `  /users/{userId}:
+    $ref: '#/components/pathItems/User'
+  /teams/{teamId}:
+    $ref: '#/components/pathItems/User'
+`,
+			messages: []string{
+				"path parameter `{userId}` is not defined in operation parameters for `GET /users/{userId}`",
+				"path parameter `{teamId}` is not defined in operation parameters for `GET /teams/{teamId}`",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+			yamlInput := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+` + tt.paths + `components:
+  pathItems:
+    User:
+      get:
+        responses:
+          '200':
+            description: ok
+`
+			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(yamlInput))
+			require.NoError(t, err, "unmarshal should succeed")
+			docInfo := createDocInfoWithIndex(t, ctx, doc, "/spec/openapi.yaml")
+			require.Empty(t, docInfo.Index.GetResolutionErrors(), "internal path item references should resolve")
+
+			errs := (&rules.PathParamsRule{}).Run(ctx, docInfo, &linter.RuleConfig{})
+			require.Len(t, errs, len(tt.messages), "each mount should be checked independently")
+			for i, err := range errs {
+				var finding *validation.Error
+				require.ErrorAs(t, err, &finding, "finding should retain validation metadata")
+				assert.Equal(t, tt.messages[i], finding.UnderlyingError.Error(), "finding should identify its path mount")
+				assert.Nil(t, finding.Fix, "a shared reference target must not offer an automatic edit")
+				assert.Empty(t, finding.DocumentLocation, "finding should use main-document reference-site coordinates")
+			}
+		})
+	}
+}
+
 func TestPathParamsRule_ExternalReferenceResolution(t *testing.T) {
 	t.Parallel()
 

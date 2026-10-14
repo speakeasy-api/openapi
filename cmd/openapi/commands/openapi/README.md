@@ -96,11 +96,23 @@ openapi spec lint --fix-interactive --dry-run ./spec.yaml
 **What lint checks:**
 
 - All validation errors (structural validity, schema compliance, references)
-- Path parameter validation
-- Operation ID requirements
+- Path parameter validation for inline and referenced Path Items, checked against each mounted URL template
+- Ineffective OpenAPI 3.0 `nullable: true` without an explicit local `type` (`oas3-nullable-without-type`)
+- Provably incompatible explicit types in `allOf` (`semantic-allof-type-conflict`)
+- Missing and duplicate operation IDs, including operations mounted through referenced Path Items
 - Consistent naming conventions
 - Security best practices
 - Additional style and consistency rules
+
+Multi-file specifications can be linted directly, without bundling first. For example, both an inline `/users/{id}` endpoint and a Path Item referenced under `/users/{id}` must declare the `id` path parameter. Path-parameter findings for referenced Path Items point to the `$ref` in the main document and identify the affected operation and URL template. This rule checks templates under `/paths`, not webhook names or callback runtime expressions.
+
+Other external findings include their source file or URL and the original line/column. JSON output exposes the source in each result's `document` field. Alias chains retain the final target's source, and annotations declared beside a `$ref` are attributed to the reference site. Replayed findings for the same external source defect are collapsed, but distinct files and mounted operation-ID collisions remain separate. Recursive Path Item/callback graphs are traversed without repeatedly expanding an active target.
+
+External findings do not offer automatic fixes, since the CLI currently persists only the main document. Safe main-document fixes remain available. Path-parameter findings at reference sites also avoid editing shared targets automatically.
+
+The nullability check is a warning in both `all` and `recommended`. It reports a keyword with no effect, not a structurally invalid document. A `type` inside `allOf` does not make `nullable` effective on the containing Schema Object. Add the intended type explicitly or remove the ineffective keyword; the linter does not guess a type or rewrite the schema.
+
+The `allOf` type-conflict check is also a warning in `all` and `recommended`. For example, `allOf: [{type: object}, {type: string}]` cannot match a value, whereas `number` and `integer` overlap. The check considers explicit types on the schema and its immediate branches, including supported already-resolved local component references. It accounts for nullable types but does not solve arbitrary compositions, follow reference chains, or interpret custom schema dialects. In OpenAPI 3.1 and 3.2, `nullable` does not widen the allowed types; use a type array including `null` instead. No automatic rewrite is offered.
 
 **Default Configuration Path:**
 
