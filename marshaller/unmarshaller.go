@@ -681,12 +681,12 @@ func implementsInterface(out reflect.Value, interfaceType reflect.Type) bool {
 	if out.Kind() != reflect.Ptr {
 		if !out.CanAddr() {
 			// Try checking the original value directly
-			return original.Type().Implements(interfaceType)
+			return interfaces.TypeImplements(original.Type(), interfaceType)
 		}
 		out = out.Addr()
 	}
 
-	return out.Type().Implements(interfaceType)
+	return interfaces.TypeImplements(out.Type(), interfaceType)
 }
 
 func isEmbeddedSequencedMap(out reflect.Value) bool {

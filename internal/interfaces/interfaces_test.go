@@ -229,3 +229,33 @@ func TestImplementsInterface_BuiltInTypes_Success(t *testing.T) {
 		})
 	}
 }
+
+func TestTypeImplements_MatchesReflect_Success(t *testing.T) {
+	t.Parallel()
+
+	coreModelType := reflect.TypeFor[CoreModel]()
+	seqMapType := reflect.TypeFor[SequencedMapInterface]()
+
+	tests := []struct {
+		name  string
+		typ   reflect.Type
+		iface reflect.Type
+	}{
+		{name: "pointer core model implements CoreModel", typ: reflect.TypeOf(&testCoreModelImpl{}), iface: coreModelType},
+		{name: "value core model does not implement CoreModel", typ: reflect.TypeOf(testCoreModelImpl{}), iface: coreModelType},
+		{name: "pointer sequenced map implements SequencedMapInterface", typ: reflect.TypeOf(&testSequencedMapImpl{}), iface: seqMapType},
+		{name: "non sequenced map does not implement SequencedMapInterface", typ: reflect.TypeOf(&testNonSequencedMap{}), iface: seqMapType},
+		{name: "string does not implement CoreModel", typ: reflect.TypeOf(""), iface: coreModelType},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			expected := tt.typ.Implements(tt.iface)
+			// Query twice so both the uncached and cached paths are exercised.
+			assert.Equal(t, expected, TypeImplements(tt.typ, tt.iface), "first lookup should match reflect")
+			assert.Equal(t, expected, TypeImplements(tt.typ, tt.iface), "cached lookup should match reflect")
+		})
+	}
+}
