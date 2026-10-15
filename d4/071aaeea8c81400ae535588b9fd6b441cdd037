@@ -1,0 +1,14 @@
+openapi/linter/customrules/go.mod
+  h_9630b74bdac540 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d4071aaeea8c81400ae535588b9fd6b441cdd037",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
