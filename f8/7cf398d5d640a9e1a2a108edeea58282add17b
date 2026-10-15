@@ -1,0 +1,25 @@
+openapi/linter/rules/allof_type_conflict_test.go
+  h_9630b74bdac540 130-131,140,428
+  s_770a7c3f57e685::t_c0231369a6df69 128-129,132-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f87cf398d5d640a9e1a2a108edeea58282add17b",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  },
+  "sessions": {
+    "s_770a7c3f57e685": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b19141db-4ce1-4f79-9c1f-68c63f4c2f10",
+        "model": "unknown"
+      },
+      "human_author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
