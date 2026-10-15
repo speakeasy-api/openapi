@@ -1,0 +1,129 @@
+openapi/index_sources_test.go
+  h_9630b74bdac540 1-182
+openapi/linter/diagnostics.go
+  h_9630b74bdac540 1-96
+cmd/openapi/go.mod
+  h_9630b74bdac540 7,18,20-21,35,42-43,45
+openapi/index_sources.go
+  h_9630b74bdac540 1-105
+go.mod
+  h_9630b74bdac540 6,12-13
+internal/interfaces/interfaces_test.go
+  h_9630b74bdac540 11,233-282
+  h_9630b74bdac540 283-285
+openapi/linter/customrules/go.mod
+  h_9630b74bdac540 11,21,23
+openapi/index_path_items.go
+  h_9630b74bdac540 1-115
+openapi/linter/rules/allof_type_conflict.go
+  h_9630b74bdac540 1-200
+.github/workflows/ci.yaml
+  h_9630b74bdac540 27,63,117,223,253,274,296
+.github/workflows/dependabot-tidy.yml
+  h_9630b74bdac540 29
+.github/workflows/release.yaml
+  h_9630b74bdac540 23
+README.md
+  h_9630b74bdac540 132,160,163-168
+cmd/openapi/commands/openapi/README.md
+  h_9630b74bdac540 99-102,107-116
+cmd/openapi/go.sum
+  h_9630b74bdac540 3-4,13-14,17-20,63-64,84-87,99-100,110-111,117-118
+go.sum
+  h_9630b74bdac540 1-2,51-52,57-58
+internal/interfaces/interfaces.go
+  h_9630b74bdac540 7,43-66
+jsonschema/oas3/tests/go.mod
+  h_9630b74bdac540 59,61
+jsonschema/oas3/tests/go.sum
+  h_9630b74bdac540 123-124,133-134
+jsonschema/oas3/tests/testsuite
+  h_9630b74bdac540 1
+jsonschema/oas3/walk.go
+  h_9630b74bdac540 116,121,126,131,150,155,160,165,170,175,194,199
+marshaller/model.go
+  h_9630b74bdac540 4,215-228
+marshaller/model_test.go
+  h_9630b74bdac540 12-62
+marshaller/populator.go
+  h_9630b74bdac540 57,206,234,239,244,277,325,374,386-387
+marshaller/populator_internal_test.go
+  h_9630b74bdac540 1-131
+marshaller/unmarshaller.go
+  h_9630b74bdac540 684,689
+openapi/index.go
+  h_9630b74bdac540 177-181,232-242,284-286,290,292-296,298-299,303,306,349-350,364-365,894,1290,1339-1343,1346,1349-1354,1951,2177-2216
+openapi/index_internal_test.go
+  h_9630b74bdac540 10,12,94-159
+openapi/index_path_items_internal_test.go
+  h_9630b74bdac540 1-36
+openapi/index_path_items_test.go
+  h_9630b74bdac540 1-220
+openapi/index_test.go
+  h_9630b74bdac540 808-859
+openapi/linter/README.md
+  h_9630b74bdac540 53-60,70,94
+openapi/linter/converter/tests/go.mod
+  h_9630b74bdac540 11-12,24,26
+openapi/linter/converter/tests/go.sum
+  h_9630b74bdac540 27-28,32-33
+openapi/linter/customrules/go.sum
+  h_9630b74bdac540 28-29,33-34
+openapi/linter/diagnostics_internal_test.go
+  h_9630b74bdac540 1-56
+openapi/linter/diagnostics_test.go
+  h_9630b74bdac540 1-405
+openapi/linter/linter.go
+  h_9630b74bdac540 156,167-172,237,240,252-253
+openapi/linter/linter_test.go
+  h_9630b74bdac540 516-754,996-997
+openapi/linter/rules/allof_type_conflict_test.go
+  h_9630b74bdac540 1-526
+openapi/linter/rules/description_duplication.go
+  h_9630b74bdac540 46,68-76,78-79
+openapi/linter/rules/oas3_nullable_without_type.go
+  h_9630b74bdac540 1-69
+openapi/linter/rules/oas3_nullable_without_type_test.go
+  h_9630b74bdac540 1-156
+openapi/linter/rules/owasp_define_error_responses_401.go
+  h_9630b74bdac540 59
+openapi/linter/rules/owasp_define_error_responses_429.go
+  h_9630b74bdac540 59
+openapi/linter/rules/owasp_define_error_responses_500.go
+  h_9630b74bdac540 59
+openapi/linter/rules/owasp_define_error_validation.go
+  h_9630b74bdac540 58
+openapi/linter/rules/owasp_protection_global_safe.go
+  h_9630b74bdac540 74
+openapi/linter/rules/owasp_protection_global_unsafe.go
+  h_9630b74bdac540 74
+openapi/linter/rules/owasp_protection_global_unsafe_strict.go
+  h_9630b74bdac540 67
+openapi/linter/rules/owasp_rate_limit.go
+  h_9630b74bdac540 70
+openapi/linter/rules/owasp_rate_limit_retry_after.go
+  h_9630b74bdac540 60
+openapi/linter/rules/parameter_description.go
+  h_9630b74bdac540 76
+openapi/linter/rules/path_params.go
+  h_9630b74bdac540 42,48-52,63-74,83,87-94,98-100,114-117,121-122
+openapi/linter/rules/path_params_test.go
+  h_9630b74bdac540 742-862
+openapi/linter/rules/rule_metadata_test.go
+  h_9630b74bdac540 85,88
+openapi/utils.go
+  h_9630b74bdac540 185,201-202
+oq/oq_test.go
+  h_9630b74bdac540 1424-1425
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ac1624f2efef145aef2db2d3316fb584e55fdabf",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
