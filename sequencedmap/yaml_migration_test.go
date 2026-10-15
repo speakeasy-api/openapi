@@ -124,6 +124,35 @@ second: beta
 	assert.Equal(t, "first: custom:alpha\nsecond: custom:beta\n", string(marshaled))
 }
 
+func TestSequencedMap_NilLegacyNodeValueMarshalsNull_Success(t *testing.T) {
+	t.Parallel()
+
+	m := sequencedmap.New(
+		sequencedmap.NewElem[string, *legacyyaml.Node]("empty", nil),
+		sequencedmap.NewElem("set", &legacyyaml.Node{Kind: legacyyaml.ScalarNode, Value: "value"}),
+	)
+
+	marshaled, err := goyaml.Marshal(m)
+	require.NoError(t, err, "marshal should not panic on typed-nil legacy nodes")
+	assert.Equal(t, "empty: null\nset: value\n", string(marshaled), "typed-nil legacy node should encode as null")
+}
+
+type nilLegacyNodeMarshaler struct{}
+
+func (nilLegacyNodeMarshaler) MarshalYAML() (interface{}, error) {
+	return (*legacyyaml.Node)(nil), nil
+}
+
+func TestSequencedMap_MarshalerReturningNilLegacyNode_Success(t *testing.T) {
+	t.Parallel()
+
+	m := sequencedmap.New(sequencedmap.NewElem("key", nilLegacyNodeMarshaler{}))
+
+	marshaled, err := goyaml.Marshal(m)
+	require.NoError(t, err, "marshal should not panic when a marshaler returns a nil legacy node")
+	assert.Equal(t, "key: null\n", string(marshaled), "nil legacy node result should encode as null")
+}
+
 func TestSequencedMap_LegacyPointerValueUnmarshalerWithAdapter(t *testing.T) {
 	t.Parallel()
 
