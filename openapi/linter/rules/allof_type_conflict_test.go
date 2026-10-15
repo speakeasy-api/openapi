@@ -127,6 +127,19 @@ func TestAllOfTypeConflictRule_Conflict(t *testing.T) {
       type: object
 `,
 		},
+		{
+			name: "referenced composition is reported once at its target", version: "3.1.0", line: 14,
+			schemas: `    Holder:
+      type: object
+      properties:
+        example:
+          $ref: '#/components/schemas/Example'
+    Example:
+      allOf:
+        - type: object
+        - type: string
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -412,19 +425,7 @@ func TestAllOfTypeConflictRule_CompatibleOrUnknown(t *testing.T) {
           nullable: [true]
 `,
 		},
-		{
-			name: "reference to a compatible composition is checked at its target", version: "3.1.0",
-			schemas: `    Holder:
-      type: object
-      properties:
-        example:
-          $ref: '#/components/schemas/Example'
-    Example:
-      allOf:
-        - type: object
-        - type: object
-`,
-		},
+
 		{
 			name: "custom schema dialect is not interpreted", version: "3.1.0",
 			schemas: `    Example:
