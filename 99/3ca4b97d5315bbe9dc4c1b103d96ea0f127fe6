@@ -1,0 +1,34 @@
+openapi/index_path_items_internal_test.go
+  h_9630b74bdac540 1-36
+openapi/linter/rules/allof_type_conflict_test.go
+  h_9630b74bdac540 391-425,463-505
+  s_0e156b50b526ff::t_10b767ca15600d 388-390
+openapi/linter/rules/oas3_nullable_without_type_test.go
+  h_9630b74bdac540 7,78-87,133-155
+  s_0e156b50b526ff::t_785abba13b71e8 77
+openapi/index_sources_test.go
+  h_9630b74bdac540 80-134
+openapi/linter/diagnostics_internal_test.go
+  h_9630b74bdac540 1-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "993ca4b97d5315bbe9dc4c1b103d96ea0f127fe6",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  },
+  "sessions": {
+    "s_0e156b50b526ff": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd35c87b-85a5-4fbc-a156-8cd950ea818b",
+        "model": "unknown"
+      },
+      "human_author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
