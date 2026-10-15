@@ -1,0 +1,14 @@
+marshaller/populator_internal_test.go
+  h_9630b74bdac540 1-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "38a1731f3132e464b95e2afebc56ca9d71207f40",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
