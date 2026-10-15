@@ -152,12 +152,8 @@ func (l *Linter) Lint(ctx context.Context, docInfo *baseLinter.DocumentInfo[*ope
 		// Create a new DocumentInfo with the index
 		docInfo = baseLinter.NewDocumentInfoWithIndex(docInfo.Document, docInfo.Location, idx)
 
-		if idx.HasErrors() {
-			preExistingErrors = append(preExistingErrors, idx.GetValidationErrors()...)
-			preExistingErrors = append(preExistingErrors, idx.GetResolutionErrors()...)
-			preExistingErrors = append(preExistingErrors, idx.GetCircularReferenceErrors()...)
-		}
 	}
+	preExistingErrors = appendIndexDiagnostics(preExistingErrors, docInfo.Index)
 
 	// Filter rules based on OpenAPI version
 	if opts == nil {
@@ -168,7 +164,12 @@ func (l *Linter) Lint(ctx context.Context, docInfo *baseLinter.DocumentInfo[*ope
 		opts.VersionFilter = &version
 	}
 
-	return l.base.Lint(ctx, docInfo, preExistingErrors, opts)
+	output, err := l.base.Lint(ctx, docInfo, preExistingErrors, opts)
+	if err != nil {
+		return nil, err
+	}
+	attributeExternalDiagnostics(output, docInfo)
+	return output, nil
 }
 
 func registerDefaultRules(registry *baseLinter.Registry[*openapi.OpenAPI]) {
@@ -233,8 +234,10 @@ func registerDefaultRules(registry *baseLinter.Registry[*openapi.OpenAPI]) {
 	registry.Register(&rules.OwaspNoAdditionalPropertiesRule{})
 	registry.Register(&rules.OwaspAdditionalPropertiesConstrainedRule{})
 	registry.Register(&rules.OAS3NoNullableRule{})
+	registry.Register(&rules.OAS3NullableWithoutTypeRule{})
 	registry.Register(&rules.OAS3ExampleMissingRule{})
 	registry.Register(&rules.OASSchemaCheckRule{})
+	registry.Register(&rules.AllOfTypeConflictRule{})
 
 	// Register rulesets
 	registerRulesets(registry)
@@ -246,6 +249,8 @@ func registerRulesets(registry *baseLinter.Registry[*openapi.OpenAPI]) {
 	// Includes semantic rules, essential style rules, and basic security rules
 	_ = registry.RegisterRuleset("recommended", []string{
 		// Semantic rules (catch real bugs)
+		rules.RuleOAS3NullableWithoutType,
+		rules.RuleSemanticAllOfTypeConflict,
 		rules.RuleSemanticPathParams,
 		rules.RuleSemanticPathDeclarations,
 		rules.RuleSemanticPathQuery,

@@ -513,6 +513,245 @@ paths:
 	}, documentErrors)
 }
 
+func TestOpenAPILinter_ReferencedPathParams_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		paths    string
+		files    map[string]string
+		messages []string
+		lines    []int
+	}{
+		{
+			name: "external path item missing parameter",
+			paths: `  /users/{id}:
+    $ref: './path.yaml'
+`,
+			files: map[string]string{
+				"/spec/path.yaml": "get:\n  responses:\n    '200':\n      description: ok\n",
+			},
+			messages: []string{"path parameter `{id}` is not defined in operation parameters for `GET /users/{id}`"},
+			lines:    []int{7},
+		},
+		{
+			name: "shared target retains both mounts",
+			paths: `  /users/{id}:
+    $ref: './path.yaml'
+  /teams/{teamId}:
+    $ref: './path.yaml'
+`,
+			files: map[string]string{
+				"/spec/path.yaml": "get:\n  responses:\n    '200':\n      description: ok\n",
+			},
+			messages: []string{
+				"path parameter `{id}` is not defined in operation parameters for `GET /users/{id}`",
+				"path parameter `{teamId}` is not defined in operation parameters for `GET /teams/{teamId}`",
+			},
+			lines: []int{7, 9},
+		},
+		{
+			name: "relative reference chain retains root mount attribution",
+			paths: `  /users/{id}:
+    $ref: './nested/alias.yaml'
+`,
+			files: map[string]string{
+				"/spec/nested/alias.yaml": "$ref: '../path.yaml'\n",
+				"/spec/path.yaml":         "get:\n  responses:\n    '200':\n      description: ok\n",
+			},
+			messages: []string{"path parameter `{id}` is not defined in operation parameters for `GET /users/{id}`"},
+			lines:    []int{7},
+		},
+		{
+			name: "unused referenced path parameter across operations",
+			paths: `  /users:
+    $ref: './path.yaml'
+`,
+			files: map[string]string{
+				"/spec/path.yaml": `parameters:
+  - name: id
+    in: path
+    required: true
+    schema:
+      type: string
+get:
+  responses:
+    '200':
+      description: ok
+post:
+  responses:
+    '201':
+      description: created
+`,
+			},
+			messages: []string{
+				"parameter `id` is declared as path parameter but not used in path template `/users` for `GET`",
+				"parameter `id` is declared as path parameter but not used in path template `/users` for `POST`",
+			},
+			lines: []int{7, 7},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+			yamlInput := "openapi: 3.0.3\ninfo:\n  title: Test API\n  version: 1.0.0\npaths:\n" + tt.paths
+			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(yamlInput))
+			require.NoError(t, err, "unmarshal should succeed")
+			fs := newMockVirtualFS()
+			for path, content := range tt.files {
+				fs.addFile(path, content)
+			}
+			lntr, err := openapiLinter.NewLinter(&linter.Config{
+				Rules: []linter.RuleEntry{{ID: rules.RuleSemanticPathParams}},
+			})
+			require.NoError(t, err, "linter should initialise")
+			output, err := lntr.Lint(ctx, linter.NewDocumentInfo(doc, "/spec/openapi.yaml"), nil, &linter.LintOptions{
+				ResolveOptions: &references.ResolveOptions{VirtualFS: fs},
+			})
+			require.NoError(t, err, "linting should succeed")
+			require.Len(t, output.Results, len(tt.messages), "each affected mount should produce a finding")
+			assert.True(t, output.HasErrors(), "referenced path-parameter defects should fail linting")
+			for i, err := range output.Results {
+				var finding *validation.Error
+				require.ErrorAs(t, err, &finding, "finding should retain validation metadata")
+				assert.Equal(t, rules.RuleSemanticPathParams, finding.Rule, "finding should come from the path-parameter rule")
+				assert.Equal(t, tt.messages[i], finding.UnderlyingError.Error(), "finding should identify its path mount")
+				assert.Equal(t, tt.lines[i], finding.GetLineNumber(), "finding should point to the reference site, not external coordinates")
+				assert.Empty(t, finding.DocumentLocation, "reference site belongs to the main document")
+				assert.Nil(t, finding.Fix, "referenced targets should not offer unsafe main-file fixes")
+			}
+		})
+	}
+}
+
+func TestOpenAPILinter_ReferencedPathParams_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		files map[string]string
+	}{
+		{
+			name: "inherited referenced parameter and operation override",
+			files: map[string]string{
+				"/spec/path.yaml": `parameters:
+  - $ref: './params/id.yaml'
+get:
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+  responses:
+    '200':
+      description: ok
+post:
+  responses:
+    '201':
+      description: created
+`,
+				"/spec/params/id.yaml": "name: id\nin: path\nrequired: true\nschema:\n  type: string\n",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(`openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users/{id}:
+    $ref: './path.yaml'
+`))
+			require.NoError(t, err, "unmarshal should succeed")
+			fs := newMockVirtualFS()
+			for path, content := range tt.files {
+				fs.addFile(path, content)
+			}
+			lntr, err := openapiLinter.NewLinter(&linter.Config{
+				Rules: []linter.RuleEntry{{ID: rules.RuleSemanticPathParams}},
+			})
+			require.NoError(t, err, "linter should initialise")
+			output, err := lntr.Lint(ctx, linter.NewDocumentInfo(doc, "/spec/openapi.yaml"), nil, &linter.LintOptions{
+				ResolveOptions: &references.ResolveOptions{VirtualFS: fs},
+			})
+			require.NoError(t, err, "linting should succeed")
+			assert.Empty(t, output.Results, "resolved path and operation parameters should satisfy the template")
+		})
+	}
+}
+
+func TestOpenAPILinter_NullableWithoutType_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		version  string
+		entry    linter.RuleEntry
+		warnings int
+		errors   int
+	}{
+		{
+			name:     "OpenAPI 3.0 warning",
+			version:  "3.0.3",
+			entry:    linter.RuleEntry{ID: rules.RuleOAS3NullableWithoutType},
+			warnings: 1,
+		},
+		{
+			name:    "OpenAPI 3.1 does not use the 3.0 rule",
+			version: "3.1.0",
+			entry:   linter.RuleEntry{ID: rules.RuleOAS3NullableWithoutType},
+		},
+		{
+			name:    "OpenAPI 3.2 does not use the 3.0 rule",
+			version: "3.2.0",
+			entry:   linter.RuleEntry{ID: rules.RuleOAS3NullableWithoutType},
+		},
+		{
+			name:    "severity override",
+			version: "3.0.3",
+			entry:   linter.RuleEntry{ID: rules.RuleOAS3NullableWithoutType, Severity: pointer.From(validation.SeverityError)},
+			errors:  1,
+		},
+		{
+			name:    "disabled rule",
+			version: "3.0.3",
+			entry:   linter.RuleEntry{ID: rules.RuleOAS3NullableWithoutType, Disabled: pointer.From(true)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader("openapi: "+tt.version+`
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Nullable:
+      nullable: true
+`))
+			require.NoError(t, err, "unmarshal should succeed")
+			lntr, err := openapiLinter.NewLinter(&linter.Config{Rules: []linter.RuleEntry{tt.entry}})
+			require.NoError(t, err, "linter should initialise")
+			output, err := lntr.Lint(ctx, linter.NewDocumentInfo(doc, "/spec/openapi.yaml"), nil, nil)
+			require.NoError(t, err, "linting should succeed")
+			assert.Len(t, output.Results, tt.warnings+tt.errors, "version and configuration should control findings")
+			assert.Equal(t, tt.errors, output.ErrorCount(), "severity overrides should control CI failures")
+		})
+	}
+}
+
 func TestLinter_FilterErrors(t *testing.T) {
 	t.Parallel()
 
@@ -754,6 +993,8 @@ func TestNewLinter_Rulesets(t *testing.T) {
 
 		// Verify key rules are included
 		assert.Contains(t, ruleIDs, rules.RuleSemanticPathParams, "should include path-params rule")
+		assert.Contains(t, ruleIDs, rules.RuleOAS3NullableWithoutType, "should include ineffective nullability check")
+		assert.Contains(t, ruleIDs, rules.RuleSemanticAllOfTypeConflict, "should include explicit allOf type-conflict check")
 		assert.Contains(t, ruleIDs, rules.RuleSemanticOperationOperationId, "should include operation-id rule")
 		assert.Contains(t, ruleIDs, rules.RuleOwaspNoCredentialsInURL, "should include basic security rules")
 	})
