@@ -50,6 +50,14 @@ func main() {
 }
 ```
 
+## Referenced documents and diagnostics
+
+Linting follows supported references without requiring a bundling step. External findings retain the source file or URL in `validation.Error.DocumentLocation` and the original line/column on the error's YAML node; JSON output includes a `document` field. Source lookup uses parsed documents already cached by resolution and does not perform additional file or network reads.
+
+A shared external defect is not reported repeatedly just because several references reach it. Mounted operations remain distinct for path checks and operation-ID uniqueness. Reference-site annotations are checked at their own source, and recursive Path Item/callback graphs are bounded during indexing.
+
+External findings do not offer fixes that the single-document fix engine cannot persist. Main-document fixes remain available. When passing a prebuilt index, its validation, resolution and circular-reference diagnostics are included automatically; forwarding the same error objects yourself does not duplicate them. Treat the index and its parsed source documents as immutable after construction.
+
 ## Available Rules
 
 <!-- START LINT RULES -->
@@ -59,6 +67,7 @@ func main() {
 | <a name="oas-schema-check"></a>`oas-schema-check` | error | Schemas must use type-appropriate constraints and have valid constraint values. For example, `string` types should use `minLength`/`maxLength`/`pattern`, numbers should use `minimum`/`maximum`/`multipleOf`, and constraint values must be logically valid (e.g., `maxLength` >= `minLength`). |
 | <a name="oas3-example-missing"></a>`oas3-example-missing` | hint | Schemas, parameters, headers, and media types should include example values to illustrate expected data formats. Examples improve documentation quality, help developers understand how to use the API correctly, and enable better testing and validation. |
 | <a name="oas3-no-nullable"></a>`oas3-no-nullable` | warning | The `nullable` keyword is not supported in OpenAPI 3.1+ and should be replaced with a type array that includes null (e.g., `type: [string, null]`). This change aligns OpenAPI 3.1 with JSON Schema Draft 2020-12, which uses type arrays to express nullable values. |
+| <a name="oas3-nullable-without-type"></a>`oas3-nullable-without-type` | warning | In OpenAPI 3.0, `nullable: true` has no effect unless the same Schema Object declares a `type`. |
 | <a name="owasp-additional-properties-constrained"></a>`owasp-additional-properties-constrained` | hint | Schemas with additionalProperties set to true or a schema should define maxProperties to limit object size. Without size limits, APIs are vulnerable to resource exhaustion attacks where clients send excessively large objects. |
 | <a name="owasp-array-limit"></a>`owasp-array-limit` | error | Array schemas must specify `maxItems` to prevent resource exhaustion attacks. Without array size limits, malicious clients could send extremely large arrays that consume excessive memory or processing time. |
 | <a name="owasp-auth-insecure-schemes"></a>`owasp-auth-insecure-schemes` | error | Authentication schemes using outdated or insecure methods must be avoided or upgraded. Insecure authentication schemes like API keys in query parameters or `HTTP Basic` over `HTTP` expose credentials and create security vulnerabilities. |
@@ -82,6 +91,7 @@ func main() {
 | <a name="owasp-security-hosts-https-oas3"></a>`owasp-security-hosts-https-oas3` | error | Server URLs must begin with https:// as the only permitted protocol. Using HTTPS is essential for protecting API traffic from interception, tampering, and eavesdropping attacks. |
 | <a name="owasp-string-limit"></a>`owasp-string-limit` | error | String schemas must specify maxLength, const, or enum to prevent unbounded data. Without string length limits, APIs are vulnerable to resource exhaustion from extremely long inputs. |
 | <a name="owasp-string-restricted"></a>`owasp-string-restricted` | error | String schemas must specify `format`, `const`, `enum`, or `pattern` to restrict content. String restrictions prevent injection attacks and ensure data conforms to expected formats. |
+| <a name="semantic-allof-type-conflict"></a>`semantic-allof-type-conflict` | warning | Explicit type constraints on a schema and its immediate allOf branches must have a non-empty intersection. A conflict means no value can satisfy those constraints, not that the OpenAPI document is structurally invalid. |
 | <a name="semantic-duplicated-enum"></a>`semantic-duplicated-enum` | warning | Enum arrays should not contain duplicate values. Duplicate enum values are redundant and can cause confusion or unexpected behavior in client code generation and validation. |
 | <a name="semantic-link-operation"></a>`semantic-link-operation` | error | Link operationId must reference an existing operation in the API specification. This ensures that links point to valid operations, including those defined in external documents that are referenced in the specification. |
 | <a name="semantic-no-ambiguous-paths"></a>`semantic-no-ambiguous-paths` | error | Path definitions must be unambiguous and distinguishable from each other to ensure correct request routing. Ambiguous paths like `/users/{id}` and `/users/{name}` can cause runtime routing conflicts since both match the same URL pattern. |

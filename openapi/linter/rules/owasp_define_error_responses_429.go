@@ -56,7 +56,7 @@ func (r *OwaspDefineErrorResponses429Rule) Run(ctx context.Context, docInfo *lin
 		path := ""
 		for _, loc := range opNode.Location {
 			switch openapi.GetParentType(loc) {
-			case "Paths":
+			case "Paths", "Callback":
 				if loc.ParentKey != nil {
 					path = *loc.ParentKey
 				}

@@ -182,6 +182,7 @@ func ExtractMethodAndPath(locations Locations) (string, string) {
 // Returns one of the following strings based on the parent type:
 // - "Paths" for *openapi.Paths
 // - "PathItem" for *openapi.ReferencedPathItem
+// - "Callback" for *openapi.ReferencedCallback (keys are runtime expressions)
 // - "OpenAPI" for *openapi.OpenAPI
 // - "Unknown" for any other type
 //
@@ -197,6 +198,8 @@ func GetParentType(location LocationContext) string {
 				parentType = "Paths"
 			case *ReferencedPathItem:
 				parentType = "PathItem"
+			case *ReferencedCallback:
+				parentType = "Callback"
 			case *OpenAPI:
 				parentType = "OpenAPI"
 			default:

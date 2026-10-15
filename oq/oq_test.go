@@ -1421,8 +1421,8 @@ func TestFormatGCF_Success(t *testing.T) {
 
 	out := oq.FormatGCF(result, g)
 	assert.Contains(t, out, "GCF profile=generic", "gcf should have profile header")
-	assert.Contains(t, out, "{name,type}", "gcf should declare field names")
-	assert.Contains(t, out, "object", "gcf should include object type value")
+	// GCF v3.6 factors columns with a constant value into the header as name=value.
+	assert.Contains(t, out, "## [3]{name,type=object}", "gcf should declare field names with the constant type factored into the header")
 }
 
 func TestFormatGCF_Count_Success(t *testing.T) {

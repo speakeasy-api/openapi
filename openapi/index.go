@@ -174,6 +174,11 @@ type Index struct {
 	// nil when the feature is disabled.
 	NodeToOperations map[*yaml.Node][]*IndexNode[*Operation]
 
+	// Source locations are derived lazily from already-cached external YAML.
+	// Indexes without diagnostic lookups do not pay for this mapping.
+	documentLocationsOnce sync.Once
+	documentLocations     map[*yaml.Node]string
+
 	// Cached merged slices (lazily computed via sync.Once for concurrent rule access)
 	allSchemasOnce       sync.Once
 	allSchemas           []*IndexNode[*oas3.JSONSchemaReferenceable]
@@ -224,6 +229,17 @@ type Index struct {
 	buildNodeOperationMap  bool                                       // Whether to build the node-to-operation map
 	currentOperation       *IndexNode[*Operation]                     // Current operation being walked (for node-to-operation mapping)
 	operationLocationDepth int                                        // Location depth when we entered the current operation
+
+	operationLocationPrefix Locations
+	activePathItemTargets   map[pathItemTargetKey]bool
+	activeCallbackTargets   map[callbackTargetKey]bool
+	referencedOperations    map[*IndexNode[*Operation]]bool
+
+	// resolvedSchemaValidation memoizes Validate results for resolved $ref targets.
+	// Resolution returns the same cached target object for every $ref to it, and
+	// validating that target depends only on the target itself, so each target is
+	// validated once and its errors are replayed (as fresh copies) for later refs.
+	resolvedSchemaValidation map[*oas3.JSONSchema[oas3.Concrete]][]error
 }
 
 // IndexNode wraps a node with its location in the document.
@@ -265,30 +281,29 @@ func IsWebhookLocation(loc Locations) bool {
 
 // ExtractOperationInfo extracts path/webhook name, method, and whether it's a webhook
 // from a location. Works for any location within an operation's subtree.
+//
+// For a callback operation, path is the callback's runtime expression and
+// method is the callback operation's own method, not the enclosing operation's.
 func ExtractOperationInfo(loc Locations) (path, method string, isWebhook bool) {
 	for i := len(loc) - 1; i >= 0; i-- {
 		l := loc[i]
-		parentType := GetParentType(l)
+		key := pointer.Value(l.ParentKey)
 
-		switch parentType {
-		case "Paths":
-			if l.ParentKey != nil {
-				path = *l.ParentKey
+		switch GetParentType(l) {
+		case "PathItem":
+			// The innermost Path Item owns the operation.
+			if method == "" {
+				method = key
 			}
-		case "PathItem", "ReferencedPathItem":
-			if l.ParentKey != nil {
-				method = *l.ParentKey
-			}
+		case "Paths", "Callback":
+			return key, method, false
 		}
 
 		if l.ParentField == "webhooks" {
-			isWebhook = true
-			if l.ParentKey != nil {
-				path = *l.ParentKey
-			}
+			return key, method, true
 		}
 	}
-	return
+	return path, method, isWebhook
 }
 
 // BuildIndex creates a new Index by walking the entire OpenAPI document.
@@ -331,6 +346,8 @@ func BuildIndex(ctx context.Context, doc *OpenAPI, resolveOpts references.Resolv
 		reportedUnknownProps:  make(map[marshaller.CoreModeler]map[string]bool),
 		currentDocumentStack:  []string{resolveOpts.TargetLocation}, // Start with main document
 		buildNodeOperationMap: options.BuildNodeOperationMap,
+
+		resolvedSchemaValidation: make(map[*oas3.JSONSchema[oas3.Concrete]][]error),
 	}
 
 	// Initialize the node-to-operation map if enabled
@@ -344,6 +361,8 @@ func BuildIndex(ctx context.Context, doc *OpenAPI, resolveOpts references.Resolv
 
 	// Phase 2: Post-process polymorphic circular refs
 	idx.finalizePolymorphicCirculars()
+	idx.validateReferencedOperationIDs()
+	idx.attributeSourceDiagnostics()
 
 	return idx
 }
@@ -872,8 +891,7 @@ func (i *Index) indexSchema(ctx context.Context, loc Locations, schema *oas3.JSO
 		}
 		i.validationErrs = append(i.validationErrs, i.applyDocumentLocation(vErrs, i.documentPathForSchema(schema))...)
 		if resolved := schema.GetResolvedSchema(); resolved != nil && i.Doc != nil {
-			opts := i.referenceValidationOptions()
-			schemaErrs := resolved.Validate(ctx, opts...)
+			schemaErrs := i.validateResolvedSchema(ctx, resolved)
 			i.validationErrs = append(i.validationErrs, i.applyDocumentLocation(schemaErrs, i.documentPathForSchema(schema))...)
 		}
 	}
@@ -1269,9 +1287,7 @@ func (i *Index) indexReferencedPathItem(ctx context.Context, loc Locations, path
 		// If resolved, explicitly walk the resolved content (similar to how schemas are handled)
 		resolved := pathItem.GetObject()
 		if resolved != nil {
-			// Wrap the resolved PathItem back into a ReferencedPathItem for walking
-			wrapped := &ReferencedPathItem{Object: resolved}
-			_ = buildIndex(ctx, i, wrapped)
+			i.walkReferencedPathItem(ctx, loc, resolved)
 		}
 		return
 	}
@@ -1320,11 +1336,22 @@ func (i *Index) indexOperation(_ context.Context, loc Locations, operation *Oper
 		return
 	}
 
+	// Always copy: the walker reuses location backing arrays, so a retained
+	// slice can be overwritten by later siblings (for example nested callbacks).
+	operationLocation := make(Locations, 0, len(i.operationLocationPrefix)+len(loc))
+	operationLocation = append(operationLocation, i.operationLocationPrefix...)
+	operationLocation = append(operationLocation, loc...)
 	indexNode := &IndexNode[*Operation]{
 		Node:     operation,
-		Location: loc,
+		Location: operationLocation,
 	}
 	i.Operations = append(i.Operations, indexNode)
+	if len(i.operationLocationPrefix) > 0 {
+		if i.referencedOperations == nil {
+			i.referencedOperations = make(map[*IndexNode[*Operation]]bool)
+		}
+		i.referencedOperations[indexNode] = true
+	}
 
 	// Track current operation for node-to-operation mapping
 	if i.buildNodeOperationMap {
@@ -1921,8 +1948,7 @@ func (i *Index) indexReferencedCallback(ctx context.Context, loc Locations, call
 		// If resolved, explicitly walk the resolved content
 		resolved := callback.GetObject()
 		if resolved != nil {
-			wrapped := &ReferencedCallback{Object: resolved}
-			_ = buildIndex(ctx, i, wrapped)
+			i.walkReferencedCallback(ctx, loc, resolved)
 		}
 		return
 	}
@@ -2146,6 +2172,46 @@ func (i *Index) applyDocumentLocation(errs []error, documentPath string) []error
 	}
 
 	return updated
+}
+
+// validateResolvedSchema validates a resolved $ref target, reusing the result
+// from an earlier reference to the same target. Every call returns errors that
+// are distinct from any previously returned, matching uncached behaviour where
+// each reference produced freshly constructed errors.
+func (i *Index) validateResolvedSchema(ctx context.Context, resolved *oas3.JSONSchema[oas3.Concrete]) []error {
+	if cached, ok := i.resolvedSchemaValidation[resolved]; ok {
+		errs, _ := cloneValidationErrors(cached)
+		return errs
+	}
+
+	errs := resolved.Validate(ctx, i.referenceValidationOptions()...)
+
+	// Only memoize results we can copy faithfully; otherwise validate again next time.
+	if pristine, ok := cloneValidationErrors(errs); ok {
+		i.resolvedSchemaValidation[resolved] = pristine
+	}
+
+	return errs
+}
+
+// cloneValidationErrors returns shallow copies of errs. It reports false if any
+// error is not a *validation.Error, since those cannot be copied safely.
+func cloneValidationErrors(errs []error) ([]error, bool) {
+	if len(errs) == 0 {
+		return nil, true
+	}
+
+	cloned := make([]error, len(errs))
+	for idx, err := range errs {
+		vErr, ok := err.(*validation.Error) //nolint:errorlint // exact type required to copy the error
+		if !ok || vErr == nil {
+			return nil, false
+		}
+		c := *vErr
+		cloned[idx] = &c
+	}
+
+	return cloned, true
 }
 
 func (i *Index) referenceValidationOptions() []validation.Option {

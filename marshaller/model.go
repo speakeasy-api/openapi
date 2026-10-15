@@ -1,6 +1,7 @@
 package marshaller
 
 import (
+	"iter"
 	"reflect"
 	"sync"
 
@@ -209,6 +210,20 @@ func (m *Model[T]) GetCachedExternalDocument(key string) (any, bool) {
 		return nil, false
 	}
 	return m.externalDocumentCache.Load(key)
+}
+
+// CachedExternalDocuments iterates the parsed documents already retained by
+// reference resolution. It does not load documents or initialise the cache.
+// Iteration order is unspecified, as with sync.Map.Range.
+func (m *Model[T]) CachedExternalDocuments() iter.Seq2[string, any] {
+	return func(yield func(string, any) bool) {
+		if m == nil || m.externalDocumentCache == nil {
+			return
+		}
+		m.externalDocumentCache.Range(func(key, value any) bool {
+			return yield(key.(string), value)
+		})
+	}
 }
 
 func (m *Model[T]) StoreExternalDocumentInCache(key string, doc any) {

@@ -129,7 +129,7 @@ The CLI provides four main command groups:
   - `explore` - Interactively explore an OpenAPI specification in the terminal
   - `inline` - Inline all references in an OpenAPI specification
   - `join` - Join multiple OpenAPI documents into a single document
-  - `lint` - Lint an OpenAPI specification for style, security, and best practices
+  - `lint` - Lint an OpenAPI specification for semantic issues, style, security, and best practices, including referenced endpoints
   - `localize` - Localize an OpenAPI specification by copying external references to a target directory
   - `optimize` - Optimize an OpenAPI specification by deduplicating inline schemas
   - `sanitize` - Remove unwanted elements from an OpenAPI specification
@@ -157,8 +157,14 @@ The CLI provides four main command groups:
 # Validate an OpenAPI specification
 openapi spec validate ./spec.yaml
 
-# Lint for style, security, and best practices
+# Lint for semantic issues, style, security, and best practices
 openapi spec lint ./spec.yaml
+
+# Lint a multi-file specification directly, without bundling first
+openapi spec lint ./split/openapi.yaml
+
+# Include external findings' source files and coordinates in JSON output
+openapi spec lint --format json ./split/openapi.yaml
 
 # Lint with custom configuration
 openapi spec lint --config lint.yaml ./spec.yaml

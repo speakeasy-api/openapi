@@ -43,6 +43,7 @@ func (r *DescriptionDuplicationRule) Run(ctx context.Context, docInfo *linter.Do
 	}
 
 	var errs []error
+	seenSummaries := make(map[*yaml.Node]bool)
 
 	// Use the index to check all nodes that have both description and summary
 	for _, node := range docInfo.Index.DescriptionAndSummaryNodes {
@@ -64,9 +65,18 @@ func (r *DescriptionDuplicationRule) Run(ctx context.Context, docInfo *linter.Do
 			}
 
 			if nodeWithRoot, ok := node.Node.(nodeWithRootNode); ok {
-				if rootNode := nodeWithRoot.GetRootNode(); rootNode != nil {
+				rootNode := nodeWithRoot.GetRootNode()
+				// Reference annotations belong to the reference site's core, not
+				// the resolved target returned by Reference.GetRootNode.
+				if accessor, ok := node.Node.(interface{ GetCoreAny() any }); ok {
+					if core, ok := accessor.GetCoreAny().(nodeWithRootNode); ok && core.GetRootNode() != nil {
+						rootNode = core.GetRootNode()
+					}
+				}
+				if rootNode != nil {
 					_, summaryValueNode, found := yml.GetMapElementNodes(ctx, rootNode, "summary")
-					if found && summaryValueNode != nil {
+					if found && summaryValueNode != nil && !seenSummaries[summaryValueNode] {
+						seenSummaries[summaryValueNode] = true
 						errs = append(errs, validation.NewValidationError(
 							config.GetSeverity(r.DefaultSeverity()),
 							RuleStyleDescriptionDuplication,

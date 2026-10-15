@@ -82,8 +82,10 @@ func allRules() []linter.RuleRunner[*openapi.OpenAPI] {
 		&rules.OwaspNoAdditionalPropertiesRule{},
 		&rules.OwaspAdditionalPropertiesConstrainedRule{},
 		&rules.OAS3NoNullableRule{},
+		&rules.OAS3NullableWithoutTypeRule{},
 		&rules.OAS3ExampleMissingRule{},
 		&rules.OASSchemaCheckRule{},
+		&rules.AllOfTypeConflictRule{},
 	}
 }
 

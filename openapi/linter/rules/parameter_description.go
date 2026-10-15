@@ -73,7 +73,7 @@ func (r *OAS3ParameterDescriptionRule) Run(ctx context.Context, docInfo *linter.
 			var method, path string
 			for _, loc := range paramNode.Location {
 				switch openapi.GetParentType(loc) {
-				case "Paths":
+				case "Paths", "Callback":
 					if loc.ParentKey != nil {
 						path = *loc.ParentKey
 					}

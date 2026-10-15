@@ -805,6 +805,58 @@ components:
 	assert.Len(t, allCallbacks, totalExpected, "GetAllCallbacks should return all callback types")
 }
 
+func TestBuildIndex_RepeatedSchemaRefValidation_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	// Each $ref to an invalid component reports the target's validation errors,
+	// even though the target is validated once and the result reused.
+	buildYAML := func(refCount int) string {
+		var props strings.Builder
+		for i := range refCount {
+			props.WriteString("        field" + string(rune('a'+i)) + ":\n          $ref: '#/components/schemas/Invalid'\n")
+		}
+		return `
+openapi: "3.1.0"
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Holder:
+      type: object
+      properties:
+` + props.String() + `    Invalid:
+      type: string
+      minLength: -1
+`
+	}
+
+	buildIndex := func(refCount int) *openapi.Index {
+		doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(buildYAML(refCount)))
+		require.NoError(t, err, "unmarshal should succeed")
+		return openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+			RootDocument:   doc,
+			TargetDocument: doc,
+			TargetLocation: "test.yaml",
+		})
+	}
+
+	single := buildIndex(1).GetValidationErrors()
+	require.NotEmpty(t, single, "invalid ref target should produce validation errors")
+
+	repeated := buildIndex(3).GetValidationErrors()
+	require.Len(t, repeated, 3*len(single), "each reference should report the target's validation errors")
+
+	for i, err := range repeated {
+		assert.Equal(t, repeated[i%len(single)].Error(), err.Error(), "replayed error should match the first reference's error")
+		for _, other := range repeated[i+1:] {
+			assert.NotSame(t, err, other, "each reported error should be a distinct instance")
+		}
+	}
+}
+
 func TestBuildIndex_NilIndex_Methods_Success(t *testing.T) {
 	t.Parallel()
 
