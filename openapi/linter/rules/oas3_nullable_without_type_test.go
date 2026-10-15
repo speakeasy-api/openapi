@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/openapi/linter/rules"
 	"github.com/speakeasy-api/openapi/validation"
@@ -74,6 +75,17 @@ func TestOAS3NullableWithoutTypeRule(t *testing.T) {
 			expectedCount: 2,
 		},
 		{
+			name:    "boolean schemas are skipped",
+			version: "3.0.3",
+			schemas: `components:
+  schemas:
+    Open:
+      type: object
+      additionalProperties: true
+`,
+			expectedCount: 0,
+		},
+		{
 			name:    "OpenAPI 3.1 is outside this rule version",
 			version: "3.1.0",
 			schemas: `components:
@@ -118,4 +130,27 @@ func TestOAS3NullableWithoutTypeRule_Metadata(t *testing.T) {
 	assert.Equal(t, rules.CategorySchemas, rule.Category())
 	assert.Equal(t, validation.SeverityWarning, rule.DefaultSeverity())
 	assert.Equal(t, []string{"3.0"}, rule.Versions())
+	assert.NotEmpty(t, rule.Description(), "rule should have a description")
+	assert.NotEmpty(t, rule.Summary(), "rule should have a summary")
+	assert.NotEmpty(t, rule.HowToFix(), "rule should explain how to fix findings")
+	assert.Contains(t, rule.Link(), "#oas3-nullable-without-type", "rule should link to its documentation")
+}
+
+func TestOAS3NullableWithoutTypeRule_MissingDocumentOrIndex(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		docInfo *linter.DocumentInfo[*openapi.OpenAPI]
+	}{
+		{name: "nil document info"},
+		{name: "nil document", docInfo: &linter.DocumentInfo[*openapi.OpenAPI]{}},
+		{name: "nil index", docInfo: &linter.DocumentInfo[*openapi.OpenAPI]{Document: &openapi.OpenAPI{}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Empty(t, (&rules.OAS3NullableWithoutTypeRule{}).Run(t.Context(), tt.docInfo, nil), "missing input should be skipped safely")
+		})
+	}
 }

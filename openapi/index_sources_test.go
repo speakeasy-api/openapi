@@ -77,6 +77,61 @@ components:
 	assert.Equal(t, "/spec/schema.yaml", idx.GetDocumentLocation(node), "provenance must use the actual resolution cache, not assume the indexed document owns it")
 }
 
+// opaqueResolutionTarget exposes only the references.ResolutionTarget methods,
+// hiding CachedExternalDocuments from the wrapped document.
+type opaqueResolutionTarget struct {
+	references.ResolutionTarget
+}
+
+func TestIndex_GetDocumentLocation_CacheOwnerWithoutEnumeration(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    External:
+      $ref: './schema.yaml'
+`))
+	require.NoError(t, err, "main document should parse")
+	fs := NewMockVirtualFS()
+	fs.AddFile("/spec/schema.yaml", "type: string\n")
+	idx := openapi.BuildIndex(ctx, doc, references.ResolveOptions{
+		RootDocument: opaqueResolutionTarget{ResolutionTarget: &openapi.OpenAPI{}}, TargetDocument: doc, TargetLocation: "/spec/main.yaml", VirtualFS: fs,
+	})
+	require.False(t, idx.HasErrors(), "external schema should resolve through the opaque cache owner")
+	require.Len(t, idx.ExternalSchemas, 1, "external schema should be indexed")
+	node := idx.ExternalSchemas[0].Node.GetSchema().GetCore().Type.ValueNode
+	assert.Empty(t, idx.GetDocumentLocation(node), "a cache owner that cannot enumerate documents should fall back to no source attribution")
+}
+
+func TestIndex_NewDocumentLocationLookup_Success(t *testing.T) {
+	t.Parallel()
+	doc := &openapi.OpenAPI{}
+	doc.InitCache()
+	node := &yaml.Node{Kind: yaml.ScalarNode, Value: "external"}
+	idx := &openapi.Index{Doc: doc}
+
+	// Resolve the shared index's lookup before the document is cached.
+	assert.Empty(t, idx.GetDocumentLocation(node), "node is not cached yet")
+	doc.StoreExternalDocumentInCache("/spec/late.yaml", node)
+
+	lookup := idx.NewDocumentLocationLookup()
+	assert.Equal(t, "/spec/late.yaml", lookup(node), "a new lookup should see documents cached after the index's first lookup")
+	assert.Empty(t, idx.GetDocumentLocation(node), "the index's own lookup snapshot should not change")
+}
+
+func TestIndex_NewDocumentLocationLookup_NilIndex(t *testing.T) {
+	t.Parallel()
+	var idx *openapi.Index
+	lookup := idx.NewDocumentLocationLookup()
+	require.NotNil(t, lookup, "nil index should still return a usable lookup")
+	assert.Empty(t, lookup(&yaml.Node{}), "nil index lookup should return no source")
+}
+
 func TestIndex_SourceDiagnostics_ReferenceChain(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()

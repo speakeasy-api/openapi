@@ -388,6 +388,44 @@ func TestAllOfTypeConflictRule_CompatibleOrUnknown(t *testing.T) {
 `,
 		},
 		{
+			name: "non-scalar type value skips the composition", version: "3.1.0",
+			schemas: `    Example:
+      allOf:
+        - type: object
+        - type: {kind: string}
+`,
+		},
+		{
+			name: "non-string type union member skips the composition", version: "3.1.0",
+			schemas: `    Example:
+      allOf:
+        - type: object
+        - type: [string, 5]
+`,
+		},
+		{
+			name: "non-boolean nullable skips the composition in OpenAPI 3.0", version: "3.0.3",
+			schemas: `    Example:
+      allOf:
+        - type: object
+        - type: string
+          nullable: [true]
+`,
+		},
+		{
+			name: "reference to a compatible composition is checked at its target", version: "3.1.0",
+			schemas: `    Holder:
+      type: object
+      properties:
+        example:
+          $ref: '#/components/schemas/Example'
+    Example:
+      allOf:
+        - type: object
+        - type: object
+`,
+		},
+		{
 			name: "custom schema dialect is not interpreted", version: "3.1.0",
 			schemas: `    Example:
       $schema: https://example.com/custom-dialect
@@ -422,6 +460,49 @@ func TestAllOfTypeConflictRule_Metadata(t *testing.T) {
 	assert.Equal(t, validation.SeverityWarning, rule.DefaultSeverity(), "rule should warn by default")
 	assert.Nil(t, rule.Versions(), "rule should be available for all supported OpenAPI versions")
 	assert.Contains(t, rule.Description(), "not that the OpenAPI document is structurally invalid", "metadata should distinguish satisfiability from structural validity")
+	assert.NotEmpty(t, rule.Summary(), "rule should have a summary")
+	assert.NotEmpty(t, rule.HowToFix(), "rule should explain how to fix findings")
+	assert.Contains(t, rule.Link(), "#semantic-allof-type-conflict", "rule should link to its documentation")
+}
+
+func TestAllOfTypeConflictRule_SkippedDocuments(t *testing.T) {
+	t.Parallel()
+
+	const conflict = `paths: {}
+components:
+  schemas:
+    Example:
+      allOf:
+        - type: object
+        - type: string
+`
+	tests := []struct {
+		name string
+		yml  string
+	}{
+		{
+			name: "unsupported OpenAPI version",
+			yml:  "openapi: 3.9.0\ninfo:\n  title: Test\n  version: 1.0.0\n" + conflict,
+		},
+		{
+			name: "document-level custom JSON Schema dialect",
+			yml:  "openapi: 3.1.0\njsonSchemaDialect: https://example.com/custom-dialect\ninfo:\n  title: Test\n  version: 1.0.0\n" + conflict,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+			doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yml))
+			require.NoError(t, err, "document should unmarshal")
+			docInfo := createDocInfoWithIndex(t, ctx, doc, "test.yaml")
+
+			errs := (&rules.AllOfTypeConflictRule{}).Run(ctx, docInfo, nil)
+
+			assert.Empty(t, errs, "documents the rule cannot interpret should be skipped")
+		})
+	}
 }
 
 func TestAllOfTypeConflictRule_MissingDocumentOrIndex(t *testing.T) {
