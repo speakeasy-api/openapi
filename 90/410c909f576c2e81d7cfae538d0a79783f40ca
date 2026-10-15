@@ -1,0 +1,27 @@
+sequencedmap/map.go
+  h_9630b74bdac540 790-793,798,806,810,813-823,826,830,832-857
+  s_9c2d454ce7d60c::t_ac052796668e18 824-825,829
+sequencedmap/yaml_migration_test.go
+  h_9630b74bdac540 127-155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "90410c909f576c2e81d7cfae538d0a79783f40ca",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  },
+  "sessions": {
+    "s_9c2d454ce7d60c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1efc3dc1-2cb5-43b2-b5c1-495c08acd331",
+        "model": "unknown"
+      },
+      "human_author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
