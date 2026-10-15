@@ -54,7 +54,7 @@ func PopulateWithContext(source any, target any, ctx *PopulationContext) error {
 	}
 
 	s := reflect.ValueOf(source)
-	if s.Type().Implements(nodeAccessorType) {
+	if interfaces.TypeImplements(s.Type(), nodeAccessorType) {
 		source = source.(NodeAccessor).GetValue()
 	}
 
@@ -203,7 +203,7 @@ func populateValue(source any, target reflect.Value, ctx *PopulationContext) err
 	valueKind := value.Kind()
 
 	// Skip NodeAccessor check if already extracted in PopulateWithContext()
-	if valueType.Implements(nodeAccessorType) {
+	if interfaces.TypeImplements(valueType, nodeAccessorType) {
 		source = source.(NodeAccessor).GetValue()
 		value = reflect.ValueOf(source)
 
@@ -231,17 +231,17 @@ func populateValue(source any, target reflect.Value, ctx *PopulationContext) err
 	targetType := target.Type()
 
 	// Check for ContextAwarePopulator first (preferred)
-	if targetType.Implements(contextAwarePopulatorType) {
+	if interfaces.TypeImplements(targetType, contextAwarePopulatorType) {
 		return target.Interface().(ContextAwarePopulator).PopulateWithContext(value.Interface(), ctx)
 	}
 
 	// Fall back to basic Populator
-	if targetType.Implements(populatorType) {
+	if interfaces.TypeImplements(targetType, populatorType) {
 		return target.Interface().(Populator).Populate(value.Interface())
 	}
 
 	// Check if target is a sequenced map and handle it specially
-	if targetType.Implements(sequencedMapType) && !isEmbeddedSequencedMapType(value.Type()) {
+	if interfaces.TypeImplements(targetType, sequencedMapType) && !isEmbeddedSequencedMapType(value.Type()) {
 		return populateSequencedMap(value.Interface(), target.Interface().(interfaces.SequencedMapInterface), ctx)
 	}
 
@@ -274,7 +274,7 @@ func populateValue(source any, target reflect.Value, ctx *PopulationContext) err
 			elementValue := valueDerefed.Index(i).Interface()
 
 			// Extract value from NodeAccessor if needed for array elements
-			if valueDerefed.Index(i).Type().Implements(nodeAccessorType) {
+			if interfaces.TypeImplements(valueDerefed.Index(i).Type(), nodeAccessorType) {
 				if nodeAccessor, ok := elementValue.(NodeAccessor); ok {
 					elementValue = nodeAccessor.GetValue()
 				}
@@ -322,8 +322,7 @@ func getSequencedMapInterface(tField reflect.Value) interfaces.SequencedMapInter
 	if !implementsSeqMap && tField.CanAddr() {
 		// For value embeds, check if a pointer to the target field implements the interface
 		ptrType := tField.Addr().Type()
-		seqMapInterfaceType := reflect.TypeOf((*interfaces.SequencedMapInterface)(nil)).Elem()
-		implementsSeqMap = ptrType.Implements(seqMapInterfaceType)
+		implementsSeqMap = interfaces.TypeImplements(ptrType, sequencedMapType)
 	}
 
 	if !implementsSeqMap {
@@ -372,7 +371,7 @@ func getSourceForPopulation(originalFieldVal reflect.Value, fieldInt any) any {
 	default:
 		// Create an addressable copy for value embeds so we can use the interface
 		ptrType := reflect.PointerTo(originalFieldVal.Type())
-		if ptrType.Implements(sequencedMapType) {
+		if interfaces.TypeImplements(ptrType, sequencedMapType) {
 			addressableCopy := reflect.New(originalFieldVal.Type())
 			addressableCopy.Elem().Set(originalFieldVal)
 			return addressableCopy.Interface()
@@ -384,8 +383,8 @@ func getSourceForPopulation(originalFieldVal reflect.Value, fieldInt any) any {
 
 func isEmbeddedSequencedMapType(t reflect.Type) bool {
 	// Check both value type and pointer type
-	implementsSequencedMap := t.Implements(sequencedMapType) || reflect.PointerTo(t).Implements(sequencedMapType)
-	implementsCoreModeler := t.Implements(coreModelerType) || reflect.PointerTo(t).Implements(coreModelerType)
+	implementsSequencedMap := interfaces.TypeImplements(t, sequencedMapType) || interfaces.TypeImplements(reflect.PointerTo(t), sequencedMapType)
+	implementsCoreModeler := interfaces.TypeImplements(t, coreModelerType) || interfaces.TypeImplements(reflect.PointerTo(t), coreModelerType)
 
 	return implementsSequencedMap && implementsCoreModeler
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"iter"
 	"reflect"
+	"sync"
 
 	"github.com/speakeasy-api/openapi/validation"
 	"gopkg.in/yaml.v3"
@@ -39,6 +40,28 @@ type SequencedMapInterface interface {
 }
 
 func ImplementsInterface[T any](t reflect.Type) bool {
-	interfaceType := reflect.TypeOf((*T)(nil)).Elem()
-	return t.Implements(interfaceType)
+	return TypeImplements(t, reflect.TypeFor[T]())
+}
+
+type implementsKey struct {
+	t     reflect.Type
+	iface reflect.Type
+}
+
+// implementsCache memoizes reflect.Type.Implements, which is costly for model
+// types with large method sets and is queried for every node during population.
+var implementsCache sync.Map // map[implementsKey]bool
+
+// TypeImplements reports whether t implements the interface type iface.
+// It is equivalent to t.Implements(iface) but caches the result per type pair.
+func TypeImplements(t, iface reflect.Type) bool {
+	key := implementsKey{t: t, iface: iface}
+	if v, ok := implementsCache.Load(key); ok {
+		implements, _ := v.(bool)
+		return implements
+	}
+
+	result := t.Implements(iface)
+	implementsCache.Store(key, result)
+	return result
 }

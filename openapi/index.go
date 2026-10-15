@@ -234,6 +234,12 @@ type Index struct {
 	activePathItemTargets   map[pathItemTargetKey]bool
 	activeCallbackTargets   map[callbackTargetKey]bool
 	referencedOperations    map[*IndexNode[*Operation]]bool
+
+	// resolvedSchemaValidation memoizes Validate results for resolved $ref targets.
+	// Resolution returns the same cached target object for every $ref to it, and
+	// validating that target depends only on the target itself, so each target is
+	// validated once and its errors are replayed (as fresh copies) for later refs.
+	resolvedSchemaValidation map[*oas3.JSONSchema[oas3.Concrete]][]error
 }
 
 // IndexNode wraps a node with its location in the document.
@@ -340,6 +346,8 @@ func BuildIndex(ctx context.Context, doc *OpenAPI, resolveOpts references.Resolv
 		reportedUnknownProps:  make(map[marshaller.CoreModeler]map[string]bool),
 		currentDocumentStack:  []string{resolveOpts.TargetLocation}, // Start with main document
 		buildNodeOperationMap: options.BuildNodeOperationMap,
+
+		resolvedSchemaValidation: make(map[*oas3.JSONSchema[oas3.Concrete]][]error),
 	}
 
 	// Initialize the node-to-operation map if enabled
@@ -883,8 +891,7 @@ func (i *Index) indexSchema(ctx context.Context, loc Locations, schema *oas3.JSO
 		}
 		i.validationErrs = append(i.validationErrs, i.applyDocumentLocation(vErrs, i.documentPathForSchema(schema))...)
 		if resolved := schema.GetResolvedSchema(); resolved != nil && i.Doc != nil {
-			opts := i.referenceValidationOptions()
-			schemaErrs := resolved.Validate(ctx, opts...)
+			schemaErrs := i.validateResolvedSchema(ctx, resolved)
 			i.validationErrs = append(i.validationErrs, i.applyDocumentLocation(schemaErrs, i.documentPathForSchema(schema))...)
 		}
 	}
@@ -2165,6 +2172,46 @@ func (i *Index) applyDocumentLocation(errs []error, documentPath string) []error
 	}
 
 	return updated
+}
+
+// validateResolvedSchema validates a resolved $ref target, reusing the result
+// from an earlier reference to the same target. Every call returns errors that
+// are distinct from any previously returned, matching uncached behaviour where
+// each reference produced freshly constructed errors.
+func (i *Index) validateResolvedSchema(ctx context.Context, resolved *oas3.JSONSchema[oas3.Concrete]) []error {
+	if cached, ok := i.resolvedSchemaValidation[resolved]; ok {
+		errs, _ := cloneValidationErrors(cached)
+		return errs
+	}
+
+	errs := resolved.Validate(ctx, i.referenceValidationOptions()...)
+
+	// Only memoize results we can copy faithfully; otherwise validate again next time.
+	if pristine, ok := cloneValidationErrors(errs); ok {
+		i.resolvedSchemaValidation[resolved] = pristine
+	}
+
+	return errs
+}
+
+// cloneValidationErrors returns shallow copies of errs. It reports false if any
+// error is not a *validation.Error, since those cannot be copied safely.
+func cloneValidationErrors(errs []error) ([]error, bool) {
+	if len(errs) == 0 {
+		return nil, true
+	}
+
+	cloned := make([]error, len(errs))
+	for idx, err := range errs {
+		vErr, ok := err.(*validation.Error) //nolint:errorlint // exact type required to copy the error
+		if !ok || vErr == nil {
+			return nil, false
+		}
+		c := *vErr
+		cloned[idx] = &c
+	}
+
+	return cloned, true
 }
 
 func (i *Index) referenceValidationOptions() []validation.Option {

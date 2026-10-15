@@ -7,7 +7,9 @@ import (
 
 	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSchemaResolutionError_SanitizesReferenceErrors_Success(t *testing.T) {
@@ -88,4 +90,70 @@ func TestSchemaResolutionError_NilError_Success(t *testing.T) {
 	actual := schemaResolutionError(schema, nil)
 
 	assert.NoError(t, actual, "nil error should remain nil")
+}
+
+func TestCloneValidationErrors_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		errs []error
+	}{
+		{
+			name: "nil errors",
+			errs: nil,
+		},
+		{
+			name: "validation errors",
+			errs: []error{
+				validation.NewValidationError(validation.SeverityError, "rule-a", errors.New("first"), nil),
+				validation.NewValidationError(validation.SeverityWarning, "rule-b", errors.New("second"), nil),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cloned, ok := cloneValidationErrors(tt.errs)
+			require.True(t, ok, "validation errors should be copyable")
+			require.Len(t, cloned, len(tt.errs), "should return one copy per error")
+			for i, err := range cloned {
+				assert.Equal(t, tt.errs[i], err, "copy should equal the original")
+				assert.NotSame(t, tt.errs[i], err, "copy should be a distinct instance")
+			}
+		})
+	}
+}
+
+func TestCloneValidationErrors_NotCopyable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		errs []error
+	}{
+		{
+			name: "plain error",
+			errs: []error{
+				validation.NewValidationError(validation.SeverityError, "rule-a", errors.New("first"), nil),
+				errors.New("not a validation error"),
+			},
+		},
+		{
+			name: "nil validation error",
+			errs: []error{(*validation.Error)(nil)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cloned, ok := cloneValidationErrors(tt.errs)
+			assert.False(t, ok, "errors that are not *validation.Error should not be copied")
+			assert.Nil(t, cloned, "no copies should be returned")
+		})
+	}
 }
