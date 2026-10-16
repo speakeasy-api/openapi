@@ -1,0 +1,39 @@
+overlay/jsonpath.go
+  h_9630b74bdac540 9,27-28
+  s_ce9ff9e4218cd4::t_aaf4f6d00a5fa9 38
+sequencedmap/map.go
+  h_9630b74bdac540 687,710,716,732,742,746
+marshaller/coremodel_jsonpath_test.go
+  h_9630b74bdac540 181,186,199,214
+values/value.go
+  h_9630b74bdac540 3
+overlay/apply_test.go
+  h_9630b74bdac540 914,928
+validation/fix.go
+  h_9630b74bdac540 3
+go.mod
+  h_9630b74bdac540 8-9,18
+go.sum
+  h_9630b74bdac540 5-16,19-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f0b9f7b1815a764d6ef8d52539df0b92cb0a9374",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  },
+  "sessions": {
+    "s_ce9ff9e4218cd4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fcac0a28-90d4-4654-b296-74553c08b0a1",
+        "model": "unknown"
+      },
+      "human_author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
