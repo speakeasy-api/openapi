@@ -1,0 +1,22 @@
+cmd/openapi/go.mod
+  h_9630b74bdac540 9-10,39
+cmd/openapi/go.sum
+  h_9630b74bdac540 71-76
+jsonschema/oas3/tests/go.sum
+  h_9630b74bdac540 85-86
+openapi/linter/converter/tests/go.mod
+  h_9630b74bdac540 11
+openapi/linter/converter/tests/go.sum
+  h_9630b74bdac540 15-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f308ebf5f5b90b2948160c8b0e4e7fe86dbe4687",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
