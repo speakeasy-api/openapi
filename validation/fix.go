@@ -1,9 +1,6 @@
 package validation
 
-import (
-	"go.yaml.in/yaml/v3"
-	gopkgyaml "gopkg.in/yaml.v3"
-)
+import "go.yaml.in/yaml/v3"
 
 // PromptType describes what kind of user input a fix needs.
 type PromptType int
@@ -77,13 +74,4 @@ type NodeFix interface {
 	// ApplyNode applies the fix directly to the YAML node tree.
 	// rootNode is the document root node.
 	ApplyNode(rootNode *yaml.Node) error
-}
-
-// LegacyNodeFix is an optional interface for fixes that implement ApplyNode
-// with *gopkg.in/yaml.v3.Node. The fix engine adapts these fixes during migration.
-type LegacyNodeFix interface {
-	Fix
-
-	// ApplyNode applies the fix directly to the legacy YAML node tree.
-	ApplyNode(rootNode *gopkgyaml.Node) error
 }

@@ -8,8 +8,6 @@ import (
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/validation"
 	"go.yaml.in/yaml/v3"
-	gopkgyaml "gopkg.in/yaml.v3"
-	"unsafe"
 )
 
 // Mode controls how fixes are applied.
@@ -252,13 +250,6 @@ func (e *Engine) ProcessErrors(ctx context.Context, doc *openapi.OpenAPI, errs [
 			} else {
 				applyErr = fix.Apply(doc)
 			}
-		} else if legacyFix, ok := fix.(validation.LegacyNodeFix); ok {
-			rootNode := doc.GetRootNode()
-			if rootNode != nil {
-				applyErr = legacyFix.ApplyNode((*gopkgyaml.Node)(unsafe.Pointer(rootNode))) //nolint:gosec // zero-copy conversion between identical Node memory layouts
-			} else {
-				applyErr = fix.Apply(doc)
-			}
 		} else {
 			applyErr = fix.Apply(doc)
 		}
@@ -294,9 +285,6 @@ func makeAppliedFix(vErr *validation.Error, fix validation.Fix) AppliedFix {
 func ApplyNodeFix(fix validation.Fix, doc *openapi.OpenAPI, rootNode *yaml.Node) error {
 	if nodeFix, ok := fix.(validation.NodeFix); ok && rootNode != nil {
 		return nodeFix.ApplyNode(rootNode)
-	}
-	if legacyFix, ok := fix.(validation.LegacyNodeFix); ok && rootNode != nil {
-		return legacyFix.ApplyNode((*gopkgyaml.Node)(unsafe.Pointer(rootNode))) //nolint:gosec // zero-copy conversion between identical Node memory layouts
 	}
 	return fix.Apply(doc)
 }

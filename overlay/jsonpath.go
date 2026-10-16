@@ -2,40 +2,17 @@ package overlay
 
 import (
 	"fmt"
-	"unsafe"
 
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath/config"
 	"github.com/speakeasy-api/openapi/internal/version"
-	"github.com/vmware-labs/yaml-jsonpath/pkg/yamlpath"
+	"github.com/speakeasy-api/yaml-jsonpath/pkg/yamlpath"
 	"go.yaml.in/yaml/v3"
-	legacyYaml "gopkg.in/yaml.v3"
 )
 
 // Queryable is an interface for querying YAML nodes using JSONPath expressions.
 type Queryable interface {
 	Query(root *yaml.Node) []*yaml.Node
-}
-
-// Compile-time layout-compatibility guard verifying that go.yaml.in/yaml/v3.Node
-// and gopkg.in/yaml.v3.Node have identical memory footprints.
-const _ = unsafe.Sizeof(yaml.Node{}) == unsafe.Sizeof(legacyYaml.Node{})
-
-type rfcJSONPathQueryable struct {
-	path *jsonpath.JSONPath
-}
-
-func (r rfcJSONPathQueryable) Query(root *yaml.Node) []*yaml.Node {
-	if r.path == nil {
-		return []*yaml.Node{}
-	}
-	legacyRoot := (*legacyYaml.Node)(unsafe.Pointer(root)) //nolint:gosec // zero-copy conversion between identical Node memory layouts
-	legacyResults := r.path.Query(legacyRoot)
-	results := make([]*yaml.Node, len(legacyResults))
-	for i, n := range legacyResults {
-		results[i] = (*yaml.Node)(unsafe.Pointer(n)) //nolint:gosec // zero-copy conversion between identical Node memory layouts
-	}
-	return results
 }
 
 type yamlPathQueryable struct {
@@ -46,14 +23,9 @@ func (y yamlPathQueryable) Query(root *yaml.Node) []*yaml.Node {
 	if y.path == nil {
 		return []*yaml.Node{}
 	}
-	legacyRoot := (*legacyYaml.Node)(unsafe.Pointer(root)) //nolint:gosec // zero-copy conversion between identical Node memory layouts
 	// errors aren't actually possible from yamlpath.
-	legacyResults, _ := y.path.Find(legacyRoot)
-	results := make([]*yaml.Node, len(legacyResults))
-	for i, n := range legacyResults {
-		results[i] = (*yaml.Node)(unsafe.Pointer(n)) //nolint:gosec // zero-copy conversion between identical Node memory layouts
-	}
-	return results
+	result, _ := y.path.Find(root)
+	return result
 }
 
 // NewPath creates a new JSONPath queryable from the given target expression.
@@ -63,7 +35,7 @@ func (y yamlPathQueryable) Query(root *yaml.Node) []*yaml.Node {
 func (o *Overlay) NewPath(target string, warnings *[]string) (Queryable, error) {
 	rfcJSONPath, rfcJSONPathErr := jsonpath.NewPath(target, config.WithPropertyNameExtension())
 	if o.UsesRFC9535() {
-		return rfcJSONPathQueryable{path: rfcJSONPath}, rfcJSONPathErr
+		return rfcJSONPath, rfcJSONPathErr
 	}
 
 	// For version < 1.1.0 without explicit rfc9535, warn about future incompatibility
