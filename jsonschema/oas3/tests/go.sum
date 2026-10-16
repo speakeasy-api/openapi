@@ -82,8 +82,8 @@ github.com/shirou/gopsutil/v4 v4.26.6 h1:Mzr/npDtQC/xpeEuQKHZt8Zo9CmPvhTj8nkR8w5
 github.com/shirou/gopsutil/v4 v4.26.6/go.mod h1:LZ6ewCSkBqUpvSOf+LsTGnRinC6iaNUNMGBtDkJBaLQ=
 github.com/sirupsen/logrus v1.9.4 h1:TsZE7l11zFCLZnZ+teH4Umoq5BhEIfIzfRDZ1Uzql2w=
 github.com/sirupsen/logrus v1.9.4/go.mod h1:ftWc9WdOfJ0a92nsE2jF5u5ZwH8Bv2zdeOC42RjbV2g=
-github.com/speakeasy-api/jsonpath v0.6.4-0.20261016002236-43d52ac89b20 h1:cUUIOfmatWE/9rZugqm2ZEenBx0kzqOxbBOTZXZsfAw=
-github.com/speakeasy-api/jsonpath v0.6.4-0.20261016002236-43d52ac89b20/go.mod h1:TmWEGgh4W878JDCrSv0eMult7SYW5bAOqOg8b5zaEvo=
+github.com/speakeasy-api/jsonpath v0.7.0 h1:Pz7dS2AfuB745mnEcmg4qyS7wTJFiHH9zjW5kFX9b4E=
+github.com/speakeasy-api/jsonpath v0.7.0/go.mod h1:b9upx/gIKYwyKVcgRxvmdyKwAykzk88FCnNH3cwbw8w=
 github.com/stretchr/objx v0.5.3 h1:jmXUvGomnU1o3W/V5h2VEradbpJDwGrzugQQvL0POH4=
 github.com/stretchr/objx v0.5.3/go.mod h1:rDQraq+vQZU7Fde9LOZLr8Tax6zZvy4kuNKF+QYS+U0=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=

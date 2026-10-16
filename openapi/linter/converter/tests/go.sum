@@ -12,8 +12,8 @@ github.com/google/pprof v0.0.0-20230207041349-798e818bf904 h1:4/hN5RUoecvl+RmJRE
 github.com/google/pprof v0.0.0-20230207041349-798e818bf904/go.mod h1:uglQLonpP8qtYCYyzA+8c/9qtqgA3qsXGYqCPKARAFg=
 github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 h1:1EYB5IzjZawrrnELUi78f9fPu57HuXjmddZPjrls/28=
 github.com/santhosh-tekuri/jsonschema/v6 v6.0.3/go.mod h1:JXeL+ps8p7/KNMjDQk3TCwPpBy0wYklyWTfbkIzdIFU=
-github.com/speakeasy-api/jsonpath v0.6.4-0.20261016002236-43d52ac89b20 h1:cUUIOfmatWE/9rZugqm2ZEenBx0kzqOxbBOTZXZsfAw=
-github.com/speakeasy-api/jsonpath v0.6.4-0.20261016002236-43d52ac89b20/go.mod h1:TmWEGgh4W878JDCrSv0eMult7SYW5bAOqOg8b5zaEvo=
+github.com/speakeasy-api/jsonpath v0.7.0 h1:Pz7dS2AfuB745mnEcmg4qyS7wTJFiHH9zjW5kFX9b4E=
+github.com/speakeasy-api/jsonpath v0.7.0/go.mod h1:b9upx/gIKYwyKVcgRxvmdyKwAykzk88FCnNH3cwbw8w=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 go.yaml.in/yaml/v3 v3.0.5 h1:N6y/pJk8buWs9NY5ERU2HSMfm+IuD/OtfdAnq6kESPw=
