@@ -5,7 +5,7 @@ import (
 	"iter"
 
 	"github.com/speakeasy-api/openapi/validation"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // Index-generated errors can initially carry the immediate reference's filename

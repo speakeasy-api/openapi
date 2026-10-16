@@ -8,7 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/overlay"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // The trailing table row is indented one space further than the rows above it,

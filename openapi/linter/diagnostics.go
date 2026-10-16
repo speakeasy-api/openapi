@@ -6,7 +6,7 @@ import (
 	baseLinter "github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/validation"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // Include index diagnostics for caller-supplied indexes too. A caller may

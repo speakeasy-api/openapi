@@ -8,7 +8,7 @@ replace (
 )
 
 require (
-	github.com/speakeasy-api/openapi v1.25.6-0.20261015113746-577889a836ef
+	github.com/speakeasy-api/openapi v1.25.7-0.20261016003642-daec030de9fa
 	github.com/speakeasy-api/openapi/openapi/linter/customrules v0.0.0-20261015113746-577889a836ef
 	github.com/stretchr/testify v1.12.1
 )
@@ -24,5 +24,4 @@ require (
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
