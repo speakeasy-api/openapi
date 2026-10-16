@@ -18,8 +18,8 @@ github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 h1:1EYB5IzjZawrrnELUi78f9fPu57Hu
 github.com/santhosh-tekuri/jsonschema/v6 v6.0.3/go.mod h1:JXeL+ps8p7/KNMjDQk3TCwPpBy0wYklyWTfbkIzdIFU=
 github.com/sergi/go-diff v1.3.1 h1:xkr+Oxo4BOQKmkn/B9eMK0g5Kg/983T9DqqPHwYqD+8=
 github.com/sergi/go-diff v1.3.1/go.mod h1:aMJSSKb2lpPvRNec0+w3fl7LP9IOFzdc9Pa4NFbPK1I=
-github.com/speakeasy-api/jsonpath v0.6.4-0.20261016002236-43d52ac89b20 h1:cUUIOfmatWE/9rZugqm2ZEenBx0kzqOxbBOTZXZsfAw=
-github.com/speakeasy-api/jsonpath v0.6.4-0.20261016002236-43d52ac89b20/go.mod h1:TmWEGgh4W878JDCrSv0eMult7SYW5bAOqOg8b5zaEvo=
+github.com/speakeasy-api/jsonpath v0.7.0 h1:Pz7dS2AfuB745mnEcmg4qyS7wTJFiHH9zjW5kFX9b4E=
+github.com/speakeasy-api/jsonpath v0.7.0/go.mod h1:b9upx/gIKYwyKVcgRxvmdyKwAykzk88FCnNH3cwbw8w=
 github.com/speakeasy-api/yaml-jsonpath v0.0.0-20261016002013-07e5f48e6d17 h1:GczZJYqsf1WvvdkFvviAaP5wLrqxRPed8TmbKFsoLFk=
 github.com/speakeasy-api/yaml-jsonpath v0.0.0-20261016002013-07e5f48e6d17/go.mod h1:EMfEapMn2EVhphaczz62z+JnkJgCFixiF1G7z3tUbzg=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
