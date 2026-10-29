@@ -1,0 +1,20 @@
+openapi: 3.0.3
+info:
+  title: Shared recursive schema
+  version: "1"
+paths:
+  /f1:
+    get:
+      responses:
+        "200":
+          $ref: ./responses/folder.yaml
+  /f2:
+    get:
+      responses:
+        "200":
+          $ref: ./responses/folder.yaml
+  /f3:
+    get:
+      responses:
+        "200":
+          $ref: ./responses/folder.yaml

@@ -120,3 +120,39 @@ func TestInline_SiblingDirectories_Success(t *testing.T) {
 	// Compare the actual output with expected output
 	assert.Equal(t, string(expectedBytes), string(actualYAML), "Inlined document should match expected output")
 }
+
+// Regression test for https://github.com/speakeasy-api/openapi/issues/285: a recursive schema in its own
+// file, reached through a response file shared by three or more operations, failed to inline.
+func TestInline_SharedResponseWithRecursiveSchema_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	inputFile, err := os.Open("testdata/inline/shared_recursive/openapi.yaml")
+	require.NoError(t, err)
+	defer inputFile.Close()
+
+	inputDoc, validationErrs, err := openapi.Unmarshal(ctx, inputFile)
+	require.NoError(t, err)
+	require.Empty(t, validationErrs, "Input document should be valid")
+
+	opts := openapi.InlineOptions{
+		ResolveOptions: openapi.ResolveOptions{
+			RootDocument:   inputDoc,
+			TargetLocation: "testdata/inline/shared_recursive/openapi.yaml",
+		},
+		RemoveUnusedComponents: true,
+	}
+
+	err = openapi.Inline(ctx, inputDoc, opts)
+	require.NoError(t, err, "inlining should succeed")
+
+	var buf bytes.Buffer
+	err = openapi.Marshal(ctx, inputDoc, &buf)
+	require.NoError(t, err)
+
+	expectedBytes, err := os.ReadFile("testdata/inline/shared_recursive_expected.yaml")
+	require.NoError(t, err)
+
+	assert.Equal(t, string(expectedBytes), buf.String(), "Inlined document should match expected output")
+}

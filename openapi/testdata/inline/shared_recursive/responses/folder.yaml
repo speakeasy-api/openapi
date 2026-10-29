@@ -1,0 +1,5 @@
+description: ok
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/Folder.yaml

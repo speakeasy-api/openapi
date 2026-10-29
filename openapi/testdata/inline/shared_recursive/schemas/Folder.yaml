@@ -1,0 +1,4 @@
+properties:
+  parents:
+    items:
+      $ref: ./Folder.yaml
