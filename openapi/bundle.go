@@ -821,10 +821,12 @@ func generateFilePathBasedName(ref string, usedNames map[string]bool, targetLoca
 		componentName = safeFileName
 	} else {
 		// Reference to specific schema within file
-		// Clean up fragment (remove leading slash and convert path separators)
-		cleanFragment := strings.TrimPrefix(fragment, "/")
-		cleanFragment = strings.ReplaceAll(cleanFragment, "/", "_")
-		componentName = safeFileName + "__" + cleanFragment
+		// Clean up fragment: unescape and sanitize each pointer token, then join with underscores
+		fragmentParts := strings.Split(strings.TrimPrefix(fragment, "/"), "/")
+		for i, part := range fragmentParts {
+			fragmentParts[i] = sanitizeComponentName(unescapeJSONPointerToken(part))
+		}
+		componentName = safeFileName + "__" + strings.Join(fragmentParts, "_")
 	}
 
 	// Ensure uniqueness
@@ -1306,7 +1308,27 @@ func extractSimpleNameFromReference(ref string) string {
 	if len(fragmentParts) == 0 {
 		return "unknown"
 	}
-	return fragmentParts[len(fragmentParts)-1]
+	return sanitizeComponentName(unescapeJSONPointerToken(fragmentParts[len(fragmentParts)-1]))
+}
+
+var (
+	validComponentName        = regexp.MustCompile(`^[a-zA-Z0-9.\-_]+$`)
+	invalidComponentNameChars = regexp.MustCompile(`[^a-zA-Z0-9.\-_]+`)
+)
+
+// sanitizeComponentName converts a name into one that satisfies the OpenAPI component name
+// pattern ^[a-zA-Z0-9.\-_]+$. Names that are already valid are returned unchanged. Otherwise runs of
+// invalid characters are replaced with "_" and leading/trailing "_" are trimmed, so a path item key
+// such as "/users/{id}" becomes "users_id".
+func sanitizeComponentName(name string) string {
+	if validComponentName.MatchString(name) {
+		return name
+	}
+	sanitized := strings.Trim(invalidComponentNameChars.ReplaceAllString(name, "_"), "_")
+	if sanitized == "" {
+		return "unknown"
+	}
+	return sanitized
 }
 
 // findCircularReferenceMatch finds a component name for a circular reference
