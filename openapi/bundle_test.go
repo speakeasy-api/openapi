@@ -520,13 +520,20 @@ components:
 `,
 		},
 		{
-			name: "openapi 3.0 references first inlined location for repeated path item",
+			name: "openapi 3.0 references first inlined location for repeated path item and keeps other paths",
 			files: map[string]string{
 				"openapi.yaml": `openapi: 3.0.3
 info:
   title: t
   version: "1"
 paths:
+  /health:
+    get:
+      responses:
+        "204":
+          description: healthy
+  /health-alias:
+    $ref: '#/paths/~1health'
   /items:
     $ref: ./paths/items.yaml
   /items-alias:
@@ -543,6 +550,13 @@ info:
   title: t
   version: "1"
 paths:
+  /health:
+    get:
+      responses:
+        "204":
+          description: healthy
+  /health-alias:
+    $ref: '#/paths/~1health'
   /items:
     get:
       responses:
