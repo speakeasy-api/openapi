@@ -26,7 +26,7 @@ jobs:
           cache: true
 
       - name: Install mise
-        uses: jdx/mise-action@v5.1.1
+        uses: jdx/mise-action@v5.2.0
         with:
           experimental: true
 
