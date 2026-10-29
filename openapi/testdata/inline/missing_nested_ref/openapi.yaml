@@ -1,0 +1,10 @@
+openapi: 3.0.3
+info:
+  title: Missing nested reference
+  version: "1"
+paths:
+  /broken:
+    get:
+      responses:
+        "200":
+          $ref: ./responses/broken.yaml

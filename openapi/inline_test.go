@@ -121,7 +121,7 @@ func TestInline_SiblingDirectories_Success(t *testing.T) {
 	assert.Equal(t, string(expectedBytes), string(actualYAML), "Inlined document should match expected output")
 }
 
-func TestInline_ExternalRecursiveSchemas_Success(t *testing.T) {
+func TestInline_ExternalReferences_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -139,6 +139,11 @@ func TestInline_ExternalRecursiveSchemas_Success(t *testing.T) {
 			name:         "different recursive schemas with the same file name get distinct components",
 			inputPath:    "testdata/inline/conflicting_recursive/openapi.yaml",
 			expectedPath: "testdata/inline/conflicting_recursive_expected.yaml",
+		},
+		{
+			name:         "external callback and link references are inlined",
+			inputPath:    "testdata/inline/callbacks_links/openapi.yaml",
+			expectedPath: "testdata/inline/callbacks_links_expected.yaml",
 		},
 	}
 
@@ -176,4 +181,29 @@ func TestInline_ExternalRecursiveSchemas_Success(t *testing.T) {
 			assert.Equal(t, string(expectedBytes), buf.String(), "Inlined document should match expected output")
 		})
 	}
+}
+
+func TestInline_MissingNestedReference_Error(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	inputFile, err := os.Open("testdata/inline/missing_nested_ref/openapi.yaml")
+	require.NoError(t, err)
+	defer inputFile.Close()
+
+	inputDoc, _, err := openapi.Unmarshal(ctx, inputFile)
+	require.NoError(t, err)
+
+	opts := openapi.InlineOptions{
+		ResolveOptions: openapi.ResolveOptions{
+			RootDocument:   inputDoc,
+			TargetLocation: "testdata/inline/missing_nested_ref/openapi.yaml",
+		},
+	}
+
+	err = openapi.Inline(ctx, inputDoc, opts)
+	require.Error(t, err, "inlining should fail when a reference inside an external file cannot be resolved")
+	assert.Contains(t, err.Error(), "failed to inline nested references", "error should come from the nested external file")
+	assert.Contains(t, err.Error(), "Missing.yaml", "error should name the missing file")
 }
