@@ -1,0 +1,6 @@
+properties:
+  name:
+    type: string
+  children:
+    items:
+      $ref: ./Node.yaml
