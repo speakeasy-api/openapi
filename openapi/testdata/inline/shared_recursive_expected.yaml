@@ -1,0 +1,39 @@
+openapi: 3.0.3
+info:
+  title: Shared recursive schema
+  version: "1"
+paths:
+  /f1:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/__Folder_yaml'
+  /f2:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/__Folder_yaml'
+  /f3:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/__Folder_yaml'
+components:
+  schemas:
+    __Folder_yaml:
+      properties:
+        parents:
+          items:
+            $ref: '#/components/schemas/__Folder_yaml'

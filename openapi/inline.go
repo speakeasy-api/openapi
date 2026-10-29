@@ -137,23 +137,39 @@ func Inline(ctx context.Context, doc *OpenAPI, opts InlineOptions) error {
 		return nil
 	}
 
-	// Track collected $defs to avoid duplication
-	collectedDefs := sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]]()
-	defHashes := make(map[string]string) // name -> hash
+	state := &inlineState{
+		collectedDefs:  sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]](),
+		defHashes:      make(map[string]string),
+		inlinedSchemas: make(map[*oas3.JSONSchema[oas3.Referenceable]]struct{}),
+	}
 
-	if err := inlineObject(ctx, doc, doc, opts.ResolveOptions, collectedDefs, defHashes); err != nil {
+	if err := inlineObject(ctx, doc, doc, opts.ResolveOptions, state); err != nil {
 		return err
 	}
 
 	// Remove unused components if requested
 	if opts.RemoveUnusedComponents {
-		removeUnusedComponents(doc, collectedDefs)
+		removeUnusedComponents(doc, state.collectedDefs)
 	}
 
 	return nil
 }
 
-func inlineObject[T any](ctx context.Context, obj *T, doc *OpenAPI, opts ResolveOptions, collectedDefs *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]], defHashes map[string]string) error {
+// inlineState is shared across the recursive inlining of a single document.
+type inlineState struct {
+	// collectedDefs tracks $defs promoted to components/schemas to avoid duplication.
+	collectedDefs *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]]
+	// defHashes maps a promoted component name to the hash of its schema.
+	defHashes map[string]string
+	// inlinedSchemas records schemas that have already been replaced with their inlined form.
+	// Resolved external objects (e.g. a response file referenced by several operations) are cached
+	// and shared between references, so the same schema can be reached again after it was inlined.
+	// Inlining it a second time would re-resolve refs that were already rewritten to components/schemas
+	// against the wrong document, so these are skipped.
+	inlinedSchemas map[*oas3.JSONSchema[oas3.Referenceable]]struct{}
+}
+
+func inlineObject[T any](ctx context.Context, obj *T, doc *OpenAPI, opts ResolveOptions, state *inlineState) error {
 	inlinedSchemas := map[*oas3.JSONSchema[oas3.Referenceable]]*oas3.JSONSchema[oas3.Referenceable]{}
 
 	for item := range Walk(ctx, obj) {
@@ -184,6 +200,11 @@ func inlineObject[T any](ctx context.Context, obj *T, doc *OpenAPI, opts Resolve
 				})
 				// If the parent is a schema, we don't need to inline it
 				if parentIsSchema {
+					return nil
+				}
+
+				// Skip schemas already inlined through another reference to the same shared object
+				if _, done := state.inlinedSchemas[schema]; done {
 					return nil
 				}
 
@@ -235,13 +256,13 @@ func inlineObject[T any](ctx context.Context, obj *T, doc *OpenAPI, opts Resolve
 						defHash := hashing.Hash(defSchema)
 
 						// Check for conflicts
-						if existingHash, exists := defHashes[defName]; exists {
+						if existingHash, exists := state.defHashes[defName]; exists {
 							if existingHash != defHash {
 								// Different schema with same name - add suffix
 								counter := 1
 								for {
 									candidateName := fmt.Sprintf("%s_%d", defName, counter)
-									if existingHash, exists := defHashes[candidateName]; !exists || existingHash == defHash {
+									if existingHash, exists := state.defHashes[candidateName]; !exists || existingHash == defHash {
 										targetName = candidateName
 										break
 									}
@@ -254,9 +275,9 @@ func inlineObject[T any](ctx context.Context, obj *T, doc *OpenAPI, opts Resolve
 						nameMapping[defName] = targetName
 
 						// Store the schema if it's new
-						if _, exists := defHashes[targetName]; !exists {
-							defHashes[targetName] = defHash
-							collectedDefs.Set(targetName, defSchema)
+						if _, exists := state.defHashes[targetName]; !exists {
+							state.defHashes[targetName] = defHash
+							state.collectedDefs.Set(targetName, defSchema)
 							doc.Components.Schemas.Set(targetName, defSchema)
 						}
 					}
@@ -270,36 +291,37 @@ func inlineObject[T any](ctx context.Context, obj *T, doc *OpenAPI, opts Resolve
 
 				// Replace the schema in place
 				*schema = *inlined
+				state.inlinedSchemas[schema] = struct{}{}
 				return nil
 			},
 
 			// Handle OpenAPI component references
 			ReferencedPathItem: func(ref *ReferencedPathItem) error {
-				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
+				return inlineReference(ctx, ref, doc, opts, state)
 			},
 			ReferencedParameter: func(ref *ReferencedParameter) error {
-				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
+				return inlineReference(ctx, ref, doc, opts, state)
 			},
 			ReferencedExample: func(ref *ReferencedExample) error {
-				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
+				return inlineReference(ctx, ref, doc, opts, state)
 			},
 			ReferencedRequestBody: func(ref *ReferencedRequestBody) error {
-				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
+				return inlineReference(ctx, ref, doc, opts, state)
 			},
 			ReferencedResponse: func(ref *ReferencedResponse) error {
-				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
+				return inlineReference(ctx, ref, doc, opts, state)
 			},
 			ReferencedHeader: func(ref *ReferencedHeader) error {
-				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
+				return inlineReference(ctx, ref, doc, opts, state)
 			},
 			ReferencedCallback: func(ref *ReferencedCallback) error {
-				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
+				return inlineReference(ctx, ref, doc, opts, state)
 			},
 			ReferencedLink: func(ref *ReferencedLink) error {
-				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
+				return inlineReference(ctx, ref, doc, opts, state)
 			},
 			ReferencedSecurityScheme: func(ref *ReferencedSecurityScheme) error {
-				return inlineReference(ctx, ref, doc, opts, collectedDefs, defHashes)
+				return inlineReference(ctx, ref, doc, opts, state)
 			},
 		})
 
@@ -312,7 +334,7 @@ func inlineObject[T any](ctx context.Context, obj *T, doc *OpenAPI, opts Resolve
 }
 
 // inlineReference inlines a generic OpenAPI reference by resolving it and replacing the reference with the actual object
-func inlineReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, ref *Reference[T, V, C], doc *OpenAPI, opts references.ResolveOptions, collectedDefs *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]], defHashes map[string]string) error {
+func inlineReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, ref *Reference[T, V, C], doc *OpenAPI, opts references.ResolveOptions, state *inlineState) error {
 	if ref == nil || !ref.IsReference() {
 		return nil
 	}
@@ -351,7 +373,7 @@ func inlineReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler]
 			TargetDocument: targetDocInfo.ResolvedDocument,
 			TargetLocation: targetDocInfo.AbsoluteDocumentPath,
 		}
-		if err := inlineObject(ctx, ref, doc, recursiveOpts, collectedDefs, defHashes); err != nil {
+		if err := inlineObject(ctx, ref, doc, recursiveOpts, state); err != nil {
 			return fmt.Errorf("failed to inline nested references in %s: %w", ref.GetReference(), err)
 		}
 	}

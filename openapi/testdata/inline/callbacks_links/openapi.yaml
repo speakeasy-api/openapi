@@ -1,0 +1,29 @@
+openapi: 3.0.3
+info:
+  title: External callbacks and links
+  version: "1"
+paths:
+  /subscriptions:
+    post:
+      operationId: createSubscription
+      responses:
+        "201":
+          description: created
+          links:
+            GetSubscription:
+              $ref: ./links/GetSubscription.yaml
+      callbacks:
+        onEvent:
+          $ref: ./callbacks/onEvent.yaml
+  /subscriptions/{id}:
+    get:
+      operationId: getSubscription
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok

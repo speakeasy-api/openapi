@@ -1,0 +1,23 @@
+openapi: 3.0.3
+info:
+  title: Conflicting recursive schema names
+  version: "1"
+paths:
+  /folders:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: ./folders/Node.yaml
+  /files:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: ./files/Node.yaml

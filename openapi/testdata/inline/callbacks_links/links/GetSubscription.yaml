@@ -1,0 +1,3 @@
+operationId: getSubscription
+parameters:
+  id: $response.body#/id
