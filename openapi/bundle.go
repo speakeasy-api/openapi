@@ -11,6 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/hashing"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/internal/utils"
+	"github.com/speakeasy-api/openapi/internal/version"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/references"
@@ -38,6 +39,9 @@ type BundleOptions struct {
 // Bundle transforms an OpenAPI document by bringing all external references into the components section,
 // creating a self-contained document that maintains the reference structure but doesn't depend on external files.
 // This operation modifies the document in place.
+//
+// OpenAPI 3.0 has no components.pathItems, so for 3.0 documents external path items are written inline at
+// their first use, and any further uses reference that location.
 //
 // Why use Bundle?
 //
@@ -173,8 +177,79 @@ func Bundle(ctx context.Context, doc *OpenAPI, opts BundleOptions) error {
 		return fmt.Errorf("failed to update references: %w", err)
 	}
 
+	// OpenAPI 3.0 has no components.pathItems, so bundled path items are written inline where they are used
+	var inlinePathItems *sequencedmap.Map[string, any]
+	if isOpenAPI30(doc) {
+		inlinePathItems = componentStorage.referenceStorage.GetOrZero("pathItems")
+		componentStorage.referenceStorage.Delete("pathItems")
+	}
+
 	// Add collected components to document
 	addComponentsToDocument(doc, componentStorage)
+
+	if inlinePathItems.Len() > 0 {
+		if err := inlineBundledPathItems(ctx, doc, inlinePathItems); err != nil {
+			return fmt.Errorf("failed to inline bundled path items: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// isOpenAPI30 reports whether the document declares an OpenAPI 3.0.x version
+func isOpenAPI30(doc *OpenAPI) bool {
+	v, err := version.Parse(doc.OpenAPI)
+	if err != nil || v == nil {
+		return false
+	}
+	return v.Major == 3 && v.Minor == 0
+}
+
+// inlineBundledPathItems replaces references to bundled path items with the path items themselves.
+// Each path item is written inline at its first use in document order. Later uses, including recursive
+// ones from callbacks within the path item, reference that first location instead to avoid infinite expansion.
+func inlineBundledPathItems(ctx context.Context, doc *OpenAPI, pathItems *sequencedmap.Map[string, any]) error {
+	const pathItemsPrefix = "#/components/pathItems/"
+	inlinedAt := make(map[string]string)
+
+	for item := range Walk(ctx, doc) {
+		err := item.Match(Matcher{
+			ReferencedPathItem: func(ref *ReferencedPathItem) error {
+				if ref == nil || !ref.IsReference() {
+					return nil
+				}
+				name, ok := strings.CutPrefix(string(ref.GetReference()), pathItemsPrefix)
+				if !ok {
+					return nil
+				}
+				bundled, ok := pathItems.Get(name)
+				if !ok {
+					return nil
+				}
+
+				if location, seen := inlinedAt[name]; seen {
+					*ref.Reference = references.Reference("#" + location)
+					return nil
+				}
+
+				pathItem, ok := bundled.(*ReferencedPathItem)
+				if !ok || pathItem.Object == nil {
+					return fmt.Errorf("bundled path item %s has no content", name)
+				}
+				inlinedAt[name] = item.Location.ToJSONPointer().String()
+
+				// The walker descends into the inlined object after this returns, inlining nested callbacks too
+				ref.Reference = nil
+				ref.Summary = nil
+				ref.Description = nil
+				ref.Object = pathItem.Object
+				return nil
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to inline path item at %s: %w", item.Location.ToJSONPointer().String(), err)
+		}
+	}
 
 	return nil
 }
@@ -403,216 +478,97 @@ func rewriteRefsInBundledComponents(ctx context.Context, componentStorage *compo
 	return nil
 }
 
-// walkAndUpdateRefsInComponent walks through a component and updates its internal references
+// walkAndUpdateRefsInComponent recursively walks a bundled component and rewrites every reference it
+// contains, including references nested inside operations and inline schemas. Relative references are
+// resolved against sourceLocation, the document the component was originally written in.
 func walkAndUpdateRefsInComponent(ctx context.Context, component any, componentStorage *componentStorage, sourceLocation string) error {
-	// We need to handle each component type that can contain references
-	// The Walk function will traverse the component and find all references
+	sourceURI := prepareSourceURI(sourceLocation)
 
-	// Use type-specific walking based on the component type
+	// Walk needs a concrete pointer type to select the correct traversal
 	switch c := component.(type) {
 	case *ReferencedResponse:
-		return walkAndUpdateRefsInResponse(ctx, c, componentStorage, sourceLocation)
+		return rewriteRefsInObject(ctx, c, componentStorage, sourceURI, false)
 	case *ReferencedParameter:
-		return walkAndUpdateRefsInParameter(ctx, c, componentStorage, sourceLocation)
+		return rewriteRefsInObject(ctx, c, componentStorage, sourceURI, false)
 	case *ReferencedRequestBody:
-		return walkAndUpdateRefsInRequestBody(ctx, c, componentStorage, sourceLocation)
+		return rewriteRefsInObject(ctx, c, componentStorage, sourceURI, false)
 	case *ReferencedCallback:
-		return walkAndUpdateRefsInCallback(ctx, c, componentStorage, sourceLocation)
+		return rewriteRefsInObject(ctx, c, componentStorage, sourceURI, false)
 	case *ReferencedPathItem:
-		return walkAndUpdateRefsInPathItem(ctx, c, componentStorage, sourceLocation)
+		return rewriteRefsInObject(ctx, c, componentStorage, sourceURI, false)
 	case *ReferencedLink:
-		return walkAndUpdateRefsInLink(ctx, c, componentStorage, sourceLocation)
+		return rewriteRefsInObject(ctx, c, componentStorage, sourceURI, false)
 	case *ReferencedExample:
-		return walkAndUpdateRefsInExample(ctx, c, componentStorage, sourceLocation)
+		return rewriteRefsInObject(ctx, c, componentStorage, sourceURI, false)
 	case *ReferencedSecurityScheme:
-		return walkAndUpdateRefsInSecurityScheme(ctx, c, componentStorage, sourceLocation)
+		return rewriteRefsInObject(ctx, c, componentStorage, sourceURI, false)
 	case *ReferencedHeader:
-		return walkAndUpdateRefsInHeader(ctx, c, componentStorage, sourceLocation)
+		return rewriteRefsInObject(ctx, c, componentStorage, sourceURI, false)
 	}
 	return nil
 }
 
-// walkAndUpdateRefsInResponse walks through a response and updates its internal references
-func walkAndUpdateRefsInResponse(_ context.Context, response *ReferencedResponse, componentStorage *componentStorage, sourceLocation string) error {
-	if response == nil || response.Object == nil {
-		return nil
+// rewriteRefsInObject walks obj and rewrites every reference that was bundled into components.
+// baseLocation is the document the references in obj were written in. When matchCircular is set,
+// fragment-only schema references that don't resolve directly are matched by their fragment.
+func rewriteRefsInObject[T any](ctx context.Context, obj *T, componentStorage *componentStorage, baseLocation string, matchCircular bool) error {
+	matcher := Matcher{
+		Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
+			updateSchemaRef(schema, componentStorage, baseLocation, matchCircular)
+			return nil
+		},
+		ReferencedPathItem: func(ref *ReferencedPathItem) error {
+			return updateReference(ref, componentStorage, "pathItems", baseLocation)
+		},
+		ReferencedParameter: func(ref *ReferencedParameter) error {
+			return updateReference(ref, componentStorage, "parameters", baseLocation)
+		},
+		ReferencedExample: func(ref *ReferencedExample) error {
+			return updateReference(ref, componentStorage, "examples", baseLocation)
+		},
+		ReferencedRequestBody: func(ref *ReferencedRequestBody) error {
+			return updateReference(ref, componentStorage, "requestBodies", baseLocation)
+		},
+		ReferencedResponse: func(ref *ReferencedResponse) error {
+			return updateReference(ref, componentStorage, "responses", baseLocation)
+		},
+		ReferencedHeader: func(ref *ReferencedHeader) error {
+			return updateReference(ref, componentStorage, "headers", baseLocation)
+		},
+		ReferencedCallback: func(ref *ReferencedCallback) error {
+			return updateReference(ref, componentStorage, "callbacks", baseLocation)
+		},
+		ReferencedLink: func(ref *ReferencedLink) error {
+			return updateReference(ref, componentStorage, "links", baseLocation)
+		},
+		ReferencedSecurityScheme: func(ref *ReferencedSecurityScheme) error {
+			return updateReference(ref, componentStorage, "securitySchemes", baseLocation)
+		},
 	}
 
-	// Walk through the response's headers and update references
-	if response.Object.Headers != nil {
-		for _, header := range response.Object.Headers.All() {
-			if header != nil && header.IsReference() {
-				updateComponentRefWithSource(header.Reference, componentStorage, "headers", sourceLocation)
-			}
+	for item := range Walk(ctx, obj) {
+		if err := item.Match(matcher); err != nil {
+			return fmt.Errorf("failed to update reference at %s: %w", item.Location.ToJSONPointer().String(), err)
 		}
 	}
-
-	// Walk through the response's content schemas
-	if response.Object.Content != nil {
-		for _, mediaType := range response.Object.Content.All() {
-			if mediaType != nil {
-				if mediaType.Schema != nil && mediaType.Schema.IsReference() {
-					updateSchemaRefWithSource(mediaType.Schema, componentStorage, sourceLocation)
-				}
-				if mediaType.ItemSchema != nil && mediaType.ItemSchema.IsReference() {
-					updateSchemaRefWithSource(mediaType.ItemSchema, componentStorage, sourceLocation)
-				}
-			}
-		}
-	}
-
 	return nil
 }
 
-// walkAndUpdateRefsInParameter walks through a parameter and updates its internal references
-func walkAndUpdateRefsInParameter(_ context.Context, param *ReferencedParameter, componentStorage *componentStorage, sourceLocation string) error {
-	if param == nil || param.Object == nil {
-		return nil
-	}
-
-	// Walk through the parameter's schema
-	if param.Object.Schema != nil && param.Object.Schema.IsReference() {
-		updateSchemaRefWithSource(param.Object.Schema, componentStorage, sourceLocation)
-	}
-
-	// Walk through parameter examples
-	if param.Object.Examples != nil {
-		for _, example := range param.Object.Examples.All() {
-			if example != nil && example.IsReference() {
-				updateComponentRefWithSource(example.Reference, componentStorage, "examples", sourceLocation)
-			}
-		}
-	}
-
-	return nil
-}
-
-// walkAndUpdateRefsInRequestBody walks through a request body and updates its internal references
-func walkAndUpdateRefsInRequestBody(_ context.Context, body *ReferencedRequestBody, componentStorage *componentStorage, sourceLocation string) error {
-	if body == nil || body.Object == nil {
-		return nil
-	}
-
-	// Walk through the request body's content schemas
-	if body.Object.Content != nil {
-		for _, mediaType := range body.Object.Content.All() {
-			if mediaType != nil {
-				if mediaType.Schema != nil && mediaType.Schema.IsReference() {
-					updateSchemaRefWithSource(mediaType.Schema, componentStorage, sourceLocation)
-				}
-				if mediaType.ItemSchema != nil && mediaType.ItemSchema.IsReference() {
-					updateSchemaRefWithSource(mediaType.ItemSchema, componentStorage, sourceLocation)
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-// walkAndUpdateRefsInCallback walks through a callback and updates its internal references
-func walkAndUpdateRefsInCallback(_ context.Context, callback *ReferencedCallback, componentStorage *componentStorage, sourceLocation string) error {
-	if callback == nil || callback.Object == nil {
-		return nil
-	}
-
-	// Callbacks contain path items with operations
-	for _, pathItem := range callback.Object.All() {
-		if pathItem != nil && pathItem.IsReference() {
-			updateComponentRefWithSource(pathItem.Reference, componentStorage, "pathItems", sourceLocation)
-		}
-	}
-
-	return nil
-}
-
-// walkAndUpdateRefsInPathItem walks through a path item and updates its internal references
-func walkAndUpdateRefsInPathItem(_ context.Context, pathItem *ReferencedPathItem, componentStorage *componentStorage, sourceLocation string) error {
-	if pathItem == nil || pathItem.Object == nil {
-		return nil
-	}
-
-	// Path items can have parameters
-	if pathItem.Object.Parameters != nil {
-		for _, param := range pathItem.Object.Parameters {
-			if param != nil && param.IsReference() {
-				updateComponentRefWithSource(param.Reference, componentStorage, "parameters", sourceLocation)
-			}
-		}
-	}
-
-	return nil
-}
-
-// walkAndUpdateRefsInLink walks through a link and updates its internal references
-func walkAndUpdateRefsInLink(_ context.Context, _ *ReferencedLink, _ *componentStorage, _ string) error {
-	// Links don't typically contain component references that need updating
-	return nil
-}
-
-// walkAndUpdateRefsInExample walks through an example and updates its internal references
-func walkAndUpdateRefsInExample(_ context.Context, _ *ReferencedExample, _ *componentStorage, _ string) error {
-	// Examples don't typically contain component references that need updating
-	return nil
-}
-
-// walkAndUpdateRefsInSecurityScheme walks through a security scheme and updates its internal references
-func walkAndUpdateRefsInSecurityScheme(_ context.Context, _ *ReferencedSecurityScheme, _ *componentStorage, _ string) error {
-	// Security schemes don't typically contain component references that need updating
-	return nil
-}
-
-// walkAndUpdateRefsInHeader walks through a header and updates its internal references
-func walkAndUpdateRefsInHeader(_ context.Context, header *ReferencedHeader, componentStorage *componentStorage, sourceLocation string) error {
-	if header == nil || header.Object == nil {
-		return nil
-	}
-
-	// Walk through the header's schema
-	if header.Object.Schema != nil && header.Object.Schema.IsReference() {
-		updateSchemaRefWithSource(header.Object.Schema, componentStorage, sourceLocation)
-	}
-
-	// Walk through header examples
-	if header.Object.Examples != nil {
-		for _, example := range header.Object.Examples.All() {
-			if example != nil && example.IsReference() {
-				updateComponentRefWithSource(example.Reference, componentStorage, "examples", sourceLocation)
-			}
-		}
-	}
-
-	return nil
-}
-
-// updateSchemaRefWithSource updates a schema reference using a specific source location for resolution
-func updateSchemaRefWithSource(schema *oas3.JSONSchema[oas3.Referenceable], componentStorage *componentStorage, sourceLocation string) {
+// updateSchemaRef rewrites a schema reference to its bundled component, resolving it against baseLocation
+func updateSchemaRef(schema *oas3.JSONSchema[oas3.Referenceable], componentStorage *componentStorage, baseLocation string, matchCircular bool) {
 	if schema == nil || !schema.IsReference() {
 		return
 	}
 
-	sourceURI := prepareSourceURI(sourceLocation)
 	ref := schema.GetRef()
-	absRef, _ := handleReference(ref, sourceURI)
+	absRef, _ := handleReference(ref, baseLocation)
 
-	if newName, exists := componentStorage.refs[absRef]; exists {
-		newRef := "#/components/schemas/" + newName
-		*schema.GetLeft().Ref = references.Reference(newRef)
+	newName, exists := componentStorage.refs[absRef]
+	if !exists && matchCircular {
+		newName, exists = findCircularReferenceMatch(string(ref), componentStorage.refs)
 	}
-}
-
-// updateComponentRefWithSource updates a component reference using a specific source location for resolution
-func updateComponentRefWithSource(ref *references.Reference, componentStorage *componentStorage, componentSection string, sourceLocation string) {
-	if ref == nil {
-		return
-	}
-
-	sourceURI := prepareSourceURI(sourceLocation)
-	absRef, _ := handleReference(*ref, sourceURI)
-
-	if newName, exists := componentStorage.refs[absRef]; exists {
-		newRef := "#/components/" + componentSection + "/" + newName
-		*ref = references.Reference(newRef)
+	if exists {
+		*schema.GetLeft().Ref = references.Reference("#/components/schemas/" + newName)
 	}
 }
 
@@ -1009,69 +965,17 @@ func generateCounterBasedName(ref string, usedNames map[string]bool) string {
 
 // updateReferencesToComponents updates all references in the document to point to new component names
 func updateReferencesToComponents(ctx context.Context, doc *OpenAPI, componentStorage *componentStorage) error {
-	for item := range Walk(ctx, doc) {
-		err := item.Match(Matcher{
-			Schema: func(schema *oas3.JSONSchema[oas3.Referenceable]) error {
-				if schema.IsReference() {
-					ref := string(schema.GetRef())
-
-					// Convert the reference to absolute for lookup using root location
-					absRef, _ := handleReference(schema.GetRef(), componentStorage.rootLocation)
-
-					if newName, exists := componentStorage.refs[absRef]; exists {
-						// Update the reference to point to the new component
-						newRef := "#/components/schemas/" + newName
-						*schema.GetLeft().Ref = references.Reference(newRef)
-					} else if newName, found := findCircularReferenceMatch(ref, componentStorage.refs); found {
-						newRef := "#/components/schemas/" + newName
-						*schema.GetLeft().Ref = references.Reference(newRef)
-					}
-				}
-				return nil
-			},
-			ReferencedPathItem: func(ref *ReferencedPathItem) error {
-				return updateReference(ref, componentStorage, "pathItems")
-			},
-			ReferencedParameter: func(ref *ReferencedParameter) error {
-				return updateReference(ref, componentStorage, "parameters")
-			},
-			ReferencedExample: func(ref *ReferencedExample) error {
-				return updateReference(ref, componentStorage, "examples")
-			},
-			ReferencedRequestBody: func(ref *ReferencedRequestBody) error {
-				return updateReference(ref, componentStorage, "requestBodies")
-			},
-			ReferencedResponse: func(ref *ReferencedResponse) error {
-				return updateReference(ref, componentStorage, "responses")
-			},
-			ReferencedHeader: func(ref *ReferencedHeader) error {
-				return updateReference(ref, componentStorage, "headers")
-			},
-			ReferencedCallback: func(ref *ReferencedCallback) error {
-				return updateReference(ref, componentStorage, "callbacks")
-			},
-			ReferencedLink: func(ref *ReferencedLink) error {
-				return updateReference(ref, componentStorage, "links")
-			},
-			ReferencedSecurityScheme: func(ref *ReferencedSecurityScheme) error {
-				return updateReference(ref, componentStorage, "securitySchemes")
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update reference at %s: %w", item.Location.ToJSONPointer().String(), err)
-		}
-	}
-	return nil
+	return rewriteRefsInObject(ctx, doc, componentStorage, componentStorage.rootLocation, true)
 }
 
-// updateReference updates a generic reference to point to the new component name
-func updateReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ref *Reference[T, V, C], componentStorage *componentStorage, componentSection string) error {
+// updateReference updates a generic reference to point to the new component name, resolving it against baseLocation
+func updateReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ref *Reference[T, V, C], componentStorage *componentStorage, componentSection string, baseLocation string) error {
 	if ref == nil || !ref.IsReference() {
 		return nil
 	}
 
-	// Convert the reference to absolute for lookup using root location
-	absRef, _ := handleReference(ref.GetReference(), componentStorage.rootLocation)
+	// Convert the reference to absolute for lookup using the location it was written in
+	absRef, _ := handleReference(ref.GetReference(), baseLocation)
 
 	if newName, exists := componentStorage.refs[absRef]; exists {
 		// Update the reference to point to the new component
@@ -1083,6 +987,15 @@ func updateReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler]
 
 // addComponentsToDocument adds all collected components to the document's components section
 func addComponentsToDocument(doc *OpenAPI, componentStorage *componentStorage) {
+	// Avoid creating an empty components section when nothing was bundled
+	hasComponents := componentStorage.schemaStorage.Len() > 0
+	for _, components := range componentStorage.referenceStorage.All() {
+		hasComponents = hasComponents || components.Len() > 0
+	}
+	if !hasComponents {
+		return
+	}
+
 	// Ensure components section exists
 	if doc.Components == nil {
 		doc.Components = &Components{}
