@@ -1,0 +1,34 @@
+openapi/inline_test.go
+  h_9630b74bdac540 123-158
+openapi/testdata/inline/shared_recursive/openapi.yaml
+  h_9630b74bdac540 1-20
+openapi/testdata/inline/shared_recursive/responses/folder.yaml
+  h_9630b74bdac540 1-5
+openapi/testdata/inline/shared_recursive/schemas/Folder.yaml
+  h_9630b74bdac540 1-4
+openapi/inline.go
+  s_e4642bd8c8f89a::t_b8591e328adfc2 140-144,146,152,158-172,206-210,259,265,278-280,294,300,303,306,309,312,315,318,321,324,337,376
+openapi/testdata/inline/shared_recursive_expected.yaml
+  h_9630b74bdac540 1-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d4efcaa9d9967fe398a01d95a11d01b162dc75bf",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  },
+  "sessions": {
+    "s_e4642bd8c8f89a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5eada903-1d18-49c8-b599-ed42f9c4e21d",
+        "model": "unknown"
+      },
+      "human_author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
