@@ -3,8 +3,10 @@ package fix
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 
+	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/validation"
 	"go.yaml.in/yaml/v3"
@@ -158,7 +160,9 @@ func (e *Engine) ProcessErrors(ctx context.Context, doc *openapi.OpenAPI, errs [
 	result := &Result{}
 	modified := make(map[conflictKey]bool)
 	skippedRules := make(map[string]bool)
+	var nodeFixes []pendingNodeFix
 
+fixLoop:
 	for _, fe := range fixable {
 		fix := fe.fix
 		vErr := fe.vErr
@@ -225,7 +229,7 @@ func (e *Engine) ProcessErrors(ctx context.Context, doc *openapi.OpenAPI, errs [
 					continue
 				}
 				if errors.Is(err, validation.ErrExitInteractive) {
-					return result, nil
+					break fixLoop
 				}
 				result.Failed = append(result.Failed, FailedFix{
 					Error: vErr, Fix: fix, FixError: err,
@@ -241,18 +245,17 @@ func (e *Engine) ProcessErrors(ctx context.Context, doc *openapi.OpenAPI, errs [
 			}
 		}
 
-		// Apply the fix
-		var applyErr error
-		if nodeFix, ok := fix.(validation.NodeFix); ok {
-			rootNode := doc.GetRootNode()
-			if rootNode != nil {
-				applyErr = nodeFix.ApplyNode(rootNode)
-			} else {
-				applyErr = fix.Apply(doc)
-			}
-		} else {
-			applyErr = fix.Apply(doc)
+		// Node fixes are deferred until all model fixes have been applied, as
+		// marshalling syncs the model back over the YAML nodes.
+		// Their locations are only marked as modified once they apply.
+		if nodeFix, ok := fix.(validation.NodeFix); ok && doc.GetRootNode() != nil {
+			nodeFixes = append(nodeFixes, pendingNodeFix{vErr: vErr, fix: nodeFix, key: key, index: len(result.Applied)})
+			result.Applied = append(result.Applied, makeAppliedFix(vErr, fix))
+			continue
 		}
+
+		// Apply the fix
+		applyErr := fix.Apply(doc)
 
 		if applyErr != nil {
 			result.Failed = append(result.Failed, FailedFix{
@@ -269,7 +272,93 @@ func (e *Engine) ProcessErrors(ctx context.Context, doc *openapi.OpenAPI, errs [
 		result.Applied = append(result.Applied, makeAppliedFix(vErr, fix))
 	}
 
+	if err := applyNodeFixes(ctx, doc, result, nodeFixes, modified); err != nil {
+		return result, err
+	}
+
 	return result, nil
+}
+
+type pendingNodeFix struct {
+	vErr  *validation.Error
+	fix   validation.NodeFix
+	key   conflictKey
+	index int // position of the fix in Result.Applied
+}
+
+// applyNodeFixes applies fixes that edit the YAML node tree directly. The model
+// is synced to the nodes first so earlier model fixes are kept, and the model is
+// rebuilt from the edited nodes afterwards so the edits survive marshalling.
+// A pending fix is skipped as a conflict only if an earlier fix for the same rule
+// and location applied, so a failed node fix does not block the ones after it.
+func applyNodeFixes(ctx context.Context, doc *openapi.OpenAPI, result *Result, nodeFixes []pendingNodeFix, modified map[conflictKey]bool) error {
+	if len(nodeFixes) == 0 {
+		return nil
+	}
+
+	rootNode, err := marshaller.Sync(ctx, doc)
+	if err != nil {
+		return fmt.Errorf("failed to sync document before applying node fixes: %w", err)
+	}
+	if rootNode == nil {
+		return errors.New("failed to sync document before applying node fixes: no root node")
+	}
+
+	notApplied := make(map[int]bool)
+	for _, nf := range nodeFixes {
+		if nf.key.Line >= 0 && modified[nf.key] {
+			notApplied[nf.index] = true
+			result.Skipped = append(result.Skipped, SkippedFix{
+				Error:  nf.vErr,
+				Fix:    nf.fix,
+				Reason: SkipConflict,
+			})
+			continue
+		}
+
+		if err := nf.fix.ApplyNode(rootNode); err != nil {
+			notApplied[nf.index] = true
+			result.Failed = append(result.Failed, FailedFix{
+				Error: nf.vErr, Fix: nf.fix, FixError: err,
+			})
+			continue
+		}
+
+		if nf.key.Line >= 0 {
+			modified[nf.key] = true
+		}
+	}
+
+	if len(notApplied) > 0 {
+		applied := make([]AppliedFix, 0, len(result.Applied)-len(notApplied))
+		for i, af := range result.Applied {
+			if !notApplied[i] {
+				applied = append(applied, af)
+			}
+		}
+		result.Applied = applied
+	}
+
+	if len(notApplied) == len(nodeFixes) {
+		return nil
+	}
+
+	// Rebuild from the document node, if there is one, so its comments are kept.
+	node := rootNode
+	if documentNode := doc.GetCore().DocumentNode; documentNode != nil && documentNode.Kind == yaml.DocumentNode {
+		documentNode.Content = []*yaml.Node{rootNode}
+		node = documentNode
+	}
+
+	config := doc.GetCore().GetConfig()
+	*doc = openapi.OpenAPI{}
+	doc.InitCache()
+	doc.GetCore().SetConfig(config)
+	if _, err := marshaller.UnmarshalNode(ctx, "", node, doc); err != nil {
+		return fmt.Errorf("failed to rebuild document after applying node fixes: %w", err)
+	}
+
+	return nil
 }
 
 func makeAppliedFix(vErr *validation.Error, fix validation.Fix) AppliedFix {

@@ -1,7 +1,9 @@
 package fix_test
 
 import (
+	"bytes"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/linter/fix"
@@ -611,4 +613,234 @@ func TestEngine_SortsByLocation(t *testing.T) {
 		order = append(order, af.Fix.Description())
 	}
 	assert.Equal(t, []string{"fix-line2", "fix-line5", "fix-line10"}, order, "fixes should be applied in location order")
+}
+
+// setNodeValueFix is a node fix that replaces the value of a YAML node.
+type setNodeValueFix struct {
+	mockFix
+	node  *yaml.Node
+	value string
+}
+
+func (f *setNodeValueFix) ApplyNode(_ *yaml.Node) error {
+	f.node.Value = f.value
+	return nil
+}
+
+// modelFix is a fix that edits the document model.
+type modelFix struct {
+	mockFix
+	apply func(doc *openapi.OpenAPI)
+}
+
+func (f *modelFix) Apply(doc any) error {
+	f.apply(doc.(*openapi.OpenAPI))
+	return nil
+}
+
+func TestEngine_NodeFix_SurvivesMarshal(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/
+paths:
+  /pets/:
+    get:
+      responses:
+        "200":
+          description: ok
+`))
+	require.NoError(t, err, "unmarshal should succeed")
+
+	urlNode := doc.Servers[0].GetCore().URL.ValueNode
+	pathKeyNode := doc.Paths.GetCore().GetMapKeyNodeOrRoot("/pets/", doc.Paths.GetRootNode())
+
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto}, nil, nil)
+	result, err := engine.ProcessErrors(ctx, doc, []error{
+		makeError("version-rule", 4, 12, "version", &modelFix{
+			mockFix: mockFix{description: "bump version"},
+			apply:   func(doc *openapi.OpenAPI) { doc.Info.Version = "2.0.0" },
+		}),
+		makeError("url-rule", 6, 10, "url", &setNodeValueFix{
+			mockFix: mockFix{description: "trim url"},
+			node:    urlNode,
+			value:   "https://api.example.com",
+		}),
+		makeError("path-rule", 8, 3, "path", &setNodeValueFix{
+			mockFix: mockFix{description: "trim path"},
+			node:    pathKeyNode,
+			value:   "/pets",
+		}),
+	})
+	require.NoError(t, err, "ProcessErrors should not fail")
+	assert.Len(t, result.Applied, 3, "should apply all fixes")
+
+	var buf bytes.Buffer
+	require.NoError(t, openapi.Marshal(ctx, doc, &buf), "marshal should succeed")
+	assert.Equal(t, `openapi: 3.1.0
+info:
+  title: Test
+  version: 2.0.0
+servers:
+  - url: https://api.example.com
+paths:
+  /pets:
+    get:
+      responses:
+        "200":
+          description: ok
+`, buf.String(), "marshalled document should keep both model and node fixes")
+}
+
+// failingNodeFix is a node fix that always fails.
+type failingNodeFix struct {
+	mockFix
+}
+
+func (f *failingNodeFix) ApplyNode(_ *yaml.Node) error {
+	return errors.New("node fix failed")
+}
+
+func TestEngine_NodeFix_FailureIsReported(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths: {}
+`))
+	require.NoError(t, err, "unmarshal should succeed")
+
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto}, nil, nil)
+	result, err := engine.ProcessErrors(ctx, doc, []error{
+		makeError("rule-a", 1, 1, "a", &failingNodeFix{mockFix: mockFix{description: "failing node fix"}}),
+		makeError("rule-b", 2, 1, "b", &mockFix{description: "model fix"}),
+	})
+	require.NoError(t, err, "ProcessErrors should not fail")
+	require.Len(t, result.Applied, 1, "should apply only the model fix")
+	assert.Equal(t, "model fix", result.Applied[0].Fix.Description(), "applied fix should be the model fix")
+	require.Len(t, result.Failed, 1, "should report the failed node fix")
+	assert.EqualError(t, result.Failed[0].FixError, "node fix failed", "failure should carry the node fix error")
+}
+
+func TestEngine_NodeFix_KeepsDocumentComments(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(`# Pets API
+# Maintained by the platform team.
+
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/
+paths: {}
+`))
+	require.NoError(t, err, "unmarshal should succeed")
+
+	urlNode := doc.Servers[0].GetCore().URL.ValueNode
+
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto}, nil, nil)
+	result, err := engine.ProcessErrors(ctx, doc, []error{
+		makeError("url-rule", 9, 10, "url", &setNodeValueFix{
+			mockFix: mockFix{description: "trim url"},
+			node:    urlNode,
+			value:   "https://api.example.com",
+		}),
+	})
+	require.NoError(t, err, "ProcessErrors should not fail")
+	require.Len(t, result.Applied, 1, "should apply the node fix")
+
+	var buf bytes.Buffer
+	require.NoError(t, openapi.Marshal(ctx, doc, &buf), "marshal should succeed")
+	assert.Equal(t, `# Pets API
+# Maintained by the platform team.
+
+openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+servers:
+  - url: https://api.example.com
+paths: {}
+`, buf.String(), "marshalled document should keep the document comments")
+}
+
+func TestEngine_NodeFix_FailedFixDoesNotBlockSameLocation(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/
+paths: {}
+`))
+	require.NoError(t, err, "unmarshal should succeed")
+
+	urlNode := doc.Servers[0].GetCore().URL.ValueNode
+
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto}, nil, nil)
+	result, err := engine.ProcessErrors(ctx, doc, []error{
+		makeError("url-rule", 6, 10, "url", &failingNodeFix{mockFix: mockFix{description: "failing node fix"}}),
+		makeError("url-rule", 6, 10, "url", &setNodeValueFix{
+			mockFix: mockFix{description: "trim url"},
+			node:    urlNode,
+			value:   "https://api.example.com",
+		}),
+	})
+	require.NoError(t, err, "ProcessErrors should not fail")
+	require.Len(t, result.Failed, 1, "should report the failed node fix")
+	require.Len(t, result.Applied, 1, "should apply the fix after the failed one")
+	assert.Equal(t, "trim url", result.Applied[0].Fix.Description(), "applied fix should be the second node fix")
+	assert.Empty(t, result.Skipped, "the failed fix should not cause a conflict")
+	assert.Equal(t, "https://api.example.com", doc.Servers[0].URL, "document should contain the applied fix")
+}
+
+func TestEngine_NodeFix_SkipsConflictAfterAppliedFix(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	doc, _, err := openapi.Unmarshal(ctx, strings.NewReader(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/
+paths: {}
+`))
+	require.NoError(t, err, "unmarshal should succeed")
+
+	urlNode := doc.Servers[0].GetCore().URL.ValueNode
+
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto}, nil, nil)
+	result, err := engine.ProcessErrors(ctx, doc, []error{
+		makeError("url-rule", 6, 10, "url", &setNodeValueFix{
+			mockFix: mockFix{description: "trim url"},
+			node:    urlNode,
+			value:   "https://api.example.com",
+		}),
+		makeError("url-rule", 6, 10, "url", &setNodeValueFix{
+			mockFix: mockFix{description: "replace url"},
+			node:    urlNode,
+			value:   "https://other.example.com",
+		}),
+	})
+	require.NoError(t, err, "ProcessErrors should not fail")
+	require.Len(t, result.Applied, 1, "should apply only the first node fix")
+	assert.Equal(t, "trim url", result.Applied[0].Fix.Description(), "applied fix should be the first node fix")
+	require.Len(t, result.Skipped, 1, "should skip the second node fix")
+	assert.Equal(t, fix.SkipConflict, result.Skipped[0].Reason, "second node fix should be skipped as a conflict")
+	assert.Equal(t, "https://api.example.com", doc.Servers[0].URL, "document should contain only the first fix")
 }
