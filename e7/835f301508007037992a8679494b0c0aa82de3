@@ -1,0 +1,29 @@
+openapi/bundle_test.go
+  h_9630b74bdac540 215-651
+openapi/bundle.go
+  h_9630b74bdac540 14,43-45,180-186,190-252,481-483,485,487,490,492,494,496,498,500,502,504,506,511-546,549-551,557-558,564,566-568,571,968,971-972,977-978,990-998
+  s_b29caf4a3c297c::t_3ac777afd78a2c 253,570
+cmd/openapi/commands/openapi/README.md
+  h_9630b74bdac540 728-729
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e7835f301508007037992a8679494b0c0aa82de3",
+  "prompts": {},
+  "humans": {
+    "h_9630b74bdac540": {
+      "author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  },
+  "sessions": {
+    "s_b29caf4a3c297c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08c1ba3f-aca3-4498-8cfd-5f1ab9d64d58",
+        "model": "unknown"
+      },
+      "human_author": "Tristan Cartledge <tristan@speakeasyapi.dev>"
+    }
+  }
+}
