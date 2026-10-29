@@ -12,6 +12,7 @@ import (
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/internal/version"
+	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/references"
@@ -806,14 +807,8 @@ func generateFilePathBasedName(ref string, usedNames map[string]bool, targetLoca
 		cleanPath = normalizedPath
 	}
 
-	// Replace extension dot with underscore to keep it but make it safe
-	ext := filepath.Ext(cleanPath)
-	if ext != "" {
-		cleanPath = cleanPath[:len(cleanPath)-len(ext)] + "_" + ext[1:] // Remove dot, add underscore
-	}
-
-	// Replace path separators and unsafe characters with underscores
-	safeFileName := regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(cleanPath, "_")
+	// Keep the extension and replace path separators and unsafe characters with underscores
+	safeFileName := filePathToComponentPrefix(cleanPath)
 
 	var componentName string
 	if fragment == "" || fragment == "/" {
@@ -821,10 +816,15 @@ func generateFilePathBasedName(ref string, usedNames map[string]bool, targetLoca
 		componentName = safeFileName
 	} else {
 		// Reference to specific schema within file
-		// Clean up fragment (remove leading slash and convert path separators)
-		cleanFragment := strings.TrimPrefix(fragment, "/")
-		cleanFragment = strings.ReplaceAll(cleanFragment, "/", "_")
-		componentName = safeFileName + "__" + cleanFragment
+		// Clean up fragment: unescape and sanitize each pointer token, then join with underscores.
+		// Empty tokens (e.g. "a//b") are kept empty so existing names stay stable.
+		fragmentParts := strings.Split(strings.TrimPrefix(fragment, "/"), "/")
+		for i, part := range fragmentParts {
+			if part != "" {
+				fragmentParts[i] = references.SanitizeComponentName(jsonpointer.UnescapeString(part))
+			}
+		}
+		componentName = safeFileName + "__" + strings.Join(fragmentParts, "_")
 	}
 
 	// Ensure uniqueness
@@ -1292,12 +1292,7 @@ func extractSimpleNameFromReference(ref string) string {
 
 	if fragment == "" || fragment == "/" {
 		// Top-level file reference - use filename as simple name
-		baseName := filepath.Base(filePath)
-		ext := filepath.Ext(baseName)
-		if ext != "" {
-			baseName = baseName[:len(baseName)-len(ext)]
-		}
-		return regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(baseName, "_")
+		return sanitizeFileNameForComponent(fileStem(filePath))
 	}
 
 	// Reference to specific schema within file - extract schema name
@@ -1306,7 +1301,7 @@ func extractSimpleNameFromReference(ref string) string {
 	if len(fragmentParts) == 0 {
 		return "unknown"
 	}
-	return fragmentParts[len(fragmentParts)-1]
+	return references.SanitizeComponentName(jsonpointer.UnescapeString(fragmentParts[len(fragmentParts)-1]))
 }
 
 // findCircularReferenceMatch finds a component name for a circular reference

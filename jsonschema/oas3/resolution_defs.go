@@ -119,8 +119,7 @@ func (s *JSONSchema[Referenceable]) tryResolveLocalDefs(_ context.Context, ref r
 	}
 
 	// URL-decode the key (JSON pointer encoding)
-	defKey = strings.ReplaceAll(defKey, "~1", "/")
-	defKey = strings.ReplaceAll(defKey, "~0", "~")
+	defKey = jsonpointer.UnescapeString(defKey)
 
 	// Look up the definition in this schema's $defs
 	defs := schema.GetDefs()

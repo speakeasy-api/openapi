@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/sequencedmap"
 )
@@ -633,19 +634,11 @@ func extractComponentTypeAndName(ptr string) (typ, name string, ok bool) {
 	}
 
 	typ = parts[2]
-	name = unescapeJSONPointerToken(parts[3])
+	name = jsonpointer.UnescapeString(parts[3])
 	if typ == "" || name == "" {
 		return "", "", false
 	}
 	return typ, name, true
-}
-
-// unescapeJSONPointerToken reverses JSON Pointer escaping (~1 => /, ~0 => ~)
-func unescapeJSONPointerToken(s string) string {
-	// Per RFC 6901: ~1 is '/', ~0 is '~'. Order matters: replace ~1 first, then ~0.
-	s = strings.ReplaceAll(s, "~1", "/")
-	s = strings.ReplaceAll(s, "~0", "~")
-	return s
 }
 
 // countTracked returns the total number of referenced components recorded in the tracker.

@@ -10,9 +10,33 @@ import (
 	"github.com/speakeasy-api/openapi/jsonpointer"
 )
 
-// componentNameRegex matches valid OpenAPI component names according to the spec.
-// Component names must match: ^[a-zA-Z0-9\.\-_]+$
-var componentNameRegex = regexp.MustCompile(`^[a-zA-Z0-9.\-_]+$`)
+var (
+	// componentNameRegex matches valid OpenAPI component names according to the spec.
+	// Component names must match: ^[a-zA-Z0-9\.\-_]+$
+	componentNameRegex = regexp.MustCompile(`^[a-zA-Z0-9.\-_]+$`)
+	// invalidComponentNameCharsRegex matches runs of characters not allowed in component names.
+	invalidComponentNameCharsRegex = regexp.MustCompile(`[^a-zA-Z0-9.\-_]+`)
+)
+
+// IsValidComponentName reports whether name matches the OpenAPI component name pattern ^[a-zA-Z0-9\.\-_]+$.
+func IsValidComponentName(name string) bool {
+	return componentNameRegex.MatchString(name)
+}
+
+// SanitizeComponentName converts name into one that satisfies the OpenAPI component name pattern.
+// Names that are already valid are returned unchanged. Otherwise runs of invalid characters are
+// replaced with "_" and leading/trailing "_" are trimmed, so a path item key such as "/users/{id}"
+// becomes "users_id". If nothing valid remains, "unknown" is returned.
+func SanitizeComponentName(name string) string {
+	if IsValidComponentName(name) {
+		return name
+	}
+	sanitized := strings.Trim(invalidComponentNameCharsRegex.ReplaceAllString(name, "_"), "_")
+	if sanitized == "" {
+		return "unknown"
+	}
+	return sanitized
+}
 
 type Reference string
 
@@ -146,11 +170,10 @@ func (r Reference) validateComponentReference(jp jsonpointer.JSONPointer) error 
 	}
 
 	// Unescape the component name before validating (JSON pointer escaping: ~0 = ~, ~1 = /)
-	unescapedName := strings.ReplaceAll(componentName, "~1", "/")
-	unescapedName = strings.ReplaceAll(unescapedName, "~0", "~")
+	unescapedName := jsonpointer.UnescapeString(componentName)
 
 	// Validate component name matches the required pattern
-	if !componentNameRegex.MatchString(unescapedName) {
+	if !IsValidComponentName(unescapedName) {
 		return fmt.Errorf("invalid reference: component name %q must match pattern ^[a-zA-Z0-9.\\-_]+$", unescapedName)
 	}
 

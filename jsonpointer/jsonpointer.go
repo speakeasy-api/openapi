@@ -432,3 +432,10 @@ func EscapeString(s string) string {
 func escape(part string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(part, "~", "~0"), "/", "~1")
 }
+
+// UnescapeString decodes a single JSON pointer reference token according to RFC6901.
+// It replaces "~1" with "/" and then "~0" with "~", the reverse of EscapeString.
+func UnescapeString(s string) string {
+	// Order matters: "~01" must decode to "~1", not "/".
+	return strings.ReplaceAll(strings.ReplaceAll(s, "~1", "/"), "~0", "~")
+}
