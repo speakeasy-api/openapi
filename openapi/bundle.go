@@ -807,14 +807,8 @@ func generateFilePathBasedName(ref string, usedNames map[string]bool, targetLoca
 		cleanPath = normalizedPath
 	}
 
-	// Replace extension dot with underscore to keep it but make it safe
-	ext := filepath.Ext(cleanPath)
-	if ext != "" {
-		cleanPath = cleanPath[:len(cleanPath)-len(ext)] + "_" + ext[1:] // Remove dot, add underscore
-	}
-
-	// Replace path separators and unsafe characters with underscores
-	safeFileName := regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(cleanPath, "_")
+	// Keep the extension and replace path separators and unsafe characters with underscores
+	safeFileName := filePathToComponentPrefix(cleanPath)
 
 	var componentName string
 	if fragment == "" || fragment == "/" {
@@ -822,10 +816,13 @@ func generateFilePathBasedName(ref string, usedNames map[string]bool, targetLoca
 		componentName = safeFileName
 	} else {
 		// Reference to specific schema within file
-		// Clean up fragment: unescape and sanitize each pointer token, then join with underscores
+		// Clean up fragment: unescape and sanitize each pointer token, then join with underscores.
+		// Empty tokens (e.g. "a//b") are kept empty so existing names stay stable.
 		fragmentParts := strings.Split(strings.TrimPrefix(fragment, "/"), "/")
 		for i, part := range fragmentParts {
-			fragmentParts[i] = references.SanitizeComponentName(jsonpointer.UnescapeString(part))
+			if part != "" {
+				fragmentParts[i] = references.SanitizeComponentName(jsonpointer.UnescapeString(part))
+			}
 		}
 		componentName = safeFileName + "__" + strings.Join(fragmentParts, "_")
 	}
@@ -1295,12 +1292,7 @@ func extractSimpleNameFromReference(ref string) string {
 
 	if fragment == "" || fragment == "/" {
 		// Top-level file reference - use filename as simple name
-		baseName := filepath.Base(filePath)
-		ext := filepath.Ext(baseName)
-		if ext != "" {
-			baseName = baseName[:len(baseName)-len(ext)]
-		}
-		return regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(baseName, "_")
+		return sanitizeFileNameForComponent(fileStem(filePath))
 	}
 
 	// Reference to specific schema within file - extract schema name

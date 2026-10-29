@@ -751,6 +751,70 @@ components:
 	}
 }
 
+func TestBundle_JSONPointerPathItemRef_FilePathConflict_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	pathItemFile := func(description string) string {
+		return `openapi: 3.1.0
+info:
+  title: users
+  version: "1"
+paths:
+  /users:
+    get:
+      responses:
+        "200":
+          description: ` + description + `
+`
+	}
+
+	files := map[string]string{
+		"openapi.yaml": `openapi: 3.1.0
+info:
+  title: t
+  version: "1"
+paths:
+  /users:
+    $ref: ./a/users.yaml#/paths/~1users
+  /v2/users:
+    $ref: ./b/users.yaml#/paths/~1users
+`,
+		"a/users.yaml": pathItemFile("from a"),
+		"b/users.yaml": pathItemFile("from b"),
+	}
+
+	expected := `openapi: 3.1.0
+info:
+  title: t
+  version: "1"
+paths:
+  /users:
+    $ref: '#/components/pathItems/users'
+  /v2/users:
+    $ref: '#/components/pathItems/b_users_yaml__paths_users'
+components:
+  pathItems:
+    users:
+      get:
+        responses:
+          "200":
+            description: from a
+    b_users_yaml__paths_users:
+      get:
+        responses:
+          "200":
+            description: from b
+`
+
+	actual := bundleFilesWithStrategy(t, files, openapi.BundleNamingFilePath)
+	assert.Equal(t, expected, actual, "conflicting path item should fall back to a valid file path based name")
+
+	_, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(actual))
+	require.NoError(t, err, "unmarshal bundled document")
+	assert.Empty(t, validationErrs, "bundled document should be valid")
+}
+
 func TestBundle_MissingExternalComponent_Error(t *testing.T) {
 	t.Parallel()
 

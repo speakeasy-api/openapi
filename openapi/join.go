@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/hashing"
@@ -329,15 +328,8 @@ func createPathItemWithOperations(conflictingOps []ConflictingOperation) *PathIt
 
 // generateConflictPath creates a new path with a fragment containing the file name
 func generateConflictPath(originalPath, filePath string) string {
-	// Extract filename without extension for the fragment
-	baseName := filepath.Base(filePath)
-	ext := filepath.Ext(baseName)
-	if ext != "" {
-		baseName = baseName[:len(baseName)-len(ext)]
-	}
-
-	// Clean the filename to make it URL-safe
-	safeFileName := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(baseName, "_")
+	// Use the filename without extension, cleaned to be URL-safe, as the fragment
+	safeFileName := sanitizeFileNameForFragment(fileStem(filePath))
 
 	// Create new path with fragment
 	return fmt.Sprintf("%s#%s", originalPath, safeFileName)
@@ -681,14 +673,8 @@ func generateJoinFilePathBasedName(originalName, filePath string, usedNames map[
 	cleanPath := filepath.Clean(filePath)
 	cleanPath = strings.TrimPrefix(cleanPath, "./")
 
-	// Replace extension dot with underscore
-	ext := filepath.Ext(cleanPath)
-	if ext != "" {
-		cleanPath = cleanPath[:len(cleanPath)-len(ext)] + "_" + ext[1:]
-	}
-
-	// Replace path separators and unsafe characters with underscores
-	safeFileName := regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(cleanPath, "_")
+	// Keep the extension and replace path separators and unsafe characters with underscores
+	safeFileName := filePathToComponentPrefix(cleanPath)
 
 	componentName := safeFileName + "__" + originalName
 
@@ -907,17 +893,7 @@ func resolveOperationIdConflicts(doc *OpenAPI, usedOperationIds map[string]bool,
 
 // generateDocumentName extracts a clean document name from the file path
 func generateDocumentName(filePath string) string {
-	// Extract filename without extension
-	baseName := filepath.Base(filePath)
-	ext := filepath.Ext(baseName)
-	if ext != "" {
-		baseName = baseName[:len(baseName)-len(ext)]
-	}
-
-	// Clean the filename to make it safe
-	safeFileName := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(baseName, "_")
-
-	return safeFileName
+	return sanitizeFileNameForFragment(fileStem(filePath))
 }
 
 // joinServersAndSecurity handles smart conflict resolution for servers and security
