@@ -212,6 +212,457 @@ components:
 	assert.NotContains(t, output.String(), "./schema.yaml", "nested source-relative references should be removed")
 }
 
+// bundleFiles writes files into a temporary directory, bundles openapi.yaml with counter naming and returns the marshaled result.
+func bundleFiles(t *testing.T, files map[string]string) string {
+	t.Helper()
+
+	ctx := t.Context()
+	dir := t.TempDir()
+	for name, content := range files {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755), "create directory for %s", name)
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o600), "write %s", name)
+	}
+
+	root := filepath.Join(dir, "openapi.yaml")
+	f, err := os.Open(root)
+	require.NoError(t, err, "open root document")
+	defer f.Close()
+
+	doc, validationErrs, err := openapi.Unmarshal(ctx, f)
+	require.NoError(t, err, "unmarshal root document")
+	require.Empty(t, validationErrs, "root document should be valid")
+
+	err = openapi.Bundle(ctx, doc, openapi.BundleOptions{
+		ResolveOptions: openapi.ResolveOptions{RootDocument: doc, TargetLocation: root},
+		NamingStrategy: openapi.BundleNamingCounter,
+	})
+	require.NoError(t, err, "bundle should succeed")
+
+	var buf bytes.Buffer
+	require.NoError(t, openapi.Marshal(ctx, doc, &buf), "marshal bundled document")
+	return buf.String()
+}
+
+const itemSchemaFile = `type: object
+properties:
+  id:
+    type: string
+`
+
+func TestBundle_NestedRefsInBundledComponents_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		files    map[string]string
+		expected string
+	}{
+		{
+			name: "schema ref inside operation of external path item",
+			files: map[string]string{
+				"openapi.yaml": `openapi: 3.1.0
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    $ref: ./paths/items.yaml
+`,
+				"paths/items.yaml": `get:
+  responses:
+    "200":
+      description: ok
+      content:
+        application/json:
+          schema:
+            $ref: ../schemas/Item.yaml
+`,
+				"schemas/Item.yaml": itemSchemaFile,
+			},
+			expected: `openapi: 3.1.0
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    $ref: '#/components/pathItems/items'
+components:
+  schemas:
+    Item:
+      type: object
+      properties:
+        id:
+          type: string
+  pathItems:
+    items:
+      get:
+        responses:
+          "200":
+            description: ok
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Item'
+`,
+		},
+		{
+			name: "schema ref nested inside inline schema of external response",
+			files: map[string]string{
+				"openapi.yaml": `openapi: 3.1.0
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    get:
+      responses:
+        "200":
+          $ref: ./responses/list.yaml
+`,
+				"responses/list.yaml": `description: ok
+content:
+  application/json:
+    schema:
+      type: array
+      items:
+        $ref: ../schemas/Item.yaml
+`,
+				"schemas/Item.yaml": itemSchemaFile,
+			},
+			expected: `openapi: 3.1.0
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    get:
+      responses:
+        "200":
+          $ref: '#/components/responses/list'
+components:
+  schemas:
+    Item:
+      type: object
+      properties:
+        id:
+          type: string
+  responses:
+    list:
+      description: ok
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/Item'
+`,
+		},
+		{
+			name: "component refs inside operations of external path item",
+			files: map[string]string{
+				"openapi.yaml": `openapi: 3.1.0
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    $ref: ./paths/items.yaml
+`,
+				"paths/items.yaml": `post:
+  parameters:
+    - $ref: ../parameters/limit.yaml
+  requestBody:
+    $ref: ../requestBodies/create.yaml
+  responses:
+    "200":
+      description: ok
+      headers:
+        X-Trace:
+          $ref: ../headers/trace.yaml
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              item:
+                $ref: ../schemas/Item.yaml
+`,
+				"parameters/limit.yaml": `name: limit
+in: query
+schema:
+  type: integer
+`,
+				"requestBodies/create.yaml": `content:
+  application/json:
+    schema:
+      $ref: ../schemas/Item.yaml
+`,
+				"headers/trace.yaml": `schema:
+  type: string
+`,
+				"schemas/Item.yaml": itemSchemaFile,
+			},
+			expected: `openapi: 3.1.0
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    $ref: '#/components/pathItems/items'
+components:
+  schemas:
+    Item:
+      type: object
+      properties:
+        id:
+          type: string
+  parameters:
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+  requestBodies:
+    create:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Item'
+  headers:
+    trace:
+      schema:
+        type: string
+  pathItems:
+    items:
+      post:
+        parameters:
+          - $ref: '#/components/parameters/limit'
+        requestBody:
+          $ref: '#/components/requestBodies/create'
+        responses:
+          "200":
+            description: ok
+            headers:
+              X-Trace:
+                $ref: '#/components/headers/trace'
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    item:
+                      $ref: '#/components/schemas/Item'
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			actual := bundleFiles(t, tt.files)
+			assert.Equal(t, tt.expected, actual, "bundled document should only contain local references")
+		})
+	}
+}
+
+func TestBundle_PathItemPlacementByVersion_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		files    map[string]string
+		expected string
+	}{
+		{
+			name: "openapi 3.0 inlines external path item",
+			files: map[string]string{
+				"openapi.yaml": `openapi: 3.0.3
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    $ref: ./paths/items.yaml
+`,
+				"paths/items.yaml": `get:
+  responses:
+    "200":
+      description: ok
+      content:
+        application/json:
+          schema:
+            $ref: ../schemas/Item.yaml
+`,
+				"schemas/Item.yaml": itemSchemaFile,
+			},
+			expected: `openapi: 3.0.3
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+components:
+  schemas:
+    Item:
+      type: object
+      properties:
+        id:
+          type: string
+`,
+		},
+		{
+			name: "openapi 3.0 references first inlined location for repeated path item and keeps other paths",
+			files: map[string]string{
+				"openapi.yaml": `openapi: 3.0.3
+info:
+  title: t
+  version: "1"
+paths:
+  /health:
+    get:
+      responses:
+        "204":
+          description: healthy
+  /health-alias:
+    $ref: '#/paths/~1health'
+  /items:
+    $ref: ./paths/items.yaml
+  /items-alias:
+    $ref: ./paths/items.yaml
+`,
+				"paths/items.yaml": `get:
+  responses:
+    "200":
+      description: ok
+`,
+			},
+			expected: `openapi: 3.0.3
+info:
+  title: t
+  version: "1"
+paths:
+  /health:
+    get:
+      responses:
+        "204":
+          description: healthy
+  /health-alias:
+    $ref: '#/paths/~1health'
+  /items:
+    get:
+      responses:
+        "200":
+          description: ok
+  /items-alias:
+    $ref: '#/paths/~1items'
+`,
+		},
+		{
+			name: "openapi 3.0 inlines path items in callbacks and breaks recursion",
+			files: map[string]string{
+				"openapi.yaml": `openapi: 3.0.3
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    $ref: ./paths/items.yaml
+`,
+				"paths/items.yaml": `post:
+  callbacks:
+    onEvent:
+      '{$request.body#/url}':
+        $ref: ./event.yaml
+  responses:
+    "200":
+      description: ok
+`,
+				"paths/event.yaml": `post:
+  callbacks:
+    again:
+      '{$request.body#/url}':
+        $ref: ./items.yaml
+  responses:
+    "204":
+      description: accepted
+`,
+			},
+			expected: `openapi: 3.0.3
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    post:
+      responses:
+        "200":
+          description: ok
+      callbacks:
+        onEvent:
+          '{$request.body#/url}':
+            post:
+              responses:
+                "204":
+                  description: accepted
+              callbacks:
+                again:
+                  '{$request.body#/url}':
+                    $ref: '#/paths/~1items'
+`,
+		},
+		{
+			name: "openapi 3.1 keeps external path item in components",
+			files: map[string]string{
+				"openapi.yaml": `openapi: 3.1.0
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    $ref: ./paths/items.yaml
+`,
+				"paths/items.yaml": `get:
+  responses:
+    "200":
+      description: ok
+`,
+			},
+			expected: `openapi: 3.1.0
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    $ref: '#/components/pathItems/items'
+components:
+  pathItems:
+    items:
+      get:
+        responses:
+          "200":
+            description: ok
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			actual := bundleFiles(t, tt.files)
+			assert.Equal(t, tt.expected, actual, "bundled path items should match the document version")
+		})
+	}
+}
+
 func TestBundle_MissingExternalComponent_Error(t *testing.T) {
 	t.Parallel()
 

@@ -725,6 +725,8 @@ What bundling does:
 - Maintains reference structure (unlike inline which expands everything)
 - Creates self-contained documents that work with reference-aware tooling
 - Handles circular references and naming conflicts intelligently
+- Rewrites references nested inside bundled components (operations, inline schemas, etc.) to their bundled locations
+- For OpenAPI 3.0 documents, which have no `components.pathItems`, writes each external path item inline at its first use; later or recursive uses reference that inlined location instead
 
 **Before bundling:**
 
