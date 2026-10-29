@@ -12,6 +12,7 @@ import (
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/internal/version"
+	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/references"
@@ -824,7 +825,7 @@ func generateFilePathBasedName(ref string, usedNames map[string]bool, targetLoca
 		// Clean up fragment: unescape and sanitize each pointer token, then join with underscores
 		fragmentParts := strings.Split(strings.TrimPrefix(fragment, "/"), "/")
 		for i, part := range fragmentParts {
-			fragmentParts[i] = sanitizeComponentName(unescapeJSONPointerToken(part))
+			fragmentParts[i] = references.SanitizeComponentName(jsonpointer.UnescapeString(part))
 		}
 		componentName = safeFileName + "__" + strings.Join(fragmentParts, "_")
 	}
@@ -1308,27 +1309,7 @@ func extractSimpleNameFromReference(ref string) string {
 	if len(fragmentParts) == 0 {
 		return "unknown"
 	}
-	return sanitizeComponentName(unescapeJSONPointerToken(fragmentParts[len(fragmentParts)-1]))
-}
-
-var (
-	validComponentName        = regexp.MustCompile(`^[a-zA-Z0-9.\-_]+$`)
-	invalidComponentNameChars = regexp.MustCompile(`[^a-zA-Z0-9.\-_]+`)
-)
-
-// sanitizeComponentName converts a name into one that satisfies the OpenAPI component name
-// pattern ^[a-zA-Z0-9.\-_]+$. Names that are already valid are returned unchanged. Otherwise runs of
-// invalid characters are replaced with "_" and leading/trailing "_" are trimmed, so a path item key
-// such as "/users/{id}" becomes "users_id".
-func sanitizeComponentName(name string) string {
-	if validComponentName.MatchString(name) {
-		return name
-	}
-	sanitized := strings.Trim(invalidComponentNameChars.ReplaceAllString(name, "_"), "_")
-	if sanitized == "" {
-		return "unknown"
-	}
-	return sanitized
+	return references.SanitizeComponentName(jsonpointer.UnescapeString(fragmentParts[len(fragmentParts)-1]))
 }
 
 // findCircularReferenceMatch finds a component name for a circular reference

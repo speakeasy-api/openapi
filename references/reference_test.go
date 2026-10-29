@@ -7,6 +7,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSanitizeComponentName_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{name: "valid name unchanged", input: "User", expected: "User"},
+		{name: "valid name with dot, dash and underscore unchanged", input: "my.Schema-v1_x", expected: "my.Schema-v1_x"},
+		{name: "valid leading underscore unchanged", input: "_Private", expected: "_Private"},
+		{name: "path item key", input: "/users", expected: "users"},
+		{name: "path item key with parameter", input: "/users/{id}", expected: "users_id"},
+		{name: "spaces and symbols collapse to single underscore", input: "User @ Schema", expected: "User_Schema"},
+		{name: "nothing valid remains", input: "/{}", expected: "unknown"},
+		{name: "empty string", input: "", expected: "unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			actual := SanitizeComponentName(tt.input)
+			assert.Equal(t, tt.expected, actual, "should return a sanitized component name")
+			assert.True(t, IsValidComponentName(actual), "sanitized name should be valid")
+		})
+	}
+}
+
 func TestReference_Validate_Success(t *testing.T) {
 	t.Parallel()
 

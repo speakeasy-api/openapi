@@ -702,6 +702,36 @@ func TestEscapeString_Success(t *testing.T) {
 	}
 }
 
+func TestUnescapeString_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{name: "no special characters", input: "hello", expected: "hello"},
+		{name: "empty string", input: "", expected: ""},
+		{name: "escaped tilde", input: "~0", expected: "~"},
+		{name: "escaped slash", input: "~1", expected: "/"},
+		{name: "path item key", input: "~1users~1{id}", expected: "/users/{id}"},
+		{name: "RFC6901 example - a/b", input: "a~1b", expected: "a/b"},
+		{name: "RFC6901 example - m~n", input: "m~0n", expected: "m~n"},
+		{name: "edge case - ~01 decodes to ~1", input: "~01", expected: "~1"},
+		{name: "edge case - ~10 decodes to /0", input: "~10", expected: "/0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := UnescapeString(tt.input)
+			assert.Equal(t, tt.expected, result, "should decode the reference token")
+			assert.Equal(t, tt.input, EscapeString(result), "should round trip through EscapeString")
+		})
+	}
+}
+
 func TestJSONPointer_String_Success(t *testing.T) {
 	t.Parallel()
 

@@ -21,9 +21,7 @@ type navigationPart struct {
 }
 
 func (n navigationPart) unescapeValue() string {
-	val := strings.ReplaceAll(n.Value, "~1", "/")
-	val = strings.ReplaceAll(val, "~0", "~")
-	return val
+	return UnescapeString(n.Value)
 }
 
 func (n navigationPart) getIndex() int {
