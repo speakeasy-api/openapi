@@ -141,7 +141,7 @@ func walkTreesAndCollectActions(path simplePath, y1 *yaml.Node, y2 yaml.Node) ([
 	case yaml.MappingNode:
 		return walkMappingNode(path, y1, y2)
 	case yaml.ScalarNode:
-		if y1.Value != y2.Value {
+		if y1.Value != y2.Value || y1.ShortTag() != y2.ShortTag() {
 			return []Action{{
 				Target: path.ToJSONPath(),
 				Update: y2,
