@@ -270,10 +270,7 @@ func applyMerge(node *yaml.Node, update *yaml.Node, opts mergeOptions) (bool, er
 			*node = *clone(update)
 			return isChanged, nil
 		}
-		// Scalar-to-scalar: update value only, preserving target's style/tag
-		isChanged := node.Value != update.Value
-		node.Value = update.Value
-		return isChanged, nil
+		return mergeScalarNode(node, update), nil
 	}
 }
 
@@ -297,11 +294,27 @@ func mergeNode(node *yaml.Node, merge *yaml.Node, opts mergeOptions) (bool, erro
 	case yaml.SequenceNode:
 		return mergeSequenceNode(node, merge), nil
 	default:
-		isChanged := node.Value != merge.Value
-		node.Value = merge.Value
-		return isChanged, nil
+		return mergeScalarNode(node, merge), nil
 	}
 }
+
+// Scalar merge helpers.
+
+// mergeScalarNode preserves formatting unless it would change the replacement's type
+// when encoded, as quoting a boolean without an explicit tag turns it into a string.
+func mergeScalarNode(node *yaml.Node, update *yaml.Node) bool {
+	tag := update.ShortTag()
+	typeChanged := node.ShortTag() != tag
+	changed := node.Value != update.Value || typeChanged
+	if typeChanged {
+		node.Style = update.Style
+	}
+	node.Tag = tag
+	node.Value = update.Value
+	return changed
+}
+
+// End scalar merge helpers.
 
 // mergeMappingNode will perform a shallow merge of the merge node into the main
 // node.

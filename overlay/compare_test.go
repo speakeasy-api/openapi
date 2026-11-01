@@ -1,6 +1,8 @@
 package overlay_test
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/overlay"
@@ -79,4 +81,58 @@ func TestCompare_ArrayAppendMultiple(t *testing.T) {
 	expectedYAML, err := yaml.Marshal(&expected)
 	require.NoError(t, err)
 	assert.Equal(t, string(expectedYAML), string(actualYAML))
+}
+
+func TestCompare_OpenAPIScalarTypes_Success(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name, beforeType, afterType, beforeValue, afterValue string
+	}{
+		{"boolean to string", "boolean", "string", "false", `"false"`},
+		{"integer to string", "integer", "string", "0", `"0"`},
+		{"null to string", `"null"`, "string", "null", `"null"`},
+		{"string to boolean", "string", "boolean", `"enabled"`, "true"},
+		{"integer to different string", "integer", "string", "0", `"1"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			const document = `openapi: 3.1.0
+info: {title: Settings API, version: 1.0.0}
+paths:
+  /settings:
+    get:
+      responses:
+        '200':
+          description: Current setting
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Setting'
+components:
+  schemas:
+    Setting:
+      type: %s
+      default: %s
+      enum: [%s]
+`
+			before, err := loader.LoadSpecificationFromReader(strings.NewReader(fmt.Sprintf(document, tt.beforeType, tt.beforeValue, tt.beforeValue)))
+			require.NoError(t, err, "before OpenAPI document should load")
+			after, err := loader.LoadSpecificationFromReader(strings.NewReader(fmt.Sprintf(document, tt.afterType, tt.afterValue, tt.afterValue)))
+			require.NoError(t, err, "after OpenAPI document should load")
+			change, err := overlay.Compare("Migrate setting type", before, *after)
+			require.NoError(t, err, "comparison should succeed")
+			serialized, err := change.ToString()
+			require.NoError(t, err, "generated overlay should serialize")
+			parsed, err := overlay.ParseReader(strings.NewReader(serialized))
+			require.NoError(t, err, "generated overlay should parse")
+			require.NoError(t, parsed.ApplyTo(before), "generated overlay should apply")
+			encoded, err := yaml.Marshal(before)
+			require.NoError(t, err, "transformed OpenAPI document should serialize")
+			var actual, expected any
+			require.NoError(t, yaml.Unmarshal(encoded, &actual), "transformed OpenAPI document should decode")
+			require.NoError(t, after.Decode(&expected), "target OpenAPI document should decode")
+			assert.Equal(t, expected, actual, "default and enum must retain the target JSON types")
+		})
+	}
 }

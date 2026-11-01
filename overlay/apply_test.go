@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
@@ -928,4 +929,61 @@ func TestApplyToOld(t *testing.T) {
 	result = path.Query(nodeNew)
 	require.NoError(t, err)
 	require.Empty(t, result)
+}
+
+func TestApplyToStrict_ScalarTypeChange_Success(t *testing.T) {
+	t.Parallel()
+	for _, version := range []string{"1.0.0", "1.1.0"} {
+		for _, tt := range []struct {
+			name, action string
+		}{
+			{"direct update", "  - target: $.default\n    update: true\n"},
+			{"recursive update", "  - target: $\n    update: {default: true}\n"},
+			{"copy", "  - target: $.default\n    copy: $.source\n"},
+		} {
+			t.Run(version+"/"+tt.name, func(t *testing.T) {
+				t.Parallel()
+				var document yaml.Node
+				require.NoError(t, yaml.Unmarshal([]byte("default: 'true' # keep comment\nsource: true\n"), &document), "document should load")
+				target := document.Content[0].Content[1]
+				originalComment := target.LineComment
+				change, err := overlay.ParseReader(strings.NewReader("overlay: " + version + "\ninfo: {title: Change type, version: 1.0.0}\nactions:\n" + tt.action))
+				require.NoError(t, err, "overlay should parse")
+				warnings, err := change.ApplyToStrict(&document)
+				require.NoError(t, err, "scalar type changes should apply")
+				assert.Empty(t, warnings, "a type change must not be reported as doing nothing")
+				assert.Zero(t, target.Style, "a boolean update must not retain string quoting")
+				assert.Equal(t, originalComment, target.LineComment, "target comments should be preserved")
+				encoded, err := yaml.Marshal(&document)
+				require.NoError(t, err, "transformed document should serialize")
+				var actual map[string]any
+				require.NoError(t, yaml.Unmarshal(encoded, &actual), "transformed document should decode")
+				assert.Equal(t, map[string]any{"default": true, "source": true}, actual, "update must replace the string with a boolean")
+				warnings, err = change.ApplyToStrict(&document)
+				require.NoError(t, err, "reapplying the scalar change should succeed")
+				require.Len(t, warnings, 1, "reapplying an identical scalar should report no change")
+				assert.Contains(t, warnings[0], "does nothing", "no-op warnings should remain accurate")
+			})
+		}
+	}
+}
+
+func TestApplyToStrict_SameScalarTypePreservesStyle_Success(t *testing.T) {
+	t.Parallel()
+	var document yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte("default: 'old' # keep comment\n"), &document), "document should load")
+	change, err := overlay.ParseReader(strings.NewReader(`overlay: 1.1.0
+info: {title: Edit text, version: 1.0.0}
+actions:
+  - target: $.default
+    update: new
+`))
+	require.NoError(t, err, "overlay should parse")
+	warnings, err := change.ApplyToStrict(&document)
+	require.NoError(t, err, "same-type edit should apply")
+	assert.Empty(t, warnings, "a changed value should not warn")
+	target := document.Content[0].Content[1]
+	assert.Equal(t, yaml.SingleQuotedStyle, target.Style, "same-type edits should retain quoting")
+	assert.Equal(t, "# keep comment", target.LineComment, "same-type edits should retain comments")
+	assert.Equal(t, "new", target.Value, "new value should be applied")
 }
