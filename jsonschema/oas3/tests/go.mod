@@ -3,7 +3,7 @@ module github.com/speakeasy-api/openapi/jsonschema/oas3/tests
 go 1.26.0
 
 require (
-	github.com/speakeasy-api/openapi v1.16.2
+	github.com/speakeasy-api/openapi v1.25.7-0.20261016002657-683982d5baaf
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
 )
@@ -54,7 +54,7 @@ require (
 	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
