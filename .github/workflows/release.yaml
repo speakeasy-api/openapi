@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install mise
-        uses: jdx/mise-action@v5.2.4
+        uses: jdx/mise-action@v5.2.7
 
       - name: Setup Go
         uses: actions/setup-go@v7
