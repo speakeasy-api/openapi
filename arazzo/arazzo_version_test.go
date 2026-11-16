@@ -111,6 +111,52 @@ func TestArazzo_Validate_Arazzo11FeaturesIn10Document_Error(t *testing.T) {
 	assert.ElementsMatch(t, expected, messages, "should report each Arazzo 1.1 feature used in a 1.0 document")
 }
 
+func TestArazzo_Validate_Self_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		self     string
+		expected string
+	}{
+		{name: "fragment identifier", self: "https://example.com/pets.arazzo.yaml#/info", expected: "`$self` must not contain a fragment identifier"},
+		{name: "invalid uri", self: "'http://[::1'", expected: "`$self` must be a valid URI reference"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			doc := "arazzo: 1.1.0\n$self: " + tt.self + "\ninfo:\n  title: Self\n  version: 1.0.0\nsourceDescriptions:\n  - name: api\n    url: ./api.yaml\nworkflows:\n  - workflowId: main\n    steps:\n      - stepId: first\n        operationId: getPet\n"
+			messages := validationMessages(t, doc)
+			assertMessagesContain(t, []string{tt.expected}, messages)
+		})
+	}
+}
+
+func TestWorkflow_Validate_InvalidDependsOnExpression_Error(t *testing.T) {
+	t.Parallel()
+
+	doc := `arazzo: 1.1.0
+info:
+  title: Workflows
+  version: 1.0.0
+sourceDescriptions:
+  - name: api
+    url: ./api.yaml
+workflows:
+  - workflowId: main
+    dependsOn:
+      - $sourceDescriptions.api
+    steps:
+      - stepId: first
+        operationId: getPet
+`
+
+	messages := validationMessages(t, doc)
+	assertMessagesContain(t, []string{"workflow.dependsOn expression is invalid"}, messages)
+}
+
 func TestIsSupportedVersion_Success(t *testing.T) {
 	t.Parallel()
 

@@ -419,6 +419,7 @@ func TestExpression_Validate_Arazzo11_Success(t *testing.T) {
 		{name: "$request.query name with dots", e: "$request.query.filter.status"},
 		{name: "$request.path name with unicode", e: "$request.path.héllo"},
 		{name: "$request.query name with escaped quote", e: `$request.query.a\"b`},
+		{name: "$request.query name with unicode escape", e: `$request.query.a\u0041`},
 		{name: "$sourceDescriptions reference with dots", e: "$sourceDescriptions.petStore.pets.list"},
 		{name: "$sourceDescriptions url without json pointer", e: "$sourceDescriptions.petStore.url"},
 	}
@@ -454,6 +455,17 @@ func TestExpression_Validate_Arazzo11_Error(t *testing.T) {
 		{name: "$request.path name with invalid escape", e: `$request.path.a\x`, wantErr: `expression is not valid, path reference name contains an invalid escape sequence ` + "`\\x`" + `: $request.path.a\x`},
 		{name: "$request.query name with incomplete unicode escape", e: `$request.query.a\u12`, wantErr: `expression is not valid, query reference name contains an incomplete unicode escape sequence: $request.query.a\u12`},
 		{name: "$request.query without name", e: "$request.query", wantErr: "expression is not valid, expected name after $request.query: $request.query"},
+		{name: "$request.query name with trailing backslash", e: `$request.query.a\`, wantErr: `expression is not valid, query reference name contains an incomplete escape sequence: $request.query.a\`},
+		{name: "$request.query name with invalid unicode escape", e: `$request.query.a\u00zz`, wantErr: `expression is not valid, query reference name contains an invalid unicode escape sequence: $request.query.a\u00zz`},
+		{name: "$request without reference", e: "$request", wantErr: "expression is not valid, expected one of [header, query, path, body, payload] after $request: $request"},
+		{name: "$request with unknown reference", e: "$request.foo", wantErr: "expression is not valid, expected one of [header, query, path, body, payload] after $request: $request.foo"},
+		{name: "$request.header without token", e: "$request.header", wantErr: "expression is not valid, expected token after $request.header: $request.header"},
+		{name: "$request.header with invalid token", e: "$request.header.a(b", wantErr: "header reference must be a valid token [^[!#$%&'*+\\-.^_`|~\\dA-Za-z]+$]: $request.header.a(b"},
+		{name: "$steps with invalid output name", e: "$steps.getPet.outputs.pet!", wantErr: "expression is not valid, output name must match [^[A-Za-z0-9._\\-]+$]: $steps.getPet.outputs.pet!"},
+		{name: "$workflows with invalid input name", e: "$workflows.login.inputs.user!", wantErr: "expression is not valid, inputs name must match [^[A-Za-z0-9._\\-]+$]: $workflows.login.inputs.user!"},
+		{name: "$sourceDescriptions with empty reference", e: "$sourceDescriptions.petStore.", wantErr: "expression is not valid, expected $sourceDescriptions.<name>.<reference>: $sourceDescriptions.petStore."},
+		{name: "$sourceDescriptions with invalid reference", e: `$sourceDescriptions.petStore.a"b`, wantErr: `expression is not valid, source reference contains an invalid character '"': $sourceDescriptions.petStore.a"b`},
+		{name: "$components with invalid name", e: "$components.parameters.page!", wantErr: "expression is not valid, component name must match [^[A-Za-z0-9._\\-]+$]: $components.parameters.page!"},
 	}
 
 	for _, tt := range tests {

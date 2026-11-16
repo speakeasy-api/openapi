@@ -20,6 +20,12 @@ sourceDescriptions:
   - name: events
     url: https://example.com/asyncapi.yaml
     type: asyncapi
+components:
+  parameters:
+    limit:
+      name: limit
+      in: query
+      value: 10
 workflows:
   - workflowId: main
     steps:
@@ -187,6 +193,38 @@ func TestStep_Validate_Arazzo11_Error(t *testing.T) {
         dependsOn:
           - $workflows.main.steps.first`,
 			expected: []string{"step.dependsOn must not reference the step itself `$workflows.main.steps.first`"},
+		},
+		{
+			name: "bare operationId with action and multiple source descriptions",
+			steps: `      - stepId: first
+        operationId: publishPet
+        action: send`,
+			expected: []string{"step.operationId must be a valid expression if there are multiple OpenAPI or AsyncAPI source descriptions"},
+		},
+		{
+			name: "dependsOn unknown source description",
+			steps: `      - stepId: first
+        operationId: $sourceDescriptions.api.getPet
+        dependsOn:
+          - $sourceDescriptions.missing.wf.steps.remote`,
+			expected: []string{"step.dependsOn sourceDescription `missing` not found"},
+		},
+		{
+			name: "invalid correlationId expression",
+			steps: `      - stepId: first
+        operationId: $sourceDescriptions.events.receivePet
+        action: receive
+        correlationId: $message.payload.id`,
+			expected: []string{"step.correlationId is invalid"},
+		},
+		{
+			name: "duplicate parameter references",
+			steps: `      - stepId: first
+        operationId: $sourceDescriptions.api.getPet
+        parameters:
+          - reference: $components.parameters.limit
+          - reference: $components.parameters.limit`,
+			expected: []string{"step.parameters duplicate parameter found with reference `$components.parameters.limit`"},
 		},
 		{
 			name: "empty dependsOn",

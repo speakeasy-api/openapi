@@ -1,0 +1,48 @@
+arazzo: 1.1.0
+info:
+  title: Action parameters
+  version: 1.0.0
+sourceDescriptions:
+  - name: api
+    url: https://example.com/openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: main
+    steps:
+      - stepId: first
+        operationId: getPet
+        onSuccess:
+          - name: adopt
+            type: goto
+            workflowId: adopt
+            parameters:
+              - name: petId
+                value: $response.body#/id
+        onFailure:
+          - name: retryAdopt
+            type: retry
+            workflowId: adopt
+            parameters:
+              - name: petId
+                value: $response.body#/id
+  - workflowId: adopt
+    steps:
+      - stepId: adopt
+        operationId: adoptPet
+components:
+  successActions:
+    adopt:
+      name: adopt
+      type: goto
+      workflowId: adopt
+      parameters:
+        - name: petId
+          value: 1
+  failureActions:
+    retryAdopt:
+      name: retryAdopt
+      type: retry
+      workflowId: adopt
+      parameters:
+        - name: petId
+          value: 1

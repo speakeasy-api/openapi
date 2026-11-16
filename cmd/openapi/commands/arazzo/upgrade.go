@@ -63,65 +63,84 @@ func init() {
 	upgradeCmd.Flags().StringVarP(&upgradeTargetVersion, "version", "V", "", "target Arazzo version to upgrade to (default latest)")
 }
 
+// upgradeFlags are the flags of the upgrade command.
+type upgradeFlags struct {
+	minorOnly     bool
+	writeInPlace  bool
+	targetVersion string
+}
+
+// upgradeIO are the streams used by the upgrade command.
+type upgradeIO struct {
+	stdin  io.Reader
+	stdout io.Writer
+	stderr io.Writer
+}
+
 func runUpgrade(cmd *cobra.Command, args []string) {
-	ctx := cmd.Context()
+	flags := upgradeFlags{minorOnly: upgradeMinorOnly, writeInPlace: upgradeWriteInPlace, targetVersion: upgradeTargetVersion}
+	if err := runUpgradeWithIO(cmd.Context(), args, flags, upgradeIO{stdin: os.Stdin, stdout: os.Stdout, stderr: os.Stderr}); err != nil {
+		cmdutil.Die(err)
+	}
+}
+
+func runUpgradeWithIO(ctx context.Context, args []string, flags upgradeFlags, streams upgradeIO) error {
 	inputFile := cmdutil.InputFileFromArgs(args)
 	outputFile := cmdutil.ArgAt(args, 1, "")
 
-	if upgradeTargetVersion != "" && upgradeMinorOnly {
-		cmdutil.Dief("--version and --minor-only are mutually exclusive")
+	if flags.targetVersion != "" && flags.minorOnly {
+		return errors.New("--version and --minor-only are mutually exclusive")
 	}
 
-	if upgradeWriteInPlace {
+	if flags.writeInPlace {
 		if cmdutil.IsStdin(inputFile) {
-			cmdutil.Dief("cannot use --write flag when reading from stdin")
+			return errors.New("cannot use --write flag when reading from stdin")
 		}
 		if outputFile != "" {
-			cmdutil.Dief("cannot specify output file when using --write flag")
+			return errors.New("cannot specify output file when using --write flag")
 		}
 		outputFile = inputFile
 	}
 
 	var opts []arazzo.Option[arazzo.UpgradeOptions]
-	if upgradeTargetVersion != "" {
+	if flags.targetVersion != "" {
 		// Enable same-minor upgrades so patch-level targets work as expected.
-		opts = append(opts, arazzo.WithUpgradeTargetVersion(upgradeTargetVersion), arazzo.WithUpgradeSameMinorVersion())
-	} else if !upgradeMinorOnly {
+		opts = append(opts, arazzo.WithUpgradeTargetVersion(flags.targetVersion), arazzo.WithUpgradeSameMinorVersion())
+	} else if !flags.minorOnly {
 		opts = append(opts, arazzo.WithUpgradeSameMinorVersion())
 	}
 
-	input, err := readInput(inputFile)
+	input, err := readInput(inputFile, streams)
 	if err != nil {
-		cmdutil.Die(err)
+		return err
 	}
 
 	output := bytes.NewBuffer(nil)
-	if err := upgradeArazzo(ctx, bytes.NewReader(input), output, os.Stderr, opts...); err != nil {
-		cmdutil.Die(err)
+	if err := upgradeArazzo(ctx, bytes.NewReader(input), output, streams.stderr, opts...); err != nil {
+		return err
 	}
 
 	if outputFile == "" {
-		if _, err := os.Stdout.Write(output.Bytes()); err != nil {
-			cmdutil.Die(err)
-		}
-		return
+		_, err := streams.stdout.Write(output.Bytes())
+		return err
 	}
 
 	cleanOutputFile := filepath.Clean(outputFile)
 	if err := os.WriteFile(cleanOutputFile, output.Bytes(), 0o644); err != nil { //nolint:gosec // output files are user specified
-		cmdutil.Die(fmt.Errorf("failed to write output file: %w", err))
+		return fmt.Errorf("failed to write output file: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "📄 Document written to: %s\n", cleanOutputFile)
+	fmt.Fprintf(streams.stderr, "📄 Document written to: %s\n", cleanOutputFile)
+	return nil
 }
 
-func readInput(inputFile string) ([]byte, error) {
+func readInput(inputFile string, streams upgradeIO) ([]byte, error) {
 	if cmdutil.IsStdin(inputFile) {
-		fmt.Fprintf(os.Stderr, "Processing Arazzo document from stdin\n")
-		return io.ReadAll(os.Stdin)
+		fmt.Fprintf(streams.stderr, "Processing Arazzo document from stdin\n")
+		return io.ReadAll(streams.stdin)
 	}
 
 	cleanInputFile := filepath.Clean(inputFile)
-	fmt.Fprintf(os.Stderr, "Processing Arazzo document: %s\n", cleanInputFile)
+	fmt.Fprintf(streams.stderr, "Processing Arazzo document: %s\n", cleanInputFile)
 
 	data, err := os.ReadFile(cleanInputFile)
 	if err != nil {

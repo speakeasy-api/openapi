@@ -21,6 +21,10 @@ components:
     petId:
       name: petId
       value: 1
+    petIdPath:
+      name: petId
+      in: path
+      value: 1
 workflows:
   - workflowId: main
     steps:
@@ -116,6 +120,16 @@ func TestActions_Validate_Parameters_Error(t *testing.T) {
                 in: query
                 value: rex`,
 			expected: []string{"parameter.in must not be used for successAction parameters"},
+		},
+		{
+			name: "referenced component parameter with in",
+			actions: `        onFailure:
+          - name: adopt
+            type: goto
+            workflowId: adopt
+            parameters:
+              - reference: $components.parameters.petIdPath`,
+			expected: []string{"failureAction.parameters reference `$components.parameters.petIdPath` resolves to a parameter with `in`, which must not be used for action parameters"},
 		},
 		{
 			name: "duplicate action parameters",

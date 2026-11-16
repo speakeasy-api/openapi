@@ -146,6 +146,13 @@ func validateActionParameters(ctx context.Context, parentName string, parameters
 				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("%s.parameters duplicate parameter found with reference `%s`", parentName, ref), parentCore, node, i))
 			}
 			seenRefs[ref] = true
+
+			// A component parameter may be shared with steps, so `in` is only an error where it is referenced from an action.
+			if a := validation.GetContextObject[Arazzo](o); a != nil {
+				if referenced := parameter.GetReferencedObject(a.Components); referenced != nil && referenced.In != nil {
+					errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, fmt.Errorf("%s.parameters reference `%s` resolves to a parameter with `in`, which must not be used for action parameters", parentName, ref), parentCore, node, i))
+				}
+			}
 		case parameter.Object != nil:
 			if seenNames[parameter.Object.Name] {
 				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("%s.parameters duplicate parameter found with name `%s`", parentName, parameter.Object.Name), parentCore, node, i))

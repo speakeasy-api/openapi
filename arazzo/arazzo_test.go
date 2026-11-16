@@ -902,6 +902,53 @@ workflows:
 	}, messages)
 }
 
+func TestArazzo_Validate_InjectedNullEntries_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	doc := `arazzo: 1.1.0
+info:
+  title: Nulls
+  version: 1.0.0
+sourceDescriptions:
+  - name: api
+    url: ./api.yaml
+    type: openapi
+workflows:
+  - workflowId: main
+    steps:
+      - stepId: first
+        operationId: getPet
+        requestBody:
+          payload: {}
+`
+
+	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewBufferString(doc))
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "document should be valid")
+
+	// Programmatically built documents can contain nil entries, validation must skip them rather than panic.
+	a.SourceDescriptions = append(a.SourceDescriptions, nil)
+	a.Workflows = append(a.Workflows, nil)
+	w := a.Workflows[0]
+	w.Steps = append(w.Steps, nil)
+	w.Parameters = []*arazzo.ReusableParameter{nil}
+	w.SuccessActions = []*arazzo.ReusableSuccessAction{nil}
+	w.FailureActions = []*arazzo.ReusableFailureAction{nil}
+	s := w.Steps[0]
+	s.Parameters = []*arazzo.ReusableParameter{nil}
+	s.SuccessCriteria = []*criterion.Criterion{nil}
+	s.OnSuccess = []*arazzo.ReusableSuccessAction{nil}
+	s.OnFailure = []*arazzo.ReusableFailureAction{nil}
+	s.RequestBody.Replacements = []*arazzo.PayloadReplacement{nil}
+
+	assert.NotPanics(t, func() { a.Validate(ctx) }, "validation should not panic on nil entries")
+	assert.NotPanics(t, func() {
+		_, err := arazzo.Upgrade(ctx, a)
+		assert.NoError(t, err, "upgrade should succeed")
+	}, "upgrade should not panic on nil entries")
+}
+
 func TestSourceDescription_Validate_InvalidTypeWithoutCore_Error(t *testing.T) {
 	t.Parallel()
 

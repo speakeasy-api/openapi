@@ -247,6 +247,45 @@ func TestUpgrade_Success(t *testing.T) {
 	}
 }
 
+func TestUpgrade_NilDocument_Success(t *testing.T) {
+	t.Parallel()
+
+	upgraded, err := arazzo.Upgrade(t.Context(), nil)
+	require.NoError(t, err, "upgrade should succeed")
+	assert.False(t, upgraded, "nil document should not be upgraded")
+}
+
+func TestUpgrade_UnknownCriterionType_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	input := `arazzo: 1.0.1
+info:
+  title: Upgrade
+  version: 1.0.0
+workflows:
+  - workflowId: workflow1
+    steps:
+      - stepId: step1
+        operationId: getPet
+        successCriteria:
+          - context: $response.body
+            condition: $.ok
+            type: unknown
+`
+
+	doc, _, err := arazzo.Unmarshal(ctx, bytes.NewBufferString(input), arazzo.WithSkipValidation())
+	require.NoError(t, err, "unmarshal should succeed")
+
+	upgraded, err := arazzo.Upgrade(ctx, doc)
+	require.NoError(t, err, "upgrade should succeed")
+	assert.True(t, upgraded, "document should be upgraded")
+
+	out := bytes.NewBuffer(nil)
+	require.NoError(t, arazzo.Marshal(ctx, doc, out), "marshal should succeed")
+	assert.Contains(t, out.String(), "type: unknown", "unknown criterion types should be left unchanged")
+}
+
 func TestUpgrade_UpgradedDocumentIsValid_Success(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -295,6 +334,12 @@ func TestUpgrade_Error(t *testing.T) {
 			name:          "invalid document version is rejected",
 			input:         "arazzo: one\ninfo:\n  title: Upgrade\n  version: 1.0.0\n",
 			expectedError: "invalid Arazzo document version `one`",
+		},
+		{
+			name:          "invalid target version is rejected",
+			input:         "arazzo: 1.0.1\ninfo:\n  title: Upgrade\n  version: 1.0.0\n",
+			opts:          []arazzo.Option[arazzo.UpgradeOptions]{arazzo.WithUpgradeTargetVersion("one")},
+			expectedError: "invalid target Arazzo version `one`",
 		},
 	}
 

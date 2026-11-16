@@ -56,6 +56,19 @@ func TestPayloadReplacement_Validate_Success(t *testing.T) {
               value: fido`,
 		},
 		{
+			name:        "xpath target for +xml content type",
+			contentType: "application/atom+xml",
+			replacements: `            - target: //pet[1]/name
+              value: fido`,
+		},
+		{
+			name:        "json pointer target without content type",
+			contentType: "~",
+			replacements: `            - target: /pet/name
+              value: rex`,
+		},
+
+		{
 			name:        "jsonpath target with explicit selector type",
 			contentType: "application/json",
 			replacements: `            - target: $.pet.name
@@ -118,6 +131,13 @@ func TestPayloadReplacement_Validate_Error(t *testing.T) {
               targetSelectorType: regex
               value: rex`,
 			expected: []string{"type must be one of [`jsonpath, xpath, jsonpointer`]"},
+		},
+		{
+			name:        "unparsable content type falls back to json pointer targets",
+			contentType: `"text/"`,
+			replacements: `            - target: /pet/name
+              value: rex`,
+			expected: []string{"requestBody.contentType is not valid"},
 		},
 		{
 			name:        "invalid selector value",

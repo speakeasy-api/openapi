@@ -31,6 +31,12 @@ func TestParse_Success(t *testing.T) {
 	}
 }
 
+func TestFromOptions_Nil_Success(t *testing.T) {
+	t.Parallel()
+
+	assert.Nil(t, FromOptions(nil), "nil options should have no version")
+}
+
 func TestParse_Error(t *testing.T) {
 	t.Parallel()
 

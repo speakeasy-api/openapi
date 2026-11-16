@@ -150,6 +150,13 @@ func TestSelector_Validate_Error(t *testing.T) {
 			expected: []string{"version must be one of [`rfc6901`]"},
 		},
 		{
+			name: "empty context and selector",
+			value: `            context: ""
+            selector: ""
+            type: jsonpointer`,
+			expected: []string{"selector.context is required", "selector.selector is required"},
+		},
+		{
 			name: "missing required fields",
 			value: `            context: $response.body
             selector: /pets`,
