@@ -9,13 +9,25 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// expressionReferenceSkippedKeys are workflow fields whose values aren't runtime expressions evaluated against
-// the workflow, or that are validated separately (dependsOn), so they aren't checked for references.
-var expressionReferenceSkippedKeys = map[string]bool{
-	"inputs":      true,
-	"description": true,
-	"summary":     true,
-	"dependsOn":   true,
+// expressionScope is the kind of value being searched for runtime expressions, which determines the keys skipped.
+type expressionScope int
+
+const (
+	// expressionScopeObject is an Arazzo object within a workflow, whose extensions are skipped.
+	expressionScopeObject expressionScope = iota
+	// expressionScopeWorkflow is a workflow object.
+	expressionScopeWorkflow
+	// expressionScopeStep is a step object.
+	expressionScopeStep
+	// expressionScopeLiteral is user data, such as a payload or parameter value, where no keys are skipped.
+	expressionScopeLiteral
+)
+
+// expressionReferenceSkippedKeys are workflow and step fields whose values aren't runtime expressions evaluated
+// against the workflow, or that are validated separately (dependsOn), so they aren't checked for references.
+var expressionReferenceSkippedKeys = map[expressionScope]map[string]bool{
+	expressionScopeWorkflow: {"inputs": true, "description": true, "summary": true, "dependsOn": true},
+	expressionScopeStep:     {"description": true, "dependsOn": true},
 }
 
 // validateReferences checks references between objects within the document that runtime expressions and
@@ -139,7 +151,7 @@ func inputParameterValidationErrors(result inputParameterErrors, core validation
 func (a *Arazzo) validateWorkflowExpressionReferences(w *Workflow) []error {
 	errs := []error{}
 
-	visitExpressionScalars(w.GetRootNode(), map[*yaml.Node]bool{}, func(node *yaml.Node) {
+	visitExpressionScalars(w.GetRootNode(), expressionScopeWorkflow, map[*yaml.Node]bool{}, func(node *yaml.Node) {
 		for _, e := range expression.ExtractExpressions(node.Value) {
 			if err := a.checkExpressionReference(w, e); err != nil {
 				errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidReference, err, node))
@@ -151,7 +163,7 @@ func (a *Arazzo) validateWorkflowExpressionReferences(w *Workflow) []error {
 }
 
 // visitExpressionScalars calls visit for every scalar value node within node that may contain runtime expressions.
-func visitExpressionScalars(node *yaml.Node, seen map[*yaml.Node]bool, visit func(node *yaml.Node)) {
+func visitExpressionScalars(node *yaml.Node, scope expressionScope, seen map[*yaml.Node]bool, visit func(node *yaml.Node)) {
 	if node == nil || seen[node] {
 		return
 	}
@@ -163,17 +175,37 @@ func visitExpressionScalars(node *yaml.Node, seen map[*yaml.Node]bool, visit fun
 	case yaml.MappingNode:
 		for i := 0; i+1 < len(node.Content); i += 2 {
 			key := node.Content[i].Value
-			if expressionReferenceSkippedKeys[key] || strings.HasPrefix(key, "x-") {
+			if skipExpressionKey(scope, key) {
 				continue
 			}
-			visitExpressionScalars(node.Content[i+1], seen, visit)
+			visitExpressionScalars(node.Content[i+1], childExpressionScope(scope, key), seen, visit)
 		}
 	case yaml.DocumentNode, yaml.SequenceNode:
 		for _, child := range node.Content {
-			visitExpressionScalars(child, seen, visit)
+			visitExpressionScalars(child, scope, seen, visit)
 		}
 	case yaml.AliasNode:
-		visitExpressionScalars(node.Alias, seen, visit)
+		visitExpressionScalars(node.Alias, scope, seen, visit)
+	}
+}
+
+// skipExpressionKey returns true if the value of key isn't searched for runtime expressions within scope.
+func skipExpressionKey(scope expressionScope, key string) bool {
+	if scope == expressionScopeLiteral {
+		return false
+	}
+	return strings.HasPrefix(key, "x-") || expressionReferenceSkippedKeys[scope][key]
+}
+
+// childExpressionScope returns the scope of the value of key within scope.
+func childExpressionScope(scope expressionScope, key string) expressionScope {
+	switch {
+	case scope == expressionScopeLiteral, key == "payload", key == "value":
+		return expressionScopeLiteral
+	case scope == expressionScopeWorkflow && key == "steps":
+		return expressionScopeStep
+	default:
+		return expressionScopeObject
 	}
 }
 

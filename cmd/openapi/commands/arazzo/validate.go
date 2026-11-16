@@ -96,7 +96,7 @@ func validateArazzo(ctx context.Context, file string, skipSources bool, stdin io
 
 	errorCount := 0
 	for _, validationErr := range validationErrors {
-		if severityOf(validationErr) == validation.SeverityError {
+		if severityOf(validationErr).Rank() >= validation.SeverityError.Rank() {
 			errorCount++
 		}
 	}

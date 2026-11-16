@@ -245,8 +245,10 @@ if err != nil {
 sources, loadErrs := arazzo.LoadSourceDescriptions(ctx, a, arazzo.LoadSourcesOptions{DocumentLocation: location})
 fmt.Printf("load errors: %d\n", len(loadErrs))
 
-validationErrs := a.ValidateSources(ctx, sources)
-for _, err := range validationErrs[:3] {
+for i, err := range a.ValidateSources(ctx, sources) {
+	if i == 3 {
+		break
+	}
 	fmt.Printf("%s\n", err.Error())
 }
 ```

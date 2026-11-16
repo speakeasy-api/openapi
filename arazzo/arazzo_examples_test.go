@@ -247,8 +247,11 @@ func Example_validatingSources() {
 	sources, loadErrs := arazzo.LoadSourceDescriptions(ctx, a, arazzo.LoadSourcesOptions{DocumentLocation: location})
 	fmt.Printf("load errors: %d\n", len(loadErrs))
 
-	validationErrs := a.ValidateSources(ctx, sources)
-	for _, err := range validationErrs[:3] {
+	// Only the first few errors are printed to keep the example short.
+	for i, err := range a.ValidateSources(ctx, sources) {
+		if i == 3 {
+			break
+		}
 		fmt.Printf("%s\n", err.Error())
 	}
 	// Output:

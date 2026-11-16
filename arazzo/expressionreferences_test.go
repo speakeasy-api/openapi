@@ -104,17 +104,12 @@ func TestArazzo_Validate_ExpressionReferences_Success(t *testing.T) {
             value: $inputs.anything`,
 		},
 		{
-			name:       "aliased payloads are only checked once",
+			name:       "descriptions and extensions of workflows and steps aren't checked",
 			mainInputs: expressionReferencesTestInputs,
 			steps: `      - stepId: second
-        operationId: createPet
-        requestBody:
-          payload: &payload
-            id: $inputs.petId
-      - stepId: third
-        operationId: createPet
-        requestBody:
-          payload: *payload`,
+        description: Runs after $steps.missing
+        operationId: getPet
+        x-note: $inputs.missing`,
 		},
 		{
 			name:       "local workflow step and actions with matching parameters",
@@ -197,6 +192,48 @@ func TestArazzo_Validate_ExpressionReferences_Error(t *testing.T) {
 				"error: expression `$workflows.missing.outputs.result` references workflow `missing` which doesn't exist",
 				"error: expression `$workflows.other.outputs.missing` references output `missing` which isn't defined by workflow `other`",
 				"error: expression `$workflows.other.inputs.missing` references input `missing` which isn't defined by workflow `other`",
+			},
+		},
+		{
+			name: "aliased payloads are only checked once",
+			steps: `      - stepId: second
+        operationId: createPet
+        requestBody:
+          payload: &payload
+            id: $inputs.missing
+      - stepId: third
+        operationId: createPet
+        requestBody:
+          payload: *payload`,
+			expected: []string{
+				"error: expression `$inputs.missing` references input `missing` which isn't defined by workflow `main`",
+			},
+		},
+		{
+			name: "payload fields named like workflow fields are checked",
+			steps: `      - stepId: second
+        operationId: createPet
+        requestBody:
+          payload:
+            description: $inputs.description
+            dependsOn: $inputs.dependsOn
+            x-id: $inputs.extension`,
+			expected: []string{
+				"error: expression `$inputs.description` references input `description` which isn't defined by workflow `main`",
+				"error: expression `$inputs.dependsOn` references input `dependsOn` which isn't defined by workflow `main`",
+				"error: expression `$inputs.extension` references input `extension` which isn't defined by workflow `main`",
+			},
+		},
+		{
+			name: "dotted parameter names must match an input exactly",
+			steps: `      - stepId: second
+        workflowId: other
+        parameters:
+          - name: petId.nested
+            value: 1`,
+			expected: []string{
+				"error: step is missing required input `petId` of workflow `other`",
+				"error: step.parameters `petId.nested` is not an input of workflow `other`",
 			},
 		},
 		{

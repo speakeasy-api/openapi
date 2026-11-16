@@ -56,6 +56,8 @@ func TestArazzo_ValidateSources_Error(t *testing.T) {
 		"error: failureAction.workflowId references workflowId `missingWorkflow` which doesn't exist in sourceDescription `shared`",
 		"error: step.workflowId references sourceDescription `untypedPetstore` which is an openapi document, not an Arazzo document",
 		"error: step.dependsOn references sourceDescription `untypedPetstore` which is an openapi document, not an Arazzo document",
+		"error: step.operationPath references sourceDescription `shared` which is an arazzo document, not an OpenAPI document",
+		"error: step.channelPath references sourceDescription `untypedPetstore` which is an openapi document, not an AsyncAPI document",
 		"error: successAction.parameters `unknown` is not an input of workflow `adoptPet`",
 		"error: successAction is missing required input `petId` of workflow `adoptPet`",
 	}
@@ -239,7 +241,8 @@ func TestArazzo_ValidateSources_NilEntries_Success(t *testing.T) {
 	a, _, err := arazzo.Unmarshal(ctx, bytes.NewReader(data))
 	require.NoError(t, err, "unmarshal should succeed")
 
-	sources, _ := arazzo.LoadSourceDescriptions(ctx, a, arazzo.LoadSourcesOptions{DocumentLocation: "testdata/sources/valid.arazzo.yaml"})
+	sources, loadErrs := arazzo.LoadSourceDescriptions(ctx, a, arazzo.LoadSourcesOptions{DocumentLocation: "testdata/sources/valid.arazzo.yaml"})
+	require.Empty(t, loadErrs, "sources should load")
 
 	a.Workflows = append(a.Workflows, nil)
 	w := a.Workflows[0]

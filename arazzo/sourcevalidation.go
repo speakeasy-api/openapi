@@ -84,6 +84,16 @@ func (a *Arazzo) validateStepSources(sources *SourceDocuments, w *Workflow, s *S
 	core := s.GetCore()
 	errs := []error{}
 
+	if s.ChannelPath != nil {
+		_, name, _, _ := s.ChannelPath.GetParts()
+		// Sources declared as another type are reported by Validate, and AsyncAPI sources aren't loaded, so a loaded
+		// source with an omitted type is a channelPath into a document that isn't AsyncAPI.
+		doc := sources.Get(name)
+		if sd := a.SourceDescriptions.Find(name); sd != nil && sd.Type == "" && doc != nil {
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.channelPath references sourceDescription `%s` which is an %s document, not an AsyncAPI document", name, doc.Type), core, core.ChannelPath))
+		}
+	}
+
 	switch {
 	case s.OperationID != nil:
 		errs = append(errs, a.validateOperationStep(sources, w, s, core.OperationID)...)
@@ -300,8 +310,11 @@ func (a *Arazzo) findTargetOperation(sources *SourceDocuments, s *Step) (*target
 			return nil, nil
 		}
 		doc := sources.Get(matches[1])
-		if doc == nil || doc.OpenAPI == nil {
+		if doc == nil {
 			return nil, nil
+		}
+		if doc.OpenAPI == nil {
+			return nil, fmt.Errorf("step.operationPath references sourceDescription `%s` which is an %s document, not an OpenAPI document", matches[1], doc.Type)
 		}
 		target := findOperationByPath(doc.OpenAPI, matches[2])
 		if target == nil {

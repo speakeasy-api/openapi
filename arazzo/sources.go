@@ -164,9 +164,10 @@ func loadSourceDescription(ctx context.Context, sd *SourceDescription, base stri
 	return doc, nil
 }
 
-// resolveSourceLocation resolves a reference against a base location. Absolute URLs and file paths are used as is.
+// resolveSourceLocation resolves a reference against a base location. Absolute URLs are used as is, as are
+// absolute file paths unless the base is a URL (where they are URI paths on the base's host).
 func resolveSourceLocation(base, ref string) (string, error) {
-	if utils.IsURL(ref) || filepath.IsAbs(ref) {
+	if utils.IsURL(ref) || (filepath.IsAbs(ref) && !utils.IsURL(base)) {
 		return ref, nil
 	}
 	return utils.JoinReference(base, ref)

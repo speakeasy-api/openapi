@@ -112,6 +112,14 @@ func TestLoadSourceDescriptions_Success(t *testing.T) {
 			expectedType:     arazzo.SourceDescriptionTypeOpenAPI,
 		},
 		{
+			name:             "absolute path resolved against the host of $self",
+			self:             "https://example.com/flows/main.arazzo.yaml",
+			url:              "/openapi.yaml",
+			responses:        map[string]string{"https://example.com/openapi.yaml": sourcesTestOpenAPI},
+			expectedLocation: "https://example.com/openapi.yaml",
+			expectedType:     arazzo.SourceDescriptionTypeOpenAPI,
+		},
+		{
 			name:             "arazzo source detected from content",
 			url:              "https://example.com/shared.arazzo.yaml",
 			responses:        map[string]string{"https://example.com/shared.arazzo.yaml": "arazzo: 1.1.0\ninfo:\n  title: Shared\n  version: 1.0.0\n"},

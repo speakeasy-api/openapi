@@ -3,6 +3,8 @@ package arazzo
 import (
 	"fmt"
 	"strings"
+
+	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 )
 
 // workflowInputs describes the inputs declared by a workflow's `inputs` JSON Schema.
@@ -26,13 +28,7 @@ func getWorkflowInputs(w *Workflow) workflowInputs {
 	}
 
 	s := w.Inputs.GetSchema()
-	if s == nil || s.IsReference() || len(s.GetAllOf()) > 0 || len(s.GetAnyOf()) > 0 || len(s.GetOneOf()) > 0 || s.GetPatternProperties().Len() > 0 {
-		return inputs
-	}
-
-	// Inputs are meant to be declared, so an absent additionalProperties is treated as declaring only the listed
-	// properties. Explicitly allowing additional properties makes any input name possible.
-	if ap := s.GetAdditionalProperties(); ap != nil && (!ap.IsBool() || *ap.GetBool()) {
+	if s == nil || s.IsReference() || hasDynamicProperties(s) {
 		return inputs
 	}
 
@@ -43,6 +39,29 @@ func getWorkflowInputs(w *Workflow) workflowInputs {
 	inputs.known = true
 
 	return inputs
+}
+
+// hasDynamicProperties returns true if the schema may allow properties other than those it lists in `properties`,
+// through composition, conditionals or explicitly allowing additional properties.
+//
+// Inputs are meant to be declared, so an absent additionalProperties is deliberately treated as declaring only the
+// listed properties, even though JSON Schema allows additional properties by default.
+func hasDynamicProperties(s *oas3.Schema) bool {
+	switch {
+	case len(s.GetAllOf()) > 0, len(s.GetAnyOf()) > 0, len(s.GetOneOf()) > 0:
+		return true
+	case s.GetIf() != nil, s.GetThen() != nil, s.GetElse() != nil:
+		return true
+	case s.GetPatternProperties().Len() > 0, s.GetDependentSchemas().Len() > 0:
+		return true
+	}
+	return allowsProperties(s.GetAdditionalProperties()) || allowsProperties(s.GetUnevaluatedProperties())
+}
+
+// allowsProperties returns true if an additionalProperties or unevaluatedProperties schema is set to anything but
+// `false`.
+func allowsProperties(js *oas3.JSONSchema[oas3.Referenceable]) bool {
+	return js != nil && (!js.IsBool() || *js.GetBool())
 }
 
 // has returns true if the input is declared. As a dotted name may refer to a nested property of an input (for
@@ -104,7 +123,8 @@ func checkWorkflowInputParameters(parentName string, a *Arazzo, parameters []*Re
 		}
 		supplied[p.Name] = true
 
-		if !inputs.has(p.Name) {
+		// Parameters map to top level inputs, so unlike expressions they must match an input exactly.
+		if !inputs.names[p.Name] {
 			result.unknown = append(result.unknown, indexedError{index: i, err: fmt.Errorf("%s.parameters `%s` is not an input of workflow `%s`", parentName, p.Name, target.WorkflowID)})
 		}
 	}

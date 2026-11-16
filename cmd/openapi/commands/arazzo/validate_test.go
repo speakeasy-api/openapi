@@ -90,7 +90,7 @@ func TestValidateArazzo_Error(t *testing.T) {
 			name:           "invalid against its sources",
 			file:           "../../../../arazzo/testdata/sources/invalid.arazzo.yaml",
 			expectedErr:    "arazzo document validation failed",
-			expectedStderr: []string{"❌ Arazzo document is invalid - 17 errors, 2 warnings or hints:", "error validation-operation-not-found step.operationId `missingOperation` not found in sourceDescription `petstore`"},
+			expectedStderr: []string{"❌ Arazzo document is invalid - 19 errors, 2 warnings or hints:", "error validation-operation-not-found step.operationId `missingOperation` not found in sourceDescription `petstore`"},
 		},
 		{
 			name:        "missing file",

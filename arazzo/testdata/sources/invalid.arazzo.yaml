@@ -48,6 +48,11 @@ workflows:
         workflowId: $sourceDescriptions.untypedPetstore.adoptPet
         dependsOn:
           - $sourceDescriptions.untypedPetstore.adoptPet.steps.fetch
+      - stepId: wrongPathSource
+        operationPath: "{$sourceDescriptions.shared.url}#/paths/~1pets/get"
+      - stepId: wrongChannelSource
+        channelPath: "{$sourceDescriptions.untypedPetstore.url}#/channels/pets"
+        action: send
 components:
   successActions:
     adoptRemote:

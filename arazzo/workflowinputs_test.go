@@ -71,6 +71,56 @@ func TestGetWorkflowInputs_AdditionalProperties_Success(t *testing.T) {
 			expectedKnown: false,
 		},
 		{
+			name: "additional properties omitted are treated as closed",
+			inputs: `      type: object
+      properties:
+        petId:
+          type: integer`,
+			expectedKnown: true,
+		},
+		{
+			name: "conditional schema",
+			inputs: `      type: object
+      if:
+        required: [kind]
+      then:
+        properties:
+          petId:
+            type: integer`,
+			expectedKnown: false,
+		},
+		{
+			name: "else schema",
+			inputs: `      type: object
+      else:
+        properties:
+          petId:
+            type: integer`,
+			expectedKnown: false,
+		},
+		{
+			name: "dependent schemas",
+			inputs: `      type: object
+      dependentSchemas:
+        kind:
+          properties:
+            petId:
+              type: integer`,
+			expectedKnown: false,
+		},
+		{
+			name: "unevaluated properties allowed",
+			inputs: `      type: object
+      unevaluatedProperties: true`,
+			expectedKnown: false,
+		},
+		{
+			name: "unevaluated properties disallowed",
+			inputs: `      type: object
+      unevaluatedProperties: false`,
+			expectedKnown: true,
+		},
+		{
 			name: "additional properties disallowed",
 			inputs: `      type: object
       additionalProperties: false
