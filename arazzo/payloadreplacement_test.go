@@ -61,12 +61,6 @@ func TestPayloadReplacement_Validate_Success(t *testing.T) {
 			replacements: `            - target: //pet[1]/name
               value: fido`,
 		},
-		{
-			name:        "json pointer target without content type",
-			contentType: "~",
-			replacements: `            - target: /pet/name
-              value: rex`,
-		},
 
 		{
 			name:        "jsonpath target with explicit selector type",
@@ -133,11 +127,18 @@ func TestPayloadReplacement_Validate_Error(t *testing.T) {
 			expected: []string{"type must be one of [`jsonpath, xpath, jsonpointer`]"},
 		},
 		{
+			name:        "missing content type falls back to json pointer targets",
+			contentType: "~",
+			replacements: `            - target: pet/name
+              value: rex`,
+			expected: []string{"payloadReplacement.target is invalid: invalid json pointer"},
+		},
+		{
 			name:        "unparsable content type falls back to json pointer targets",
 			contentType: `"text/"`,
-			replacements: `            - target: /pet/name
+			replacements: `            - target: pet/name
               value: rex`,
-			expected: []string{"requestBody.contentType is not valid"},
+			expected: []string{"requestBody.contentType is not valid", "payloadReplacement.target is invalid: invalid json pointer"},
 		},
 		{
 			name:        "invalid selector value",

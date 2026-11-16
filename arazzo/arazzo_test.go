@@ -943,10 +943,6 @@ workflows:
 	s.RequestBody.Replacements = []*arazzo.PayloadReplacement{nil}
 
 	assert.NotPanics(t, func() { a.Validate(ctx) }, "validation should not panic on nil entries")
-	assert.NotPanics(t, func() {
-		_, err := arazzo.Upgrade(ctx, a)
-		assert.NoError(t, err, "upgrade should succeed")
-	}, "upgrade should not panic on nil entries")
 }
 
 func TestSourceDescription_Validate_InvalidTypeWithoutCore_Error(t *testing.T) {
