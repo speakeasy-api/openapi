@@ -344,6 +344,21 @@ required: ["name", "email"]
 description: "User schema with additional validation requirements"
 `,
 		},
+		{
+			name: "valid reference schema in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: "#/components/schemas/User"
+`,
+		},
+		{
+			name: "valid reference schema with ignored sibling keywords in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: "#/components/schemas/User"
+required: ["name", "email"]
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -500,13 +515,12 @@ oneOf: "invalid"
 			},
 		},
 		{
-			name: "$ref with additional properties not allowed in OpenAPI 3.0",
+			name: "invalid reference string in OpenAPI 3.0",
 			yml: `
 $schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
-$ref: "#/components/schemas/User"
-required: ["name", "email"]
+$ref: "#/components/schemas/"
 `,
-			wantErrs: []string{"[2:1] error validation-invalid-schema schema. additional properties '$ref' not allowed"},
+			wantErrs: []string{"[3:1] error validation-invalid-reference invalid reference: component name cannot be empty"},
 		},
 		{
 			name: "empty component name in $ref",

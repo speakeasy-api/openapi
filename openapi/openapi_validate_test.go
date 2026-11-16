@@ -161,6 +161,73 @@ jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 x-custom: value
 `,
 		},
+		{
+			name: "valid_3_0_boolean_exclusive_bounds_in_component_schema",
+			yml: `
+openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    S:
+      type: number
+      minimum: 5
+      exclusiveMinimum: true
+      maximum: 10
+      exclusiveMaximum: false
+`,
+		},
+		{
+			name: "valid_3_0_boolean_exclusive_bounds_in_parameter_and_media_type_schemas",
+			yml: `
+openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /items:
+    get:
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            exclusiveMinimum: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: number
+                maximum: 100
+                exclusiveMaximum: true
+`,
+		},
+		{
+			name: "valid_3_0_reference_schemas",
+			yml: `
+openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Base:
+      type: object
+      properties:
+        child:
+          $ref: '#/components/schemas/Child'
+    Alias:
+      $ref: '#/components/schemas/Base'
+    Child:
+      type: string
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -356,6 +423,22 @@ paths:
           description: ok
 `,
 			wantErrs: []string{"error validation-operation-parameters parameter \"id\" is duplicated in path \"/users/{id}\""},
+		},
+		{
+			name: "numeric_exclusive_minimum_in_3_0_component_schema",
+			yml: `
+openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    S:
+      type: number
+      exclusiveMinimum: 5
+`,
+			wantErrs: []string{"error validation-type-mismatch schema.exclusiveMinimum expected `boolean`, got `number`"},
 		},
 	}
 
