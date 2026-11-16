@@ -344,6 +344,21 @@ required: ["name", "email"]
 description: "User schema with additional validation requirements"
 `,
 		},
+		{
+			name: "valid reference schema in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: "#/components/schemas/User"
+`,
+		},
+		{
+			name: "valid reference schema with ignored sibling keywords in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: "#/components/schemas/User"
+required: ["name", "email"]
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -426,7 +441,6 @@ additionalProperties: "invalid"
 `,
 			wantErrs: []string{
 				"[2:1] error validation-type-mismatch schema.additionalProperties expected one of [`boolean`, `object`], got `string`",
-				"[2:1] error validation-type-mismatch schema.additionalProperties expected one of [`boolean`, `object`], got `string`",
 				"[3:23] error validation-type-mismatch schema.additionalProperties failed to validate either Schema [schema.additionalProperties expected `object`, got `invalid`] or bool [schema.additionalProperties line 3: cannot unmarshal !!str `invalid` into bool]",
 			},
 		},
@@ -453,7 +467,6 @@ type: array
 items: "invalid"
 `,
 			wantErrs: []string{
-				"[2:1] error validation-type-mismatch schema.items expected one of [`boolean`, `object`], got `string`",
 				"[2:1] error validation-type-mismatch schema.items expected one of [`boolean`, `object`], got `string`",
 				"[3:8] error validation-type-mismatch schema.items failed to validate either Schema [schema.items expected `object`, got `invalid`] or bool [schema.items line 3: cannot unmarshal !!str `invalid` into bool]",
 			},
@@ -500,13 +513,45 @@ oneOf: "invalid"
 			},
 		},
 		{
-			name: "$ref with additional properties not allowed in OpenAPI 3.0",
+			name: "wrong type for 3.0 keyword in nested schema reports only the type error",
 			yml: `
 $schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
-$ref: "#/components/schemas/User"
-required: ["name", "email"]
+type: object
+examples: [{}]
+properties:
+  count:
+    type: integer
+    exclusiveMaximum: 10
 `,
-			wantErrs: []string{"[2:1] error validation-invalid-schema schema. additional properties '$ref' not allowed"},
+			wantErrs: []string{"[8:23] error validation-type-mismatch schema.properties.count.exclusiveMaximum expected `boolean`, got `number`"},
+		},
+		{
+			name: "non-string nested $ref in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+properties:
+  a:
+    $ref: 5
+`,
+			wantErrs: []string{"[5:11] error validation-type-mismatch schema.properties.a.$ref expected `string`, got `number`"},
+		},
+		{
+			name: "malformed nested $ref URI in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+properties:
+  a:
+    $ref: "http://[bad"
+`,
+			wantErrs: []string{"[5:11] error validation-invalid-schema schema.properties.a.$ref 'http://[bad' is not valid uri-reference: parse \"http://[bad\": missing ']' in host"},
+		},
+		{
+			name: "invalid reference string in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: "#/components/schemas/"
+`,
+			wantErrs: []string{"[3:1] error validation-invalid-reference invalid reference: component name cannot be empty"},
 		},
 		{
 			name: "empty component name in $ref",
