@@ -141,6 +141,13 @@ func TestPayloadReplacement_Validate_Error(t *testing.T) {
 			expected: []string{"requestBody.contentType is not valid", "payloadReplacement.target is invalid: invalid json pointer"},
 		},
 		{
+			name:        "invalid expression value",
+			contentType: "application/json",
+			replacements: `            - target: /pet/name
+              value: $steps.first`,
+			expected: []string{"payloadReplacement.value is invalid"},
+		},
+		{
 			name:        "invalid selector value",
 			contentType: "application/json",
 			replacements: `            - target: /pet/name

@@ -945,6 +945,75 @@ workflows:
 	assert.NotPanics(t, func() { a.Validate(ctx) }, "validation should not panic on nil entries")
 }
 
+const programmaticChangesTestDoc = `arazzo: 1.1.0
+info:
+  title: Programmatic changes
+  version: 1.0.0
+sourceDescriptions:
+  - name: api
+    url: ./api.yaml
+    type: openapi
+workflows:
+  - workflowId: main
+    steps:
+      - stepId: first
+        operationId: getPet
+        parameters:
+          - name: petId
+            in: path
+            value: 1
+        requestBody:
+          payload: {}
+          replacements:
+            - target: /name
+              value: rex
+        onSuccess:
+          - name: adopt
+            type: goto
+            workflowId: adopt
+            parameters:
+              - name: petId
+                value: 1
+  - workflowId: adopt
+    steps:
+      - stepId: adopt
+        operationId: adoptPet
+`
+
+func TestArazzo_Validate_ProgrammaticallyRemovedValues_Error(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewBufferString(programmaticChangesTestDoc))
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "document should be valid")
+
+	s := a.Workflows[0].Steps[0]
+	s.Parameters[0].Object.Value = nil
+	s.RequestBody.Replacements[0].Value = nil
+
+	errs := a.Validate(ctx)
+	messages := make([]string, 0, len(errs))
+	for _, e := range errs {
+		messages = append(messages, e.Error())
+	}
+	assertMessagesContain(t, []string{"`parameter.value` is required", "payloadReplacement.value is required"}, messages)
+}
+
+func TestArazzo_Validate_InjectedNullActionParameter_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewBufferString(programmaticChangesTestDoc))
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "document should be valid")
+
+	action := a.Workflows[0].Steps[0].OnSuccess[0].Object
+	action.Parameters = append(action.Parameters, nil)
+
+	assert.Empty(t, a.Validate(ctx), "nil action parameters should be skipped")
+}
+
 func TestSourceDescription_Validate_InvalidTypeWithoutCore_Error(t *testing.T) {
 	t.Parallel()
 

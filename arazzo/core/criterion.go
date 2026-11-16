@@ -102,11 +102,8 @@ func (c *CriterionTypeUnion) SyncChanges(ctx context.Context, model any, valueNo
 		c.ExpressionType = nil
 
 		tv, err := marshaller.SyncValue(ctx, tf.Interface(), &c.Type, scalarNode, false)
-		if err != nil {
-			return nil, err
-		}
 		c.SetRootNode(tv)
-		return tv, nil
+		return tv, err
 	}
 
 	c.Type = nil
@@ -118,11 +115,8 @@ func (c *CriterionTypeUnion) SyncChanges(ctx context.Context, model any, valueNo
 	}
 
 	ev, err := marshaller.SyncValue(ctx, ef.Interface(), &c.ExpressionType, mappingNode, false)
-	if err != nil {
-		return nil, err
-	}
 	c.SetRootNode(ev)
-	return ev, nil
+	return ev, err
 }
 
 type Criterion struct {

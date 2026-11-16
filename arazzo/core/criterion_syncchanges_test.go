@@ -31,6 +31,20 @@ func TestCriterionTypeUnion_SyncChanges_WithStringType_Success(t *testing.T) {
 	assert.NotNil(t, resultNode, "result node should not be nil")
 }
 
+func TestCriterionTypeUnion_SyncChanges_ReplacesUnsupportedNodeKind_Success(t *testing.T) {
+	t.Parallel()
+
+	var node yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte("[a, b]"), &node), "unmarshal should succeed")
+
+	ctu := CriterionTypeUnion{}
+	resultNode, err := ctu.SyncChanges(t.Context(), CriterionTypeUnion{Type: pointer.From("regex")}, node.Content[0])
+	require.NoError(t, err, "SyncChanges should succeed")
+	require.NotNil(t, resultNode, "result node should not be nil")
+	assert.Equal(t, yaml.ScalarNode, resultNode.Kind, "a new scalar node should replace the sequence node")
+	assert.Equal(t, "regex", resultNode.Value, "result node should contain the type")
+}
+
 func TestCriterionTypeUnion_SyncChanges_NonStruct_Error(t *testing.T) {
 	t.Parallel()
 

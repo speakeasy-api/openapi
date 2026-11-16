@@ -202,6 +202,28 @@ func TestStep_Validate_Arazzo11_Error(t *testing.T) {
 			expected: []string{"step.operationId must be a valid expression if there are multiple OpenAPI or AsyncAPI source descriptions"},
 		},
 		{
+			name: "invalid operationId expression",
+			steps: `      - stepId: first
+        operationId: $sourceDescriptions.api.`,
+			expected: []string{"step.operationId expression is invalid"},
+		},
+		{
+			name: "invalid workflowId expression",
+			steps: `      - stepId: first
+        workflowId: $sourceDescriptions.api.`,
+			expected: []string{"step.workflowId expression is invalid"},
+		},
+		{
+			name: "invalid action workflowId expression",
+			steps: `      - stepId: first
+        operationId: $sourceDescriptions.api.getPet
+        onSuccess:
+          - name: next
+            type: goto
+            workflowId: $sourceDescriptions.api.`,
+			expected: []string{"`successAction`.workflowId expression is invalid"},
+		},
+		{
 			name: "dependsOn unknown source description",
 			steps: `      - stepId: first
         operationId: $sourceDescriptions.api.getPet
