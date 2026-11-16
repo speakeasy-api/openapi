@@ -175,7 +175,12 @@ func validateAgainstDialect(schema string, node *yaml.Node, coreSchema *core.Sch
 		}
 	}
 
-	err = oasSchemaValidator.Validate(jsAny)
+	return dialectValidationErrors(oasSchemaValidator.Validate(jsAny), coreSchema)
+}
+
+// dialectValidationErrors converts an error returned by the dialect validator into validation errors
+// located against coreSchema.
+func dialectValidationErrors(err error, coreSchema *core.Schema) []error {
 	if err == nil {
 		return nil
 	}
