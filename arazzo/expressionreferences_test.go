@@ -210,6 +210,22 @@ func TestArazzo_Validate_ExpressionReferences_Error(t *testing.T) {
 			},
 		},
 		{
+			name: "aliased objects reused as payloads are checked as payloads",
+			steps: `      - stepId: second
+        operationId: createPet
+        parameters:
+          - &param
+            name: id
+            in: query
+            value: 1
+            x-extra: $inputs.missing
+        requestBody:
+          payload: *param`,
+			expected: []string{
+				"error: expression `$inputs.missing` references input `missing` which isn't defined by workflow `main`",
+			},
+		},
+		{
 			name: "payload fields named like workflow fields are checked",
 			steps: `      - stepId: second
         operationId: createPet

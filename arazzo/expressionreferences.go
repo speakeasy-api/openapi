@@ -151,7 +151,7 @@ func inputParameterValidationErrors(result inputParameterErrors, core validation
 func (a *Arazzo) validateWorkflowExpressionReferences(w *Workflow) []error {
 	errs := []error{}
 
-	visitExpressionScalars(w.GetRootNode(), expressionScopeWorkflow, map[*yaml.Node]bool{}, func(node *yaml.Node) {
+	visitExpressionScalars(w.GetRootNode(), expressionScopeWorkflow, map[expressionVisit]bool{}, func(node *yaml.Node) {
 		for _, e := range expression.ExtractExpressions(node.Value) {
 			if err := a.checkExpressionReference(w, e); err != nil {
 				errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidReference, err, node))
@@ -162,12 +162,20 @@ func (a *Arazzo) validateWorkflowExpressionReferences(w *Workflow) []error {
 	return errs
 }
 
+// expressionVisit identifies a node visited within a scope. Aliased nodes are revisited when reused in another
+// scope, as different keys may be skipped.
+type expressionVisit struct {
+	node  *yaml.Node
+	scope expressionScope
+}
+
 // visitExpressionScalars calls visit for every scalar value node within node that may contain runtime expressions.
-func visitExpressionScalars(node *yaml.Node, scope expressionScope, seen map[*yaml.Node]bool, visit func(node *yaml.Node)) {
-	if node == nil || seen[node] {
+func visitExpressionScalars(node *yaml.Node, scope expressionScope, seen map[expressionVisit]bool, visit func(node *yaml.Node)) {
+	key := expressionVisit{node: node, scope: scope}
+	if node == nil || seen[key] {
 		return
 	}
-	seen[node] = true
+	seen[key] = true
 
 	switch node.Kind {
 	case yaml.ScalarNode:

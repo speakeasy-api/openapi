@@ -26,7 +26,7 @@ func TestVisitExpressionScalars_NilNode_Success(t *testing.T) {
 	t.Parallel()
 
 	visited := []*yaml.Node{}
-	visitExpressionScalars(nil, expressionScopeWorkflow, map[*yaml.Node]bool{}, func(node *yaml.Node) {
+	visitExpressionScalars(nil, expressionScopeWorkflow, map[expressionVisit]bool{}, func(node *yaml.Node) {
 		visited = append(visited, node)
 	})
 	assert.Empty(t, visited, "nothing should be visited")
