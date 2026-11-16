@@ -6,9 +6,12 @@ import (
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/pointer"
+	"github.com/speakeasy-api/openapi/references"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 )
 
 func TestSchema_Validate_Success(t *testing.T) {
@@ -554,6 +557,49 @@ $ref: "#/components/schemas/"
 			wantErrs: []string{"[3:1] error validation-invalid-reference invalid reference: component name cannot be empty"},
 		},
 		{
+			name: "number top-level $ref in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: 1
+`,
+			wantErrs: []string{"[3:7] error validation-type-mismatch schema.$ref expected `string`, got `number`"},
+		},
+		{
+			name: "boolean top-level $ref in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: true
+`,
+			wantErrs: []string{"[3:7] error validation-type-mismatch schema.$ref expected `string`, got `boolean`"},
+		},
+		{
+			name: "non-string top-level $ref in OpenAPI 3.0 ignores invalid siblings",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: true
+exclusiveMinimum: 5
+type: [string, number]
+`,
+			wantErrs: []string{"[3:7] error validation-type-mismatch schema.$ref expected `string`, got `boolean`"},
+		},
+		{
+			name: "non-string top-level $ref with aliased key in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+x-key: &refKey $ref
+*refKey : 1
+`,
+			wantErrs: []string{"[4:11] error validation-type-mismatch schema.$ref expected `string`, got `number`"},
+		},
+		{
+			name: "malformed top-level $ref URI in OpenAPI 3.0 is reported once",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: "http://[bad"
+`,
+			wantErrs: []string{"[3:1] error validation-invalid-reference invalid reference URI: parse \"http://[bad\": missing ']' in host"},
+		},
+		{
 			name: "empty component name in $ref",
 			yml: `
 $ref: "#/components/schemas/"
@@ -626,4 +672,44 @@ $ref: "#"
 			assert.Equal(t, tt.wantErrs, errMessages)
 		})
 	}
+}
+
+func TestSchema_Validate_ProgrammaticReferenceInOpenAPI30_Success(t *testing.T) {
+	t.Parallel()
+
+	schema := &oas3.Schema{
+		Ref:     pointer.From(references.Reference("#/components/schemas/Base")),
+		Minimum: pointer.From(0.0),
+	}
+
+	errs := schema.Validate(t.Context(), validation.WithContextObject(&oas3.ParentDocumentVersion{OpenAPI: pointer.From("3.0.3")}))
+	assert.Empty(t, errs, "programmatically built reference schema should be valid")
+}
+
+func TestSchema_Validate_NonJSONValue_Error(t *testing.T) {
+	t.Parallel()
+
+	var schema oas3.Schema
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString("type: number\nmaximum: .inf\n"), &schema)
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "unmarshal should not report errors")
+
+	errs := schema.Validate(t.Context())
+	require.Len(t, errs, 1, "should report a single error")
+	assert.Contains(t, errs[0].Error(), "error validation-invalid-syntax schema is not valid json", "should report the JSON conversion failure")
+}
+
+func TestSchema_Validate_UnsupportedNodeKind_Error(t *testing.T) {
+	t.Parallel()
+
+	var schema oas3.Schema
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString("type: string\n"), &schema)
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "unmarshal should not report errors")
+
+	schema.GetCore().RootNode = &yaml.Node{}
+
+	errs := schema.Validate(t.Context())
+	require.Len(t, errs, 1, "should report a single error")
+	assert.Contains(t, errs[0].Error(), "schema is not valid json: unknown node kind", "should report the YAML to JSON conversion failure")
 }
