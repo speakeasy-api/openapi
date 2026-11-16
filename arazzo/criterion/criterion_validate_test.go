@@ -491,6 +491,9 @@ func TestCriterion_Validate_JsonPathKeywordMemberNames_Success(t *testing.T) {
 		{name: "descendant value member", condition: "$..value[0]"},
 		{name: "value member inside filter query", condition: "$[?@.value[0] == 1]"},
 		{name: "length member followed by index", condition: "$.length[0]"},
+		{name: "count member followed by index", condition: "$.count[0]"},
+		{name: "match member followed by index", condition: "$.match[0]"},
+		{name: "search member followed by index", condition: "$.search[0]"},
 		{name: "keyword members", condition: "$.true.false.null"},
 		{name: "value function call", condition: "$[?value(@.a) == 1]"},
 	}
