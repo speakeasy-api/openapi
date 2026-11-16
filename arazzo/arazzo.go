@@ -195,6 +195,8 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, a.Components.Validate(ctx, opts...)...)
 	}
 
+	errs = append(errs, a.validateReferences()...)
+
 	a.Valid = len(errs) == 0 && core.GetValid()
 
 	return errs

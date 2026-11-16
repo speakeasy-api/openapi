@@ -222,6 +222,35 @@ for _, err := range validationErrs {
 }
 ```
 
+## Validate an Arazzo document against its source descriptions
+
+Shows loading the OpenAPI and Arazzo documents a workflow references and checking its steps against them.
+
+```go
+ctx := context.Background()
+
+location := "testdata/sources/invalid.arazzo.yaml"
+
+f, err := os.Open(location)
+if err != nil {
+	panic(err)
+}
+defer f.Close()
+
+a, _, err := arazzo.Unmarshal(ctx, f)
+if err != nil {
+	panic(err)
+}
+
+sources, loadErrs := arazzo.LoadSourceDescriptions(ctx, a, arazzo.LoadSourcesOptions{DocumentLocation: location})
+fmt.Printf("load errors: %d\n", len(loadErrs))
+
+validationErrs := a.ValidateSources(ctx, sources)
+for _, err := range validationErrs[:3] {
+	fmt.Printf("%s\n", err.Error())
+}
+```
+
 <!-- END USAGE EXAMPLES -->
 
 ## Contributing

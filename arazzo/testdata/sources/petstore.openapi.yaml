@@ -1,0 +1,76 @@
+openapi: 3.2.0
+info:
+  title: Petstore
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - $ref: "#/components/parameters/RequestID"
+      responses:
+        "200":
+          description: The pets
+    post:
+      operationId: createPet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "201":
+          description: The created pet
+  /pets/{petId}:
+    parameters:
+      - name: petId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: getPet
+      responses:
+        "200":
+          description: The pet
+    delete:
+      operationId: deletePet
+      parameters:
+        - name: X-Api-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: reason
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+    additionalOperations:
+      COPY:
+        operationId: copyPet
+        responses:
+          "201":
+            description: Copied
+webhooks:
+  newPet:
+    post:
+      operationId: newPetWebhook
+      responses:
+        "200":
+          description: Received
+components:
+  parameters:
+    RequestID:
+      name: X-Request-ID
+      in: header
+      schema:
+        type: string

@@ -185,13 +185,23 @@ $CLI spec validate dist/test/test-joined-conflicts.yaml > /dev/null
 
 # Test arazzo validation with known test files
 echo "  ✓ Testing arazzo validation..."
-$CLI arazzo validate arazzo/testdata/simple.arazzo.yaml > /dev/null
-$CLI arazzo validate arazzo/testdata/test.arazzo.yaml > /dev/null
-$CLI arazzo validate arazzo/testdata/speakeasybar.arazzo.yaml > /dev/null
+# These documents reference remote example sources, so skip loading them
+$CLI arazzo validate --skip-sources arazzo/testdata/simple.arazzo.yaml > /dev/null
+$CLI arazzo validate --skip-sources arazzo/testdata/test.arazzo.yaml > /dev/null
+$CLI arazzo validate --skip-sources arazzo/testdata/speakeasybar.arazzo.yaml > /dev/null
+
+# Test arazzo validation against local source descriptions
+echo "  ✓ Testing arazzo validation against source descriptions..."
+$CLI arazzo validate arazzo/testdata/sources/valid.arazzo.yaml > /dev/null
+if $CLI arazzo validate arazzo/testdata/sources/invalid.arazzo.yaml > /dev/null 2>&1; then
+    echo "    ❌ Expected arazzo validation to fail for a document that doesn't match its sources"
+    exit 1
+fi
+$CLI arazzo validate --skip-sources arazzo/testdata/sources/invalid.arazzo.yaml > /dev/null
 
 # Test arazzo validation with known bad file (should fail)
 echo "  ✓ Testing arazzo validation with known bad file..."
-if $CLI arazzo validate arazzo/testdata/invalid.arazzo.yaml > /dev/null 2>&1; then
+if $CLI arazzo validate --skip-sources arazzo/testdata/invalid.arazzo.yaml > /dev/null 2>&1; then
     echo "    ❌ Expected arazzo validation to fail for invalid file"
     exit 1
 fi

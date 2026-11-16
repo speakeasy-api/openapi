@@ -28,6 +28,9 @@ openapi arazzo validate ./workflow.arazzo.yaml
 
 # Validate with verbose output
 openapi arazzo validate -v ./workflow.arazzo.yaml
+
+# Only validate the document itself, without loading its source descriptions
+openapi arazzo validate --skip-sources ./workflow.arazzo.yaml
 ```
 
 This command checks for:
@@ -35,8 +38,23 @@ This command checks for:
 - Structural validity according to the Arazzo Specification
 - Workflow step definitions and dependencies
 - Parameter and expression syntax
+- `$steps`, `$workflows` and `$inputs` expressions that reference steps, outputs and inputs that exist
+- Parameters passed to workflows in the same document that match the workflow's inputs
 - Source description references and validity
 - Step success and failure action definitions
+
+By default the OpenAPI and Arazzo documents referenced by `sourceDescriptions` are also loaded, and the workflows are checked against them:
+
+- `operationId`, `operationPath` and `workflowId` targets (including `dependsOn` entries) exist
+- Step parameters match the target operation's parameters by name and location
+- Required parameters and request bodies are supplied
+- Parameters passed to workflows in other Arazzo documents match their inputs
+
+Relative source URLs are resolved against the document's `$self`, or its file location. A source that can't be loaded is reported as a warning, and AsyncAPI sources are reported with a hint and not checked. Only errors make validation fail.
+
+| Flag             | Description                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------ |
+| `--skip-sources` | Don't load source descriptions to validate the document against them, for example when working offline |
 
 Documents are validated against the version they declare. Using an Arazzo 1.1 feature (such as `dependsOn` on a step or an AsyncAPI source description) in a document that declares `arazzo: 1.0.x` is reported as an error, use [`upgrade`](#upgrade) to move the document to 1.1.
 

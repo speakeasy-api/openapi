@@ -193,7 +193,8 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 		errs = append(errs, validatePathTarget(a, "channelPath", "channel", *s.ChannelPath, core, core.ChannelPath, exprOpts)...)
 
 		_, sourceDescriptionName, _, _ := s.ChannelPath.GetParts()
-		if sd := a.SourceDescriptions.Find(sourceDescriptionName); sd != nil && sd.Type != SourceDescriptionTypeAsyncAPI {
+		// An omitted type is ambiguous, so only report sources explicitly declared as another type.
+		if sd := a.SourceDescriptions.Find(sourceDescriptionName); sd != nil && sd.Type != "" && sd.Type != SourceDescriptionTypeAsyncAPI {
 			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.channelPath must reference an `asyncapi` sourceDescription, `%s` is of type `%s`", sourceDescriptionName, sd.Type), core, core.ChannelPath))
 		}
 	}
@@ -464,7 +465,7 @@ func (s *Step) validateDependsOn(a *Arazzo, w *Workflow) []error {
 			switch {
 			case sd == nil:
 				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.dependsOn sourceDescription `%s` not found", sourceDescriptionName), core, core.DependsOn, i))
-			case sd.Type != SourceDescriptionTypeArazzo:
+			case sd.Type != "" && sd.Type != SourceDescriptionTypeArazzo:
 				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.dependsOn sourceDescription `%s` must be of type `arazzo`", sourceDescriptionName), core, core.DependsOn, i))
 			}
 		case strings.HasPrefix(dependsOn, "$"):

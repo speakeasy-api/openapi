@@ -224,3 +224,36 @@ func Example_validating() {
 	// [13:9] error validation-required-field step at least one of operationId, operationPath or workflowId fields must be set
 	// [22:13] error validation-required-field parameter.in is required within a step when workflowId is not set
 }
+
+// Example_validatingSources demonstrates how to validate an Arazzo document against its source descriptions.
+// Shows loading the OpenAPI and Arazzo documents a workflow references and checking its steps against them.
+func Example_validatingSources() {
+	ctx := context.Background()
+
+	location := "testdata/sources/invalid.arazzo.yaml"
+
+	f, err := os.Open(location)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	a, _, err := arazzo.Unmarshal(ctx, f)
+	if err != nil {
+		panic(err)
+	}
+
+	// Relative source description URLs are resolved against $self, or the document's location.
+	sources, loadErrs := arazzo.LoadSourceDescriptions(ctx, a, arazzo.LoadSourcesOptions{DocumentLocation: location})
+	fmt.Printf("load errors: %d\n", len(loadErrs))
+
+	validationErrs := a.ValidateSources(ctx, sources)
+	for _, err := range validationErrs[:3] {
+		fmt.Printf("%s\n", err.Error())
+	}
+	// Output:
+	// load errors: 0
+	// [16:9] error validation-invalid-reference workflow.dependsOn references workflowId `missingWorkflow` which doesn't exist in sourceDescription `shared`
+	// [19:22] error validation-operation-not-found step.operationId `missingOperation` not found in sourceDescription `petstore`
+	// [21:24] error validation-operation-not-found step.operationPath `{$sourceDescriptions.petstore.url}#/paths/~1missing/get` doesn't reference an operation in sourceDescription `petstore`
+}

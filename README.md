@@ -144,7 +144,7 @@ The CLI provides four main command groups:
   - `upgrade` - Upgrade a Swagger 2.0 specification to OpenAPI 3.0
 
 - **`openapi arazzo`** - Commands for working with Arazzo workflow documents ([documentation](./cmd/openapi/commands/arazzo/README.md))
-  - `validate` - Validate an Arazzo workflow document
+  - `validate` - Validate an Arazzo workflow document, including against the OpenAPI and Arazzo documents it references
   - `upgrade` - Upgrade an Arazzo workflow document to the latest supported version (1.1.0)
 
 - **`openapi overlay`** - Commands for working with OpenAPI overlays ([documentation](./cmd/openapi/commands/overlay/README.md))
@@ -185,8 +185,11 @@ openapi spec upgrade ./spec.yaml ./upgraded-spec.yaml
 # Apply an overlay to a specification
 openapi overlay apply --overlay overlay.yaml --schema spec.yaml
 
-# Validate an Arazzo workflow document
+# Validate an Arazzo workflow document and check it against its source descriptions
 openapi arazzo validate ./workflow.arazzo.yaml
+
+# Validate an Arazzo workflow document without loading its source descriptions
+openapi arazzo validate --skip-sources ./workflow.arazzo.yaml
 
 # Upgrade an Arazzo 1.0.x workflow document to 1.1.0
 openapi arazzo upgrade -w ./workflow.arazzo.yaml

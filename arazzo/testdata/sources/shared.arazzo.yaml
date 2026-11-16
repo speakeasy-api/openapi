@@ -1,0 +1,26 @@
+arazzo: 1.1.0
+info:
+  title: Shared workflows
+  version: 1.0.0
+sourceDescriptions:
+  - name: petstore
+    url: ./petstore.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: adoptPet
+    inputs:
+      type: object
+      required:
+        - petId
+      properties:
+        petId:
+          type: integer
+        note:
+          type: string
+    steps:
+      - stepId: fetch
+        operationId: getPet
+        parameters:
+          - name: petId
+            in: path
+            value: $inputs.petId
