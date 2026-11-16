@@ -153,7 +153,7 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 	if err != nil {
 		var validationErr *jsValidator.ValidationError
 		if errors.As(err, &validationErr) {
-			errs = append(errs, getRootCauses(validationErr, *core)...)
+			errs = append(errs, dedupeErrors(getRootCauses(validationErr, *core))...)
 		} else {
 			errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSchema, fmt.Errorf("schema invalid: %s", err.Error()), core.RootNode))
 		}
@@ -261,6 +261,22 @@ func filterReferenceBranchCauses(err *jsValidator.ValidationError) []*jsValidato
 		return err.Causes
 	}
 	return filtered
+}
+
+// dedupeErrors removes errors with identical messages and locations. Branches of anyOf/oneOf can
+// report the same root cause (e.g. an invalid nested $ref fails both the Schema and Reference arms).
+func dedupeErrors(errs []error) []error {
+	seen := make(map[string]struct{}, len(errs))
+	deduped := make([]error, 0, len(errs))
+	for _, err := range errs {
+		key := err.Error()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		deduped = append(deduped, err)
+	}
+	return deduped
 }
 
 func isOnlyMissingRef(err *jsValidator.ValidationError) bool {

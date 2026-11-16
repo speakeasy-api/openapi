@@ -9,6 +9,11 @@
       "format": "uri",
       "description": "Added unofficial support for $schema property to assist testing"
     },
+    "$ref": {
+      "type": "string",
+      "format": "uri-reference",
+      "description": "Declared so a nested Reference Object cannot bypass $ref validation by matching the open Schema Object branch of anyOf [Schema, Reference]"
+    },
     "title": {
       "type": "string"
     },
