@@ -425,12 +425,18 @@ components:
   schemas:
     Money:
       type: number
+    NullableMoney:
+      type: number
+      nullable: true
     Order:
       type: object
       properties:
         nullable:
           $ref: "#/components/schemas/Money"
           type: number
+          nullable: true
+        nullableTarget:
+          $ref: "#/components/schemas/NullableMoney"
           nullable: true
         notNullable:
           $ref: "#/components/schemas/Money"
@@ -448,13 +454,22 @@ components:
   schemas:
     Money:
       type: number
+    NullableMoney:
+      type:
+        - number
+        - "null"
     Order:
       type: object
       properties:
         nullable:
-          oneOf:
+          anyOf:
             - $ref: '#/components/schemas/Money'
               type: number
+            - type:
+                - "null"
+        nullableTarget:
+          anyOf:
+            - $ref: '#/components/schemas/NullableMoney'
             - type:
                 - "null"
         notNullable:
@@ -490,6 +505,53 @@ components:
 			assert.Empty(t, validationErrs, "upgraded document should be valid")
 		})
 	}
+}
+
+func TestUpgrade_NullableReferenceKeepsResolution_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	yml := `openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Money:
+      type: number
+    Order:
+      type: object
+      properties:
+        amount:
+          $ref: "#/components/schemas/Money"
+          nullable: true
+`
+
+	doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(yml))
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "input document should be valid")
+
+	_, err = doc.ResolveAllReferences(ctx, openapi.ResolveAllOptions{OpenAPILocation: "openapi.yaml"})
+	require.NoError(t, err, "resolving references should succeed")
+
+	_, err = openapi.Upgrade(ctx, doc)
+	require.NoError(t, err, "upgrade should succeed")
+
+	order, ok := doc.Components.Schemas.Get("Order")
+	require.True(t, ok, "Order schema should exist")
+	amount, ok := order.GetSchema().GetProperties().Get("amount")
+	require.True(t, ok, "amount property should exist")
+
+	assert.False(t, amount.IsReference(), "wrapper should no longer be a reference")
+	assert.Same(t, amount.GetSchema(), amount.GetResolvedSchema().GetSchema(), "wrapper should resolve to itself, not a stale target")
+
+	anyOf := amount.GetSchema().AnyOf
+	require.Len(t, anyOf, 2, "wrapper should hold the reference and null")
+	assert.True(t, anyOf[0].IsReference(), "first branch should be the reference")
+	resolved := anyOf[0].GetResolvedSchema()
+	require.NotNil(t, resolved, "moved reference should keep its resolution")
+	assert.Equal(t, []oas3.SchemaType{oas3.SchemaTypeNumber}, resolved.GetSchema().GetType(), "moved reference should resolve to Money")
 }
 
 func TestUpgradeAdditionalOperations(t *testing.T) {

@@ -6,6 +6,8 @@ import (
 
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/pointer"
+	"github.com/speakeasy-api/openapi/references"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -570,6 +572,25 @@ $ref: true
 			wantErrs: []string{"[3:7] error validation-type-mismatch schema.$ref expected `string`, got `boolean`"},
 		},
 		{
+			name: "non-string top-level $ref in OpenAPI 3.0 ignores invalid siblings",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: true
+exclusiveMinimum: 5
+type: [string, number]
+`,
+			wantErrs: []string{"[3:7] error validation-type-mismatch schema.$ref expected `string`, got `boolean`"},
+		},
+		{
+			name: "non-string top-level $ref with aliased key in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+x-key: &refKey $ref
+*refKey : 1
+`,
+			wantErrs: []string{"[4:11] error validation-type-mismatch schema.$ref expected `string`, got `number`"},
+		},
+		{
 			name: "malformed top-level $ref URI in OpenAPI 3.0 is reported once",
 			yml: `
 $schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
@@ -650,4 +671,16 @@ $ref: "#"
 			assert.Equal(t, tt.wantErrs, errMessages)
 		})
 	}
+}
+
+func TestSchema_Validate_ProgrammaticReferenceInOpenAPI30_Success(t *testing.T) {
+	t.Parallel()
+
+	schema := &oas3.Schema{
+		Ref:     pointer.From(references.Reference("#/components/schemas/Base")),
+		Minimum: pointer.From(0.0),
+	}
+
+	errs := schema.Validate(t.Context(), validation.WithContextObject(&oas3.ParentDocumentVersion{OpenAPI: pointer.From("3.0.3")}))
+	assert.Empty(t, errs, "programmatically built reference schema should be valid")
 }

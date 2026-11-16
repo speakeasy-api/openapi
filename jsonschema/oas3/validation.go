@@ -138,7 +138,12 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 			js.Valid = len(errs) == 0 && core.GetValid()
 			return errs
 		}
-		node = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{core.Ref.KeyNode, core.Ref.ValueNode}}
+		// Resolve an aliased key so the synthetic mapping serializes as `$ref` rather than the alias.
+		refKeyNode := core.Ref.KeyNode
+		if resolved := yml.ResolveAlias(refKeyNode); resolved != nil {
+			refKeyNode = resolved
+		}
+		node = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{refKeyNode, core.Ref.ValueNode}}
 	}
 
 	if dialectErrs := validateAgainstDialect(schema, node, core); len(dialectErrs) > 0 {

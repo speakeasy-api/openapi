@@ -368,7 +368,11 @@ func upgradeSchema30to31(js *oas3.JSONSchema[oas3.Referenceable]) {
 
 	upgradeExample30to31(schema)
 	upgradeExclusiveMinMax30to31(schema)
-	upgradeNullableSchema30to31(schema)
+	if schema.IsReference() {
+		upgradeNullableReference30to31(js)
+	} else {
+		upgradeNullableSchema30to31(schema)
+	}
 }
 
 func upgradeExample30to31(schema *oas3.Schema) {
@@ -417,10 +421,6 @@ func upgradeNullableSchema30to31(schema *oas3.Schema) {
 	schema.Nullable = nil
 
 	switch {
-	case schema.IsReference():
-		// The $ref target is still applied alongside any siblings in 3.1+, so adding null to a sibling
-		// type or anyOf/oneOf would not admit null. Wrap the whole schema in oneOf with null instead.
-		wrapInOneOfWithNull(schema)
 	case len(schema.GetType()) > 0:
 		if !slices.Contains(schema.GetType(), "null") {
 			schema.Type = oas3.NewTypeFromArray(append(schema.GetType(), "null"))
@@ -432,16 +432,34 @@ func upgradeNullableSchema30to31(schema *oas3.Schema) {
 		nullSchema := createNullSchema()
 		schema.OneOf = append(schema.OneOf, nullSchema)
 	default:
-		wrapInOneOfWithNull(schema)
+		nullSchema := createNullSchema()
+		clone := *schema
+		newSchema := oas3.Schema{}
+		newSchema.OneOf = []*oas3.JSONSchema[oas3.Referenceable]{oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&clone), nullSchema}
+		*schema = newSchema
 	}
 }
 
-func wrapInOneOfWithNull(schema *oas3.Schema) {
-	nullSchema := createNullSchema()
-	clone := *schema
-	newSchema := oas3.Schema{}
-	newSchema.OneOf = []*oas3.JSONSchema[oas3.Referenceable]{oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&clone), nullSchema}
-	*schema = newSchema
+// upgradeNullableReference30to31 converts `nullable: true` next to a $ref. The $ref target is still
+// applied alongside any siblings in 3.1+, so adding null to a sibling type or anyOf/oneOf would not
+// admit null. Instead the reference (with its siblings) moves into an anyOf branch alongside null.
+// anyOf rather than oneOf so a target that already admits null still validates.
+func upgradeNullableReference30to31(js *oas3.JSONSchema[oas3.Referenceable]) {
+	schema := js.GetSchema()
+
+	if schema.Nullable == nil || !*schema.Nullable {
+		schema.Nullable = nil // clear it out if it was set to false
+		return
+	}
+
+	schema.Nullable = nil
+
+	// ShallowCopy carries any reference resolution state over to the moved reference, and replacing the
+	// wrapper drops the now-stale resolution state from the schema that no longer holds the $ref.
+	reference := js.ShallowCopy()
+	*js = *oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&oas3.Schema{
+		AnyOf: []*oas3.JSONSchema[oas3.Referenceable]{reference, createNullSchema()},
+	})
 }
 
 func createNullSchema() *oas3.JSONSchema[oas3.Referenceable] {
