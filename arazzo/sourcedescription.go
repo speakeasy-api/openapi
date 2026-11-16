@@ -22,7 +22,7 @@ type SourceDescriptions []*SourceDescription
 // Find will return the first SourceDescription object with the provided name.
 func (s SourceDescriptions) Find(name string) *SourceDescription {
 	for _, sourceDescription := range s {
-		if sourceDescription.Name == name {
+		if sourceDescription != nil && sourceDescription.Name == name {
 			return sourceDescription
 		}
 	}
@@ -82,7 +82,7 @@ func (s *SourceDescription) Validate(ctx context.Context, opts ...validation.Opt
 	}
 
 	switch {
-	case !core.Type.Present:
+	case s.Type == "" && !core.Type.Present:
 		// type is optional
 	case s.Type == SourceDescriptionTypeAsyncAPI && !is11:
 		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationSupportedVersion, specversion.Requires11Error("`sourceDescription.type` `asyncapi`"), core, core.Type))

@@ -162,6 +162,10 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 	sourceDescriptionNames := make(map[string]bool)
 
 	for i, sourceDescription := range a.SourceDescriptions {
+		if sourceDescription == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, sourceDescription.Validate(ctx, opts...)...)
 
 		if _, ok := sourceDescriptionNames[sourceDescription.Name]; ok {
@@ -174,6 +178,10 @@ func (a *Arazzo) Validate(ctx context.Context, opts ...validation.Option) []erro
 	workflowIds := make(map[string]bool)
 
 	for i, workflow := range a.Workflows {
+		if workflow == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, workflow.Validate(ctx, opts...)...)
 
 		if _, ok := workflowIds[workflow.WorkflowID]; ok {

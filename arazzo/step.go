@@ -24,7 +24,7 @@ type Steps []*Step
 // Find will return the first Step object with the provided id.
 func (s Steps) Find(id string) *Step {
 	for _, step := range s {
-		if step.StepID == id {
+		if step != nil && step.StepID == id {
 			return step
 		}
 	}
@@ -125,7 +125,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 
 		numStepsWithID := 0
 		for _, step := range w.Steps {
-			if step.StepID == s.StepID {
+			if step != nil && step.StepID == s.StepID {
 				numStepsWithID++
 			}
 		}
@@ -165,13 +165,7 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 	}
 
 	if s.OperationID != nil {
-		numAPISourceDescriptions := 0
-		for _, sourceDescription := range a.SourceDescriptions {
-			if sourceDescription.Type == SourceDescriptionTypeOpenAPI || sourceDescription.Type == SourceDescriptionTypeAsyncAPI {
-				numAPISourceDescriptions++
-			}
-		}
-		if numAPISourceDescriptions > 1 && !s.OperationID.IsExpression(exprOpts...) {
+		if len(apiSourceDescriptions(a)) > 1 && !s.OperationID.IsExpression(exprOpts...) {
 			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, errors.New("step.operationId must be a valid expression if there are multiple OpenAPI or AsyncAPI source descriptions"), core, core.OperationID))
 		}
 		if s.OperationID.IsExpression(exprOpts...) {
@@ -230,6 +224,10 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 	}
 
 	for _, parameter := range s.Parameters {
+		if parameter == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, parameter.Validate(ctx, opts...)...)
 	}
 	errs = append(errs, validateParametersUnique("step", s.Parameters, core, core.Parameters)...)
@@ -247,6 +245,10 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 	}
 
 	for _, successCriterion := range s.SuccessCriteria {
+		if successCriterion == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, successCriterion.Validate(opts...)...)
 	}
 
@@ -254,6 +256,10 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 	successActions := make(map[string]bool)
 
 	for i, onSuccess := range s.OnSuccess {
+		if onSuccess == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, onSuccess.Validate(ctx, opts...)...)
 
 		if onSuccess.Reference != nil {
@@ -276,6 +282,10 @@ func (s *Step) Validate(ctx context.Context, opts ...validation.Option) []error 
 	failureActions := make(map[string]bool)
 
 	for i, onFailure := range s.OnFailure {
+		if onFailure == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, onFailure.Validate(ctx, opts...)...)
 
 		if onFailure.Reference != nil {
@@ -329,17 +339,47 @@ func (s *Step) validateVersionedFields(is11 bool) []error {
 	return errs
 }
 
+// apiSourceDescriptions returns the source descriptions that describe an API (OpenAPI or AsyncAPI). A source
+// description without a type is included, as it may describe either.
+func apiSourceDescriptions(a *Arazzo) []*SourceDescription {
+	sds := []*SourceDescription{}
+	for _, sd := range a.SourceDescriptions {
+		if sd != nil && sd.Type != SourceDescriptionTypeArazzo {
+			sds = append(sds, sd)
+		}
+	}
+	return sds
+}
+
+// operationSourceDescription returns the source description targeted by the step's operationId: the referenced
+// source description for a `$sourceDescriptions.<name>.<operationId>` expression, or the only API source description
+// for a bare operationId. Returns nil if it can't be determined.
+func (s *Step) operationSourceDescription(a *Arazzo) *SourceDescription {
+	if s.OperationID == nil {
+		return nil
+	}
+
+	if s.OperationID.IsExpression(expression.WithArazzo11Grammar()) {
+		_, sourceDescriptionName, _, _ := s.OperationID.GetParts()
+		return a.SourceDescriptions.Find(sourceDescriptionName)
+	}
+
+	if sds := apiSourceDescriptions(a); len(sds) == 1 {
+		return sds[0]
+	}
+
+	return nil
+}
+
 // validateAsyncFields validates the AsyncAPI specific step fields (action, correlationId) and timeout.
 func (s *Step) validateAsyncFields(a *Arazzo) []error {
 	core := s.GetCore()
 	errs := []error{}
 
+	operationSourceDescription := s.operationSourceDescription(a)
 	asyncOperationSourceDescription := ""
-	if s.OperationID != nil && s.OperationID.IsExpression(expression.WithArazzo11Grammar()) {
-		_, sourceDescriptionName, _, _ := s.OperationID.GetParts()
-		if sd := a.SourceDescriptions.Find(sourceDescriptionName); sd != nil && sd.Type == SourceDescriptionTypeAsyncAPI {
-			asyncOperationSourceDescription = sourceDescriptionName
-		}
+	if operationSourceDescription != nil && operationSourceDescription.Type == SourceDescriptionTypeAsyncAPI {
+		asyncOperationSourceDescription = operationSourceDescription.Name
 	}
 
 	switch {
@@ -354,11 +394,9 @@ func (s *Step) validateAsyncFields(a *Arazzo) []error {
 			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, errors.New("step.action is only applicable to asyncapi steps using operationId or channelPath"), core, core.Action))
 		}
 
-		if s.OperationID != nil && s.OperationID.IsExpression(expression.WithArazzo11Grammar()) {
-			_, sourceDescriptionName, _, _ := s.OperationID.GetParts()
-			if sd := a.SourceDescriptions.Find(sourceDescriptionName); sd != nil && sd.Type != SourceDescriptionTypeAsyncAPI {
-				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.action is only applicable to asyncapi steps, sourceDescription `%s` is of type `%s`", sourceDescriptionName, sd.Type), core, core.Action))
-			}
+		// An omitted type is ambiguous, so only report sources explicitly declared as another type.
+		if sd := operationSourceDescription; sd != nil && sd.Type != "" && sd.Type != SourceDescriptionTypeAsyncAPI {
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.action is only applicable to asyncapi steps, sourceDescription `%s` is of type `%s`", sd.Name, sd.Type), core, core.Action))
 		}
 	case s.ChannelPath != nil:
 		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("step.action is required when channelPath is set"), core, core.ChannelPath))
@@ -413,6 +451,8 @@ func (s *Step) validateDependsOn(a *Arazzo, w *Workflow) []error {
 			workflowID, stepID := workflowStepMatches[1], workflowStepMatches[2]
 			workflow := a.Workflows.Find(workflowID)
 			switch {
+			case workflowID == w.WorkflowID && stepID == s.StepID:
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.dependsOn must not reference the step itself `%s`", dependsOn), core, core.DependsOn, i))
 			case workflow == nil:
 				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.dependsOn workflowId `%s` not found", workflowID), core, core.DependsOn, i))
 			case workflow.Steps.Find(stepID) == nil:

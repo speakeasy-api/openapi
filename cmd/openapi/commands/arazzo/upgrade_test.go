@@ -12,10 +12,11 @@ func TestUpgradeArazzo_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		input          string
-		expected       string
-		expectedStderr []string
+		name              string
+		input             string
+		expected          string
+		expectedStderr    []string
+		notExpectedStderr []string
 	}{
 		{
 			name: "upgrades 1.0 document",
@@ -57,7 +58,8 @@ workflows:
               type: jsonpath
               version: draft-goessner-dispatch-jsonpath-00
 `,
-			expectedStderr: []string{"Successfully upgraded from 1.0.1 to 1.1.0"},
+			expectedStderr:    []string{"Successfully upgraded from 1.0.1 to 1.1.0"},
+			notExpectedStderr: []string{"validation errors"},
 		},
 		{
 			name: "reports expressions that need manual changes",
@@ -119,6 +121,9 @@ workflows:
 			assert.Equal(t, tt.expected, out.String(), "upgraded document should match")
 			for _, expected := range tt.expectedStderr {
 				assert.Contains(t, stderr.String(), expected, "stderr should contain expected output")
+			}
+			for _, notExpected := range tt.notExpectedStderr {
+				assert.NotContains(t, stderr.String(), notExpected, "stderr should not contain unexpected output")
 			}
 		})
 	}

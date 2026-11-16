@@ -76,6 +76,34 @@ func TestSelector_Validate_Success(t *testing.T) {
 	}
 }
 
+func TestSelector_Validate_Alias_Success(t *testing.T) {
+	t.Parallel()
+
+	doc := `arazzo: 1.1.0
+info:
+  title: Selectors
+  version: 1.0.0
+  x-selector: &selector
+    context: $response.body
+    selector: /pets/0/id
+    type: jsonpointer
+sourceDescriptions:
+  - name: api
+    url: https://example.com/openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: main
+    steps:
+      - stepId: first
+        operationId: getPet
+        outputs:
+          pet: *selector
+`
+
+	messages := validationMessages(t, doc)
+	assert.Empty(t, messages, "aliased selector should be valid")
+}
+
 func TestSelector_Validate_Error(t *testing.T) {
 	t.Parallel()
 

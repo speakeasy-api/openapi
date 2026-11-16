@@ -17,7 +17,10 @@ import (
 
 // Parse parses an Arazzo version string, ignoring any prerelease suffix (e.g. `1.1.0-rc1`).
 func Parse(v string) (*version.Version, error) {
-	base, _, _ := strings.Cut(v, "-")
+	base, prerelease, hasPrerelease := strings.Cut(v, "-")
+	if hasPrerelease && prerelease == "" {
+		return nil, fmt.Errorf("invalid version `%s`: empty prerelease suffix", v)
+	}
 	return version.Parse(base)
 }
 

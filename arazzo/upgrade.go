@@ -86,7 +86,8 @@ func Upgrade(ctx context.Context, doc *Arazzo, opts ...Option[UpgradeOptions]) (
 		upgradeFrom10To11(doc)
 	}
 
-	doc.Arazzo = targetVersion.String()
+	// Use the validated target string rather than the parsed version so any prerelease suffix is preserved.
+	doc.Arazzo = options.targetVersion
 
 	_, err = marshaller.Sync(ctx, doc)
 	return true, err

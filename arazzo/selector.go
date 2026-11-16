@@ -15,6 +15,7 @@ import (
 	"github.com/speakeasy-api/openapi/jsonpointer"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
+	"github.com/speakeasy-api/openapi/yml"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -96,6 +97,7 @@ func validateSelectorSyntax(typ criterion.CriterionType, selector string) error 
 // isSelectorNode returns true if the node looks like a Selector Object (a mapping with both `context` and
 // `selector` keys). Used to distinguish Selector Objects from literal object values where both are allowed.
 func isSelectorNode(node *yaml.Node) bool {
+	node = yml.ResolveAlias(node)
 	if node == nil || node.Kind != yaml.MappingNode {
 		return false
 	}

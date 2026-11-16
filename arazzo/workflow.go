@@ -22,7 +22,7 @@ type Workflows []*Workflow
 // Find will return the first workflow with the matching workflowId.
 func (w Workflows) Find(id string) *Workflow {
 	for _, workflow := range w {
-		if workflow.WorkflowID == id {
+		if workflow != nil && workflow.WorkflowID == id {
 			return workflow
 		}
 	}
@@ -110,20 +110,36 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 	}
 
 	for _, step := range w.Steps {
+		if step == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, step.Validate(ctx, opts...)...)
 	}
 
 	for _, successAction := range w.SuccessActions {
+		if successAction == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, successAction.Validate(ctx, opts...)...)
 	}
 
 	for _, failureAction := range w.FailureActions {
+		if failureAction == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, failureAction.Validate(ctx, opts...)...)
 	}
 
 	errs = append(errs, validateOutputs(ctx, "workflow", w.Outputs, core, core.Outputs, opts...)...)
 
 	for _, parameter := range w.Parameters {
+		if parameter == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, parameter.Validate(ctx, opts...)...)
 	}
 	errs = append(errs, validateParametersUnique("workflow", w.Parameters, core, core.Parameters)...)

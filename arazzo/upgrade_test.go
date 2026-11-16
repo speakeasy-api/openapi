@@ -45,7 +45,36 @@ workflows:
               - context: $response.body
                 condition: $.done
                 type: jsonpath
+        onFailure:
+          - name: stop
+            type: end
+            criteria:
+              - context: $response.body
+                condition: //error
+                type: xpath
+    successActions:
+      - name: workflowDone
+        type: end
+        criteria:
+          - context: $response.body
+            condition: $.ok
+            type: jsonpath
+    failureActions:
+      - name: workflowFailed
+        type: end
+        criteria:
+          - context: $response.body
+            condition: $.failed
+            type: jsonpath
 components:
+  successActions:
+    finish:
+      name: finish
+      type: end
+      criteria:
+        - context: $response.body
+          condition: //finished
+          type: xpath
   failureActions:
     retry:
       name: retry
@@ -98,7 +127,44 @@ workflows:
                 type:
                   type: jsonpath
                   version: draft-goessner-dispatch-jsonpath-00
+        onFailure:
+          - name: stop
+            type: end
+            criteria:
+              - context: $response.body
+                condition: //error
+                type:
+                  type: xpath
+                  version: xpath-30
+    successActions:
+      - name: workflowDone
+        type: end
+        criteria:
+          - context: $response.body
+            condition: $.ok
+            type:
+              type: jsonpath
+              version: draft-goessner-dispatch-jsonpath-00
+    failureActions:
+      - name: workflowFailed
+        type: end
+        criteria:
+          - context: $response.body
+            condition: $.failed
+            type:
+              type: jsonpath
+              version: draft-goessner-dispatch-jsonpath-00
 components:
+  successActions:
+    finish:
+      name: finish
+      type: end
+      criteria:
+        - context: $response.body
+          condition: //finished
+          type:
+            type: xpath
+            version: xpath-30
   failureActions:
     retry:
       name: retry
@@ -152,6 +218,13 @@ func TestUpgrade_Success(t *testing.T) {
 			input:            "arazzo: 1.0.1-rc1\ninfo:\n  title: Upgrade\n  version: 1.0.0\n",
 			expectedUpgraded: true,
 			expected:         "arazzo: 1.1.0\ninfo:\n  title: Upgrade\n  version: 1.0.0\n",
+		},
+		{
+			name:             "prerelease target version suffix is preserved",
+			input:            "arazzo: 1.0.1\ninfo:\n  title: Upgrade\n  version: 1.0.0\n",
+			opts:             []arazzo.Option[arazzo.UpgradeOptions]{arazzo.WithUpgradeTargetVersion("1.1.0-rc1")},
+			expectedUpgraded: true,
+			expected:         "arazzo: 1.1.0-rc1\ninfo:\n  title: Upgrade\n  version: 1.0.0\n",
 		},
 	}
 

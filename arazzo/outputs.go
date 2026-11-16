@@ -82,12 +82,16 @@ func validateOutputs(ctx context.Context, parentName string, outputs Outputs, pa
 			errs = append(errs, validation.NewMapKeyError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("%s.outputs name must be a valid name [`%s`]: `%s`", parentName, outputNameRegex.String(), name), parent, outputsField, name))
 		}
 
-		if s := output.GetSelector(); s != nil {
+		s, e := output.GetSelector(), output.GetExpression()
+		switch {
+		case s != nil:
 			errs = append(errs, s.Validate(ctx, opts...)...)
-		} else if e := output.GetExpression(); e != nil {
+		case e != nil:
 			if err := e.Validate(exprOpts...); err != nil {
 				errs = append(errs, validation.NewMapValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("%s.outputs expression is invalid: %w", parentName, err), parent, outputsField, name))
 			}
+		default:
+			errs = append(errs, validation.NewMapValueError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("%s.outputs value must be a runtime expression or a selector object", parentName), parent, outputsField, name))
 		}
 	}
 

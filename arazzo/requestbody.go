@@ -59,6 +59,10 @@ func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) [
 
 	replacementOpts := append(append([]validation.Option{}, opts...), validation.WithContextObject(r))
 	for _, replacement := range r.Replacements {
+		if replacement == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, replacement.Validate(ctx, replacementOpts...)...)
 	}
 

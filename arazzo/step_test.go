@@ -1,6 +1,7 @@
 package arazzo_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -180,6 +181,14 @@ func TestStep_Validate_Arazzo11_Error(t *testing.T) {
 			},
 		},
 		{
+			name: "dependsOn qualified reference to the step itself",
+			steps: `      - stepId: first
+        operationId: $sourceDescriptions.api.getPet
+        dependsOn:
+          - $workflows.main.steps.first`,
+			expected: []string{"step.dependsOn must not reference the step itself `$workflows.main.steps.first`"},
+		},
+		{
 			name: "empty dependsOn",
 			steps: `      - stepId: first
         operationId: $sourceDescriptions.api.getPet
@@ -241,6 +250,91 @@ func TestStep_Validate_Arazzo11_Error(t *testing.T) {
 			t.Parallel()
 
 			messages := validationMessages(t, sprintfDoc(stepTestDoc, tt.steps))
+			assertMessagesContain(t, tt.expected, messages)
+		})
+	}
+}
+
+// singleSourceStepTestDoc is an Arazzo 1.1 document with a single source description, the first %s verb is replaced
+// by the source description type and the second by the step's operationId and action.
+const singleSourceStepTestDoc = `arazzo: 1.1.0
+info:
+  title: Steps
+  version: 1.0.0
+sourceDescriptions:
+  - name: api
+    url: https://example.com/api.yaml
+%s
+workflows:
+  - workflowId: main
+    steps:
+      - stepId: first
+%s
+`
+
+func TestStep_Validate_BareOperationIDSingleSource_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		sourceType string
+		step       string
+	}{
+		{
+			name:       "asyncapi source with action",
+			sourceType: "    type: asyncapi",
+			step:       "        operationId: publishPet\n        action: send",
+		},
+		{
+			name:       "openapi source without action",
+			sourceType: "    type: openapi",
+			step:       "        operationId: getPet",
+		},
+		{
+			name:       "untyped source with action",
+			sourceType: "",
+			step:       "        operationId: publishPet\n        action: send",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			messages := validationMessages(t, fmt.Sprintf(singleSourceStepTestDoc, tt.sourceType, tt.step))
+			assert.Empty(t, messages, "step should be valid")
+		})
+	}
+}
+
+func TestStep_Validate_BareOperationIDSingleSource_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		sourceType string
+		step       string
+		expected   []string
+	}{
+		{
+			name:       "asyncapi source without action",
+			sourceType: "    type: asyncapi",
+			step:       "        operationId: publishPet",
+			expected:   []string{"step.action is required for asyncapi steps, operationId references asyncapi sourceDescription `api`"},
+		},
+		{
+			name:       "openapi source with action",
+			sourceType: "    type: openapi",
+			step:       "        operationId: getPet\n        action: send",
+			expected:   []string{"step.action is only applicable to asyncapi steps, sourceDescription `api` is of type `openapi`"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			messages := validationMessages(t, fmt.Sprintf(singleSourceStepTestDoc, tt.sourceType, tt.step))
 			assertMessagesContain(t, tt.expected, messages)
 		})
 	}

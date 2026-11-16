@@ -129,8 +129,10 @@ func (p *Parameter) Validate(ctx context.Context, opts ...validation.Option) []e
 func validateParametersUnique(parentName string, parameters []*ReusableParameter, parentCore validation.CoreModeler, node validation.SliceNodeGetter) []error {
 	errs := []error{}
 
+	type parameterKey struct{ name, in string }
+
 	seenRefs := map[string]bool{}
-	seen := map[string]bool{}
+	seen := map[parameterKey]bool{}
 
 	for i, parameter := range parameters {
 		switch {
@@ -146,7 +148,7 @@ func validateParametersUnique(parentName string, parameters []*ReusableParameter
 			if parameter.Object.In != nil {
 				in = string(*parameter.Object.In)
 			}
-			id := parameter.Object.Name + "." + in
+			id := parameterKey{name: parameter.Object.Name, in: in}
 			if seen[id] {
 				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("%s.parameters duplicate parameter found with name `%s` and in `%s`", parentName, parameter.Object.Name, in), parentCore, node, i))
 			}

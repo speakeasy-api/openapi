@@ -847,3 +847,71 @@ func filterCurrentUnconfirmedValidationErrors(validationErrs []error, docSpecifi
 
 	return filteredValidationErrs
 }
+
+func TestArazzo_Validate_NullEntries_Error(t *testing.T) {
+	t.Parallel()
+
+	doc := `arazzo: 1.1.0
+info:
+  title: Nulls
+  version: 1.0.0
+sourceDescriptions:
+  - null
+  - name: api
+    url: ./api.yaml
+    type: openapi
+workflows:
+  - null
+  - workflowId: main
+    parameters:
+      - null
+    successActions:
+      - null
+    failureActions:
+      - null
+    steps:
+      - null
+      - stepId: first
+        operationId: getPet
+        parameters:
+          - null
+        successCriteria:
+          - null
+        onSuccess:
+          - null
+        onFailure:
+          - null
+        requestBody:
+          replacements:
+            - null
+`
+
+	messages := validationMessages(t, doc)
+	assertMessagesContain(t, []string{
+		"arazzo.sourceDescriptions.0 expected `object`",
+		"arazzo.workflows.0 expected `object`",
+		"workflow.parameters.0 reusable expected `object`",
+		"workflow.successActions.0 reusable expected `object`",
+		"workflow.failureActions.0 reusable expected `object`",
+		"workflow.steps.0 expected `object`",
+		"step.parameters.0 reusable expected `object`",
+		"step.successCriteria.0 expected `object`",
+		"step.onSuccess.0 reusable expected `object`",
+		"step.onFailure.0 reusable expected `object`",
+		"requestBody.replacements.0 expected `object`",
+	}, messages)
+}
+
+func TestSourceDescription_Validate_InvalidTypeWithoutCore_Error(t *testing.T) {
+	t.Parallel()
+
+	sd := &arazzo.SourceDescription{
+		Name: "api",
+		URL:  "https://example.com/openapi.yaml",
+		Type: "bogus",
+	}
+
+	errs := sd.Validate(t.Context())
+	require.NotEmpty(t, errs, "validation should fail")
+	assert.Contains(t, errors.Join(errs...).Error(), "sourceDescription.type must be one of", "should report the invalid type")
+}

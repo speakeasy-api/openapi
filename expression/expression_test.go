@@ -416,6 +416,11 @@ func TestExpression_Validate_Arazzo11_Success(t *testing.T) {
 		{name: "$components parameters", e: "$components.parameters.page"},
 		{name: "$components successActions", e: "$components.successActions.done"},
 		{name: "$components failureActions", e: "$components.failureActions.retry"},
+		{name: "$request.query name with dots", e: "$request.query.filter.status"},
+		{name: "$request.path name with unicode", e: "$request.path.héllo"},
+		{name: "$request.query name with escaped quote", e: `$request.query.a\"b`},
+		{name: "$sourceDescriptions reference with dots", e: "$sourceDescriptions.petStore.pets.list"},
+		{name: "$sourceDescriptions url without json pointer", e: "$sourceDescriptions.petStore.url"},
 	}
 
 	for _, tt := range tests {
@@ -444,6 +449,11 @@ func TestExpression_Validate_Arazzo11_Error(t *testing.T) {
 		{name: "$inputs with invalid characters", e: "$inputs.pet!id", wantErr: "expression is not valid, expected a name matching [^[A-Za-z0-9._\\-]+$] after $inputs: $inputs.pet!id"},
 		{name: "json pointer on $statusCode", e: "$statusCode#/foo", wantErr: "expression is not valid, json pointers are not allowed in current context: $statusCode#/foo"},
 		{name: "unknown root", e: "$foo.bar", wantErr: "expression is not valid, must begin with one of [url, method, statusCode, request, response, inputs, outputs, steps, workflows, sourceDescriptions, components, message, self]: $foo.bar"},
+		{name: "$sourceDescriptions url with json pointer without braces", e: "$sourceDescriptions.petStore.url#/paths", wantErr: "expression is not valid, json pointers are not allowed in current context: $sourceDescriptions.petStore.url#/paths"},
+		{name: "$request.query name with raw quote", e: `$request.query.a"b`, wantErr: `expression is not valid, query reference name contains an invalid character '"': $request.query.a"b`},
+		{name: "$request.path name with invalid escape", e: `$request.path.a\x`, wantErr: `expression is not valid, path reference name contains an invalid escape sequence ` + "`\\x`" + `: $request.path.a\x`},
+		{name: "$request.query name with incomplete unicode escape", e: `$request.query.a\u12`, wantErr: `expression is not valid, query reference name contains an incomplete unicode escape sequence: $request.query.a\u12`},
+		{name: "$request.query without name", e: "$request.query", wantErr: "expression is not valid, expected name after $request.query: $request.query"},
 	}
 
 	for _, tt := range tests {

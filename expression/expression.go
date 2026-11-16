@@ -1,6 +1,7 @@
 package expression
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -274,12 +275,13 @@ func (e Expression) validateArazzo11(typ ExpressionType, reference string, expre
 				return fmt.Errorf("header reference must be a valid token [%s]: %s", tokenRegex.String(), string(e))
 			}
 		case ReferenceTypeQuery, ReferenceTypePath:
-			if len(expressionParts) != 1 {
+			// query-reference / path-reference = "query." / "path." name, where name = *( CHAR )
+			if len(expressionParts) == 0 {
 				return fmt.Errorf("expression is not valid, expected name after $%s.%s: %s", typ, reference, string(e))
 			}
 
-			if err := validateName(string(e), expressionParts[0], reference+" reference"); err != nil {
-				return err
+			if err := validateCHARs(strings.Join(expressionParts, ".")); err != nil {
+				return fmt.Errorf("expression is not valid, %s reference name %w: %s", reference, err, string(e))
 			}
 		default:
 			return fmt.Errorf("expression is not valid, expected one of [%s] after $%s: %s", strings.Join(arazzo11ReferenceTypes, ", "), typ, string(e))
@@ -314,11 +316,18 @@ func (e Expression) validateArazzo11(typ ExpressionType, reference string, expre
 		if !identifierStrictRegex.MatchString(reference) || len(expressionParts) == 0 {
 			return fmt.Errorf("expression is not valid, expected $sourceDescriptions.<name>.<reference>: %s", string(e))
 		}
-		if err := validateName(string(e), strings.Join(expressionParts, "."), "source reference"); err != nil {
-			return err
+		// source-reference-id = 1*CHAR
+		sourceReferenceID := strings.Join(expressionParts, ".")
+		if sourceReferenceID == "" {
+			return fmt.Errorf("expression is not valid, expected $sourceDescriptions.<name>.<reference>: %s", string(e))
 		}
-		// Allow `{$sourceDescriptions.<name>.url}#/json/pointer` as used by operationPath and channelPath.
-		allowJSONPointers = expressionParts[len(expressionParts)-1] == "url"
+		if err := validateCHARs(sourceReferenceID); err != nil {
+			return fmt.Errorf("expression is not valid, source reference %w: %s", err, string(e))
+		}
+		// Only allow a JSON Pointer for the braced `{$sourceDescriptions.<name>.url}#/json/pointer` form used by
+		// operationPath and channelPath.
+		expressionPart, _, _ := strings.Cut(string(e), "#")
+		allowJSONPointers = sourceReferenceID == "url" && strings.HasPrefix(expressionPart, "{") && strings.HasSuffix(expressionPart, "}")
 	case ExpressionTypeComponents:
 		// components-reference = ("parameters" / "successActions" / "failureActions") "." identifier
 		if !slices.Contains(arazzo11ComponentTypes, reference) || len(expressionParts) == 0 {
@@ -404,6 +413,40 @@ func getType(expression string) ([]string, ExpressionType) {
 	}
 
 	return expressionParts, typ
+}
+
+// validateCHARs validates a value against the Arazzo 1.1 ABNF `CHAR` rule: JSON string style characters where
+// braces, raw quotes and control characters are not allowed and `\` must start a valid escape sequence.
+func validateCHARs(value string) error {
+	runes := []rune(value)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		switch {
+		case r == '\\':
+			if i+1 >= len(runes) {
+				return errors.New("contains an incomplete escape sequence")
+			}
+			i++
+			switch runes[i] {
+			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
+			case 'u':
+				if i+4 >= len(runes) {
+					return errors.New("contains an incomplete unicode escape sequence")
+				}
+				for _, h := range runes[i+1 : i+5] {
+					if !strings.ContainsRune("0123456789abcdefABCDEF", h) {
+						return errors.New("contains an invalid unicode escape sequence")
+					}
+				}
+				i += 4
+			default:
+				return fmt.Errorf("contains an invalid escape sequence `\\%c`", runes[i])
+			}
+		case r < 0x20, r == '"', r == '{', r == '}':
+			return fmt.Errorf("contains an invalid character %q", r)
+		}
+	}
+	return nil
 }
 
 // TODO the spec is currently ambiguous on how to handle any additional dot separated parts after the name so just treat as a name for now
