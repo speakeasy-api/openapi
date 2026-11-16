@@ -474,3 +474,45 @@ func TestCriterion_Validate_WithTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestCriterion_Validate_JsonPathKeywordMemberNames_Success(t *testing.T) {
+	t.Parallel()
+
+	// RFC 9535 member-name-shorthand allows function names (value, length, count,
+	// match, search) and keywords (true, false, null) as member names.
+	tests := []struct {
+		name      string
+		condition string
+	}{
+		{name: "value member followed by index", condition: "$.value[0]"},
+		{name: "value member followed by wildcard", condition: "$.value[*]"},
+		{name: "value member followed by filter", condition: "$.value[?(@.id == 'x')]"},
+		{name: "value member followed by child", condition: "$.value.id"},
+		{name: "descendant value member", condition: "$..value[0]"},
+		{name: "value member inside filter query", condition: "$[?@.value[0] == 1]"},
+		{name: "length member followed by index", condition: "$.length[0]"},
+		{name: "keyword members", condition: "$.true.false.null"},
+		{name: "value function call", condition: "$[?value(@.a) == 1]"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := &criterion.Criterion{
+				Context:   pointer.From(expression.Expression("$response.body")),
+				Condition: tt.condition,
+				Type: criterion.CriterionTypeUnion{
+					Type: pointer.From(criterion.CriterionTypeJsonPath),
+				},
+			}
+
+			err := c.Sync(t.Context())
+			require.NoError(t, err, "sync should succeed")
+
+			errs := c.Validate()
+			assert.Empty(t, errs, "validation should succeed")
+			assert.True(t, c.Valid, "criterion should be valid")
+		})
+	}
+}
