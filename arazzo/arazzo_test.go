@@ -671,7 +671,7 @@ var stressTests = []struct {
 		args: args{
 			location: "https://raw.githubusercontent.com/ritza-co/e2e-testing-arazzo/c0615c3708a1e4c0fcaeb79edae78ddc4eb5ba82/arazzo.yaml",
 			validationIgnores: []string{
-				"[42:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 8: unexpected token", // legit invalid RFC 9535 syntax
+				"[42:24] error validation-invalid-syntax invalid jsonpath expression: Error at line 1, column 9: unexpected token when parsing segment", // legit invalid RFC 9535 syntax
 			},
 		},
 		wantTitle: "Build-a-Bot Workflow",
