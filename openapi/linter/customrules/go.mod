@@ -8,7 +8,7 @@ require (
 	github.com/dop251/goja v0.0.0-20260106131823-651366fbe6e3
 	github.com/evanw/esbuild v0.28.2
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
-	github.com/speakeasy-api/openapi v1.26.3-0.20261102103018-bb4439a5fcc1
+	github.com/speakeasy-api/openapi v1.26.4-0.20261116012745-bdb0d271330e
 	github.com/stretchr/testify v1.12.1
 	go.yaml.in/yaml/v3 v3.0.6
 )
