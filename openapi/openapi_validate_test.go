@@ -224,6 +224,8 @@ components:
           $ref: '#/components/schemas/Child'
     Alias:
       $ref: '#/components/schemas/Base'
+      exclusiveMinimum: true
+      type: [string, number]
     Child:
       type: string
 `,
