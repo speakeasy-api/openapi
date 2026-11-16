@@ -509,7 +509,7 @@ func walkComponentSuccessActions(ctx context.Context, actions *sequencedmap.Map[
 	return true
 }
 
-func walkSuccessAction(_ context.Context, action *SuccessAction, loc Locations, arazzo *Arazzo, yield func(WalkItem) bool) bool {
+func walkSuccessAction(ctx context.Context, action *SuccessAction, loc Locations, arazzo *Arazzo, yield func(WalkItem) bool) bool {
 	if action == nil {
 		return true
 	}
@@ -517,6 +517,11 @@ func walkSuccessAction(_ context.Context, action *SuccessAction, loc Locations, 
 	actionMatchFunc := getMatchFunc(action)
 
 	if !yield(WalkItem{Match: actionMatchFunc, Location: loc, Arazzo: arazzo}) {
+		return false
+	}
+
+	// Walk through parameters
+	if !walkReusableParameters(ctx, action.Parameters, append(loc, LocationContext{ParentMatchFunc: actionMatchFunc, ParentField: "parameters"}), arazzo, yield) {
 		return false
 	}
 
@@ -543,7 +548,7 @@ func walkComponentFailureActions(ctx context.Context, actions *sequencedmap.Map[
 	return true
 }
 
-func walkFailureAction(_ context.Context, action *FailureAction, loc Locations, arazzo *Arazzo, yield func(WalkItem) bool) bool {
+func walkFailureAction(ctx context.Context, action *FailureAction, loc Locations, arazzo *Arazzo, yield func(WalkItem) bool) bool {
 	if action == nil {
 		return true
 	}
@@ -551,6 +556,11 @@ func walkFailureAction(_ context.Context, action *FailureAction, loc Locations, 
 	actionMatchFunc := getMatchFunc(action)
 
 	if !yield(WalkItem{Match: actionMatchFunc, Location: loc, Arazzo: arazzo}) {
+		return false
+	}
+
+	// Walk through parameters
+	if !walkReusableParameters(ctx, action.Parameters, append(loc, LocationContext{ParentMatchFunc: actionMatchFunc, ParentField: "parameters"}), arazzo, yield) {
 		return false
 	}
 

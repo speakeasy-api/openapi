@@ -8,6 +8,7 @@ import (
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/arazzo/criterion"
+	"github.com/speakeasy-api/openapi/arazzo/internal/specversion"
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
@@ -40,6 +41,8 @@ type SuccessAction struct {
 	WorkflowID *expression.Expression
 	// StepID is the workflow/step to go to on success. Mutually exclusive to WorkflowID.
 	StepID *string
+	// Parameters is a list of parameters to pass to the workflow referenced by WorkflowID. Requires WorkflowID. Arazzo 1.1+ only.
+	Parameters []*ReusableParameter
 	// Criteria is a list of criteria that must be met for the action to be taken.
 	Criteria []criterion.Criterion
 	// Extensions provides a list of extensions to the SuccessAction object.
@@ -94,11 +97,62 @@ func (s *SuccessAction) Validate(ctx context.Context, opts ...validation.Option)
 		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("successAction.type must be one of [`%s`]", strings.Join([]string{string(SuccessActionTypeEnd), string(SuccessActionTypeGoto)}, ", ")), core, core.Type))
 	}
 
+	errs = append(errs, validateActionParameters(ctx, "successAction", s.Parameters, s.WorkflowID, core, core.Parameters, opts...)...)
+
 	for i := range s.Criteria {
 		errs = append(errs, s.Criteria[i].Validate(opts...)...)
 	}
 
 	s.Valid = len(errs) == 0 && core.GetValid()
+
+	return errs
+}
+
+// validateActionParameters validates the parameters of a success or failure action. Parameters are an
+// Arazzo 1.1+ feature, require workflowId to be set, map to workflow inputs (so `in` MUST NOT be used) and
+// must not contain duplicates.
+func validateActionParameters(ctx context.Context, parentName string, parameters []*ReusableParameter, workflowID *expression.Expression, parentCore validation.CoreModeler, node marshaller.Node[[]*core.Reusable[*core.Parameter]], opts ...validation.Option) []error {
+	o := validation.NewOptions(opts...)
+
+	if !node.Present {
+		return nil
+	}
+
+	if !specversion.IsAtLeast11(o) {
+		return []error{validation.NewValueError(validation.SeverityError, validation.RuleValidationSupportedVersion, specversion.Requires11Error("`"+parentName+".parameters`"), parentCore, node)}
+	}
+
+	errs := []error{}
+
+	if workflowID == nil {
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("%s.workflowId is required when parameters are set", parentName), parentCore, node))
+	}
+
+	seenRefs := map[string]bool{}
+	seenNames := map[string]bool{}
+
+	for i, parameter := range parameters {
+		if parameter == nil {
+			continue
+		}
+
+		paramOpts := append(append([]validation.Option{}, opts...), validation.WithContextObject(&actionParameterContext{parentName: parentName, inline: parameter.Object != nil}))
+		errs = append(errs, parameter.Validate(ctx, paramOpts...)...)
+
+		switch {
+		case parameter.Reference != nil:
+			ref := string(*parameter.Reference)
+			if seenRefs[ref] {
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("%s.parameters duplicate parameter found with reference `%s`", parentName, ref), parentCore, node, i))
+			}
+			seenRefs[ref] = true
+		case parameter.Object != nil:
+			if seenNames[parameter.Object.Name] {
+				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("%s.parameters duplicate parameter found with name `%s`", parentName, parameter.Object.Name), parentCore, node, i))
+			}
+			seenNames[parameter.Object.Name] = true
+		}
+	}
 
 	return errs
 }
@@ -127,8 +181,9 @@ func validationActionWorkflowIDAndStepID(ctx context.Context, parentName string,
 		errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationMutuallyExclusiveFields, fmt.Errorf("`%s`.workflowId and stepId are mutually exclusive, only one can be specified", parentName), params.workflowIDNode))
 	}
 	if params.workflowID != nil {
-		if params.workflowID.IsExpression() {
-			if err := params.workflowID.Validate(); err != nil {
+		exprOpts := specversion.ExpressionOptions(o)
+		if params.workflowID.IsExpression(exprOpts...) {
+			if err := params.workflowID.Validate(exprOpts...); err != nil {
 				errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("`%s`.workflowId expression is invalid: %w", parentName, err), params.workflowIDNode))
 			}
 

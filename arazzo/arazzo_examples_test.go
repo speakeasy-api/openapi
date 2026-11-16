@@ -89,7 +89,7 @@ func Example_creating() {
 
 	fmt.Printf("%s", buf.String())
 	// Output:
-	// arazzo: 1.0.1
+	// arazzo: 1.1.0
 	// info:
 	//   title: My Workflow
 	//   summary: A summary
@@ -171,6 +171,36 @@ func Example_walking() {
 	// Workflow: simpleWorkflow
 }
 
+// Example_upgrading demonstrates how to upgrade an Arazzo 1.0.x document to the latest supported version.
+// Shows loading a document, upgrading it and validating the result.
+func Example_upgrading() {
+	ctx := context.Background()
+
+	f, err := os.Open("testdata/simple.arazzo.yaml")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	a, _, err := arazzo.Unmarshal(ctx, f, arazzo.WithSkipValidation())
+	if err != nil {
+		panic(err)
+	}
+
+	originalVersion := a.Arazzo
+
+	upgraded, err := arazzo.Upgrade(ctx, a)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("upgraded: %t, from: %s, to: %s\n", upgraded, originalVersion, a.Arazzo)
+	fmt.Printf("validation errors: %d\n", len(a.Validate(ctx)))
+	// Output:
+	// upgraded: true, from: 1.0.0, to: 1.1.0
+	// validation errors: 0
+}
+
 // Example_validating demonstrates how to validate an Arazzo document.
 // Shows loading an invalid document and handling validation errors.
 func Example_validating() {
@@ -192,4 +222,5 @@ func Example_validating() {
 	// Output:
 	// [3:3] error validation-required-field `info.version` is required
 	// [13:9] error validation-required-field step at least one of operationId, operationPath or workflowId fields must be set
+	// [22:13] error validation-required-field parameter.in is required within a step when workflowId is not set
 }

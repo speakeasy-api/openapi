@@ -33,7 +33,7 @@
     <!-- Swagger Support Badge -->
     <a href="https://spec.openapis.org/oas/v2.0.html"><img alt="Swagger Support" src="https://img.shields.io/badge/Swagger-2.0-85EA2D.svg?style=for-the-badge&logo=swagger"></a>
     <!-- Arazzo Support Badge -->
-    <a href="https://www.speakeasy.com/openapi/arazzo"><img alt="Arazzo Support" src="https://img.shields.io/badge/Arazzo-1.0-purple.svg?style=for-the-badge"></a>
+    <a href="https://www.speakeasy.com/openapi/arazzo"><img alt="Arazzo Support" src="https://img.shields.io/badge/Arazzo-1.0%20%7C%201.1-purple.svg?style=for-the-badge"></a>
     <!-- Line Break --><br/>
     <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
     <!-- Release Version Badge -->
@@ -70,7 +70,7 @@
 
 ### [arazzo](./arazzo)
 
-The `arazzo` package provides an API for working with Arazzo documents including reading, creating, mutating, walking and validating them.
+The `arazzo` package provides an API for working with Arazzo 1.0.x and 1.1.x documents including reading, creating, mutating, walking, validating and upgrading them.
 
 ### [openapi](./openapi)
 
@@ -145,6 +145,7 @@ The CLI provides four main command groups:
 
 - **`openapi arazzo`** - Commands for working with Arazzo workflow documents ([documentation](./cmd/openapi/commands/arazzo/README.md))
   - `validate` - Validate an Arazzo workflow document
+  - `upgrade` - Upgrade an Arazzo workflow document to the latest supported version (1.1.0)
 
 - **`openapi overlay`** - Commands for working with OpenAPI overlays ([documentation](./cmd/openapi/commands/overlay/README.md))
   - `apply` - Apply an overlay to an OpenAPI specification
@@ -186,6 +187,9 @@ openapi overlay apply --overlay overlay.yaml --schema spec.yaml
 
 # Validate an Arazzo workflow document
 openapi arazzo validate ./workflow.arazzo.yaml
+
+# Upgrade an Arazzo 1.0.x workflow document to 1.1.0
+openapi arazzo upgrade -w ./workflow.arazzo.yaml
 
 # Validate a Swagger 2.0 document
 openapi swagger validate ./api.swagger.yaml

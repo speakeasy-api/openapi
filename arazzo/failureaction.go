@@ -43,6 +43,8 @@ type FailureAction struct {
 	RetryAfter *float64
 	// RetryLimit is the number of times to retry the workflow/step on failure. If not set a single retry will be attempted if type is retry.
 	RetryLimit *int
+	// Parameters is a list of parameters to pass to the workflow referenced by WorkflowID. Requires WorkflowID. Arazzo 1.1+ only.
+	Parameters []*ReusableParameter
 	// A list of assertions to check before taking the action.
 	Criteria []criterion.Criterion
 	// Extensions provides a list of extensions to the FailureAction object.
@@ -132,6 +134,8 @@ func (f *FailureAction) Validate(ctx context.Context, opts ...validation.Option)
 	default:
 		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("failureAction.type must be one of [`%s`]", strings.Join([]string{string(FailureActionTypeEnd), string(FailureActionTypeGoto), string(FailureActionTypeRetry)}, ", ")), core, core.Type))
 	}
+
+	errs = append(errs, validateActionParameters(ctx, "failureAction", f.Parameters, f.WorkflowID, core, core.Parameters, opts...)...)
 
 	for i := range f.Criteria {
 		errs = append(errs, f.Criteria[i].Validate(opts...)...)

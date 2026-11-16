@@ -8,7 +8,8 @@ import (
 type ValueOrExpression = *yaml.Node
 
 // GetValueOrExpressionValue will return the value or expression from the provided ValueOrExpression.
-func GetValueOrExpressionValue(value ValueOrExpression) (*yaml.Node, *Expression, error) {
+// Pass WithArazzo11Grammar() to also recognize Arazzo 1.1 expressions such as `$message` and `$self`.
+func GetValueOrExpressionValue(value ValueOrExpression, opts ...ValidateOption) (*yaml.Node, *Expression, error) {
 	if value == nil {
 		return nil, nil, nil
 	}
@@ -22,7 +23,7 @@ func GetValueOrExpressionValue(value ValueOrExpression) (*yaml.Node, *Expression
 		switch v := val.(type) {
 		case string:
 			asExpression := Expression(v)
-			if asExpression.IsExpression() {
+			if asExpression.IsExpression(opts...) {
 				return nil, &asExpression, nil
 			}
 		default:

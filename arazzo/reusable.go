@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
+	"github.com/speakeasy-api/openapi/arazzo/internal/specversion"
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -135,7 +136,7 @@ func (r *Reusable[T, V, C]) Validate(ctx context.Context, opts ...validation.Opt
 
 func (r *Reusable[T, V, C]) validateReference(ctx context.Context, a *Arazzo, objComponentType string, opts ...validation.Option) []error {
 	core := r.GetCore()
-	if err := r.Reference.Validate(); err != nil {
+	if err := r.Reference.Validate(specversion.ExpressionOptions(validation.NewOptions(opts...))...); err != nil {
 		return []error{
 			validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("`%s`.reference is invalid: %w", componentTypeToReusableType(objComponentType), err), core, core.Reference),
 		}

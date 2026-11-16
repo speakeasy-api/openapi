@@ -32,7 +32,7 @@ import (
 // getTestArazzoInstance returns a fresh copy of the test instance to avoid data races in parallel tests
 func getTestArazzoInstance() *arazzo.Arazzo {
 	return &arazzo.Arazzo{
-		Arazzo: arazzo.Version,
+		Arazzo: "1.0.1",
 		Info: arazzo.Info{
 			Title:   "My Workflow",
 			Summary: pointer.From("A summary"),
@@ -176,13 +176,13 @@ func getTestArazzoInstance() *arazzo.Arazzo {
 								},
 							},
 						},
-						Outputs: sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("name", "$response.body#/name")),
+						Outputs: sequencedmap.New(sequencedmap.NewElem("name", arazzo.NewOutputValueFromExpression("$response.body#/name"))),
 						Model: marshaller.Model[core.Step]{
 							Valid: true,
 						},
 					},
 				},
-				Outputs: sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("name", "$steps.step1.outputs.name")),
+				Outputs: sequencedmap.New(sequencedmap.NewElem("name", arazzo.NewOutputValueFromExpression("$steps.step1.outputs.name"))),
 				Model: marshaller.Model[core.Workflow]{
 					Valid: true,
 				},
@@ -280,7 +280,7 @@ func TestArazzo_RoundTrip_Success(t *testing.T) {
 
 func TestArazzoUnmarshal_ValidationErrors(t *testing.T) {
 	t.Parallel()
-	data := []byte(`arazzo: 1.0.2
+	data := []byte(`arazzo: 1.2.0
 x-test: some-value
 info:
   title: My Workflow
@@ -301,10 +301,10 @@ sourceDescriptions:
 		underlyingError error
 	}{
 		{line: 1, column: 1, underlyingError: errors.New("`arazzo.workflows` is required")},
-		{line: 1, column: 9, underlyingError: errors.New("arazzo.version only Arazzo versions between `1.0.0` and `1.0.1` are supported")},
+		{line: 1, column: 9, underlyingError: errors.New("arazzo.version only Arazzo versions `1.0.x`, `1.1.x` are supported")},
 		{line: 4, column: 3, underlyingError: errors.New("`info.version` is required")},
 		{line: 6, column: 5, underlyingError: errors.New("`sourceDescription.url` is required")},
-		{line: 7, column: 11, underlyingError: errors.New("sourceDescription.type must be one of [`openapi, arazzo`]")},
+		{line: 7, column: 11, underlyingError: errors.New("sourceDescription.type must be one of [`openapi, asyncapi, arazzo`]")},
 	}
 
 	require.Len(t, validationErrs, len(expectedErrors), "number of validation errors should match")
@@ -320,7 +320,7 @@ sourceDescriptions:
 	}
 
 	expected := &arazzo.Arazzo{
-		Arazzo: "1.0.2",
+		Arazzo: "1.2.0",
 		Info: arazzo.Info{
 			Title:   "My Workflow",
 			Version: "",
@@ -633,8 +633,8 @@ var stressTests = []struct {
 			location: "https://raw.githubusercontent.com/frankkilcommins/simple-spectral-arazzo-GA/4ec8856f1cf21c0f77597c715c150ef3e2772a89/apis/OnlineStore.arazzo.yaml",
 			validationIgnores: []string{
 				"`info.title` is required", // legit issue
-				"operationId must be a valid expression if there are multiple OpenAPI source descriptions", // legit issue
-				"$responses.body.menuItems[0].subcategories[0].id",                                         // legit issue
+				"operationId must be a valid expression if there are multiple OpenAPI or AsyncAPI source descriptions", // legit issue
+				"$responses.body.menuItems[0].subcategories[0].id",                                                     // legit issue
 			},
 			skipRoundTrip: true, // Has lots of validation errors that impact round tripping
 		},
@@ -682,6 +682,7 @@ var stressTests = []struct {
 			location: "https://raw.githubusercontent.com/API-Flows/openapi-workflow-registry/75c237ce1b155ba9f8dc7f065759df7ae1cbbbe5/root/adyen/adyen-giving.yaml",
 			validationIgnores: []string{
 				"in must be one of [`path, query, header, cookie`] but was `body`",
+				"duplicate parameter found with name `merchantAccount` and in `body`", // legit issue
 			},
 		},
 		wantTitle: "Adyen Giving",
