@@ -532,8 +532,9 @@ components:
 	require.NoError(t, err, "unmarshal should succeed")
 	require.Empty(t, validationErrs, "input document should be valid")
 
-	_, err = doc.ResolveAllReferences(ctx, openapi.ResolveAllOptions{OpenAPILocation: "openapi.yaml"})
+	resolveErrs, err := doc.ResolveAllReferences(ctx, openapi.ResolveAllOptions{OpenAPILocation: "openapi.yaml"})
 	require.NoError(t, err, "resolving references should succeed")
+	require.Empty(t, resolveErrs, "resolving references should not report validation errors")
 
 	_, err = openapi.Upgrade(ctx, doc)
 	require.NoError(t, err, "upgrade should succeed")
