@@ -230,6 +230,44 @@ components:
       type: string
 `,
 		},
+		{
+			name: "valid_3_0_unknown_keywords_are_ignored",
+			yml: `
+openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    S:
+      $id: https://example.com/schemas/s
+      type: object
+      examples:
+        - name: a
+      unevaluatedProperties: false
+      $defs:
+        Inner:
+          type: [string, number]
+      properties:
+        name:
+          type: string
+          const: fixed
+          contentMediaType: text/plain
+        tags:
+          type: array
+          prefixItems:
+            - type: string
+          items:
+            type: string
+        child:
+          $ref: '#/components/schemas/Child'
+          description: ignored sibling
+          type: [string, number]
+    Child:
+      type: string
+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -441,6 +479,41 @@ components:
       exclusiveMinimum: 5
 `,
 			wantErrs: []string{"error validation-type-mismatch schema.exclusiveMinimum expected `boolean`, got `number`"},
+		},
+		{
+			name: "type_array_in_3_0_component_schema",
+			yml: `
+openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    S:
+      type: [string, "null"]
+`,
+			wantErrs: []string{"error validation-type-mismatch schema.type expected `string`, got `array`"},
+		},
+		{
+			name: "wrong_type_for_3_0_keyword_in_nested_schema",
+			yml: `
+openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    S:
+      type: object
+      examples: [{}]
+      properties:
+        count:
+          type: integer
+          exclusiveMaximum: 10
+`,
+			wantErrs: []string{"exclusiveMaximum expected `boolean`, got `number`"},
 		},
 	}
 

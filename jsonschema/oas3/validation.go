@@ -123,8 +123,9 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 	}
 
 	// In OpenAPI 3.0 a schema containing $ref is a Reference Object rather than a Schema Object,
-	// and any sibling keywords are ignored. The 3.0 dialect only describes Schema Objects, so skip
-	// dialect validation here; the reference string itself has already been validated above.
+	// and any sibling keywords are ignored. Skip dialect validation so siblings are not checked
+	// against 3.0 Schema Object types; the reference string itself has already been validated above.
+	// (Nested references get the same treatment via anyOf [Schema, Reference] in the 3.0 dialect.)
 	if schema == JSONSchema30SchemaID && js.IsReference() {
 		js.Valid = len(errs) == 0 && js.GetCore().GetValid()
 		return errs
@@ -166,7 +167,7 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 	errs := []error{}
 
-	for _, cause := range err.Causes {
+	for _, cause := range filterReferenceBranchCauses(err) {
 		if len(cause.Causes) == 0 {
 			var errJP jsonpointer.JSONPointer
 			switch {
@@ -236,6 +237,43 @@ func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {
 	}
 
 	return errs
+}
+
+// filterReferenceBranchCauses drops anyOf/oneOf branches that failed only because `$ref` is missing.
+// The OpenAPI 3.0 dialect validates subschemas as anyOf [Schema, Reference]; when a non-reference
+// subschema is invalid, the Reference branch always fails with "missing property `$ref`", which is
+// noise rather than a useful error. Other branches are kept, and nothing is dropped if every branch
+// is a missing-$ref failure.
+func filterReferenceBranchCauses(err *jsValidator.ValidationError) []*jsValidator.ValidationError {
+	switch err.ErrorKind.(type) {
+	case *kind.AnyOf, *kind.OneOf:
+	default:
+		return err.Causes
+	}
+
+	filtered := make([]*jsValidator.ValidationError, 0, len(err.Causes))
+	for _, cause := range err.Causes {
+		if !isOnlyMissingRef(cause) {
+			filtered = append(filtered, cause)
+		}
+	}
+	if len(filtered) == 0 {
+		return err.Causes
+	}
+	return filtered
+}
+
+func isOnlyMissingRef(err *jsValidator.ValidationError) bool {
+	if len(err.Causes) == 0 {
+		required, ok := err.ErrorKind.(*kind.Required)
+		return ok && len(required.Missing) == 1 && required.Missing[0] == "$ref"
+	}
+	for _, cause := range err.Causes {
+		if !isOnlyMissingRef(cause) {
+			return false
+		}
+	}
+	return true
 }
 
 var (

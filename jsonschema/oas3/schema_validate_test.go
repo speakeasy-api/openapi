@@ -515,6 +515,19 @@ oneOf: "invalid"
 			},
 		},
 		{
+			name: "wrong type for 3.0 keyword in nested schema reports only the type error",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+type: object
+examples: [{}]
+properties:
+  count:
+    type: integer
+    exclusiveMaximum: 10
+`,
+			wantErrs: []string{"[8:23] error validation-type-mismatch schema.properties.count.exclusiveMaximum expected `boolean`, got `number`"},
+		},
+		{
 			name: "invalid reference string in OpenAPI 3.0",
 			yml: `
 $schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"

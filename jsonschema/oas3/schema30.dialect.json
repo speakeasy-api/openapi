@@ -1,7 +1,7 @@
 {
   "id": "https://spec.openapis.org/oas/3.0/dialect/2024-10-18",
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "description": "OpenAPI 3.0 Schema Object based on official https://spec.openapis.org/oas/3.0/schema/2024-10-18.html specification",
+  "description": "OpenAPI 3.0 Schema Object based on official https://spec.openapis.org/oas/3.0/schema/2024-10-18.html specification. Speakeasy deviation: unknown keywords (e.g. OpenAPI 3.1 / JSON Schema 2020-12 keywords) are allowed and ignored rather than rejected, while keywords defined by 3.0 keep their 3.0 types. Subschemas use anyOf rather than oneOf because a Reference Object also satisfies the open Schema Object.",
   "type": "object",
   "properties": {
     "$schema": {
@@ -85,37 +85,37 @@
       "enum": ["array", "boolean", "integer", "number", "object", "string"]
     },
     "not": {
-      "oneOf": [{ "$ref": "#" }, { "$ref": "#/definitions/Reference" }]
+      "anyOf": [{ "$ref": "#" }, { "$ref": "#/definitions/Reference" }]
     },
     "allOf": {
       "type": "array",
       "items": {
-        "oneOf": [{ "$ref": "#" }, { "$ref": "#/definitions/Reference" }]
+        "anyOf": [{ "$ref": "#" }, { "$ref": "#/definitions/Reference" }]
       }
     },
     "oneOf": {
       "type": "array",
       "items": {
-        "oneOf": [{ "$ref": "#" }, { "$ref": "#/definitions/Reference" }]
+        "anyOf": [{ "$ref": "#" }, { "$ref": "#/definitions/Reference" }]
       }
     },
     "anyOf": {
       "type": "array",
       "items": {
-        "oneOf": [{ "$ref": "#" }, { "$ref": "#/definitions/Reference" }]
+        "anyOf": [{ "$ref": "#" }, { "$ref": "#/definitions/Reference" }]
       }
     },
     "items": {
-      "oneOf": [{ "$ref": "#" }, { "$ref": "#/definitions/Reference" }]
+      "anyOf": [{ "$ref": "#" }, { "$ref": "#/definitions/Reference" }]
     },
     "properties": {
       "type": "object",
       "additionalProperties": {
-        "oneOf": [{ "$ref": "#" }, { "$ref": "#/definitions/Reference" }]
+        "anyOf": [{ "$ref": "#" }, { "$ref": "#/definitions/Reference" }]
       }
     },
     "additionalProperties": {
-      "oneOf": [
+      "anyOf": [
         { "$ref": "#" },
         { "$ref": "#/definitions/Reference" },
         { "type": "boolean" }
@@ -159,10 +159,6 @@
       "$ref": "#/definitions/XML"
     }
   },
-  "patternProperties": {
-    "^x-": {}
-  },
-  "additionalProperties": false,
   "definitions": {
     "Reference": {
       "type": "object",
