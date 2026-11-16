@@ -11,6 +11,7 @@ import (
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 )
 
 func TestSchema_Validate_Success(t *testing.T) {
@@ -683,4 +684,32 @@ func TestSchema_Validate_ProgrammaticReferenceInOpenAPI30_Success(t *testing.T) 
 
 	errs := schema.Validate(t.Context(), validation.WithContextObject(&oas3.ParentDocumentVersion{OpenAPI: pointer.From("3.0.3")}))
 	assert.Empty(t, errs, "programmatically built reference schema should be valid")
+}
+
+func TestSchema_Validate_NonJSONValue_Error(t *testing.T) {
+	t.Parallel()
+
+	var schema oas3.Schema
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString("type: number\nmaximum: .inf\n"), &schema)
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "unmarshal should not report errors")
+
+	errs := schema.Validate(t.Context())
+	require.Len(t, errs, 1, "should report a single error")
+	assert.Contains(t, errs[0].Error(), "error validation-invalid-syntax schema is not valid json", "should report the JSON conversion failure")
+}
+
+func TestSchema_Validate_UnsupportedNodeKind_Error(t *testing.T) {
+	t.Parallel()
+
+	var schema oas3.Schema
+	validationErrs, err := marshaller.Unmarshal(t.Context(), bytes.NewBufferString("type: string\n"), &schema)
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "unmarshal should not report errors")
+
+	schema.GetCore().RootNode = &yaml.Node{}
+
+	errs := schema.Validate(t.Context())
+	require.Len(t, errs, 1, "should report a single error")
+	assert.Contains(t, errs[0].Error(), "schema is not valid json: unknown node kind", "should report the YAML to JSON conversion failure")
 }

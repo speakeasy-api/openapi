@@ -365,6 +365,7 @@ components:
       type: number
     Order:
       type: object
+      additionalProperties: false
       properties:
         exclusive:
           $ref: "#/components/schemas/Money"
@@ -401,6 +402,7 @@ components:
       type: number
     Order:
       type: object
+      additionalProperties: false
       properties:
         exclusive:
           $ref: "#/components/schemas/Money"
