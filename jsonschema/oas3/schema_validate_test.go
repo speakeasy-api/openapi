@@ -554,6 +554,30 @@ $ref: "#/components/schemas/"
 			wantErrs: []string{"[3:1] error validation-invalid-reference invalid reference: component name cannot be empty"},
 		},
 		{
+			name: "number top-level $ref in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: 1
+`,
+			wantErrs: []string{"[3:7] error validation-type-mismatch schema.$ref expected `string`, got `number`"},
+		},
+		{
+			name: "boolean top-level $ref in OpenAPI 3.0",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: true
+`,
+			wantErrs: []string{"[3:7] error validation-type-mismatch schema.$ref expected `string`, got `boolean`"},
+		},
+		{
+			name: "malformed top-level $ref URI in OpenAPI 3.0 is reported once",
+			yml: `
+$schema: "https://spec.openapis.org/oas/3.0/dialect/2024-10-18"
+$ref: "http://[bad"
+`,
+			wantErrs: []string{"[3:1] error validation-invalid-reference invalid reference URI: parse \"http://[bad\": missing ']' in host"},
+		},
+		{
 			name: "empty component name in $ref",
 			yml: `
 $ref: "#/components/schemas/"

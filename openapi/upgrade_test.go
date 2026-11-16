@@ -330,6 +330,168 @@ components:
 	assert.NotEmpty(t, simpleExample.Examples, "examples should not be empty")
 }
 
+func TestUpgrade_ReferenceSiblings_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		targetVersion string
+		yml           string
+		expected      string
+	}{
+		{
+			name:          "exclusive bounds next to $ref are converted for 3.2.0",
+			targetVersion: "3.2.0",
+			yml: `openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /items:
+    get:
+      parameters:
+        - name: q
+          in: query
+          schema:
+            $ref: "#/components/schemas/Money"
+            maximum: 10
+            exclusiveMaximum: true
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
+    Money:
+      type: number
+    Order:
+      type: object
+      properties:
+        exclusive:
+          $ref: "#/components/schemas/Money"
+          minimum: 0
+          exclusiveMinimum: true
+        inclusive:
+          $ref: "#/components/schemas/Money"
+          minimum: 0
+          exclusiveMinimum: false
+    Capped:
+      $ref: "#/components/schemas/Money"
+      maximum: 3
+      exclusiveMaximum: true
+`,
+			expected: `openapi: 3.2.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /items:
+    get:
+      parameters:
+        - name: q
+          in: query
+          schema:
+            $ref: "#/components/schemas/Money"
+            exclusiveMaximum: 10
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
+    Money:
+      type: number
+    Order:
+      type: object
+      properties:
+        exclusive:
+          $ref: "#/components/schemas/Money"
+          exclusiveMinimum: 0
+        inclusive:
+          $ref: "#/components/schemas/Money"
+          minimum: 0
+    Capped:
+      $ref: "#/components/schemas/Money"
+      exclusiveMaximum: 3
+`,
+		},
+		{
+			name:          "nullable and example next to $ref are converted for 3.1.0",
+			targetVersion: "3.1.0",
+			yml: `openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Money:
+      type: number
+    Order:
+      type: object
+      properties:
+        nullable:
+          $ref: "#/components/schemas/Money"
+          type: number
+          nullable: true
+        notNullable:
+          $ref: "#/components/schemas/Money"
+          nullable: false
+        example:
+          $ref: "#/components/schemas/Money"
+          example: 5
+`,
+			expected: `openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Money:
+      type: number
+    Order:
+      type: object
+      properties:
+        nullable:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+              type: number
+            - type:
+                - "null"
+        notNullable:
+          $ref: "#/components/schemas/Money"
+        example:
+          $ref: "#/components/schemas/Money"
+          examples:
+            - 5
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+
+			doc, validationErrs, err := openapi.Unmarshal(ctx, strings.NewReader(tt.yml))
+			require.NoError(t, err, "unmarshal should succeed")
+			require.Empty(t, validationErrs, "input document should be valid")
+
+			upgraded, err := openapi.Upgrade(ctx, doc, openapi.WithUpgradeTargetVersion(tt.targetVersion))
+			require.NoError(t, err, "upgrade should succeed")
+			assert.True(t, upgraded, "upgrade should have been performed")
+
+			var buf bytes.Buffer
+			err = openapi.Marshal(ctx, doc, &buf)
+			require.NoError(t, err, "marshal should succeed")
+			assert.Equal(t, tt.expected, buf.String(), "upgraded output should match expected")
+
+			_, validationErrs, err = openapi.Unmarshal(ctx, strings.NewReader(buf.String()))
+			require.NoError(t, err, "unmarshal of upgraded document should succeed")
+			assert.Empty(t, validationErrs, "upgraded document should be valid")
+		})
+	}
+}
+
 func TestUpgradeAdditionalOperations(t *testing.T) {
 	t.Parallel()
 

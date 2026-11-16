@@ -17,6 +17,7 @@ import (
 	"github.com/speakeasy-api/openapi/jsonschema/oas3/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
+	"github.com/speakeasy-api/openapi/yml"
 	"go.yaml.in/yaml/v3"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
@@ -122,46 +123,63 @@ func (js *Schema) Validate(ctx context.Context, opts ...validation.Option) []err
 		schema = JSONSchema31SchemaID
 	}
 
+	core := js.GetCore()
+
+	node := core.RootNode
 	// In OpenAPI 3.0 a schema containing $ref is a Reference Object rather than a Schema Object,
-	// and any sibling keywords are ignored. Skip dialect validation so siblings are not checked
-	// against 3.0 Schema Object types; the reference string itself has already been validated above.
+	// and any sibling keywords are ignored, so siblings are not checked against 3.0 Schema Object types.
+	// A string reference has already been validated above. A non-string $ref (e.g. `$ref: 1`) is decoded
+	// leniently into a string by the model, so validate the $ref keyword alone against the dialect to
+	// report the type mismatch.
 	// (Nested references get the same treatment via anyOf [Schema, Reference] in the 3.0 dialect.)
 	if schema == JSONSchema30SchemaID && js.IsReference() {
-		js.Valid = len(errs) == 0 && js.GetCore().GetValid()
-		return errs
+		refValueNode := yml.ResolveAlias(core.Ref.ValueNode)
+		if core.Ref.KeyNode == nil || refValueNode == nil || (refValueNode.Kind == yaml.ScalarNode && refValueNode.ShortTag() == "!!str") {
+			js.Valid = len(errs) == 0 && core.GetValid()
+			return errs
+		}
+		node = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{core.Ref.KeyNode, core.Ref.ValueNode}}
 	}
 
+	if dialectErrs := validateAgainstDialect(schema, node, core); len(dialectErrs) > 0 {
+		errs = append(errs, dialectErrs...)
+	}
+
+	js.Valid = len(errs) == 0 && core.GetValid()
+
+	return errs
+}
+
+// validateAgainstDialect validates node against the given OpenAPI schema dialect, reporting errors
+// against the locations in coreSchema.
+func validateAgainstDialect(schema string, node *yaml.Node, coreSchema *core.Schema) []error {
 	oasSchemaValidator := initValidation(schema)
 
 	buf := bytes.NewBuffer([]byte{})
-	core := js.GetCore()
 
-	if err := json.YAMLToJSON(core.RootNode, 0, buf); err != nil {
+	if err := json.YAMLToJSON(node, 0, buf); err != nil {
 		return []error{
-			validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("schema is not valid json: %w", err), core.RootNode),
+			validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("schema is not valid json: %w", err), coreSchema.RootNode),
 		}
 	}
 
 	jsAny, err := jsValidator.UnmarshalJSON(buf)
 	if err != nil {
 		return []error{
-			validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("schema is not valid json: %w", err), core.RootNode),
+			validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("schema is not valid json: %w", err), coreSchema.RootNode),
 		}
 	}
 
 	err = oasSchemaValidator.Validate(jsAny)
-	if err != nil {
-		var validationErr *jsValidator.ValidationError
-		if errors.As(err, &validationErr) {
-			errs = append(errs, dedupeErrors(getRootCauses(validationErr, *core))...)
-		} else {
-			errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSchema, fmt.Errorf("schema invalid: %s", err.Error()), core.RootNode))
-		}
+	if err == nil {
+		return nil
 	}
 
-	js.Valid = len(errs) == 0 && core.GetValid()
-
-	return errs
+	var validationErr *jsValidator.ValidationError
+	if errors.As(err, &validationErr) {
+		return dedupeErrors(getRootCauses(validationErr, *coreSchema))
+	}
+	return []error{validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSchema, fmt.Errorf("schema invalid: %s", err.Error()), coreSchema.RootNode)}
 }
 
 func getRootCauses(err *jsValidator.ValidationError, js core.Schema) []error {

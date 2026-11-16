@@ -357,11 +357,14 @@ func setTagParent(doc *OpenAPI, tagMap map[string]*Tag, childTagName, parentTagN
 }
 
 func upgradeSchema30to31(js *oas3.JSONSchema[oas3.Referenceable]) {
-	if js == nil || js.IsReference() || js.IsRight() {
+	if js == nil || js.IsRight() {
 		return
 	}
 
-	schema := js.GetResolvedSchema().GetLeft()
+	// Operate on the schema itself rather than its resolved target: referenced schemas are upgraded
+	// where they are defined, while keywords next to a $ref (ignored in 3.0 but evaluated in 3.1+)
+	// must be converted here so the upgraded document stays valid.
+	schema := js.GetSchema()
 
 	upgradeExample30to31(schema)
 	upgradeExclusiveMinMax30to31(schema)
@@ -414,6 +417,10 @@ func upgradeNullableSchema30to31(schema *oas3.Schema) {
 	schema.Nullable = nil
 
 	switch {
+	case schema.IsReference():
+		// The $ref target is still applied alongside any siblings in 3.1+, so adding null to a sibling
+		// type or anyOf/oneOf would not admit null. Wrap the whole schema in oneOf with null instead.
+		wrapInOneOfWithNull(schema)
 	case len(schema.GetType()) > 0:
 		if !slices.Contains(schema.GetType(), "null") {
 			schema.Type = oas3.NewTypeFromArray(append(schema.GetType(), "null"))
@@ -425,12 +432,16 @@ func upgradeNullableSchema30to31(schema *oas3.Schema) {
 		nullSchema := createNullSchema()
 		schema.OneOf = append(schema.OneOf, nullSchema)
 	default:
-		nullSchema := createNullSchema()
-		clone := *schema
-		newSchema := oas3.Schema{}
-		newSchema.OneOf = []*oas3.JSONSchema[oas3.Referenceable]{oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&clone), nullSchema}
-		*schema = newSchema
+		wrapInOneOfWithNull(schema)
 	}
+}
+
+func wrapInOneOfWithNull(schema *oas3.Schema) {
+	nullSchema := createNullSchema()
+	clone := *schema
+	newSchema := oas3.Schema{}
+	newSchema.OneOf = []*oas3.JSONSchema[oas3.Referenceable]{oas3.NewJSONSchemaFromSchema[oas3.Referenceable](&clone), nullSchema}
+	*schema = newSchema
 }
 
 func createNullSchema() *oas3.JSONSchema[oas3.Referenceable] {
