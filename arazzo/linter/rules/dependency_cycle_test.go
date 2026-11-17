@@ -44,13 +44,15 @@ func TestDependencyCycleRule_Success(t *testing.T) {
           - $workflows.missing.steps.one
           - missing
           - two
+      - null
   - workflowId: b
     steps:
       - stepId: one
         operationId: x
+      - null
 `)
 
-	assert.Empty(t, runRule(t, &rules.DependencyCycleRule{}, doc), "acyclic dependencies should not be reported")
+	assert.Empty(t, runRule(t, &rules.DependencyCycleRule{}, doc), "acyclic dependencies and empty steps should not be reported")
 }
 
 func TestDependencyCycleRule_WorkflowAndStepCycle_Error(t *testing.T) {
