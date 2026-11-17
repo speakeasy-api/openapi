@@ -207,7 +207,11 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 
 		// An explicit null is how a document says a value is unset, the same as leaving it out. Keep an authored
 		// null while the value is still unset, so documents round-trip unchanged, and point the backing node at it.
-		if nullKeyNode, nullValueNode := nullMapEntry(ctx, valueNode, key); isNilValue(sourceVal) && nullValueNode != nil {
+		var nullKeyNode, nullValueNode *yaml.Node
+		if isNilValue(sourceVal) {
+			nullKeyNode, nullValueNode = nullMapEntry(ctx, valueNode, key)
+		}
+		if nullValueNode != nil {
 			if _, err := nodeMutator.Unmarshal(ctx, "", nullKeyNode, nullValueNode); err != nil {
 				return nil, err
 			}
