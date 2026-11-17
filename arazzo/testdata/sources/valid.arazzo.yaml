@@ -1,0 +1,99 @@
+arazzo: 1.1.0
+info:
+  title: Source-aware validation
+  version: 1.0.0
+sourceDescriptions:
+  - name: petstore
+    url: ./petstore.openapi.yaml
+  - name: shared
+    url: ./shared.arazzo.yaml
+    type: arazzo
+workflows:
+  - workflowId: managePets
+    dependsOn:
+      - $sourceDescriptions.shared.adoptPet
+    inputs:
+      type: object
+      properties:
+        petId:
+          type: integer
+    parameters:
+      - name: X-Request-ID
+        in: header
+        value: abc
+    steps:
+      - stepId: list
+        operationId: $sourceDescriptions.petstore.listPets
+        parameters:
+          - name: limit
+            in: query
+            value: 10
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          firstPetId: $response.body#/0/id
+      - stepId: create
+        operationId: createPet
+        requestBody:
+          contentType: application/json
+          payload:
+            name: rex
+      - stepId: fetch
+        operationPath: "{$sourceDescriptions.petstore.url}#/paths/~1pets~1{petId}/get"
+        parameters:
+          - name: petId
+            in: path
+            value: $steps.list.outputs.firstPetId
+      - stepId: remove
+        operationId: deletePet
+        parameters:
+          - name: petId
+            in: path
+            value: $inputs.petId
+          - name: x-api-key
+            in: header
+            value: secret
+          - name: reason
+            in: query
+            value: adopted
+      - stepId: copy
+        operationPath: "{$sourceDescriptions.petstore.url}#/paths/~1pets~1{petId}/additionalOperations/COPY"
+        parameters:
+          - name: petId
+            in: path
+            value: 1
+      - stepId: copyById
+        operationId: copyPet
+        parameters:
+          - name: petId
+            in: path
+            value: 1
+      - stepId: webhook
+        operationPath: "{$sourceDescriptions.petstore.url}#/webhooks/newPet/post"
+      - stepId: adopt
+        workflowId: $sourceDescriptions.shared.adoptPet
+        dependsOn:
+          - $sourceDescriptions.shared.adoptPet.steps.fetch
+        parameters:
+          - name: petId
+            value: $steps.list.outputs.firstPetId
+        onSuccess:
+          - name: adoptAnother
+            type: goto
+            workflowId: $sourceDescriptions.shared.adoptPet
+            parameters:
+              - name: petId
+                value: 2
+components:
+  successActions:
+    finish:
+      name: finish
+      type: end
+  failureActions:
+    adoptElsewhere:
+      name: adoptElsewhere
+      type: goto
+      workflowId: $sourceDescriptions.shared.adoptPet
+      parameters:
+        - name: petId
+          value: 3

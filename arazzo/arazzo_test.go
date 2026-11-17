@@ -596,6 +596,8 @@ var stressTests = []struct {
 			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/23852b8b0d13ab1e3288a57a990611ffed45ab5d/examples/1.0.0/bnpl-arazzo.yaml",
 			validationIgnores: []string{
 				"$response.headers.Location", // doc should be referencing `$response.header.Location`
+				"references output `redirectAuthToken` which isn't defined by step `authenticateCustomerAndAuthorizeLoan`", // legit issue, the output is defined by a different step
+				"references output `loanTransactionId` which isn't defined by step `initiateBnplTransaction`",              // legit issue, the step only outputs `loanTransactionResourceUrl`
 			},
 		},
 		wantTitle: "BNPL Workflow description",
@@ -635,6 +637,7 @@ var stressTests = []struct {
 				"`info.title` is required", // legit issue
 				"operationId must be a valid expression if there are multiple OpenAPI or AsyncAPI source descriptions", // legit issue
 				"$responses.body.menuItems[0].subcategories[0].id",                                                     // legit issue
+				"references step `StoreAndLanguage` which doesn't exist",                                               // legit issue, typo of `selectStoreAndLanguage`
 			},
 			skipRoundTrip: true, // Has lots of validation errors that impact round tripping
 		},
@@ -683,6 +686,7 @@ var stressTests = []struct {
 			validationIgnores: []string{
 				"in must be one of [`path, query, header, cookie`] but was `body`",
 				"duplicate parameter found with name `merchantAccount` and in `body`", // legit issue
+				"which isn't defined by workflow `giving`",                            // legit issue, `donation` and `donationAccount` aren't declared inputs
 			},
 		},
 		wantTitle: "Adyen Giving",
@@ -975,6 +979,11 @@ workflows:
               - name: petId
                 value: 1
   - workflowId: adopt
+    inputs:
+      type: object
+      properties:
+        petId:
+          type: integer
     steps:
       - stepId: adopt
         operationId: adoptPet

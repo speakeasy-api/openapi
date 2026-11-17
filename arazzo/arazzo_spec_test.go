@@ -41,6 +41,10 @@ var specPassFixtureDeviations = map[string]string{
 	"bnpl-example.yaml":                              "`$response.body.<name>` and `$response.headers.<name>` don't match the source ABNF",
 	"asyncapi-success-criteria.arazzo.yaml":          "`$.status == 'accepted'` isn't a valid RFC 9535 JSONPath query, the default for `jsonpath` criteria",
 	"oauth-example.yaml":                             "`$.access_token != null` isn't a valid RFC 9535 JSONPath query, the default for `jsonpath` criteria",
+
+	// Fixtures that reference inputs or outputs that aren't declared in the document.
+	"payload-replacement-literal-values.arazzo.yaml": "`$inputs.itemId` references an input that isn't declared, the workflow has no `inputs`",
+	"parameter-with-selector.arazzo.yaml":            "`$inputs.user` references an input that isn't declared, the workflow has no `inputs`",
 }
 
 func TestArazzo_SpecFixtures_Pass_Success(t *testing.T) {

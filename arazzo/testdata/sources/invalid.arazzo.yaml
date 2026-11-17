@@ -1,0 +1,64 @@
+arazzo: 1.1.0
+info:
+  title: Source-aware validation errors
+  version: 1.0.0
+sourceDescriptions:
+  - name: petstore
+    url: ./petstore.openapi.yaml
+    type: openapi
+  - name: shared
+    url: ./shared.arazzo.yaml
+  - name: untypedPetstore
+    url: ./petstore.openapi.yaml
+workflows:
+  - workflowId: managePets
+    dependsOn:
+      - $sourceDescriptions.shared.missingWorkflow
+    steps:
+      - stepId: missingOperation
+        operationId: $sourceDescriptions.petstore.missingOperation
+      - stepId: missingPath
+        operationPath: "{$sourceDescriptions.petstore.url}#/paths/~1missing/get"
+      - stepId: wrongSource
+        operationId: $sourceDescriptions.shared.adoptPet
+      - stepId: parameters
+        operationId: $sourceDescriptions.petstore.deletePet
+        parameters:
+          - name: id
+            in: path
+            value: 1
+          - name: verbose
+            in: query
+            value: true
+      - stepId: body
+        operationId: $sourceDescriptions.petstore.createPet
+      - stepId: adopt
+        workflowId: $sourceDescriptions.shared.adoptPet
+        dependsOn:
+          - $sourceDescriptions.shared.adoptPet.steps.missingStep
+          - $sourceDescriptions.shared.missingWorkflow.steps.fetch
+        parameters:
+          - name: unknown
+            value: 1
+        onFailure:
+          - name: retryElsewhere
+            type: goto
+            workflowId: $sourceDescriptions.shared.missingWorkflow
+      - stepId: notArazzo
+        workflowId: $sourceDescriptions.untypedPetstore.adoptPet
+        dependsOn:
+          - $sourceDescriptions.untypedPetstore.adoptPet.steps.fetch
+      - stepId: wrongPathSource
+        operationPath: "{$sourceDescriptions.shared.url}#/paths/~1pets/get"
+      - stepId: wrongChannelSource
+        channelPath: "{$sourceDescriptions.untypedPetstore.url}#/channels/pets"
+        action: send
+components:
+  successActions:
+    adoptRemote:
+      name: adoptRemote
+      type: goto
+      workflowId: $sourceDescriptions.shared.adoptPet
+      parameters:
+        - name: unknown
+          value: 1

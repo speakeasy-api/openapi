@@ -8,9 +8,14 @@ import (
 	"sort"
 	"strings"
 
+	arazzoLinter "github.com/speakeasy-api/openapi/arazzo/linter"
 	"github.com/speakeasy-api/openapi/linter"
-	"github.com/speakeasy-api/openapi/openapi"
 	openapiLinter "github.com/speakeasy-api/openapi/openapi/linter"
+)
+
+const (
+	openAPILinterDir = "openapi/linter"
+	arazzoLinterDir  = "arazzo/linter"
 )
 
 func main() {
@@ -27,8 +32,14 @@ func updateLintDocs() error {
 		return fmt.Errorf("failed to update OpenAPI lint docs: %w", err)
 	}
 
-	if err := updateRuleLinks(); err != nil {
-		return fmt.Errorf("failed to update rule links: %w", err)
+	if err := updateArazzoLintDocs(); err != nil {
+		return fmt.Errorf("failed to update Arazzo lint docs: %w", err)
+	}
+
+	for _, dir := range []string{openAPILinterDir, arazzoLinterDir} {
+		if err := updateRuleLinks(dir); err != nil {
+			return fmt.Errorf("failed to update rule links: %w", err)
+		}
 	}
 
 	fmt.Println("🎉 Lint docs updated successfully!")
@@ -36,7 +47,22 @@ func updateLintDocs() error {
 }
 
 func updateOpenAPILintDocs() error {
-	readmeFile := "openapi/linter/README.md"
+	// Create linter to get the registry
+	lint, err := openapiLinter.NewLinter(linter.NewConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create linter: %w", err)
+	}
+	return writeRulesTable(openAPILinterDir, generateRulesTable(linter.NewDocGenerator(lint.Registry())))
+}
+
+func updateArazzoLintDocs() error {
+	lint := arazzoLinter.NewLinter(linter.NewConfig())
+	return writeRulesTable(arazzoLinterDir, generateRulesTable(linter.NewDocGenerator(lint.Registry())))
+}
+
+// writeRulesTable writes the rules table into the README of the linter in dir.
+func writeRulesTable(dir, content string) error {
+	readmeFile := filepath.Join(dir, "README.md")
 
 	// Check if README exists
 	if _, err := os.Stat(readmeFile); os.IsNotExist(err) {
@@ -44,18 +70,6 @@ func updateOpenAPILintDocs() error {
 		return nil
 	}
 
-	// Create linter to get the registry
-	config := linter.NewConfig()
-	lint, err := openapiLinter.NewLinter(config)
-	if err != nil {
-		return fmt.Errorf("failed to create linter: %w", err)
-	}
-	docGen := linter.NewDocGenerator(lint.Registry())
-
-	// Generate rules table
-	content := generateRulesTable(docGen)
-
-	// Update README file
 	if err := updateReadmeFile(readmeFile, content); err != nil {
 		return fmt.Errorf("failed to update README: %w", err)
 	}
@@ -64,7 +78,7 @@ func updateOpenAPILintDocs() error {
 	return nil
 }
 
-func generateRulesTable(docGen *linter.DocGenerator[*openapi.OpenAPI]) string {
+func generateRulesTable[T any](docGen *linter.DocGenerator[T]) string {
 	docs := docGen.GenerateAllRuleDocs()
 
 	// Sort rules alphabetically by ID
@@ -117,9 +131,10 @@ func updateReadmeFile(filename, newContent string) error {
 	return os.WriteFile(filename, []byte(newFileContent), 0600) // #nosec G703 -- filename is a trusted repository README path from local tooling
 }
 
-func updateRuleLinks() error {
-	const baseURL = "https://github.com/speakeasy-api/openapi/blob/main/openapi/linter/README.md"
-	rulesDir := "openapi/linter/rules"
+// updateRuleLinks points the Link() method of each rule in the linter in dir at the rule's section of its README.
+func updateRuleLinks(dir string) error {
+	baseURL := "https://github.com/speakeasy-api/openapi/blob/main/" + dir + "/README.md"
+	rulesDir := filepath.Join(dir, "rules")
 
 	// Get all rule files
 	entries, err := os.ReadDir(rulesDir)

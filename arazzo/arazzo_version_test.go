@@ -23,6 +23,11 @@ sourceDescriptions:
     type: asyncapi
 workflows:
   - workflowId: main
+    inputs:
+      type: object
+      properties:
+        pet:
+          type: object
     steps:
       - stepId: search
         operationId: $sourceDescriptions.api.searchPets

@@ -34,6 +34,13 @@ workflows:
       - stepId: second
         operationId: listPets
   - workflowId: adopt
+    inputs:
+      type: object
+      properties:
+        name:
+          type: string
+        petId:
+          type: integer
     steps:
       - stepId: adopt
         operationId: adoptPet

@@ -1,0 +1,146 @@
+openapi: 3.2.0
+info:
+  title: Pet Store API
+  version: 2.0.0
+tags:
+  - name: pets
+    description: Find, create and fetch pets
+  - name: adoption
+    summary: Adopt a new pet
+  - name: unused
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      summary: List pets
+      tags: [pets]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            format: int32
+        - name: species
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/Species"
+      responses:
+        "200":
+          description: The pets
+          links:
+            getFirstPet:
+              operationId: getPet
+              parameters:
+                path.petId: $response.body#/0/id
+        "400":
+          description: Bad request
+          links:
+            ignored:
+              operationId: getPet
+              parameters:
+                petId: $response.body#/unused
+    post:
+      operationId: createPet
+      summary: Create a pet
+      tags: [pets, adoption]
+      requestBody:
+        required: true
+        description: The pet to create
+        content:
+          application/xml:
+            schema:
+              type: string
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Pet"
+      responses:
+        "201":
+          description: The created pet
+          links:
+            adopt:
+              $ref: "#/components/links/AdoptPet"
+  /pets/{petId}:
+    parameters:
+      - $ref: "#/components/parameters/PetId"
+    get:
+      operationId: getPet
+      summary: Get a pet
+      tags: [pets]
+      parameters:
+        - name: verbose
+          in: query
+          schema:
+            type: boolean
+      responses:
+        2XX:
+          description: The pet
+  /pets/{petId}/adopt:
+    post:
+      tags: [adoption]
+      summary: Adopt a pet
+      parameters:
+        - $ref: "#/components/parameters/PetId"
+        - name: X-Channel
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: [web, store]
+        - name: note
+          in: query
+          required: true
+          description: A note for the adoption
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Adopted
+  /health:
+    get:
+      operationId: health
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        default:
+          description: Healthy
+    additionalOperations:
+      PURGE:
+        summary: Purge caches
+        responses:
+          "204":
+            description: Purged
+components:
+  schemas:
+    Species:
+      type: string
+      description: The species of pet
+      enum: [dog, cat]
+    Pet:
+      type: object
+      description: A pet
+  parameters:
+    PetId:
+      name: petId
+      in: path
+      required: true
+      description: The pet's ID
+      schema:
+        type: string
+  links:
+    AdoptPet:
+      operationRef: "#/paths/~1pets~1{petId}~1adopt/post"
+      parameters:
+        petId: $response.body#/id
+        header.X-Channel: web
+        note: "pet {$response.body#/id}"
+      requestBody: $response.body#/owner
