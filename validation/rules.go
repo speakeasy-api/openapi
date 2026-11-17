@@ -20,6 +20,7 @@ const (
 	RuleValidationTagNotFound             = "validation-tag-not-found"
 	RuleValidationSupportedVersion        = "validation-supported-version"
 	RuleValidationCircularReference       = "validation-circular-reference"
+	RuleValidationUnsupportedFormat       = "validation-unsupported-format"
 )
 
 type RuleInfo struct {
@@ -118,6 +119,11 @@ var ruleInfoByID = map[string]RuleInfo{
 		Summary:     "Circular reference.",
 		Description: "Schemas must not contain circular references that cannot be resolved. Unresolvable cycles can break validation and tooling.",
 		HowToFix:    "Refactor schemas to break the reference cycle.",
+	},
+	RuleValidationUnsupportedFormat: {
+		Summary:     "Content not validated.",
+		Description: "The content uses a format or language this tool can preserve but not validate, for example a non JSON Schema based schema format. The content has not been checked.",
+		HowToFix:    "Validate the content with a tool that supports its format, or use a supported format if full validation is required.",
 	},
 }
 
