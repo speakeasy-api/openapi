@@ -205,6 +205,14 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 			return nil, fmt.Errorf("syncChanges expected NodeMutator, got %s", fieldTarget.Type())
 		}
 
+		// Optional fields with a non-pointer scalar type can't represent being unset, so their zero value is treated
+		// as unset rather than written out as an empty value.
+		if field.Tag.Get("required") == "false" && isZeroScalar(sourceVal) {
+			valueNode = yml.DeleteMapNodeElement(ctx, key, valueNode)
+			nodeMutator.SetPresent(false)
+			continue
+		}
+
 		keyNode, valNode, err := nodeMutator.SyncValue(ctx, key, sourceInt)
 		if err != nil {
 			return nil, err
@@ -562,6 +570,19 @@ func getSourceInterface(sourceField reflect.Value) any {
 		}
 	}
 	return nil
+}
+
+// isZeroScalar returns true if v is a string, bool or number holding its zero value.
+func isZeroScalar(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.String, reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return v.IsZero()
+	default:
+		return false
+	}
 }
 
 func dereferenceType(typ reflect.Type) reflect.Type {

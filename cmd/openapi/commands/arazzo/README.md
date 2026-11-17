@@ -10,6 +10,8 @@ Arazzo workflows describe sequences of API calls and their dependencies. These c
 - [Available Commands](#available-commands)
   - [`validate`](#validate)
   - [`upgrade`](#upgrade)
+  - [`lint`](#lint)
+  - [`list-rules`](#list-rules)
 - [What is Arazzo?](#what-is-arazzo)
   - [Example Arazzo Document](#example-arazzo-document)
 - [Common Use Cases](#common-use-cases)
@@ -114,6 +116,114 @@ arazzo: 1.1.0
               type: jsonpath
               version: draft-goessner-dispatch-jsonpath-00
 ```
+
+### `lint`
+
+Lint an Arazzo workflow document for semantic issues, style and security concerns. Lint reports everything [`validate`](#validate) does, plus lint rules such as:
+
+- Steps that can never run, and workflows or steps that depend on each other in a cycle
+- Unused components, workflow inputs and step outputs
+- Steps without `successCriteria`, and retries without `retryAfter`
+- Source descriptions without a `type`, or loaded over plain HTTP
+
+```bash
+# Lint an Arazzo workflow document, checking it against its source descriptions
+openapi arazzo lint ./workflow.arazzo.yaml
+
+# Only lint the document itself, without loading its source descriptions
+openapi arazzo lint --skip-sources ./workflow.arazzo.yaml
+
+# Use the recommended ruleset and disable a rule
+openapi arazzo lint --ruleset recommended --disable style-step-success-criteria ./workflow.arazzo.yaml
+
+# Output as JSON, with a per-rule summary
+openapi arazzo lint --format json --summary ./workflow.arazzo.yaml
+
+# Lint from stdin
+cat ./workflow.arazzo.yaml | openapi arazzo lint
+
+# Apply fixes that don't need input, previewing them first
+openapi arazzo lint --fix --dry-run ./workflow.arazzo.yaml
+openapi arazzo lint --fix ./workflow.arazzo.yaml
+
+# Also be prompted for fixes that need input, such as a missing info description
+openapi arazzo lint --fix-interactive ./workflow.arazzo.yaml
+```
+
+| Flag                | Description                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `-f, --format`      | Output format: `text` (default) or `json`                                            |
+| `-r, --ruleset`     | Ruleset to use: `all` (default) or `recommended`                                     |
+| `-c, --config`      | Path to a lint config file (default `~/.openapi/arazzo-lint.yaml`)                   |
+| `-d, --disable`     | Rule IDs to disable (can be repeated)                                                |
+| `--summary`         | Print a per-rule summary table of findings                                           |
+| `--skip-sources`    | Don't load source descriptions to check the document against them                    |
+| `--fix`             | Apply fixes that don't need input and write the file back                            |
+| `--fix-interactive` | Apply all fixes, prompting for the ones that need input                              |
+| `--dry-run`         | Show the fixes that would be applied without changing the file (requires a fix flag) |
+
+The configuration file uses the same format as `openapi spec lint`, but is kept separate as the rules and rulesets differ:
+
+```yaml
+extends: recommended
+
+rules:
+  - id: style-step-success-criteria
+    severity: error
+  - id: semantic-unused-step-output
+    disabled: true
+```
+
+The available fixes remove unused components, set a source description's `type` (from the loaded document when the source was loaded, otherwise by asking), and add an `info.description` (by asking). Fixes aren't supported when reading from stdin.
+
+Before `--fix`:
+
+```yaml
+sourceDescriptions:
+  - name: petstore
+    url: ./petstore.openapi.yaml
+# ...
+components:
+  parameters:
+    unusedParam:
+      name: limit
+      in: query
+      value: 10
+```
+
+After:
+
+```yaml
+sourceDescriptions:
+  - name: petstore
+    url: ./petstore.openapi.yaml
+    type: openapi
+# ...
+```
+
+See the [Arazzo linter documentation](../../../../arazzo/linter/README.md) for every rule.
+
+### `list-rules`
+
+List the available Arazzo lint rules with their category, default severity, fix guidance and rulesets.
+
+```bash
+# List all rules
+openapi arazzo list-rules
+
+# Filter by category or ruleset
+openapi arazzo list-rules --category semantic
+openapi arazzo list-rules --ruleset recommended
+
+# Output as JSON
+openapi arazzo list-rules --format json
+```
+
+| Flag           | Description                                         |
+| -------------- | --------------------------------------------------- |
+| `-f, --format` | Output format: `text` (default) or `json`           |
+| `--category`   | Filter by category: `semantic`, `style`, `security` |
+| `--ruleset`    | Filter by ruleset: `all` or `recommended`           |
 
 ## What is Arazzo?
 

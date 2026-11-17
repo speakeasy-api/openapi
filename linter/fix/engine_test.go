@@ -324,6 +324,39 @@ func TestEngine_NodeFix_FallsBackToApply(t *testing.T) {
 	assert.True(t, f.applied, "Apply should be called as fallback")
 }
 
+// recordingFix records the document it was applied to.
+type recordingFix struct {
+	mockFix
+	appliedTo any
+}
+
+func (f *recordingFix) Apply(doc any) error {
+	f.appliedTo = doc
+	return f.mockFix.Apply(doc)
+}
+
+func TestEngine_ProcessDocumentErrors_Success(t *testing.T) {
+	t.Parallel()
+
+	// Non-OpenAPI documents are passed to Apply, including for node fixes.
+	type otherDoc struct{}
+	doc := &otherDoc{}
+	modelF := &recordingFix{mockFix: mockFix{description: "model fix"}}
+	nodeF := &mockNodeFix{mockFix: mockFix{description: "node fix"}}
+
+	engine := fix.NewEngine(fix.Options{Mode: fix.ModeAuto}, nil, nil)
+	result, err := engine.ProcessDocumentErrors(t.Context(), doc, []error{
+		makeError("rule-a", 1, 1, "issue", modelF),
+		makeError("rule-b", 2, 1, "issue", nodeF),
+	})
+
+	require.NoError(t, err, "ProcessDocumentErrors should not fail")
+	assert.Len(t, result.Applied, 2, "should apply both fixes")
+	assert.Same(t, doc, modelF.appliedTo, "Apply should receive the document")
+	assert.True(t, nodeF.applied, "node fixes should fall back to Apply")
+	assert.False(t, nodeF.nodeApplied, "ApplyNode should not be called for non-OpenAPI documents")
+}
+
 func TestEngine_RegistryFix(t *testing.T) {
 	t.Parallel()
 

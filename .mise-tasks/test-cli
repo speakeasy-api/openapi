@@ -31,6 +31,8 @@ $CLI spec bundle --help > /dev/null
 $CLI spec join --help > /dev/null
 $CLI spec bootstrap --help > /dev/null
 $CLI arazzo validate --help > /dev/null
+$CLI arazzo lint --help > /dev/null
+$CLI arazzo list-rules --help > /dev/null
 $CLI overlay apply --help > /dev/null
 $CLI overlay validate --help > /dev/null
 $CLI overlay compare --help > /dev/null
@@ -199,6 +201,24 @@ if $CLI arazzo validate arazzo/testdata/sources/invalid.arazzo.yaml > /dev/null 
 fi
 $CLI arazzo validate --skip-sources arazzo/testdata/sources/invalid.arazzo.yaml > /dev/null
 
+# Test arazzo linting
+echo "  ✓ Testing arazzo lint..."
+$CLI arazzo lint arazzo/testdata/lint/clean.arazzo.yaml > /dev/null
+# This document references a remote source, so skip loading them
+if $CLI arazzo lint --skip-sources arazzo/testdata/lint/issues.arazzo.yaml > /dev/null 2>&1; then
+    echo "    ❌ Expected arazzo lint to fail for a document with lint errors"
+    exit 1
+fi
+$CLI arazzo lint --skip-sources --ruleset recommended --disable semantic-dependency-cycle --format json arazzo/testdata/lint/issues.arazzo.yaml > /dev/null
+cp arazzo/testdata/lint/issues.arazzo.yaml dist/test/test-arazzo-lint-fix.yaml
+$CLI arazzo lint --skip-sources --fix --disable semantic-dependency-cycle dist/test/test-arazzo-lint-fix.yaml > /dev/null 2>&1
+if grep -q "unusedParam" dist/test/test-arazzo-lint-fix.yaml; then
+    echo "    ❌ Expected arazzo lint --fix to remove unused components"
+    exit 1
+fi
+$CLI arazzo list-rules > /dev/null
+$CLI arazzo list-rules --format json > /dev/null
+
 # Test arazzo validation with known bad file (should fail)
 echo "  ✓ Testing arazzo validation with known bad file..."
 if $CLI arazzo validate --skip-sources arazzo/testdata/invalid.arazzo.yaml > /dev/null 2>&1; then
@@ -277,7 +297,7 @@ echo "   - Tested all command help outputs"
 echo "   - Validated known good and bad files"
 echo "   - Tested bootstrap, upgrade, inline, clean, sanitize, bundle, join commands"
 echo "   - Compared outputs with expected results"
-echo "   - Tested arazzo validation"
+echo "   - Tested arazzo validation, lint and list-rules"
 echo "   - Tested overlay validation, apply, and compare"
 echo "   - Tested error cases and edge conditions"
 echo "   - Validated all generated files"
