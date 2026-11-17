@@ -1,0 +1,290 @@
+# A document using every AsyncAPI 3.x object, used for parse, round-trip and walk tests.
+asyncapi: 3.1.0
+id: "urn:example:orders"
+info:
+  title: Orders API
+  version: 1.0.0
+  description: Order events.
+  termsOfService: https://example.com/terms
+  contact:
+    name: Orders team
+    url: https://example.com/support
+    email: orders@example.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  tags:
+    - name: orders
+    - $ref: "#/components/tags/events"
+  externalDocs:
+    url: https://example.com/docs
+  x-audience: internal
+defaultContentType: application/json
+servers:
+  production:
+    host: "{region}.broker.example.com:9092"
+    protocol: kafka
+    protocolVersion: "3.6"
+    pathname: /v1
+    title: Production
+    summary: Production cluster
+    description: The production Kafka cluster.
+    variables:
+      region:
+        enum:
+          - eu
+          - us
+        default: eu
+        description: Deployment region.
+        examples:
+          - eu
+    security:
+      - $ref: "#/components/securitySchemes/saslScram"
+      - type: oauth2
+        flows:
+          clientCredentials:
+            tokenUrl: https://auth.example.com/token
+            availableScopes:
+              orders:write: Write orders
+        scopes:
+          - orders:write
+    tags:
+      - name: kafka
+    externalDocs:
+      url: https://example.com/kafka
+    bindings:
+      kafka:
+        schemaRegistryUrl: https://registry.example.com
+        bindingVersion: 0.5.0
+    x-cluster: primary
+  staging:
+    $ref: "#/components/servers/staging"
+channels:
+  orderPlaced:
+    address: orders.{orderId}.placed
+    title: Order placed
+    summary: Orders that have been placed.
+    description: Published when an order is placed.
+    messages:
+      orderPlaced:
+        $ref: "#/components/messages/orderPlaced"
+      orderPlacedInline:
+        name: OrderPlacedInline
+        payload:
+          type: object
+    servers:
+      - $ref: "#/servers/production"
+    parameters:
+      orderId:
+        $ref: "#/components/parameters/orderId"
+    tags:
+      - name: orders
+    externalDocs:
+      url: https://example.com/channels
+    bindings:
+      kafka:
+        topic: orders
+        partitions: 3
+  orderReplies:
+    address: null
+    messages:
+      orderConfirmed:
+        $ref: "#/components/messages/orderConfirmed"
+  robotCommands:
+    address: robot/commands
+    bindings:
+      ros2:
+        role: subscriber
+        node: /robot
+        bindingVersion: 0.1.0
+operations:
+  placeOrder:
+    action: send
+    channel:
+      $ref: "#/channels/orderPlaced"
+    title: Place an order
+    summary: Places an order.
+    description: Sends an order placed event.
+    security:
+      - $ref: "#/components/securitySchemes/saslScram"
+    tags:
+      - name: orders
+    externalDocs:
+      url: https://example.com/operations
+    bindings:
+      kafka:
+        groupId:
+          type: string
+    traits:
+      - $ref: "#/components/operationTraits/kafka"
+      - title: Inline trait
+    messages:
+      - $ref: "#/channels/orderPlaced/messages/orderPlaced"
+    reply:
+      address:
+        description: Reply address.
+        location: $message.header#/replyTo
+      channel:
+        $ref: "#/channels/orderReplies"
+      messages:
+        - $ref: "#/channels/orderReplies/messages/orderConfirmed"
+  receiveNothing:
+    action: receive
+    channel:
+      $ref: "#/channels/orderReplies"
+    messages: []
+  shared:
+    $ref: "#/components/operations/shared"
+components:
+  schemas:
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+    AvroOrder:
+      schemaFormat: application/vnd.apache.avro;version=1.9.0
+      schema:
+        type: record
+        name: Order
+        fields:
+          - name: id
+            type: string
+  servers:
+    staging:
+      host: staging.broker.example.com
+      protocol: kafka
+  channels:
+    shared:
+      address: shared
+  operations:
+    shared:
+      action: receive
+      channel:
+        $ref: "#/channels/orderPlaced"
+  messages:
+    orderPlaced:
+      headers:
+        type: object
+        properties:
+          replyTo:
+            type: string
+      payload:
+        $ref: "#/components/schemas/Order"
+      correlationId:
+        $ref: "#/components/correlationIds/orderId"
+      contentType: application/json
+      name: OrderPlaced
+      title: Order placed
+      summary: An order was placed.
+      description: Sent when an order is placed.
+      tags:
+        - name: orders
+      externalDocs:
+        url: https://example.com/messages
+      bindings:
+        kafka:
+          key:
+            type: string
+      examples:
+        - name: simple
+          summary: A simple order.
+          headers:
+            replyTo: orders.replies
+          payload:
+            id: "123"
+      traits:
+        - $ref: "#/components/messageTraits/common"
+    orderConfirmed:
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          type: object
+  securitySchemes:
+    saslScram:
+      type: scramSha256
+      description: SASL/SCRAM authentication.
+    apiKey:
+      type: httpApiKey
+      name: X-API-Key
+      in: header
+    userKey:
+      type: apiKey
+      in: user
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    oidc:
+      type: openIdConnect
+      openIdConnectUrl: https://auth.example.com/.well-known/openid-configuration
+    oauth:
+      type: oauth2
+      flows:
+        implicit:
+          authorizationUrl: https://auth.example.com/authorize
+          availableScopes: {}
+        password:
+          tokenUrl: https://auth.example.com/token
+          availableScopes: {}
+        authorizationCode:
+          authorizationUrl: https://auth.example.com/authorize
+          tokenUrl: https://auth.example.com/token
+          refreshUrl: https://auth.example.com/refresh
+          availableScopes:
+            read: Read access
+  serverVariables:
+    port:
+      default: "9092"
+  parameters:
+    orderId:
+      description: The order ID.
+      location: $message.payload#/id
+  correlationIds:
+    orderId:
+      description: Correlates by order ID.
+      location: $message.payload#/id
+  replies:
+    confirmation:
+      channel:
+        $ref: "#/channels/orderReplies"
+  replyAddresses:
+    replyTo:
+      location: $message.header#/replyTo
+  externalDocs:
+    docs:
+      url: https://example.com/docs
+  tags:
+    events:
+      name: events
+      description: Event tags.
+  operationTraits:
+    kafka:
+      bindings:
+        kafka:
+          clientId:
+            type: string
+  messageTraits:
+    common:
+      headers:
+        type: object
+      contentType: application/json
+  serverBindings:
+    kafka:
+      kafka:
+        bindingVersion: 0.5.0
+  channelBindings:
+    kafka:
+      kafka:
+        topic: shared
+  operationBindings:
+    kafka:
+      kafka:
+        groupId:
+          type: string
+  messageBindings:
+    kafka:
+      kafka:
+        key:
+          type: string
+x-owner: platform

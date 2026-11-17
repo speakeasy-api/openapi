@@ -21,6 +21,7 @@ const (
 	RuleValidationSupportedVersion        = "validation-supported-version"
 	RuleValidationCircularReference       = "validation-circular-reference"
 	RuleValidationUnsupportedFormat       = "validation-unsupported-format"
+	RuleValidationUnknownProperties       = "validation-unknown-properties"
 )
 
 type RuleInfo struct {
@@ -124,6 +125,11 @@ var ruleInfoByID = map[string]RuleInfo{
 		Summary:     "Content not validated.",
 		Description: "The content uses a format or language this tool can preserve but not validate, for example a non JSON Schema based schema format. The content has not been checked.",
 		HowToFix:    "Validate the content with a tool that supports its format, or use a supported format if full validation is required.",
+	},
+	RuleValidationUnknownProperties: {
+		Summary:     "Unknown property.",
+		Description: "The object contains a property that is not defined by the specification and is not an extension. Unknown properties are preserved but ignored by tooling.",
+		HowToFix:    "Remove the property, correct its spelling, or prefix it with `x-` to make it an extension.",
 	},
 }
 

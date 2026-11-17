@@ -3,6 +3,8 @@ package asyncapi_test
 import (
 	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -47,6 +49,9 @@ servers:
 channels:
   lightingMeasured:
     address: smartylighting/streetlights/1/0/event/{streetlightId}/lighting/measured
+    parameters:
+      streetlightId:
+        description: The ID of the streetlight.
 operations:
   receiveLightMeasurement:
     action: receive
@@ -74,6 +79,72 @@ func marshal(t *testing.T, a *asyncapi.AsyncAPI) string {
 	var buf bytes.Buffer
 	require.NoError(t, asyncapi.Marshal(t.Context(), a, &buf), "marshal should succeed")
 	return buf.String()
+}
+
+// minimalDoc returns a valid AsyncAPI 3.1 document with the provided YAML appended at the root.
+func minimalDoc(body string) string {
+	return "asyncapi: 3.1.0\ninfo:\n  title: T\n  version: '1'\n" + body
+}
+
+// diagnostics returns `severity:rule` for each validation error.
+func diagnostics(errs []error) []string {
+	out := make([]string, 0, len(errs))
+	for _, err := range errs {
+		var vErr *validation.Error
+		if errors.As(err, &vErr) {
+			out = append(out, string(vErr.Severity)+":"+vErr.Rule)
+		} else {
+			out = append(out, "unknown:"+err.Error())
+		}
+	}
+	return out
+}
+
+type validationCase struct {
+	name     string
+	doc      string
+	expected []string
+}
+
+// runValidationCases unmarshals each document and checks its `severity:rule` diagnostics, ignoring hints.
+func runValidationCases(t *testing.T, tests []validationCase) {
+	t.Helper()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			a, validationErrs := unmarshal(t, tt.doc)
+			actual := []string{}
+			for _, d := range diagnostics(validationErrs) {
+				if !strings.HasPrefix(d, string(validation.SeverityHint)+":") {
+					actual = append(actual, d)
+				}
+			}
+			assert.Equal(t, tt.expected, actual, "diagnostics should match")
+			assert.Equal(t, len(errorsOnly(validationErrs)) == 0, a.Valid, "validity should reflect error diagnostics")
+		})
+	}
+}
+
+// errorsOnly returns only the error-severity validation errors.
+func errorsOnly(errs []error) []error {
+	out := []error{}
+	for _, err := range errs {
+		var vErr *validation.Error
+		if !errors.As(err, &vErr) || vErr.Severity == validation.SeverityError {
+			out = append(out, err)
+		}
+	}
+	return out
+}
+
+func readTestdata(t *testing.T, name string) string {
+	t.Helper()
+
+	data, err := os.ReadFile(filepath.Join("testdata", name))
+	require.NoError(t, err, "should read test data")
+	return string(data)
 }
 
 func validationRules(errs []error) []string {

@@ -1,0 +1,89 @@
+# Based on the AsyncAPI 3.0.0 streetlights example (Apache 2.0), trimmed to the parts used by tests.
+asyncapi: 3.0.0
+info:
+  title: Streetlights Kafka API
+  version: 1.0.0
+  description: The Smartylighting Streetlights API allows you to remotely manage the city lights.
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+defaultContentType: application/json
+servers:
+  scram-connections:
+    host: test.mykafkacluster.org:18092
+    protocol: kafka-secure
+    description: Test broker secured with scramSha256
+    security:
+      - $ref: "#/components/securitySchemes/saslScram"
+    tags:
+      - name: env:test-scram
+        description: This environment is meant for running internal tests through scramSha256
+channels:
+  lightingMeasured:
+    address: smartylighting.streetlights.1.0.event.{streetlightId}.lighting.measured
+    messages:
+      lightMeasured:
+        $ref: "#/components/messages/lightMeasured"
+    description: The topic on which measured values may be produced and consumed.
+    parameters:
+      streetlightId:
+        $ref: "#/components/parameters/streetlightId"
+operations:
+  receiveLightMeasurement:
+    action: receive
+    channel:
+      $ref: "#/channels/lightingMeasured"
+    summary: Inform about environmental lighting conditions of a particular streetlight.
+    traits:
+      - $ref: "#/components/operationTraits/kafka"
+    messages:
+      - $ref: "#/channels/lightingMeasured/messages/lightMeasured"
+components:
+  messages:
+    lightMeasured:
+      name: lightMeasured
+      title: Light measured
+      summary: Inform about environmental lighting conditions of a particular streetlight.
+      contentType: application/json
+      traits:
+        - $ref: "#/components/messageTraits/commonHeaders"
+      payload:
+        $ref: "#/components/schemas/lightMeasuredPayload"
+  schemas:
+    lightMeasuredPayload:
+      type: object
+      properties:
+        lumens:
+          type: integer
+          minimum: 0
+          description: Light intensity measured in lumens.
+        sentAt:
+          $ref: "#/components/schemas/sentAt"
+    sentAt:
+      type: string
+      format: date-time
+      description: Date and time when the message was sent.
+  securitySchemes:
+    saslScram:
+      type: scramSha256
+      description: Provide your username and password for SASL/SCRAM authentication
+  parameters:
+    streetlightId:
+      description: The ID of the streetlight.
+  messageTraits:
+    commonHeaders:
+      headers:
+        type: object
+        properties:
+          my-app-header:
+            type: integer
+            minimum: 0
+            maximum: 100
+  operationTraits:
+    kafka:
+      bindings:
+        kafka:
+          clientId:
+            type: string
+            enum:
+              - my-app-id

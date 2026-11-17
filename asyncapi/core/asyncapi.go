@@ -5,21 +5,21 @@ import (
 	"github.com/speakeasy-api/openapi/extensions/core"
 	schemacore "github.com/speakeasy-api/openapi/jsonschema/asyncapi/core"
 	"github.com/speakeasy-api/openapi/marshaller"
-	values "github.com/speakeasy-api/openapi/values/core"
+	"github.com/speakeasy-api/openapi/sequencedmap"
 )
 
 // AsyncAPI is the backing model for the root AsyncAPI Object.
 type AsyncAPI struct {
 	marshaller.CoreModel `model:"asyncapi"`
 
-	AsyncAPI           marshaller.Node[string]       `key:"asyncapi"`
-	ID                 marshaller.Node[*string]      `key:"id"`
-	Info               marshaller.Node[Info]         `key:"info"`
-	Servers            marshaller.Node[values.Value] `key:"servers"`
-	DefaultContentType marshaller.Node[*string]      `key:"defaultContentType"`
-	Channels           marshaller.Node[values.Value] `key:"channels"`
-	Operations         marshaller.Node[values.Value] `key:"operations"`
-	Components         marshaller.Node[values.Value] `key:"components"`
+	AsyncAPI           marshaller.Node[string]                                            `key:"asyncapi"`
+	ID                 marshaller.Node[*string]                                           `key:"id"`
+	Info               marshaller.Node[Info]                                              `key:"info"`
+	Servers            marshaller.Node[*sequencedmap.Map[string, *Reference[*Server]]]    `key:"servers"`
+	DefaultContentType marshaller.Node[*string]                                           `key:"defaultContentType"`
+	Channels           marshaller.Node[*sequencedmap.Map[string, *Reference[*Channel]]]   `key:"channels"`
+	Operations         marshaller.Node[*sequencedmap.Map[string, *Reference[*Operation]]] `key:"operations"`
+	Components         marshaller.Node[*Components]                                       `key:"components"`
 
 	Extensions core.Extensions `key:"extensions"`
 }
