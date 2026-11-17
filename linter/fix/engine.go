@@ -289,11 +289,8 @@ fixLoop:
 	if oasDoc == nil {
 		return result, nil
 	}
-	if err := applyNodeFixes(ctx, oasDoc, result, nodeFixes, modified); err != nil {
-		return result, err
-	}
 
-	return result, nil
+	return result, applyNodeFixes(ctx, oasDoc, result, nodeFixes, modified)
 }
 
 type pendingNodeFix struct {
