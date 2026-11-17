@@ -28,30 +28,32 @@ jobs:
           go-version-file: "go.work"
           cache: false # Disable caching to ensure fresh dependency resolution
 
+      # The modules are updated to the pushed commit by SHA through the default module proxy. The proxy fetches a new
+      # commit on demand, and it keeps serving the commits that feature branches were pinned to after the branch is
+      # squash merged and deleted. GOPROXY=direct can't fetch those, which made `go get` fail on the existing pin.
       - name: Update openapi/linter/customrules go.mod
         run: |
           cd openapi/linter/customrules
 
-          # Update to latest main commit (GOPROXY=direct needed to resolve @main before proxy indexes it)
-          GOPROXY=direct go get github.com/speakeasy-api/openapi@main
+          go get "github.com/speakeasy-api/openapi@${GITHUB_SHA}"
           go mod tidy
 
       - name: Update openapi/linter/converter/tests go.mod
         run: |
           cd openapi/linter/converter/tests
 
-          # Update to latest main commit (both main module and customrules)
-          GOPROXY=direct go get github.com/speakeasy-api/openapi@main
-          GOPROXY=direct go get github.com/speakeasy-api/openapi/openapi/linter/customrules@main
+          # Update both the main module and customrules
+          go get "github.com/speakeasy-api/openapi@${GITHUB_SHA}"
+          go get "github.com/speakeasy-api/openapi/openapi/linter/customrules@${GITHUB_SHA}"
           go mod tidy
 
       - name: Update cmd/openapi go.mod
         run: |
           cd cmd/openapi
 
-          # Update to latest main commit (both main module and customrules)
-          GOPROXY=direct go get github.com/speakeasy-api/openapi@main
-          GOPROXY=direct go get github.com/speakeasy-api/openapi/openapi/linter/customrules@main
+          # Update both the main module and customrules
+          go get "github.com/speakeasy-api/openapi@${GITHUB_SHA}"
+          go get "github.com/speakeasy-api/openapi/openapi/linter/customrules@${GITHUB_SHA}"
           go mod tidy
 
       - name: Check for changes
