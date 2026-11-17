@@ -79,6 +79,39 @@ func TestUnusedComponentRule_Error(t *testing.T) {
 	assert.Equal(t, expected, runRule(t, &rules.UnusedComponentRule{}, unusedComponentsDoc), "unused components should be reported")
 }
 
+func TestUnusedComponentRule_DottedNames_Success(t *testing.T) {
+	t.Parallel()
+
+	doc := minimalDoc + `components:
+  parameters:
+    page:
+      name: page
+      in: query
+      value: $components.parameters.page.size.value
+    page.size:
+      name: size
+      in: query
+      value: 10
+`
+	expected := []string{"warning: component `page` in `components.parameters` is never referenced"}
+	assert.Equal(t, expected, runRule(t, &rules.UnusedComponentRule{}, doc), "a component referencing a dotted name it prefixes should count as a use of that component")
+}
+
+func TestUnusedComponentRule_DescriptionMention_Error(t *testing.T) {
+	t.Parallel()
+
+	doc := minimalDoc + `    description: Could use $components.parameters.limit one day.
+components:
+  parameters:
+    limit:
+      name: limit
+      in: query
+      value: 10
+`
+	expected := []string{"warning: component `limit` in `components.parameters` is never referenced"}
+	assert.Equal(t, expected, runRule(t, &rules.UnusedComponentRule{}, doc), "mentions in descriptions should not count as references")
+}
+
 func TestUnusedComponentRule_NoComponents_Success(t *testing.T) {
 	t.Parallel()
 

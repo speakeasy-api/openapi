@@ -206,8 +206,11 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 		}
 
 		// Optional fields with a non-pointer scalar type can't represent being unset, so their zero value is treated
-		// as unset rather than written out as an empty value.
+		// as unset rather than written out as an empty value. The core is still synced so it holds the zero value.
 		if field.Tag.Get("required") == "false" && isZeroScalar(sourceVal) {
+			if _, _, err := nodeMutator.SyncValue(ctx, key, sourceInt); err != nil {
+				return nil, err
+			}
 			valueNode = yml.DeleteMapNodeElement(ctx, key, valueNode)
 			nodeMutator.SetPresent(false)
 			continue

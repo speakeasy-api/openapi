@@ -26,7 +26,7 @@ func TestSourceDescriptionHTTPSRule_Success(t *testing.T) {
   - name: relative
     url: ./openapi.yaml
   - name: localhost
-    url: http://localhost:8080/openapi.yaml
+    url: http://LOCALHOST:8080/openapi.yaml
   - name: loopback
     url: http://127.0.0.1/openapi.yaml
   - name: ipv6
@@ -42,6 +42,15 @@ func TestSourceDescriptionHTTPSRule_Error(t *testing.T) {
 
 	doc := sourcesDoc("1.1.0", `  - name: insecure
     url: HTTP://example.com/openapi.yaml
+  - name: lookalike
+    url: http://127.evil.example/openapi.yaml
+  - name: remoteIP
+    url: http://10.0.0.1/openapi.yaml
 `)
-	assert.Equal(t, []string{"warning: sourceDescription `insecure` url `HTTP://example.com/openapi.yaml` uses http instead of https"}, runRule(t, &rules.SourceDescriptionHTTPSRule{}, doc), "http URLs should be reported")
+	expected := []string{
+		"warning: sourceDescription `insecure` url `HTTP://example.com/openapi.yaml` uses http instead of https",
+		"warning: sourceDescription `lookalike` url `http://127.evil.example/openapi.yaml` uses http instead of https",
+		"warning: sourceDescription `remoteIP` url `http://10.0.0.1/openapi.yaml` uses http instead of https",
+	}
+	assert.Equal(t, expected, runRule(t, &rules.SourceDescriptionHTTPSRule{}, doc), "http URLs to non-local hosts should be reported")
 }

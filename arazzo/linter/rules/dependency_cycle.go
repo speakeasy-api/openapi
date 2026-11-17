@@ -35,7 +35,8 @@ func (r *DependencyCycleRule) DefaultSeverity() validation.Severity { return val
 func (r *DependencyCycleRule) Versions() []string                   { return nil }
 
 // dependencyEdge is a dependsOn entry of a workflow or step that references another workflow or step in the
-// document.
+// document. Implied edges, with no report, are orderings implied by a workflow's dependsOn, and are only reported as
+// part of a cycle that also contains a dependsOn entry.
 type dependencyEdge struct {
 	to     string
 	report func(cycle string) error
@@ -98,7 +99,41 @@ func (r *DependencyCycleRule) Run(_ context.Context, docInfo *linter.DocumentInf
 	}
 
 	errs := findDependencyCycles(workflowNodes, workflowEdges)
+
+	// The steps of a workflow only run once the workflows it depends on, and so all of their steps, have completed,
+	// which can form a cycle with step dependsOn entries. Workflow cycles are reported on their own, so these
+	// orderings are only added when the workflows don't already form a cycle.
+	if len(errs) == 0 {
+		addImpliedStepEdges(a, stepEdges)
+	}
+
 	return append(errs, findDependencyCycles(stepNodes, stepEdges)...)
+}
+
+// addImpliedStepEdges adds an edge from each step to each step of the workflows its workflow depends on.
+func addImpliedStepEdges(a *arazzo.Arazzo, stepEdges map[string][]dependencyEdge) {
+	for _, w := range a.Workflows {
+		if w == nil {
+			continue
+		}
+		for _, dependsOn := range w.DependsOn {
+			dependency := a.Workflows.Find(string(dependsOn))
+			if dependency == nil {
+				continue
+			}
+			for _, s := range w.Steps {
+				if s == nil {
+					continue
+				}
+				from := w.WorkflowID + ".steps." + s.StepID
+				for _, ds := range dependency.Steps {
+					if ds != nil {
+						stepEdges[from] = append(stepEdges[from], dependencyEdge{to: dependency.WorkflowID + ".steps." + ds.StepID})
+					}
+				}
+			}
+		}
+	}
 }
 
 // localStepDependency returns the `<workflowId>.steps.<stepId>` key of a step dependsOn entry that references a step
@@ -118,7 +153,9 @@ func localStepDependency(a *arazzo.Arazzo, w *arazzo.Workflow, dependsOn string)
 	return workflowID + ".steps." + stepID
 }
 
-// findDependencyCycles reports each cycle in the dependency graph once, against the dependsOn entry that closes it.
+// findDependencyCycles reports each cycle in the dependency graph once, against the dependsOn entry that closes it,
+// or the last dependsOn entry in the cycle when it's closed by an implied edge. Cycles made only of implied edges
+// aren't reported.
 func findDependencyCycles(nodes []string, edges map[string][]dependencyEdge) []error {
 	const (
 		unvisited = iota
@@ -129,6 +166,7 @@ func findDependencyCycles(nodes []string, edges map[string][]dependencyEdge) []e
 	var errs []error
 	state := map[string]int{}
 	path := []string{}
+	pathEdges := []dependencyEdge{}
 
 	var visit func(node string)
 	visit = func(node string) {
@@ -138,7 +176,9 @@ func findDependencyCycles(nodes []string, edges map[string][]dependencyEdge) []e
 		for _, edge := range edges[node] {
 			switch state[edge.to] {
 			case unvisited:
+				pathEdges = append(pathEdges, edge)
 				visit(edge.to)
+				pathEdges = pathEdges[:len(pathEdges)-1]
 			case visiting:
 				start := 0
 				for i, n := range path {
@@ -148,7 +188,13 @@ func findDependencyCycles(nodes []string, edges map[string][]dependencyEdge) []e
 					}
 				}
 				cycle := append(append([]string{}, path[start:]...), edge.to)
-				errs = append(errs, edge.report(strings.Join(cycle, " -> ")))
+				cycleEdges := append(append([]dependencyEdge{}, pathEdges[start:]...), edge)
+				for i := len(cycleEdges) - 1; i >= 0; i-- {
+					if cycleEdges[i].report != nil {
+						errs = append(errs, cycleEdges[i].report(strings.Join(cycle, " -> ")))
+						break
+					}
+				}
 			}
 		}
 

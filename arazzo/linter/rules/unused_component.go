@@ -119,15 +119,14 @@ func (r *UnusedComponentRule) Run(_ context.Context, docInfo *linter.DocumentInf
 }
 
 // markComponentUse marks a `$components.<section>.<name>` reference as used. Component names may contain dots, so
-// the name and each of its dotted prefixes are marked.
+// the name and each of its dotted prefixes are marked, except the component making the reference, as a reference to
+// itself (or a path within itself) doesn't count as a use.
 func markComponentUse(used map[string]map[string]bool, section, name, ownerSection, ownerName string) {
-	if section == ownerSection {
-		// A reference to the component itself (or a dotted path within it) doesn't count as a use.
-		if name == ownerName || strings.HasPrefix(name, ownerName+".") {
-			return
-		}
-	}
 	if used[section] == nil {
+		return
+	}
+	if section == ownerSection {
+		markDottedName(used[section], name, ownerName)
 		return
 	}
 	markDottedName(used[section], name)

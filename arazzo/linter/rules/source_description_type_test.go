@@ -81,6 +81,7 @@ func TestSourceDescriptionTypeRule_InteractiveFix_Success(t *testing.T) {
 			assert.Equal(t, tt.expectedChoices, fix.Prompts()[0].Choices, "choices should match")
 
 			require.Error(t, fix.SetInput(nil), "fix should need one response")
+			require.Error(t, fix.SetInput([]string{"OpenAPI"}), "fix should reject types that aren't offered")
 			require.NoError(t, fix.SetInput([]string{"openapi"}), "set input should succeed")
 			require.NoError(t, fix.Apply(a), "fix should apply")
 			assert.Equal(t, arazzo.SourceDescriptionType(arazzo.SourceDescriptionTypeOpenAPI), a.SourceDescriptions[1].Type, "type should be set")

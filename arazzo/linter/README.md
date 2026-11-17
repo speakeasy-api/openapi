@@ -49,8 +49,16 @@ import (
 func main() {
     ctx := context.Background()
 
-    f, _ := os.Open("workflow.arazzo.yaml")
-    doc, validationErrors, _ := arazzo.Unmarshal(ctx, f)
+    f, err := os.Open("workflow.arazzo.yaml")
+    if err != nil {
+        panic(err)
+    }
+    defer f.Close()
+
+    doc, validationErrors, err := arazzo.Unmarshal(ctx, f)
+    if err != nil {
+        panic(err)
+    }
 
     // Optionally load the sourceDescriptions, so findings can be checked against them and fixes can use them
     sources, loadErrors := arazzo.LoadSourceDescriptions(ctx, doc, arazzo.LoadSourcesOptions{DocumentLocation: "workflow.arazzo.yaml"})
@@ -59,7 +67,10 @@ func main() {
     ctx = arazzoLinter.WithSourceDocuments(ctx, sources)
 
     lint := arazzoLinter.NewLinter(linter.NewConfig())
-    output, _ := lint.Lint(ctx, linter.NewDocumentInfo(doc, "workflow.arazzo.yaml"), validationErrors, nil)
+    output, err := lint.Lint(ctx, linter.NewDocumentInfo(doc, "workflow.arazzo.yaml"), validationErrors, nil)
+    if err != nil {
+        panic(err)
+    }
 
     fmt.Println(output.FormatText())
 }

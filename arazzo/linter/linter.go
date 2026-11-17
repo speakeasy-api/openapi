@@ -66,14 +66,9 @@ func (l *Linter) FilterErrors(errs []error) []error {
 //
 // Rules can make use of the documents loaded for the document's sourceDescriptions when they are provided with
 // WithSourceDocuments.
+//
+// Rules check the version the document declares themselves, so opts.VersionFilter isn't needed.
 func (l *Linter) Lint(ctx context.Context, docInfo *baseLinter.DocumentInfo[*arazzo.Arazzo], preExistingErrors []error, opts *baseLinter.LintOptions) (*baseLinter.Output, error) {
-	if opts == nil {
-		opts = &baseLinter.LintOptions{}
-	}
-	if opts.VersionFilter == nil && docInfo != nil && docInfo.Document != nil {
-		version := docInfo.Document.Arazzo
-		opts.VersionFilter = &version
-	}
 	return l.base.Lint(ctx, docInfo, preExistingErrors, opts)
 }
 

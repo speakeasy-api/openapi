@@ -3,6 +3,8 @@ package rules
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/speakeasy-api/openapi/arazzo"
 	"github.com/speakeasy-api/openapi/linter"
@@ -95,6 +97,9 @@ func (f *setSourceDescriptionTypeFix) Prompts() []validation.Prompt {
 func (f *setSourceDescriptionTypeFix) SetInput(responses []string) error {
 	if len(responses) != 1 {
 		return fmt.Errorf("expected 1 response, got %d", len(responses))
+	}
+	if !slices.Contains(f.choices, responses[0]) {
+		return fmt.Errorf("invalid sourceDescription type `%s`, expected one of: %s", responses[0], strings.Join(f.choices, ", "))
 	}
 	f.sourceType = arazzo.SourceDescriptionType(responses[0])
 	return nil

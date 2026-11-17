@@ -131,6 +131,8 @@ func TestUnreachableStepRule_Success(t *testing.T) {
           - name: done
             type: goto
             stepId: second
+            criteria:
+              - condition: $statusCode == 202
       - stepId: second
         operationId: b
 `,
@@ -243,6 +245,33 @@ func TestUnreachableStepRule_Error(t *testing.T) {
 			assert.Equal(t, tt.expected, runRule(t, &rules.UnreachableStepRule{}, stepsDoc(tt.steps, tt.workflowActions, "")), "findings should match")
 		})
 	}
+}
+
+func TestUnreachableStepRule_NullStep_Success(t *testing.T) {
+	t.Parallel()
+
+	doc := stepsDoc(`      - stepId: first
+        operationId: a
+      - null
+      - stepId: third
+        operationId: c
+`, "", "")
+	assert.Empty(t, runRule(t, &rules.UnreachableStepRule{}, doc), "a null step should not stop the steps after it running")
+}
+
+func TestUnreachableStepRule_ReferenceWithoutComponents_Success(t *testing.T) {
+	t.Parallel()
+
+	doc := stepsDoc(`      - stepId: first
+        operationId: a
+        onSuccess:
+          - reference: $components.successActions.missing
+        onFailure:
+          - reference: $components.failureActions.missing
+      - stepId: second
+        operationId: b
+`, "", "")
+	assert.Empty(t, runRule(t, &rules.UnreachableStepRule{}, doc), "unresolvable references should be ignored")
 }
 
 func TestUnreachableStepRule_NoSteps_Success(t *testing.T) {

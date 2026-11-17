@@ -134,6 +134,55 @@ func TestUnusedWorkflowInputRule_Error(t *testing.T) {
 	}
 }
 
+func TestUnusedWorkflowInputRule_Components_Success(t *testing.T) {
+	t.Parallel()
+
+	inputs := `      type: object
+      properties:
+        petId:
+          type: integer
+        owner:
+          type: string
+        retries:
+          type: integer`
+	doc := inputsDoc(inputs, "$inputs.petId", `components:
+  parameters:
+    owner:
+      name: owner
+      in: query
+      value: $inputs.owner
+  failureActions:
+    retry:
+      name: retry
+      type: retry
+      retryLimit: 1
+      criteria:
+        - condition: $inputs.retries > 0
+`)
+	assert.Empty(t, runRule(t, &rules.UnusedWorkflowInputRule{}, doc), "inputs read by reusable components should count as used")
+}
+
+func TestUnusedWorkflowInputRule_DescriptionMention_Error(t *testing.T) {
+	t.Parallel()
+
+	inputs := `      type: object
+      description: Pass $inputs.unused to change nothing.
+      properties:
+        petId:
+          type: integer
+        unused:
+          type: string`
+	doc := inputsDoc(inputs, "$inputs.petId", "") + `components:
+  parameters:
+    documented:
+      name: x
+      in: query
+      value: 1
+      description: Not $inputs.unused either.
+`
+	assert.Equal(t, []string{"warning: input `unused` of workflow `main` is never used"}, runRule(t, &rules.UnusedWorkflowInputRule{}, doc), "mentions in descriptions should not count as reads")
+}
+
 func TestUnusedWorkflowInputRule_NoInputs_Success(t *testing.T) {
 	t.Parallel()
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/arazzo"
+	arazzoLinter "github.com/speakeasy-api/openapi/arazzo/linter"
 	"github.com/speakeasy-api/openapi/arazzo/linter/rules"
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/validation"
@@ -13,21 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// allRules returns every built-in rule.
+// allRules returns every rule registered by the Arazzo linter, so new rules are covered by the shared tests.
 func allRules() []linter.RuleRunner[*arazzo.Arazzo] {
-	return []linter.RuleRunner[*arazzo.Arazzo]{
-		&rules.UnreachableStepRule{},
-		&rules.DependencyCycleRule{},
-		&rules.UnusedComponentRule{},
-		&rules.UnusedWorkflowInputRule{},
-		&rules.UnusedStepOutputRule{},
-		&rules.StepSuccessCriteriaRule{},
-		&rules.SourceDescriptionTypeRule{},
-		&rules.InfoDescriptionRule{},
-		&rules.WorkflowDescriptionRule{},
-		&rules.RetryAfterRule{},
-		&rules.SourceDescriptionHTTPSRule{},
-	}
+	return arazzoLinter.NewLinter(nil).Registry().AllRules()
 }
 
 // parseDoc parses an Arazzo document without validation.

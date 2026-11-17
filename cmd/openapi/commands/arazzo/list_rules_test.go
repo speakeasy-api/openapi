@@ -20,12 +20,12 @@ func TestListRules_Text_Success(t *testing.T) {
 		{
 			name:     "all rules",
 			flags:    listRulesFlags{},
-			expected: []string{"SEMANTIC (5 rules)", "STYLE (5 rules)", "SECURITY (1 rules)", "[fixable]", "11 rules total"},
+			expected: []string{"SEMANTIC (5 rules)", "STYLE (5 rules)", "SECURITY (1 rule)", "[fixable]", "11 rules total"},
 		},
 		{
 			name:     "by category",
 			flags:    listRulesFlags{category: "security"},
-			expected: []string{"security-source-description-https", "1 rules total"},
+			expected: []string{"security-source-description-https", "1 rule total"},
 		},
 		{
 			name:     "by ruleset",
@@ -50,6 +50,15 @@ func TestListRules_Text_Success(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestListRules_UnknownRuleset_Error(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	err := listRules(&buf, listRulesFlags{ruleset: "strict"})
+	require.Error(t, err, "unknown rulesets should be rejected")
+	assert.Contains(t, err.Error(), "unknown ruleset `strict`, available rulesets: all, recommended", "error should list the rulesets")
 }
 
 func TestListRules_JSON_Success(t *testing.T) {

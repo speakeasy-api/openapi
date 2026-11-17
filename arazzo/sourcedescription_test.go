@@ -74,6 +74,8 @@ workflows: []
 			var buf bytes.Buffer
 			require.NoError(t, arazzo.Marshal(ctx, a, &buf), "marshal should succeed")
 			assert.Equal(t, tt.expected, buf.String(), "an empty optional type should not be written")
+			assert.Empty(t, a.SourceDescriptions[0].GetCore().Type.Value, "the core type should be cleared")
+			assert.False(t, a.SourceDescriptions[0].GetCore().Type.Present, "the core type should not be present")
 		})
 	}
 }

@@ -136,8 +136,11 @@ openapi arazzo lint --skip-sources ./workflow.arazzo.yaml
 # Use the recommended ruleset and disable a rule
 openapi arazzo lint --ruleset recommended --disable style-step-success-criteria ./workflow.arazzo.yaml
 
-# Output as JSON, with a per-rule summary
-openapi arazzo lint --format json --summary ./workflow.arazzo.yaml
+# Output as JSON
+openapi arazzo lint --format json ./workflow.arazzo.yaml
+
+# Add a per-rule summary table to the text output
+openapi arazzo lint --summary ./workflow.arazzo.yaml
 
 # Lint from stdin
 cat ./workflow.arazzo.yaml | openapi arazzo lint

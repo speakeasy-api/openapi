@@ -228,7 +228,7 @@ func applyArazzoFixes(ctx context.Context, flags lintFlags, doc *arazzo.Arazzo, 
 	if err != nil {
 		return false, fmt.Errorf("fix processing failed: %w", err)
 	}
-	reportArazzoFixResults(streams.stderr, result, flags.dryRun)
+	cmdutil.ReportFixResults(streams.stderr, result, flags.dryRun)
 
 	if len(result.Applied) == 0 || flags.dryRun {
 		return false, nil
@@ -245,32 +245,6 @@ func applyArazzoFixes(ctx context.Context, flags lintFlags, doc *arazzo.Arazzo, 
 	return true, nil
 }
 
-func reportArazzoFixResults(w io.Writer, result *fix.Result, dryRun bool) {
-	prefix := ""
-	if dryRun {
-		prefix = "[dry-run] "
-	}
-
-	if len(result.Applied) > 0 {
-		fmt.Fprintf(w, "\n%sFixed:\n", prefix)
-		for _, af := range result.Applied {
-			fmt.Fprintf(w, "  [%d:%d] %s - %s\n", af.Error.GetLineNumber(), af.Error.GetColumnNumber(), af.Error.Rule, af.Fix.Description())
-		}
-	}
-	if len(result.Skipped) > 0 {
-		fmt.Fprintf(w, "\n%sSkipped:\n", prefix)
-		for _, sf := range result.Skipped {
-			fmt.Fprintf(w, "  [%d:%d] %s - %s\n", sf.Error.GetLineNumber(), sf.Error.GetColumnNumber(), sf.Error.Rule, sf.Fix.Description())
-		}
-	}
-	if len(result.Failed) > 0 {
-		fmt.Fprintf(w, "\n%sFailed:\n", prefix)
-		for _, ff := range result.Failed {
-			fmt.Fprintf(w, "  [%d:%d] %s - %s: %v\n", ff.Error.GetLineNumber(), ff.Error.GetColumnNumber(), ff.Error.Rule, ff.Fix.Description(), ff.FixError)
-		}
-	}
-}
-
 // loadArazzoLintConfig loads the lint configuration from --config, or ~/.openapi/arazzo-lint.yaml if it exists,
 // and applies the command line overrides.
 func loadArazzoLintConfig(flags lintFlags) (*linter.Config, error) {
@@ -283,8 +257,12 @@ func loadArazzoLintConfig(flags lintFlags) (*linter.Config, error) {
 		}
 		config = loaded
 	} else if homeDir, err := os.UserHomeDir(); err == nil {
-		if loaded, err := linter.LoadConfigFromFile(filepath.Join(homeDir, ".openapi", "arazzo-lint.yaml")); err == nil {
+		loaded, err := linter.LoadConfigFromFile(filepath.Join(homeDir, ".openapi", "arazzo-lint.yaml"))
+		switch {
+		case err == nil:
 			config = loaded
+		case !errors.Is(err, os.ErrNotExist):
+			return nil, err
 		}
 	}
 

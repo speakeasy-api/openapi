@@ -49,7 +49,7 @@ func (r *UnusedStepOutputRule) Run(_ context.Context, docInfo *linter.DocumentIn
 			continue
 		}
 
-		used, all := usedStepOutputs(w)
+		used, all := usedStepOutputs(docInfo.Document, w)
 		for _, s := range w.Steps {
 			if s == nil || all[s.StepID] {
 				continue
@@ -67,12 +67,13 @@ func (r *UnusedStepOutputRule) Run(_ context.Context, docInfo *linter.DocumentIn
 }
 
 // usedStepOutputs returns the step outputs read with `$steps` expressions within the workflow, keyed by stepId.
-// all records the steps whose outputs are used as a whole.
-func usedStepOutputs(w *arazzo.Workflow) (map[string]map[string]bool, map[string]bool) {
+// all records the steps whose outputs are used as a whole. Expressions in reusable components count too, as the
+// components can be referenced from the workflow.
+func usedStepOutputs(a *arazzo.Arazzo, w *arazzo.Workflow) (map[string]map[string]bool, map[string]bool) {
 	used := map[string]map[string]bool{}
 	all := map[string]bool{}
 
-	visitScalars(w.GetRootNode(), func(scalar *yaml.Node) {
+	visit := func(scalar *yaml.Node) {
 		for _, m := range stepOutputsExpressionRegex.FindAllStringSubmatch(scalar.Value, -1) {
 			if m[2] == "" {
 				all[m[1]] = true
@@ -83,7 +84,11 @@ func usedStepOutputs(w *arazzo.Workflow) (map[string]map[string]bool, map[string
 			}
 			markDottedName(used[m[1]], m[2])
 		}
-	})
+	}
+	visitScalars(w.GetRootNode(), visit)
+	for _, node := range reusableComponentNodes(a) {
+		visitScalars(node, visit)
+	}
 
 	return used, all
 }

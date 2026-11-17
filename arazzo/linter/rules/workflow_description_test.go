@@ -28,7 +28,7 @@ func TestWorkflowDescriptionRule_Error(t *testing.T) {
 	t.Parallel()
 
 	doc := workflowsDoc(`  - workflowId: empty
-    summary: ""
+    summary: "  "
     description: ""
     steps:
       - stepId: one

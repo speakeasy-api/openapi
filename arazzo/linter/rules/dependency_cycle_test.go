@@ -53,6 +53,36 @@ func TestDependencyCycleRule_Success(t *testing.T) {
 	assert.Empty(t, runRule(t, &rules.DependencyCycleRule{}, doc), "acyclic dependencies should not be reported")
 }
 
+func TestDependencyCycleRule_WorkflowAndStepCycle_Error(t *testing.T) {
+	t.Parallel()
+
+	// b's steps only run after a has completed, but a's step waits for one of b's steps.
+	doc := workflowsDoc(`  - workflowId: a
+    steps:
+      - stepId: one
+        operationId: x
+        dependsOn:
+          - $workflows.b.steps.one
+  - workflowId: b
+    dependsOn:
+      - a
+    steps:
+      - stepId: one
+        operationId: x
+  - workflowId: c
+    dependsOn:
+      - b
+    steps:
+      - stepId: one
+        operationId: x
+        dependsOn:
+          - $workflows.b.steps.one
+`)
+
+	expected := []string{"error: step.dependsOn creates a cycle: a.steps.one -> b.steps.one -> a.steps.one"}
+	assert.Equal(t, expected, runRule(t, &rules.DependencyCycleRule{}, doc), "cycles across workflow and step dependencies should be reported")
+}
+
 func TestDependencyCycleRule_Error(t *testing.T) {
 	t.Parallel()
 

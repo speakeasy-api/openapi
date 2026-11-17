@@ -3,6 +3,7 @@ package rules
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/arazzo"
@@ -32,6 +33,11 @@ func isAtLeast11(a *arazzo.Arazzo) bool {
 	return err == nil && v != nil && (v.Major > 1 || (v.Major == 1 && v.Minor >= 1))
 }
 
+// hasText returns true if s is set to something other than whitespace.
+func hasText(s *string) bool {
+	return s != nil && strings.TrimSpace(*s) != ""
+}
+
 // withFix attaches a fix to a validation error.
 func withFix(err error, fix validation.Fix) error {
 	var vErr *validation.Error
@@ -41,7 +47,11 @@ func withFix(err error, fix validation.Fix) error {
 	return err
 }
 
-// visitScalars calls visit for every scalar node within node, following aliases. Each node is visited once.
+// proseKeys are the keys of documentation fields, which can mention runtime expressions without using them.
+var proseKeys = map[string]bool{"description": true, "summary": true}
+
+// visitScalars calls visit for every scalar node within node, following aliases and skipping documentation fields.
+// Each node is visited once.
 func visitScalars(node *yaml.Node, visit func(node *yaml.Node)) {
 	seen := map[*yaml.Node]bool{}
 	var walk func(node *yaml.Node)
@@ -56,6 +66,15 @@ func visitScalars(node *yaml.Node, visit func(node *yaml.Node)) {
 			visit(node)
 		case yaml.AliasNode:
 			walk(node.Alias)
+		case yaml.MappingNode:
+			for i := 0; i+1 < len(node.Content); i += 2 {
+				// Documentation can mention expressions without using them.
+				if proseKeys[node.Content[i].Value] {
+					continue
+				}
+				walk(node.Content[i])
+				walk(node.Content[i+1])
+			}
 		default:
 			for _, child := range node.Content {
 				walk(child)
@@ -63,6 +82,19 @@ func visitScalars(node *yaml.Node, visit func(node *yaml.Node)) {
 		}
 	}
 	walk(node)
+}
+
+// reusableComponentNodes returns the parameter and action sections of the document's components, which can contain
+// runtime expressions evaluated in the context of the workflow and step that reference them.
+func reusableComponentNodes(a *arazzo.Arazzo) []*yaml.Node {
+	componentsNode := mapValue(a.GetRootNode(), "components")
+	nodes := []*yaml.Node{}
+	for _, section := range []string{"parameters", "successActions", "failureActions"} {
+		if node := mapValue(componentsNode, section); node != nil {
+			nodes = append(nodes, node)
+		}
+	}
+	return nodes
 }
 
 // mapValue returns the value node for key within a mapping node, or nil.
@@ -86,6 +118,9 @@ func mapValue(node *yaml.Node, key string) *yaml.Node {
 
 // mapKey returns the key node for key within a mapping node, or nil.
 func mapKey(node *yaml.Node, key string) *yaml.Node {
+	if node != nil && node.Kind == yaml.AliasNode {
+		return mapKey(node.Alias, key)
+	}
 	if node == nil || node.Kind != yaml.MappingNode {
 		return nil
 	}
@@ -98,10 +133,12 @@ func mapKey(node *yaml.Node, key string) *yaml.Node {
 }
 
 // markDottedName marks name, and each of its dotted prefixes, as used. Names of inputs, outputs and components may
-// contain dots, so `a.b.c` may refer to `a.b` followed by a nested property `c`.
-func markDottedName(used map[string]bool, name string) {
+// contain dots, so `a.b.c` may refer to `a.b` followed by a nested property `c`. Names in except are not marked.
+func markDottedName(used map[string]bool, name string, except ...string) {
 	for {
-		used[name] = true
+		if !slices.Contains(except, name) {
+			used[name] = true
+		}
 		i := strings.LastIndex(name, ".")
 		if i < 0 {
 			return
@@ -132,15 +169,17 @@ func successActions(a *arazzo.Arazzo, w *arazzo.Workflow, s *arazzo.Step) []*ara
 	return actions
 }
 
+// resolveSuccessAction returns the inline or referenced action, or nil if it can't be resolved.
 func resolveSuccessAction(a *arazzo.Arazzo, action *arazzo.ReusableSuccessAction) *arazzo.SuccessAction {
-	if action == nil {
+	if action == nil || (action.IsReference() && a.Components == nil) {
 		return nil
 	}
 	return action.Get(a.Components)
 }
 
+// resolveFailureAction returns the inline or referenced action, or nil if it can't be resolved.
 func resolveFailureAction(a *arazzo.Arazzo, action *arazzo.ReusableFailureAction) *arazzo.FailureAction {
-	if action == nil {
+	if action == nil || (action.IsReference() && a.Components == nil) {
 		return nil
 	}
 	return action.Get(a.Components)

@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/speakeasy-api/openapi/linter/fix"
-	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
@@ -176,7 +174,7 @@ func TestLintArazzo_Fix_Success(t *testing.T) {
 	require.Error(t, err, "the dependency cycles can't be fixed")
 
 	assert.Contains(t, stderr, "Applied 2 fix(es)", "unused components should be removed")
-	assert.Contains(t, stderr, "Skipped:", "interactive fixes should be skipped")
+	assert.Contains(t, stderr, "(requires interactive input)", "interactive fixes should be skipped")
 
 	data, err := os.ReadFile(file)
 	require.NoError(t, err, "fixed file should be read")
@@ -224,37 +222,26 @@ func TestLintArazzo_FixInteractive_Success(t *testing.T) {
 	assert.Equal(t, "openapi", doc.SourceDescriptions[0].Type, "type should be set")
 }
 
-type stubFix struct{}
-
-func (stubFix) Description() string          { return "stub fix" }
-func (stubFix) Interactive() bool            { return false }
-func (stubFix) Prompts() []validation.Prompt { return nil }
-func (stubFix) SetInput([]string) error      { return nil }
-func (stubFix) Apply(any) error              { return nil }
-
-func TestReportArazzoFixResults_Failed(t *testing.T) {
-	t.Parallel()
-
-	vErr := &validation.Error{UnderlyingError: errors.New("issue"), Rule: "some-rule"}
-	var f validation.Fix = stubFix{}
-	var buf bytes.Buffer
-	reportArazzoFixResults(&buf, &fix.Result{Failed: []fix.FailedFix{{Error: vErr, Fix: f, FixError: errors.New("boom")}}}, false)
-	assert.Contains(t, buf.String(), "Failed:", "failed fixes should be reported")
-	assert.Contains(t, buf.String(), "some-rule", "rule should be reported")
-	assert.Contains(t, buf.String(), "boom", "fix error should be reported")
-}
-
 //nolint:paralleltest // modifies HOME to test the default config location
 func TestLoadArazzoLintConfig_HomeConfig_Success(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+
+	config, err := loadArazzoLintConfig(lintFlags{})
+	require.NoError(t, err, "a missing home config should be ignored")
+	assert.Equal(t, []string{"all"}, config.Extends, "default config should be used")
+
 	require.NoError(t, os.MkdirAll(filepath.Join(home, ".openapi"), 0o700), "config dir should be created")
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".openapi", "arazzo-lint.yaml"), []byte("extends: recommended\n"), 0o600), "config should be written")
 
-	config, err := loadArazzoLintConfig(lintFlags{format: "json"})
+	config, err = loadArazzoLintConfig(lintFlags{format: "json"})
 	require.NoError(t, err, "config should load")
 	assert.Equal(t, []string{"recommended"}, config.Extends, "home config should be used")
 	assert.Equal(t, "json", string(config.OutputFormat), "output format should be set")
+
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".openapi", "arazzo-lint.yaml"), []byte("extends: [\n"), 0o600), "config should be written")
+	_, err = loadArazzoLintConfig(lintFlags{})
+	require.Error(t, err, "an invalid home config should be reported")
 }
 
 func TestValidateArazzoLintFlags_Success(t *testing.T) {

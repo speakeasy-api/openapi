@@ -3,6 +3,7 @@ package rules
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 
@@ -57,5 +58,9 @@ func isInsecureURL(raw string) bool {
 		return false
 	}
 	host := u.Hostname()
-	return host != "localhost" && host != "::1" && !strings.HasPrefix(host, "127.")
+	if strings.EqualFold(host, "localhost") {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip == nil || !ip.IsLoopback()
 }

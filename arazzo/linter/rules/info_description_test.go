@@ -48,7 +48,10 @@ func TestInfoDescriptionRule_Fix_Success(t *testing.T) {
 	require.Len(t, fix.Prompts(), 1, "fix should have one prompt")
 
 	require.Error(t, fix.SetInput(nil), "fix should need one response")
-	require.NoError(t, fix.SetInput([]string{"Adopts pets."}), "set input should succeed")
+	require.NoError(t, fix.SetInput([]string{"   "}), "set input should succeed")
+	require.Error(t, fix.Apply(a), "fix should reject an empty description")
+	assert.Nil(t, a.Info.Description, "an empty description should not be set")
+	require.NoError(t, fix.SetInput([]string{" Adopts pets. "}), "set input should succeed")
 	require.Error(t, fix.Apply("not a document"), "fix should reject other documents")
 	require.NoError(t, fix.Apply(a), "fix should apply")
 	assert.Equal(t, "Adopts pets.", *a.Info.Description, "description should be set")
@@ -58,6 +61,6 @@ func TestInfoDescriptionRule_Fix_Success(t *testing.T) {
 func TestInfoDescriptionRule_EmptyDescription_Error(t *testing.T) {
 	t.Parallel()
 
-	a := &arazzo.Arazzo{Info: arazzo.Info{Description: pointerTo("")}}
-	assert.Len(t, (&rules.InfoDescriptionRule{}).Run(t.Context(), linter.NewDocumentInfo(a, ""), &linter.RuleConfig{}), 1, "an empty description should be reported")
+	a := &arazzo.Arazzo{Info: arazzo.Info{Description: pointerTo(" \n")}}
+	assert.Len(t, (&rules.InfoDescriptionRule{}).Run(t.Context(), linter.NewDocumentInfo(a, ""), &linter.RuleConfig{}), 1, "a blank description should be reported")
 }

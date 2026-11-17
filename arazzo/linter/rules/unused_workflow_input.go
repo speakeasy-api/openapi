@@ -58,7 +58,7 @@ func (r *UnusedWorkflowInputRule) Run(_ context.Context, docInfo *linter.Documen
 			continue
 		}
 
-		used, all := usedInputs(w)
+		used, all := usedInputs(a, w)
 		if all {
 			continue
 		}
@@ -101,28 +101,31 @@ func workflowInputsSchema(a *arazzo.Arazzo, w *arazzo.Workflow) (*oas3.Schema, *
 }
 
 // usedInputs returns the inputs read with `$inputs` expressions within the workflow. all is true if the whole of
-// `$inputs` is used, so every input counts as used.
-func usedInputs(w *arazzo.Workflow) (map[string]bool, bool) {
+// `$inputs` is used, so every input counts as used. Expressions in reusable components count too, as the components
+// can be referenced from the workflow.
+func usedInputs(a *arazzo.Arazzo, w *arazzo.Workflow) (map[string]bool, bool) {
 	used := map[string]bool{}
 	all := false
 
-	root := w.GetRootNode()
-	if root == nil || root.Kind != yaml.MappingNode {
-		return used, false
-	}
-	for i := 0; i+1 < len(root.Content); i += 2 {
-		if root.Content[i].Value == "inputs" {
-			continue
-		}
-		visitScalars(root.Content[i+1], func(scalar *yaml.Node) {
-			for _, m := range inputsExpressionRegex.FindAllStringSubmatch(scalar.Value, -1) {
-				if m[1] == "" {
-					all = true
-					continue
-				}
-				markDottedName(used, m[1])
+	visit := func(scalar *yaml.Node) {
+		for _, m := range inputsExpressionRegex.FindAllStringSubmatch(scalar.Value, -1) {
+			if m[1] == "" {
+				all = true
+				continue
 			}
-		})
+			markDottedName(used, m[1])
+		}
+	}
+
+	if root := w.GetRootNode(); root != nil && root.Kind == yaml.MappingNode {
+		for i := 0; i+1 < len(root.Content); i += 2 {
+			if root.Content[i].Value != "inputs" {
+				visitScalars(root.Content[i+1], visit)
+			}
+		}
+	}
+	for _, node := range reusableComponentNodes(a) {
+		visitScalars(node, visit)
 	}
 
 	return used, all

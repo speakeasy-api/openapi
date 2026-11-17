@@ -76,13 +76,18 @@ func reachableSteps(a *arazzo.Arazzo, w *arazzo.Workflow) []bool {
 
 	queue := []int{0}
 	reachable[0] = true
+	markIndex := func(j int) {
+		if !reachable[j] {
+			reachable[j] = true
+			queue = append(queue, j)
+		}
+	}
 	mark := func(stepID *string) {
 		if stepID == nil {
 			return
 		}
-		if j, ok := index[*stepID]; ok && !reachable[j] {
-			reachable[j] = true
-			queue = append(queue, j)
+		if j, ok := index[*stepID]; ok {
+			markIndex(j)
 		}
 	}
 
@@ -111,8 +116,8 @@ func reachableSteps(a *arazzo.Arazzo, w *arazzo.Workflow) []bool {
 			}
 		}
 
-		if continues && next < len(w.Steps) && w.Steps[next] != nil {
-			mark(&w.Steps[next].StepID)
+		if continues && next < len(w.Steps) {
+			markIndex(next)
 		}
 	}
 

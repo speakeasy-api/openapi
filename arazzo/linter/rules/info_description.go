@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/speakeasy-api/openapi/arazzo"
 	"github.com/speakeasy-api/openapi/linter"
@@ -40,7 +41,7 @@ func (r *InfoDescriptionRule) Run(_ context.Context, docInfo *linter.DocumentInf
 	}
 
 	info := &docInfo.Document.Info
-	if info.Description != nil && *info.Description != "" {
+	if hasText(info.Description) {
 		return nil
 	}
 
@@ -68,7 +69,7 @@ func (f *addInfoDescriptionFix) SetInput(responses []string) error {
 	if len(responses) != 1 {
 		return fmt.Errorf("expected 1 response, got %d", len(responses))
 	}
-	f.description = responses[0]
+	f.description = strings.TrimSpace(responses[0])
 	return nil
 }
 
@@ -76,6 +77,9 @@ func (f *addInfoDescriptionFix) Apply(doc any) error {
 	a, ok := doc.(*arazzo.Arazzo)
 	if !ok {
 		return fmt.Errorf("expected *arazzo.Arazzo, got %T", doc)
+	}
+	if f.description == "" {
+		return errors.New("description must not be empty")
 	}
 	a.Info.Description = &f.description
 	return nil

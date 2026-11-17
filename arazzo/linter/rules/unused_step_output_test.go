@@ -35,6 +35,39 @@ func TestUnusedStepOutputRule_Success(t *testing.T) {
 	assert.Empty(t, runRule(t, &rules.UnusedStepOutputRule{}, doc), "used outputs should not be reported")
 }
 
+func TestUnusedStepOutputRule_Components_Success(t *testing.T) {
+	t.Parallel()
+
+	doc := stepsDoc(`      - stepId: first
+        operationId: a
+        outputs:
+          id: $response.body#/id
+      - stepId: second
+        operationId: b
+        parameters:
+          - reference: $components.parameters.id
+`, "", `components:
+  parameters:
+    id:
+      name: id
+      in: query
+      value: $steps.first.outputs.id
+`)
+	assert.Empty(t, runRule(t, &rules.UnusedStepOutputRule{}, doc), "outputs read by reusable components should count as used")
+}
+
+func TestUnusedStepOutputRule_DescriptionMention_Error(t *testing.T) {
+	t.Parallel()
+
+	doc := stepsDoc(`      - stepId: first
+        operationId: a
+        description: Returns $steps.first.outputs.unused for later.
+        outputs:
+          unused: $response.body#/name
+`, "", "")
+	assert.Equal(t, []string{"hint: output `unused` of step `first` is never used"}, runRule(t, &rules.UnusedStepOutputRule{}, doc), "mentions in descriptions should not count as reads")
+}
+
 func TestUnusedStepOutputRule_Error(t *testing.T) {
 	t.Parallel()
 

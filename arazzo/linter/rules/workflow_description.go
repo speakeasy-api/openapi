@@ -39,7 +39,7 @@ func (r *WorkflowDescriptionRule) Run(_ context.Context, docInfo *linter.Documen
 
 	var errs []error
 	for _, w := range docInfo.Document.Workflows {
-		if w == nil || (w.Summary != nil && *w.Summary != "") || (w.Description != nil && *w.Description != "") {
+		if w == nil || hasText(w.Summary) || hasText(w.Description) {
 			continue
 		}
 		core := w.GetCore()

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -19,8 +20,8 @@ var listRulesCmd = &cobra.Command{
 	Short: "List all available Arazzo linting rules",
 	Long: `List all available Arazzo linting rules with their metadata.
 
-Shows each rule's ID, category, default severity, description, and fix guidance.
-Use --category to filter by category, or --ruleset to show only rules in a ruleset.
+Shows each rule's ID, category, default severity, summary, and fix guidance. Use --format json to include the
+full description. Use --category to filter by category, or --ruleset to show only rules in a ruleset.
 
 Examples:
   openapi arazzo list-rules
@@ -66,6 +67,9 @@ func runListRules(_ *cobra.Command, _ []string) {
 
 func listRules(w io.Writer, flags listRulesFlags) error {
 	registry := arazzoLinter.NewLinter(nil).Registry()
+	if flags.ruleset != "" && !slices.Contains(registry.AllRulesets(), flags.ruleset) {
+		return fmt.Errorf("unknown ruleset `%s`, available rulesets: %s", flags.ruleset, strings.Join(registry.AllRulesets(), ", "))
+	}
 
 	infos := []ruleInfo{}
 	for _, rule := range registry.AllRules() {
@@ -125,7 +129,7 @@ func printRulesText(w io.Writer, infos []ruleInfo, categories []string) {
 			continue
 		}
 
-		fmt.Fprintf(w, "\n%s (%d rules)\n", strings.ToUpper(category), len(rules))
+		fmt.Fprintf(w, "\n%s (%s)\n", strings.ToUpper(category), pluralRules(len(rules)))
 		fmt.Fprintln(w, strings.Repeat("─", 80))
 
 		tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
@@ -142,7 +146,15 @@ func printRulesText(w io.Writer, infos []ruleInfo, categories []string) {
 		_ = tw.Flush()
 	}
 
-	fmt.Fprintf(w, "\n%d rules total\n", len(infos))
+	fmt.Fprintf(w, "\n%s total\n", pluralRules(len(infos)))
+}
+
+// pluralRules returns "1 rule" or "<n> rules".
+func pluralRules(n int) string {
+	if n == 1 {
+		return "1 rule"
+	}
+	return strconv.Itoa(n) + " rules"
 }
 
 // GetListRulesCommand returns the list-rules command for external use

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/arazzo"
+	"github.com/speakeasy-api/openapi/expression"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
@@ -23,10 +24,13 @@ func TestVisitScalars_FollowsAliases_Success(t *testing.T) {
 	node := parseNode(t, `a: &shared
   value: one
 b: *shared
+c: [two]
+description: skipped
+summary: skipped
 `)
 	values := []string{}
 	visitScalars(node, func(scalar *yaml.Node) { values = append(values, scalar.Value) })
-	assert.Equal(t, []string{"a", "value", "one", "b"}, values, "aliased nodes should be visited once")
+	assert.Equal(t, []string{"a", "value", "one", "b", "c", "two"}, values, "aliased nodes should be visited once and documentation skipped")
 }
 
 func TestMapValue_Success(t *testing.T) {
@@ -45,8 +49,9 @@ b: *shared
 func TestMapKey_Success(t *testing.T) {
 	t.Parallel()
 
-	node := parseNode(t, "a: 1\n")
+	node := parseNode(t, "a: &shared\n  b: 1\nc: *shared\n")
 	assert.Equal(t, "a", mapKey(node, "a").Value, "key should be found")
+	assert.Equal(t, "b", mapKey(mapValue(node, "c"), "b").Value, "aliases should be followed")
 	assert.Nil(t, mapKey(node, "missing"), "missing keys should not be found")
 	assert.Nil(t, mapKey(nil, "a"), "nil nodes have no keys")
 }
@@ -57,6 +62,10 @@ func TestResolveActions_Nil_Success(t *testing.T) {
 	a := &arazzo.Arazzo{}
 	assert.Nil(t, resolveSuccessAction(a, nil), "nil success actions resolve to nil")
 	assert.Nil(t, resolveFailureAction(a, nil), "nil failure actions resolve to nil")
+
+	reference := expression.Expression("$components.successActions.missing")
+	assert.Nil(t, resolveSuccessAction(a, &arazzo.ReusableSuccessAction{Reference: &reference}), "references without components resolve to nil")
+	assert.Nil(t, resolveFailureAction(a, &arazzo.ReusableFailureAction{Reference: &reference}), "references without components resolve to nil")
 }
 
 func TestMarkComponentUse_UnknownSection_Success(t *testing.T) {
@@ -70,7 +79,7 @@ func TestMarkComponentUse_UnknownSection_Success(t *testing.T) {
 func TestUsedInputs_NoRootNode_Success(t *testing.T) {
 	t.Parallel()
 
-	used, all := usedInputs(&arazzo.Workflow{})
+	used, all := usedInputs(&arazzo.Arazzo{}, &arazzo.Workflow{})
 	assert.Empty(t, used, "workflows without nodes use no inputs")
 	assert.False(t, all, "workflows without nodes don't use all inputs")
 }
