@@ -57,7 +57,7 @@ func createBootstrapAdoptPetWorkflow() *Workflow {
 		Steps: Steps{
 			{
 				StepID:      "findPets",
-				Description: pointer.From("Find available pets of the requested species"),
+				Description: pointer.From("Find available pets of the requested species, succeeding when at least one is found"),
 				OperationID: pointer.From(expression.Expression("$sourceDescriptions.petStore.findPets")),
 				Parameters: []*ReusableParameter{
 					{Reference: pointer.From(expression.Expression("$components.parameters.apiVersion"))},
@@ -68,7 +68,7 @@ func createBootstrapAdoptPetWorkflow() *Workflow {
 					{Condition: "$statusCode == 200"},
 					{
 						Context:   pointer.From(expression.Expression("$response.body")),
-						Condition: "$[?@.status == 'available']",
+						Condition: "$[0]",
 						Type: criterion.CriterionTypeUnion{
 							ExpressionType: &criterion.CriterionExpressionType{Type: criterion.CriterionTypeJsonPath, Version: criterion.CriterionTypeVersionRFC9535},
 						},

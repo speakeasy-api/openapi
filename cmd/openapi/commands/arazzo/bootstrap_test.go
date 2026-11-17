@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/speakeasy-api/openapi/arazzo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,35 +27,40 @@ func TestBootstrapArazzo_Stdout_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		flags          bootstrapFlags
-		expectedStdout []string
-		expectedStderr string
+		name              string
+		flags             bootstrapFlags
+		expectedSource    string
+		expectedWorkflows []string
+		expectedSteps     []string
+		expectedStderr    string
 	}{
 		{
-			name:           "sample",
-			expectedStdout: []string{"title: Pet adoption workflows\n", "workflowId: adoptPet\n"},
+			name:              "sample",
+			expectedSource:    "petStore https://api.example.com/openapi.yaml",
+			expectedWorkflows: []string{"adoptPet"},
+			expectedSteps:     []string{"findPets", "adoptPet"},
 		},
 		{
-			name:  "from OpenAPI",
-			flags: bootstrapFlags{from: bootstrapFixture},
-			expectedStdout: []string{
-				"url: " + filepath.ToSlash(filepath.Clean(bootstrapFixture)) + "\n",
-				"workflowId: pets\n",
-				"workflowId: adoption\n",
-				"workflowId: default\n",
-			},
-			expectedStderr: "Generating Arazzo workflows from: " + filepath.Clean(bootstrapFixture),
+			name:              "from OpenAPI",
+			flags:             bootstrapFlags{from: bootstrapFixture},
+			expectedSource:    "petStoreAPI " + filepath.ToSlash(filepath.Clean(bootstrapFixture)),
+			expectedWorkflows: []string{"pets", "adoption", "default"},
+			expectedSteps:     []string{"listPets", "createPet", "getPet"},
+			expectedStderr:    "Generating Arazzo workflows from: " + filepath.Clean(bootstrapFixture),
 		},
 		{
-			name:           "tags",
-			flags:          bootstrapFlags{from: bootstrapFixture, tags: []string{"adoption"}, sourceName: "store"},
-			expectedStdout: []string{"name: store\n", "workflowId: adoption\n"},
+			name:              "tags",
+			flags:             bootstrapFlags{from: bootstrapFixture, tags: []string{"adoption"}, sourceName: "store"},
+			expectedSource:    "store " + filepath.ToSlash(filepath.Clean(bootstrapFixture)),
+			expectedWorkflows: []string{"adoption"},
+			expectedSteps:     []string{"createPet", "postPetsPetIdAdopt"},
 		},
 		{
-			name:           "operations",
-			flags:          bootstrapFlags{from: bootstrapFixture, operations: []string{"listPets", "getPet"}, workflowID: "findPet"},
-			expectedStdout: []string{"workflowId: findPet\n", "value: $steps.listPets.outputs.petId\n"},
+			name:              "operations",
+			flags:             bootstrapFlags{from: bootstrapFixture, operations: []string{"getPet", "listPets", "getPet"}, workflowID: "findPet"},
+			expectedSource:    "petStoreAPI " + filepath.ToSlash(filepath.Clean(bootstrapFixture)),
+			expectedWorkflows: []string{"findPet"},
+			expectedSteps:     []string{"getPet", "listPets", "getPet2"},
 		},
 	}
 
@@ -63,10 +70,25 @@ func TestBootstrapArazzo_Stdout_Success(t *testing.T) {
 
 			stdout, stderr, err := runBootstrapCommand(t, nil, tt.flags)
 			require.NoError(t, err, "bootstrap should succeed")
-			for _, expected := range tt.expectedStdout {
-				assert.Contains(t, stdout, expected, "stdout should contain the expected output")
-			}
 			assert.Contains(t, stderr, tt.expectedStderr, "stderr should contain the expected output")
+
+			doc, validationErrs, err := arazzo.Unmarshal(t.Context(), strings.NewReader(stdout))
+			require.NoError(t, err, "output should parse")
+			assert.Empty(t, validationErrs, "output should be valid")
+			require.Len(t, doc.SourceDescriptions, 1, "output should have a single source description")
+			assert.Equal(t, tt.expectedSource, doc.SourceDescriptions[0].Name+" "+doc.SourceDescriptions[0].URL, "source description should match")
+
+			workflows := []string{}
+			for _, w := range doc.Workflows {
+				workflows = append(workflows, w.WorkflowID)
+			}
+			assert.Equal(t, tt.expectedWorkflows, workflows, "workflows should match exactly")
+
+			steps := []string{}
+			for _, s := range doc.Workflows[0].Steps {
+				steps = append(steps, s.StepID)
+			}
+			assert.Equal(t, tt.expectedSteps, steps, "the first workflow's steps should match in order")
 		})
 	}
 }

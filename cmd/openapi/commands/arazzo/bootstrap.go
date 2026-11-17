@@ -23,10 +23,10 @@ var bootstrapCmd = &cobra.Command{
 
 With --from, generates starter workflows for the operations in an OpenAPI document:
 - One workflow per tag, calling the tag's operations in document order. Operations without tags
-  go in a workflow named ` + "`" + arazzo.UntaggedWorkflowID + "`" + `, and operations with several tags are in each tag's workflow.
+  go in the ` + "`" + arazzo.UntaggedWorkflowID + "`" + ` workflow, and operations with several tags are in each tag's workflow.
 - Each step targets its operation by operationId (or operationPath when it doesn't have one), passes the
-  required parameters and request body, and succeeds on the operation's documented 2xx status code.
-- Values come from workflow inputs typed from the operation's schemas. When an earlier step's successful
+  required parameters and request body, and succeeds on the operation's documented 2xx status codes.
+- Values come from workflow inputs typed from the operation's schemas. When an earlier step's 2xx
   response declares an OpenAPI link to the operation, the value comes from that step's outputs instead.
 
 Use --tag to only generate the workflows for some tags, or --operations to generate a single workflow

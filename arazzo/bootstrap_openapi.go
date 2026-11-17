@@ -69,14 +69,15 @@ type BootstrapOptions struct {
 // BootstrapFromOpenAPI generates a starter Arazzo document for an OpenAPI document.
 //
 // By default it generates one workflow per tag, calling the tag's operations in document order. Operations without
-// tags are added to a workflow named UntaggedWorkflowID, and operations with several tags are added to the workflow
-// for each of their tags. Each step:
+// tags are added to the workflow named UntaggedWorkflowID (along with any operations tagged with that name), and
+// operations with several tags are added to the workflow for each of their tags. Each step:
 //
 //   - targets the operation by operationId, or by operationPath if the operation doesn't have one
 //   - passes the operation's required parameters, and its request body if it's required
 //   - takes those values from workflow inputs typed from the operation's schemas, or from the outputs of an earlier
-//     step whose successful response declares an OpenAPI link to the operation
-//   - succeeds when the response has the operation's first documented 2xx status code, or any 2xx status code
+//     step whose 2xx response declares an OpenAPI link to the operation
+//   - succeeds on one of the operation's documented 2xx status codes, or any 2xx status code if it documents the
+//     `2XX` range or no 2xx status codes
 //
 // References in the OpenAPI document should be resolved first (see openapi.OpenAPI.ResolveAllReferences), as
 // parameters, request bodies and links that are unresolved references are skipped.
@@ -225,11 +226,12 @@ type tagGroup struct {
 }
 
 // groupOperationsByTag groups operations by tag, ordering the tags declared by the document first, then other tags in
-// the order they're used, then the untagged operations.
+// the order they're used, then the untagged operations. Untagged operations are grouped with any operations tagged
+// UntaggedWorkflowID, as both would otherwise produce a workflow of that name.
 func groupOperationsByTag(doc *openapi.OpenAPI, operations []bootstrapOperation) []tagGroup {
 	groups := []tagGroup{}
 	index := map[string]int{}
-	add := func(tag string, o *bootstrapOperation) {
+	add := func(tag string, o *bootstrapOperation) *tagGroup {
 		i, ok := index[tag]
 		if !ok {
 			i = len(groups)
@@ -239,14 +241,14 @@ func groupOperationsByTag(doc *openapi.OpenAPI, operations []bootstrapOperation)
 		if o != nil {
 			groups[i].operations = append(groups[i].operations, *o)
 		}
+		return &groups[i]
 	}
 
 	for _, tag := range doc.Tags {
 		if tag == nil || tag.Name == "" {
 			continue
 		}
-		add(tag.Name, nil)
-		g := &groups[index[tag.Name]]
+		g := add(tag.Name, nil)
 		if summary := tag.GetSummary(); summary != "" {
 			g.summary = summary
 		}
@@ -259,19 +261,26 @@ func groupOperationsByTag(doc *openapi.OpenAPI, operations []bootstrapOperation)
 		if len(tags) == 0 {
 			untagged = append(untagged, operations[i])
 		}
-		for _, tag := range slices.Compact(slices.Clone(tags)) {
-			add(tag, &operations[i])
+		seen := map[string]bool{}
+		for _, tag := range tags {
+			if !seen[tag] {
+				seen[tag] = true
+				add(tag, &operations[i])
+			}
 		}
 	}
 
-	// Declared tags without operations don't get a workflow.
-	groups = slices.DeleteFunc(groups, func(g tagGroup) bool { return len(g.operations) == 0 })
-
 	if len(untagged) > 0 {
-		groups = append(groups, tagGroup{tag: UntaggedWorkflowID, summary: "Calls the operations without tags in order", operations: untagged})
+		_, tagged := index[UntaggedWorkflowID]
+		g := add(UntaggedWorkflowID, nil)
+		if !tagged {
+			g.summary = "Calls the operations without tags in order"
+		}
+		g.operations = append(g.operations, untagged...)
 	}
 
-	return groups
+	// Declared tags without operations don't get a workflow.
+	return slices.DeleteFunc(groups, func(g tagGroup) bool { return len(g.operations) == 0 })
 }
 
 // bootstrapper builds the workflows of a bootstrapped document.
@@ -299,13 +308,18 @@ type workflowBuilder struct {
 	steps      []*bootstrapStep
 	inputs     *sequencedmap.Map[string, *oas3.JSONSchema[oas3.Referenceable]]
 	required   []string
+	// inputNames are the input names in use, and inputsByValue maps the values the inputs are for to their names.
+	inputNames    map[string]bool
+	inputsByValue map[string]string
 }
 
 func (b *bootstrapper) buildWorkflow(workflowID, summary, description string, operations []bootstrapOperation) *Workflow {
 	wb := &workflowBuilder{
-		sourceName: b.sourceName,
-		stepIDs:    map[string]bool{},
-		inputs:     sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]](),
+		sourceName:    b.sourceName,
+		stepIDs:       map[string]bool{},
+		inputs:        sequencedmap.New[string, *oas3.JSONSchema[oas3.Referenceable]](),
+		inputNames:    map[string]bool{},
+		inputsByValue: map[string]string{},
 	}
 
 	w := &Workflow{WorkflowID: workflowID, Summary: pointer.From(summary)}
@@ -354,7 +368,7 @@ func (wb *workflowBuilder) addStep(o bootstrapOperation) *Step {
 		}
 		value := links.parameterValue(p)
 		if value == nil {
-			value = wb.input(toIdentifierMatching(p.GetName(), "input", inputNameRegex), parameterSchema(p), p.GetDescription())
+			value = wb.input(parameterKey(p.GetName(), p.GetIn()), toIdentifierMatching(p.GetName(), "input", inputNameRegex), parameterSchema(p), p.GetDescription())
 		}
 		s.Parameters = append(s.Parameters, &ReusableParameter{Object: &Parameter{
 			Name:  p.GetName(),
@@ -367,7 +381,7 @@ func (wb *workflowBuilder) addStep(o bootstrapOperation) *Step {
 		contentType, mediaType := preferredMediaType(rb.Content)
 		payload := links.requestBody()
 		if payload == nil {
-			payload = wb.input(stepID+"Body", mediaType.GetSchema(), pointer.Value(rb.Description))
+			payload = wb.input("body:"+stepID, stepID+"Body", mediaType.GetSchema(), pointer.Value(rb.Description))
 		}
 		requestBody := &RequestBody{Payload: payload}
 		if contentType != "" {
@@ -383,14 +397,18 @@ func (wb *workflowBuilder) addStep(o bootstrapOperation) *Step {
 	return s
 }
 
-// input declares a workflow input, reusing an existing input with the same name, and returns an expression for its
-// value.
-func (wb *workflowBuilder) input(name string, schema *oas3.JSONSchema[oas3.Referenceable], description string) *yaml.Node {
-	if !wb.inputs.Has(name) {
-		wb.inputs.Set(name, inputSchema(schema, description))
-		wb.required = append(wb.required, name)
+// input returns an expression for the workflow input providing a value, identified by key. Steps share the input for
+// the same parameter (name and location). Other values get their own input, named after name with a numeric suffix if
+// it's already used.
+func (wb *workflowBuilder) input(key, name string, schema *oas3.JSONSchema[oas3.Referenceable], description string) *yaml.Node {
+	inputName, ok := wb.inputsByValue[key]
+	if !ok {
+		inputName = uniqueName(name, wb.inputNames)
+		wb.inputsByValue[key] = inputName
+		wb.inputs.Set(inputName, inputSchema(schema, description))
+		wb.required = append(wb.required, inputName)
 	}
-	return yml.CreateStringNode("$inputs." + name)
+	return yml.CreateStringNode("$inputs." + inputName)
 }
 
 // stepLinks are the values provided for a step by the links of earlier steps, closest step first.
@@ -412,7 +430,7 @@ type linkedValue struct {
 // converted when used, so steps don't get outputs that nothing reads.
 func (l stepLinks) parameterValue(p *openapi.Parameter) *yaml.Node {
 	for _, lv := range l.parameters {
-		if lv.name != p.GetName() || (lv.in != "" && lv.in != p.GetIn()) {
+		if (lv.in != "" && lv.in != p.GetIn()) || !parameterNamesMatch(p, lv.name) {
 			continue
 		}
 		if value := lv.from.linkValue(lv.node, p.GetName()); value != nil {
@@ -432,7 +450,16 @@ func (l stepLinks) requestBody() *yaml.Node {
 	return nil
 }
 
-// findLinks finds the values provided for an operation by links in the successful responses of earlier steps.
+// parameterNamesMatch compares a parameter's name with the name used by a link. Header names are case-insensitive.
+func parameterNamesMatch(p *openapi.Parameter, name string) bool {
+	if p.GetIn() == openapi.ParameterInHeader {
+		return strings.EqualFold(p.GetName(), name)
+	}
+	return p.GetName() == name
+}
+
+// findLinks finds the values provided for an operation by links in the 2xx responses of earlier steps, which are
+// the responses their success criteria accept.
 func (wb *workflowBuilder) findLinks(o bootstrapOperation) stepLinks {
 	links := stepLinks{}
 	for i := len(wb.steps) - 1; i >= 0; i-- {
@@ -475,20 +502,22 @@ func splitLinkParameter(key string) (openapi.ParameterIn, string) {
 }
 
 // linkValue converts the value of a link into a value for the step it links to. Runtime expressions become
-// outputs of this step and constants are used as they are. Returns nil for values that can't be converted, such as
-// expressions embedded in strings.
+// outputs of this step and constants, including strings that start with `$` but aren't runtime expressions, are used
+// as they are. Returns nil for values that can't be converted, such as invalid expressions, expressions that don't
+// read from this step, and expressions embedded in strings or nested values.
 func (bs *bootstrapStep) linkValue(node *yaml.Node, name string) *yaml.Node {
 	if node == nil {
 		return nil
 	}
-	if node.Kind != yaml.ScalarNode || !strings.HasPrefix(node.Value, "$") {
-		if strings.Contains(yamlValues(node), "$") {
+
+	e := expression.Expression(node.Value)
+	if node.Kind != yaml.ScalarNode || !e.IsExpression(expression.WithArazzo11Grammar()) {
+		if containsExpression(node) {
 			return nil
 		}
 		return node
 	}
 
-	e := expression.Expression(node.Value)
 	if e.Validate(expression.WithArazzo11Grammar()) != nil || !slices.Contains(linkExpressionTypes, e.GetType()) {
 		return nil
 	}
@@ -510,16 +539,13 @@ func (bs *bootstrapStep) linkValue(node *yaml.Node, name string) *yaml.Node {
 	return yml.CreateStringNode("$steps." + bs.step.StepID + ".outputs." + outputName)
 }
 
-// yamlValues concatenates the scalar values within a node.
-func yamlValues(node *yaml.Node) string {
+// containsExpression returns true if a value is or contains a runtime expression, either on its own or embedded in a
+// string such as `pet {$response.body#/id}`.
+func containsExpression(node *yaml.Node) bool {
 	if node.Kind == yaml.ScalarNode {
-		return node.Value
+		return strings.Contains(node.Value, "{$") || expression.Expression(node.Value).IsExpression(expression.WithArazzo11Grammar())
 	}
-	var sb strings.Builder
-	for _, child := range node.Content {
-		sb.WriteString(yamlValues(child))
-	}
-	return sb.String()
+	return slices.ContainsFunc(node.Content, containsExpression)
 }
 
 // bootstrapParameters returns the resolved parameters of an operation, including those declared on its path item.
@@ -594,16 +620,31 @@ func inputSchema(schema *oas3.JSONSchema[oas3.Referenceable], description string
 	return oas3.NewJSONSchemaFromSchema[oas3.Referenceable](input)
 }
 
-// successCriterion checks for the first 2xx status code the operation documents, or any 2xx status code.
+// successCriterion accepts the 2xx status codes the operation documents, or any 2xx status code if it documents the
+// `2XX` range or no 2xx status codes.
 func successCriterion(o *openapi.Operation) *criterion.Criterion {
+	codes := []string{}
 	for code := range o.GetResponses().All() {
-		if n, err := strconv.Atoi(code); err == nil && n >= 200 && n < 300 {
-			return &criterion.Criterion{Condition: "$statusCode == " + code}
+		if strings.EqualFold(code, "2XX") {
+			codes = nil
+			break
 		}
+		if n, err := strconv.Atoi(code); err == nil && n >= 200 && n < 300 {
+			codes = append(codes, code)
+		}
+	}
+
+	if len(codes) == 1 {
+		return &criterion.Criterion{Condition: "$statusCode == " + codes[0]}
+	}
+
+	condition := `^2\d\d$`
+	if len(codes) > 1 {
+		condition = "^(" + strings.Join(codes, "|") + ")$"
 	}
 	return &criterion.Criterion{
 		Context:   pointer.From(expression.Expression("$statusCode")),
-		Condition: `^2\d\d$`,
+		Condition: condition,
 		Type:      criterion.CriterionTypeUnion{Type: pointer.From(criterion.CriterionTypeRegex)},
 	}
 }

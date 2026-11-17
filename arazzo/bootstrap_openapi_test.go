@@ -202,7 +202,7 @@ paths:
           type: integer
     get:
       operationId: get.thing
-      tags: [Thing Store, Thing Store]
+      tags: [Thing Store, default, Thing Store]
       parameters:
         - name: id
           in: path
@@ -223,7 +223,7 @@ paths:
             unusable:
               operationId: put.thing
               parameters:
-                X-Trace: $nope
+                X-Trace: $response.body.id
                 id: $inputs.id
               requestBody:
                 payload: $response.body#/thing
@@ -234,19 +234,32 @@ paths:
             update:
               operationId: put.thing
               parameters:
-                query.id: $response.body#/ignored
-                id: $response.body#/id
+                cookie.id: $response.body#/ignored
+                path.id: $response.body#/id
                 other: $response.body#/other
-                X-Trace:
+                x-trace:
                   trace: abc
+                price: $5
               requestBody:
                 payload: fixed
+        "202":
+          description: Accepted
     put:
       operationId: put.thing
       tags: [Thing Store]
       parameters:
         - name: X-Trace
           in: header
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: price
+          in: query
           required: true
           schema:
             type: string
@@ -257,6 +270,12 @@ paths:
       responses:
         "201":
           description: Updated
+  /ping:
+    get:
+      operationId: ping
+      responses:
+        "204":
+          description: Pong
 `
 
 	a, err := arazzo.BootstrapFromOpenAPI(loadBootstrapOpenAPI(t, []byte(source), "edge.openapi.yaml"), arazzo.BootstrapOptions{SourceURL: "https://example.com/edge.openapi.yaml"})
@@ -282,6 +301,59 @@ workflows:
         xTrace:
           type: string
           format: uuid
+        id2:
+          type: string
+      required:
+        - id
+        - xTrace
+        - id2
+    steps:
+      - stepId: getThing
+        operationId: get.thing
+        parameters:
+          - name: id
+            in: path
+            value: $inputs.id
+          - name: X-Trace
+            in: header
+            value: $inputs.xTrace
+        successCriteria:
+          - context: $statusCode
+            condition: ^(200|202)$
+            type: regex
+        outputs:
+          id: $response.body#/id
+      - stepId: putThing
+        operationId: put.thing
+        parameters:
+          - name: id
+            in: path
+            value: $steps.getThing.outputs.id
+          - name: X-Trace
+            in: header
+            value:
+              trace: abc
+          - name: id
+            in: query
+            value: $inputs.id2
+          - name: price
+            in: query
+            value: $5
+        requestBody:
+          contentType: text/plain
+          payload:
+            payload: fixed
+        successCriteria:
+          - condition: $statusCode == 201
+  - workflowId: default
+    summary: Calls the `+"`default`"+` operations in order
+    inputs:
+      type: object
+      properties:
+        id: {}
+        xTrace:
+          type: string
+          format: uuid
       required:
         - id
         - xTrace
@@ -296,25 +368,13 @@ workflows:
             in: header
             value: $inputs.xTrace
         successCriteria:
-          - condition: $statusCode == 200
-        outputs:
-          id: $response.body#/id
-      - stepId: putThing
-        operationId: put.thing
-        parameters:
-          - name: id
-            in: path
-            value: $steps.getThing.outputs.id
-          - name: X-Trace
-            in: header
-            value:
-              trace: abc
-        requestBody:
-          contentType: text/plain
-          payload:
-            payload: fixed
+          - context: $statusCode
+            condition: ^(200|202)$
+            type: regex
+      - stepId: ping
+        operationId: ping
         successCriteria:
-          - condition: $statusCode == 201
+          - condition: $statusCode == 204
 `, actual, "generated document should handle the edge cases")
 	requireValidAndClean(t, actual, "")
 }

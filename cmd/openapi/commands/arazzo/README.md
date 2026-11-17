@@ -342,14 +342,14 @@ openapi arazzo bootstrap
 | `--workflow-id` | `workflowId` of the workflow generated for `--operations` (default `main`)                        |
 | `--source-name` | Name of the OpenAPI source description (default derived from the OpenAPI document's `info.title`) |
 
-With `--from`, there is one workflow per tag, calling the tag's operations in the order they appear in the document. Operations without tags go in a workflow named `default`, and an operation with several tags is in the workflow for each of them. Each step:
+With `--from`, there is one workflow per tag, calling the tag's operations in the order they appear in the document. Operations without tags go in the `default` workflow (along with any operations tagged `default`), and an operation with several tags is in the workflow for each of them. Each step:
 
 - Targets its operation by `operationId`, or by `operationPath` if the operation doesn't have one
 - Passes the operation's required parameters, and its request body when it's required
-- Takes those values from workflow inputs, typed from the operation's schemas
-- Succeeds on the operation's first documented 2xx status code, or any 2xx status code if it only documents a range or a default response
+- Takes those values from workflow inputs, typed from the operation's schemas. Steps share the input for the same parameter, and different parameters whose names would clash get a numbered input instead (such as `id2`)
+- Succeeds on the operation's documented 2xx status codes (`$statusCode == 200`, or a regex criterion such as `^(200|202)$` for several), or any 2xx status code if it documents the `2XX` range or no 2xx status codes
 
-When an earlier step's successful response declares an [OpenAPI link](https://spec.openapis.org/oas/latest.html#link-object) to the operation, the value comes from that step instead: link expressions such as `$response.body#/id` become outputs of the earlier step, and constants are used as they are. Link values that embed expressions in a string, such as `"pet {$response.body#/id}"`, fall back to a workflow input.
+When an earlier step's 2xx response declares an [OpenAPI link](https://spec.openapis.org/oas/latest.html#link-object) to the operation, the value comes from that step instead: link expressions such as `$response.body#/id` become outputs of the earlier step, and constants are used as they are. Link values that embed expressions in a string, such as `"pet {$response.body#/id}"`, fall back to a workflow input.
 
 The source description's `url` is the OpenAPI document's path relative to the output file (or to the current directory when writing to stdout), so the generated document passes [`validate`](#validate) and [`lint`](#lint) straight away. Review the generated steps before using them: the workflows call every operation of a tag in document order, which won't always be a meaningful flow.
 

@@ -26,7 +26,7 @@ workflows:
         - ownerName
     steps:
       - stepId: findPets
-        description: Find available pets of the requested species
+        description: Find available pets of the requested species, succeeding when at least one is found
         operationId: $sourceDescriptions.petStore.findPets
         parameters:
           - reference: $components.parameters.apiVersion
@@ -39,7 +39,7 @@ workflows:
         successCriteria:
           - condition: $statusCode == 200
           - context: $response.body
-            condition: $[?@.status == 'available']
+            condition: $[0]
             type:
               type: jsonpath
               version: rfc9535
