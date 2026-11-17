@@ -268,6 +268,6 @@ func TestApply_Success(t *testing.T) {
 	for _, cmd := range root.Commands() {
 		names = append(names, cmd.Name())
 	}
-	assert.ElementsMatch(t, []string{"validate", "upgrade", "lint", "list-rules"}, names, "arazzo commands should be registered")
+	assert.ElementsMatch(t, []string{"validate", "upgrade", "lint", "list-rules", "graph"}, names, "arazzo commands should be registered")
 	assert.Equal(t, upgradeCmd, GetUpgradeCommand(), "should return the upgrade command")
 }

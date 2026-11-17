@@ -12,6 +12,7 @@ Arazzo workflows describe sequences of API calls and their dependencies. These c
   - [`upgrade`](#upgrade)
   - [`lint`](#lint)
   - [`list-rules`](#list-rules)
+  - [`graph`](#graph)
 - [What is Arazzo?](#what-is-arazzo)
   - [Example Arazzo Document](#example-arazzo-document)
 - [Common Use Cases](#common-use-cases)
@@ -227,6 +228,92 @@ openapi arazzo list-rules --format json
 | `-f, --format` | Output format: `text` (default) or `json`           |
 | `--category`   | Filter by category: `semantic`, `style`, `security` |
 | `--ruleset`    | Filter by ruleset: `all` or `recommended`           |
+
+### `graph`
+
+Render the workflows of an Arazzo document as a [Mermaid](https://mermaid.js.org/) flowchart or a [Graphviz](https://graphviz.org/) DOT digraph.
+
+```bash
+# Print a Mermaid flowchart, ready to paste into Markdown or GitHub
+openapi arazzo graph ./workflow.arazzo.yaml
+
+# Write a DOT file (the format is inferred from .dot and .gv extensions) and render it with Graphviz
+openapi arazzo graph ./workflow.arazzo.yaml ./workflow.dot
+dot -Tsvg ./workflow.dot -o ./workflow.svg
+
+# Only render one workflow, laid out left to right
+openapi arazzo graph --workflow adoptPet --direction LR ./workflow.arazzo.yaml
+
+# Render from stdin
+cat ./workflow.arazzo.yaml | openapi arazzo graph
+```
+
+| Flag              | Description                                                                      |
+| ----------------- | -------------------------------------------------------------------------------- |
+| `-f, --format`    | Output format: `mermaid` (default) or `dot` (default for `.dot` and `.gv` files) |
+| `-w, --workflow`  | Only render the workflow with this `workflowId`                                  |
+| `-d, --direction` | Layout direction: `TB` (top to bottom, default) or `LR` (left to right)          |
+
+Each workflow is drawn as a group, starting from a node named after its `workflowId`, containing its steps and the operation, operation path, channel or workflow each one targets. The edges show:
+
+| Edge                                 | Mermaid     | DOT         |
+| ------------------------------------ | ----------- | ----------- |
+| A step following on to the next step | solid       | solid       |
+| A success action `goto`              | solid green | solid green |
+| A failure action `goto` or `retry`   | dashed red  | dashed red  |
+| A workflow or step `dependsOn` entry | dashed grey | dotted grey |
+| A step running another workflow      | thick       | bold        |
+
+Steps run in order unless a success action ends the workflow or goes elsewhere. Actions are taken in order and the first that applies wins, so an action without `criteria` always applies: the actions after it aren't drawn, and a step only follows on to the next step if none of its success actions apply unconditionally. Workflow level actions apply to every step unless the step has an action with the same name. Workflows and steps outside the diagram, such as those in other Arazzo documents referenced by `sourceDescriptions` or left out by `--workflow`, are drawn with dashed borders.
+
+For example, this workflow:
+
+```yaml
+workflows:
+  - workflowId: adoptPet
+    dependsOn:
+      - registerOwner
+    steps:
+      - stepId: findPet
+        operationId: listPets
+        onSuccess:
+          - name: noPets
+            type: end
+            criteria:
+              - condition: $response.body#/0 == null
+      - stepId: adopt
+        operationId: adoptPet
+        onFailure:
+          - name: retryBusy
+            type: retry
+            retryAfter: 1
+  - workflowId: registerOwner
+    steps:
+      - stepId: register
+        operationId: createOwner
+```
+
+renders as:
+
+```mermaid
+flowchart TB
+  subgraph wf0 ["adoptPet"]
+    w0(["adoptPet"])
+    w0s0["findPet<br/>listPets"]
+    w0s1["adopt<br/>adoptPet"]
+  end
+  subgraph wf1 ["registerOwner"]
+    w1(["registerOwner"])
+    w1s0["register<br/>createOwner"]
+  end
+  w0 -.->|"dependsOn"| w1
+  w0 --> w0s0
+  w0s0 --> w0s1
+  w0s1 -.->|"retryBusy"| w0s1
+  w1 --> w1s0
+  linkStyle 0 stroke:#757575
+  linkStyle 3 stroke:#c62828
+```
 
 ## What is Arazzo?
 

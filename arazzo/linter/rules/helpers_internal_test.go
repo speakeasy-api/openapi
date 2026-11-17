@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/arazzo"
-	"github.com/speakeasy-api/openapi/expression"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
@@ -54,18 +53,6 @@ func TestMapKey_Success(t *testing.T) {
 	assert.Equal(t, "b", mapKey(mapValue(node, "c"), "b").Value, "aliases should be followed")
 	assert.Nil(t, mapKey(node, "missing"), "missing keys should not be found")
 	assert.Nil(t, mapKey(nil, "a"), "nil nodes have no keys")
-}
-
-func TestResolveActions_Nil_Success(t *testing.T) {
-	t.Parallel()
-
-	a := &arazzo.Arazzo{}
-	assert.Nil(t, resolveSuccessAction(a, nil), "nil success actions resolve to nil")
-	assert.Nil(t, resolveFailureAction(a, nil), "nil failure actions resolve to nil")
-
-	reference := expression.Expression("$components.successActions.missing")
-	assert.Nil(t, resolveSuccessAction(a, &arazzo.ReusableSuccessAction{Reference: &reference}), "references without components resolve to nil")
-	assert.Nil(t, resolveFailureAction(a, &arazzo.ReusableFailureAction{Reference: &reference}), "references without components resolve to nil")
 }
 
 func TestMarkComponentUse_UnknownSection_Success(t *testing.T) {

@@ -33,6 +33,7 @@ $CLI spec bootstrap --help > /dev/null
 $CLI arazzo validate --help > /dev/null
 $CLI arazzo lint --help > /dev/null
 $CLI arazzo list-rules --help > /dev/null
+$CLI arazzo graph --help > /dev/null
 $CLI overlay apply --help > /dev/null
 $CLI overlay validate --help > /dev/null
 $CLI overlay compare --help > /dev/null
@@ -219,6 +220,18 @@ fi
 $CLI arazzo list-rules > /dev/null
 $CLI arazzo list-rules --format json > /dev/null
 
+# Test arazzo graph rendering against the golden files
+echo "  ✓ Testing arazzo graph..."
+$CLI arazzo graph arazzo/testdata/graph/workflows.arazzo.yaml dist/test/test-arazzo-graph.mmd > /dev/null 2>&1
+diff -u arazzo/testdata/graph/workflows.mmd dist/test/test-arazzo-graph.mmd
+$CLI arazzo graph arazzo/testdata/graph/workflows.arazzo.yaml dist/test/test-arazzo-graph.dot > /dev/null 2>&1
+diff -u arazzo/testdata/graph/workflows.dot dist/test/test-arazzo-graph.dot
+$CLI arazzo graph --workflow registerOwner --direction LR arazzo/testdata/speakeasybar.arazzo.yaml > /dev/null 2>&1 && {
+    echo "    ❌ Expected arazzo graph to fail for an unknown workflow"
+    exit 1
+}
+$CLI arazzo graph --format dot --direction LR arazzo/testdata/speakeasybar.arazzo.yaml > /dev/null 2>&1
+
 # Test arazzo validation with known bad file (should fail)
 echo "  ✓ Testing arazzo validation with known bad file..."
 if $CLI arazzo validate --skip-sources arazzo/testdata/invalid.arazzo.yaml > /dev/null 2>&1; then
@@ -297,7 +310,7 @@ echo "   - Tested all command help outputs"
 echo "   - Validated known good and bad files"
 echo "   - Tested bootstrap, upgrade, inline, clean, sanitize, bundle, join commands"
 echo "   - Compared outputs with expected results"
-echo "   - Tested arazzo validation, lint and list-rules"
+echo "   - Tested arazzo validation, lint, list-rules and graph"
 echo "   - Tested overlay validation, apply, and compare"
 echo "   - Tested error cases and edge conditions"
 echo "   - Validated all generated files"
