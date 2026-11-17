@@ -19,6 +19,10 @@ testdata/**/*.yaml text eol=lf
 testdata/**/*.yml text eol=lf
 testdata/**/*.json text eol=lf
 
+# Graph golden files are compared byte for byte with the LF output of `arazzo graph`
+*.mmd text eol=lf
+*.dot text eol=lf
+
 # Binary files should not be normalized
 *.png binary
 *.jpg binary
