@@ -150,6 +150,7 @@ The CLI provides four main command groups:
   - `list-rules` - List the available Arazzo lint rules
   - `graph` - Render the workflows of an Arazzo document as a Mermaid or Graphviz DOT diagram
   - `bootstrap` - Generate starter Arazzo workflows from an OpenAPI document, or create an example Arazzo document
+  - `explore` - Interactively explore the workflows of an Arazzo document
 
 - **`openapi overlay`** - Commands for working with OpenAPI overlays ([documentation](./cmd/openapi/commands/overlay/README.md))
   - `apply` - Apply an overlay to an OpenAPI specification
@@ -206,6 +207,9 @@ openapi arazzo graph ./workflow.arazzo.yaml
 
 # Generate starter Arazzo workflows from an OpenAPI document
 openapi arazzo bootstrap --from ./openapi.yaml ./workflows.arazzo.yaml
+
+# Interactively explore the workflows of an Arazzo document
+openapi arazzo explore ./workflow.arazzo.yaml
 
 # Validate a Swagger 2.0 document
 openapi swagger validate ./api.swagger.yaml

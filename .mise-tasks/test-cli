@@ -35,6 +35,7 @@ $CLI arazzo lint --help > /dev/null
 $CLI arazzo list-rules --help > /dev/null
 $CLI arazzo graph --help > /dev/null
 $CLI arazzo bootstrap --help > /dev/null
+$CLI arazzo explore --help > /dev/null
 $CLI overlay apply --help > /dev/null
 $CLI overlay validate --help > /dev/null
 $CLI overlay compare --help > /dev/null

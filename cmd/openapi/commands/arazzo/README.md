@@ -14,6 +14,7 @@ Arazzo workflows describe sequences of API calls and their dependencies. These c
   - [`list-rules`](#list-rules)
   - [`graph`](#graph)
   - [`bootstrap`](#bootstrap)
+  - [`explore`](#explore)
 - [What is Arazzo?](#what-is-arazzo)
   - [Example Arazzo Document](#example-arazzo-document)
 - [Common Use Cases](#common-use-cases)
@@ -429,6 +430,55 @@ workflows:
 ```
 
 Without `--from`, the example document has a workflow with inputs and outputs, steps that pass values to each other, success criteria, and reusable parameter and failure action components.
+
+### `explore`
+
+Browse the workflows of an Arazzo document in an interactive terminal UI, the Arazzo counterpart of `openapi spec explore`.
+
+```bash
+# Explore an Arazzo document
+openapi arazzo explore ./workflow.arazzo.yaml
+
+# Explore from stdin
+cat ./workflow.arazzo.yaml | openapi arazzo explore
+```
+
+Each workflow is listed with its steps underneath it. Steps have a badge for what they target: `OP` for an `operationId`, `PATH` for an `operationPath`, `FLOW` for a `workflowId`, and `SEND`, `RECV` or `CHAN` for an AsyncAPI `channelPath`. Expand a row to see its details:
+
+- **Workflows:** summary, description, `dependsOn`, inputs (with types and which are required), parameters, success and failure actions, and outputs
+- **Steps:** target, `correlationId` and `timeout`, `dependsOn`, parameters, request body, success criteria, success and failure actions, and outputs
+
+Parameters and actions that reference `components` are shown resolved, noting the component they came from. A step's actions include the workflow level actions it inherits, marked `(from workflow)`, unless the step overrides them with an action of the same name. Validation errors are listed before the explorer starts, but don't stop the document being explored.
+
+| Key           | Action                               |
+| ------------- | ------------------------------------ |
+| `↑`/`k`       | Move up                              |
+| `↓`/`j`       | Move down                            |
+| `gg` / `G`    | Jump to the top / bottom             |
+| `Ctrl-U`      | Scroll up by half a screen           |
+| `Ctrl-D`      | Scroll down by half a screen         |
+| `[` / `]`     | Jump to the previous / next workflow |
+| `Enter`/Space | Toggle details                       |
+| `e` / `E`     | Expand / collapse all details        |
+| `?`           | Toggle help                          |
+| `q`/`Ctrl+C`  | Quit                                 |
+
+For example, the [`graph`](#graph) test fixture with its first step expanded:
+
+```text
+▶ adoptPet  Find a pet and adopt it
+  ▼ OP   findPet  listPets
+      Operation: listPets
+      On success:
+        - noPets: end the workflow when $response.body#/0 == null
+        - tooMany: go to step notify when $response.body#/100 != null
+      On failure:
+        - retryBusy: retry after 1s when $statusCode == 503 (from $components.failureActions.retryBusy) (from workflow)
+  ▶ PATH adopt  {$sourceDescriptions.petstore.url}#/paths/~1pets~1{petId}/post
+  ▶ FLOW notify  registerOwner
+▶ registerOwner
+  ▶ OP   register  createOwner
+```
 
 ## What is Arazzo?
 
