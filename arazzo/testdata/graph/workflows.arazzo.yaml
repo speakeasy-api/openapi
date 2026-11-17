@@ -1,0 +1,70 @@
+arazzo: 1.1.0
+info:
+  title: Pet adoption
+  version: 1.0.0
+sourceDescriptions:
+  - name: petstore
+    url: ../sources/petstore.openapi.yaml
+    type: openapi
+  - name: shared
+    url: ../sources/shared.arazzo.yaml
+    type: arazzo
+workflows:
+  - workflowId: adoptPet
+    summary: Find a pet and adopt it
+    dependsOn:
+      - registerOwner
+      - $sourceDescriptions.shared.audit
+    failureActions:
+      - reference: $components.failureActions.retryBusy
+    steps:
+      - stepId: findPet
+        operationId: listPets
+        onSuccess:
+          - name: noPets
+            type: end
+            criteria:
+              - condition: $response.body#/0 == null
+          - name: tooMany
+            type: goto
+            stepId: notify
+            criteria:
+              - condition: $response.body#/100 != null
+      - stepId: adopt
+        operationPath: "{$sourceDescriptions.petstore.url}#/paths/~1pets~1{petId}/post"
+        dependsOn:
+          - $workflows.registerOwner.steps.register
+        onSuccess:
+          - name: done
+            type: end
+        onFailure:
+          - name: giveUp
+            type: goto
+            workflowId: $sourceDescriptions.shared.cleanup
+            criteria:
+              - condition: $statusCode == 409
+          - name: retryBusy
+            type: goto
+            stepId: findPet
+            criteria:
+              - condition: $statusCode == 503
+      - stepId: notify
+        workflowId: registerOwner
+        onFailure:
+          - name: backToStart
+            type: goto
+            stepId: findPet
+  - workflowId: registerOwner
+    steps:
+      - stepId: register
+        operationId: createOwner
+        dependsOn:
+          - $sourceDescriptions.shared.audit.steps.log
+components:
+  failureActions:
+    retryBusy:
+      name: retryBusy
+      type: retry
+      retryAfter: 1
+      criteria:
+        - condition: $statusCode == 503

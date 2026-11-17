@@ -10,6 +10,7 @@ import (
 
 	"sync"
 
+	"github.com/speakeasy-api/openapi/cmd/openapi/commands/cmdutil"
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/linter/fix"
 	"github.com/speakeasy-api/openapi/openapi"
@@ -264,7 +265,7 @@ func applyFixes(ctx context.Context, fixOpts fix.Options, doc *openapi.OpenAPI, 
 	}
 
 	// Report fix results to stderr
-	reportFixResults(result, fixOpts.DryRun)
+	cmdutil.ReportFixResults(os.Stderr, result, fixOpts.DryRun)
 
 	// Write modified document back if any fixes were applied (and not dry-run)
 	if len(result.Applied) > 0 && !fixOpts.DryRun {
@@ -281,55 +282,6 @@ func applyFixes(ctx context.Context, fixOpts fix.Options, doc *openapi.OpenAPI, 
 	return nil
 }
 
-func reportFixResults(result *fix.Result, dryRun bool) {
-	prefix := ""
-	if dryRun {
-		prefix = "[dry-run] "
-	}
-
-	if len(result.Applied) > 0 {
-		fmt.Fprintf(os.Stderr, "\n%sFixed:\n", prefix)
-		for _, af := range result.Applied {
-			fmt.Fprintf(os.Stderr, "  [%d:%d] %s - %s\n",
-				af.Error.GetLineNumber(), af.Error.GetColumnNumber(),
-				af.Error.Rule, af.Fix.Description())
-			if af.Before != "" || af.After != "" {
-				fmt.Fprintf(os.Stderr, "    %s -> %s\n", af.Before, af.After)
-			}
-		}
-	}
-
-	if len(result.Skipped) > 0 {
-		fmt.Fprintf(os.Stderr, "\n%sSkipped:\n", prefix)
-		for _, sf := range result.Skipped {
-			fmt.Fprintf(os.Stderr, "  [%d:%d] %s - %s (%s)\n",
-				sf.Error.GetLineNumber(), sf.Error.GetColumnNumber(),
-				sf.Error.Rule, sf.Fix.Description(), skipReasonString(sf.Reason))
-		}
-	}
-
-	if len(result.Failed) > 0 {
-		fmt.Fprintf(os.Stderr, "\n%sFailed:\n", prefix)
-		for _, ff := range result.Failed {
-			fmt.Fprintf(os.Stderr, "  [%d:%d] %s - %s: %v\n",
-				ff.Error.GetLineNumber(), ff.Error.GetColumnNumber(),
-				ff.Error.Rule, ff.Fix.Description(), ff.FixError)
-		}
-	}
-}
-
-func skipReasonString(reason fix.SkipReason) string {
-	switch reason {
-	case fix.SkipInteractive:
-		return "requires interactive input"
-	case fix.SkipConflict:
-		return "conflict with previous fix"
-	case fix.SkipUser:
-		return "skipped by user"
-	default:
-		return "unknown"
-	}
-}
 
 // lazyPrompter defers TerminalPrompter creation until an interactive fix is
 // actually encountered, avoiding unnecessary setup when all fixes are non-interactive.

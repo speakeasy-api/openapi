@@ -33,7 +33,7 @@
     <!-- Swagger Support Badge -->
     <a href="https://spec.openapis.org/oas/v2.0.html"><img alt="Swagger Support" src="https://img.shields.io/badge/Swagger-2.0-85EA2D.svg?style=for-the-badge&logo=swagger"></a>
     <!-- Arazzo Support Badge -->
-    <a href="https://www.speakeasy.com/openapi/arazzo"><img alt="Arazzo Support" src="https://img.shields.io/badge/Arazzo-1.0-purple.svg?style=for-the-badge"></a>
+    <a href="https://www.speakeasy.com/openapi/arazzo"><img alt="Arazzo Support" src="https://img.shields.io/badge/Arazzo-1.0%20%7C%201.1-purple.svg?style=for-the-badge"></a>
     <!-- Line Break --><br/>
     <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
     <!-- Release Version Badge -->
@@ -70,7 +70,7 @@
 
 ### [arazzo](./arazzo)
 
-The `arazzo` package provides an API for working with Arazzo documents including reading, creating, mutating, walking and validating them.
+The `arazzo` package provides an API for working with Arazzo 1.0.x and 1.1.x documents including reading, creating, mutating, walking, validating, linting, upgrading and graphing them, and bootstrapping them from OpenAPI documents.
 
 ### [openapi](./openapi)
 
@@ -144,7 +144,13 @@ The CLI provides four main command groups:
   - `upgrade` - Upgrade a Swagger 2.0 specification to OpenAPI 3.0
 
 - **`openapi arazzo`** - Commands for working with Arazzo workflow documents ([documentation](./cmd/openapi/commands/arazzo/README.md))
-  - `validate` - Validate an Arazzo workflow document
+  - `validate` - Validate an Arazzo workflow document, including against the OpenAPI and Arazzo documents it references
+  - `upgrade` - Upgrade an Arazzo workflow document to the latest supported version (1.1.0)
+  - `lint` - Lint an Arazzo workflow document for semantic issues, style and security concerns, with optional fixes
+  - `list-rules` - List the available Arazzo lint rules
+  - `graph` - Render the workflows of an Arazzo document as a Mermaid or Graphviz DOT diagram
+  - `bootstrap` - Generate starter Arazzo workflows from an OpenAPI document, or create an example Arazzo document
+  - `explore` - Interactively explore the workflows of an Arazzo document
 
 - **`openapi overlay`** - Commands for working with OpenAPI overlays ([documentation](./cmd/openapi/commands/overlay/README.md))
   - `apply` - Apply an overlay to an OpenAPI specification
@@ -184,8 +190,26 @@ openapi spec upgrade ./spec.yaml ./upgraded-spec.yaml
 # Apply an overlay to a specification
 openapi overlay apply --overlay overlay.yaml --schema spec.yaml
 
-# Validate an Arazzo workflow document
+# Validate an Arazzo workflow document and check it against its source descriptions
 openapi arazzo validate ./workflow.arazzo.yaml
+
+# Validate an Arazzo workflow document without loading its source descriptions
+openapi arazzo validate --skip-sources ./workflow.arazzo.yaml
+
+# Upgrade an Arazzo 1.0.x workflow document to 1.1.0
+openapi arazzo upgrade -w ./workflow.arazzo.yaml
+
+# Lint an Arazzo workflow document and apply the fixes that don't need input
+openapi arazzo lint --fix ./workflow.arazzo.yaml
+
+# Render the workflows of an Arazzo document as a Mermaid flowchart
+openapi arazzo graph ./workflow.arazzo.yaml
+
+# Generate starter Arazzo workflows from an OpenAPI document
+openapi arazzo bootstrap --from ./openapi.yaml ./workflows.arazzo.yaml
+
+# Interactively explore the workflows of an Arazzo document
+openapi arazzo explore ./workflow.arazzo.yaml
 
 # Validate a Swagger 2.0 document
 openapi swagger validate ./api.swagger.yaml

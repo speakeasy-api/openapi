@@ -32,7 +32,7 @@ import (
 // getTestArazzoInstance returns a fresh copy of the test instance to avoid data races in parallel tests
 func getTestArazzoInstance() *arazzo.Arazzo {
 	return &arazzo.Arazzo{
-		Arazzo: arazzo.Version,
+		Arazzo: "1.0.1",
 		Info: arazzo.Info{
 			Title:   "My Workflow",
 			Summary: pointer.From("A summary"),
@@ -176,13 +176,13 @@ func getTestArazzoInstance() *arazzo.Arazzo {
 								},
 							},
 						},
-						Outputs: sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("name", "$response.body#/name")),
+						Outputs: sequencedmap.New(sequencedmap.NewElem("name", arazzo.NewOutputValueFromExpression("$response.body#/name"))),
 						Model: marshaller.Model[core.Step]{
 							Valid: true,
 						},
 					},
 				},
-				Outputs: sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("name", "$steps.step1.outputs.name")),
+				Outputs: sequencedmap.New(sequencedmap.NewElem("name", arazzo.NewOutputValueFromExpression("$steps.step1.outputs.name"))),
 				Model: marshaller.Model[core.Workflow]{
 					Valid: true,
 				},
@@ -280,7 +280,7 @@ func TestArazzo_RoundTrip_Success(t *testing.T) {
 
 func TestArazzoUnmarshal_ValidationErrors(t *testing.T) {
 	t.Parallel()
-	data := []byte(`arazzo: 1.0.2
+	data := []byte(`arazzo: 1.2.0
 x-test: some-value
 info:
   title: My Workflow
@@ -301,10 +301,10 @@ sourceDescriptions:
 		underlyingError error
 	}{
 		{line: 1, column: 1, underlyingError: errors.New("`arazzo.workflows` is required")},
-		{line: 1, column: 9, underlyingError: errors.New("arazzo.version only Arazzo versions between `1.0.0` and `1.0.1` are supported")},
+		{line: 1, column: 9, underlyingError: errors.New("arazzo.version only Arazzo versions `1.0.x`, `1.1.x` are supported")},
 		{line: 4, column: 3, underlyingError: errors.New("`info.version` is required")},
 		{line: 6, column: 5, underlyingError: errors.New("`sourceDescription.url` is required")},
-		{line: 7, column: 11, underlyingError: errors.New("sourceDescription.type must be one of [`openapi, arazzo`]")},
+		{line: 7, column: 11, underlyingError: errors.New("sourceDescription.type must be one of [`openapi, asyncapi, arazzo`]")},
 	}
 
 	require.Len(t, validationErrs, len(expectedErrors), "number of validation errors should match")
@@ -320,7 +320,7 @@ sourceDescriptions:
 	}
 
 	expected := &arazzo.Arazzo{
-		Arazzo: "1.0.2",
+		Arazzo: "1.2.0",
 		Info: arazzo.Info{
 			Title:   "My Workflow",
 			Version: "",
@@ -596,6 +596,8 @@ var stressTests = []struct {
 			location: "https://raw.githubusercontent.com/OAI/Arazzo-Specification/23852b8b0d13ab1e3288a57a990611ffed45ab5d/examples/1.0.0/bnpl-arazzo.yaml",
 			validationIgnores: []string{
 				"$response.headers.Location", // doc should be referencing `$response.header.Location`
+				"references output `redirectAuthToken` which isn't defined by step `authenticateCustomerAndAuthorizeLoan`", // legit issue, the output is defined by a different step
+				"references output `loanTransactionId` which isn't defined by step `initiateBnplTransaction`",              // legit issue, the step only outputs `loanTransactionResourceUrl`
 			},
 		},
 		wantTitle: "BNPL Workflow description",
@@ -633,8 +635,9 @@ var stressTests = []struct {
 			location: "https://raw.githubusercontent.com/frankkilcommins/simple-spectral-arazzo-GA/4ec8856f1cf21c0f77597c715c150ef3e2772a89/apis/OnlineStore.arazzo.yaml",
 			validationIgnores: []string{
 				"`info.title` is required", // legit issue
-				"operationId must be a valid expression if there are multiple OpenAPI source descriptions", // legit issue
-				"$responses.body.menuItems[0].subcategories[0].id",                                         // legit issue
+				"operationId must be a valid expression if there are multiple OpenAPI or AsyncAPI source descriptions", // legit issue
+				"$responses.body.menuItems[0].subcategories[0].id",                                                     // legit issue
+				"references step `StoreAndLanguage` which doesn't exist",                                               // legit issue, typo of `selectStoreAndLanguage`
 			},
 			skipRoundTrip: true, // Has lots of validation errors that impact round tripping
 		},
@@ -682,6 +685,8 @@ var stressTests = []struct {
 			location: "https://raw.githubusercontent.com/API-Flows/openapi-workflow-registry/75c237ce1b155ba9f8dc7f065759df7ae1cbbbe5/root/adyen/adyen-giving.yaml",
 			validationIgnores: []string{
 				"in must be one of [`path, query, header, cookie`] but was `body`",
+				"duplicate parameter found with name `merchantAccount` and in `body`", // legit issue
+				"which isn't defined by workflow `giving`",                            // legit issue, `donation` and `donationAccount` aren't declared inputs
 			},
 		},
 		wantTitle: "Adyen Giving",
@@ -845,4 +850,189 @@ func filterCurrentUnconfirmedValidationErrors(validationErrs []error, docSpecifi
 	}
 
 	return filteredValidationErrs
+}
+
+func TestArazzo_Validate_NullEntries_Error(t *testing.T) {
+	t.Parallel()
+
+	doc := `arazzo: 1.1.0
+info:
+  title: Nulls
+  version: 1.0.0
+sourceDescriptions:
+  - null
+  - name: api
+    url: ./api.yaml
+    type: openapi
+workflows:
+  - null
+  - workflowId: main
+    parameters:
+      - null
+    successActions:
+      - null
+    failureActions:
+      - null
+    steps:
+      - null
+      - stepId: first
+        operationId: getPet
+        parameters:
+          - null
+        successCriteria:
+          - null
+        onSuccess:
+          - null
+        onFailure:
+          - null
+        requestBody:
+          replacements:
+            - null
+`
+
+	messages := validationMessages(t, doc)
+	assertMessagesContain(t, []string{
+		"arazzo.sourceDescriptions.0 expected `object`",
+		"arazzo.workflows.0 expected `object`",
+		"workflow.parameters.0 reusable expected `object`",
+		"workflow.successActions.0 reusable expected `object`",
+		"workflow.failureActions.0 reusable expected `object`",
+		"workflow.steps.0 expected `object`",
+		"step.parameters.0 reusable expected `object`",
+		"step.successCriteria.0 expected `object`",
+		"step.onSuccess.0 reusable expected `object`",
+		"step.onFailure.0 reusable expected `object`",
+		"requestBody.replacements.0 expected `object`",
+	}, messages)
+}
+
+func TestArazzo_Validate_InjectedNullEntries_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	doc := `arazzo: 1.1.0
+info:
+  title: Nulls
+  version: 1.0.0
+sourceDescriptions:
+  - name: api
+    url: ./api.yaml
+    type: openapi
+workflows:
+  - workflowId: main
+    steps:
+      - stepId: first
+        operationId: getPet
+        requestBody:
+          payload: {}
+`
+
+	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewBufferString(doc))
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "document should be valid")
+
+	// Programmatically built documents can contain nil entries, validation must skip them rather than panic.
+	a.SourceDescriptions = append(a.SourceDescriptions, nil)
+	a.Workflows = append(a.Workflows, nil)
+	w := a.Workflows[0]
+	w.Steps = append(w.Steps, nil)
+	w.Parameters = []*arazzo.ReusableParameter{nil}
+	w.SuccessActions = []*arazzo.ReusableSuccessAction{nil}
+	w.FailureActions = []*arazzo.ReusableFailureAction{nil}
+	s := w.Steps[0]
+	s.Parameters = []*arazzo.ReusableParameter{nil}
+	s.SuccessCriteria = []*criterion.Criterion{nil}
+	s.OnSuccess = []*arazzo.ReusableSuccessAction{nil}
+	s.OnFailure = []*arazzo.ReusableFailureAction{nil}
+	s.RequestBody.Replacements = []*arazzo.PayloadReplacement{nil}
+
+	assert.NotPanics(t, func() { a.Validate(ctx) }, "validation should not panic on nil entries")
+}
+
+const programmaticChangesTestDoc = `arazzo: 1.1.0
+info:
+  title: Programmatic changes
+  version: 1.0.0
+sourceDescriptions:
+  - name: api
+    url: ./api.yaml
+    type: openapi
+workflows:
+  - workflowId: main
+    steps:
+      - stepId: first
+        operationId: getPet
+        parameters:
+          - name: petId
+            in: path
+            value: 1
+        requestBody:
+          payload: {}
+          replacements:
+            - target: /name
+              value: rex
+        onSuccess:
+          - name: adopt
+            type: goto
+            workflowId: adopt
+            parameters:
+              - name: petId
+                value: 1
+  - workflowId: adopt
+    inputs:
+      type: object
+      properties:
+        petId:
+          type: integer
+    steps:
+      - stepId: adopt
+        operationId: adoptPet
+`
+
+func TestArazzo_Validate_ProgrammaticallyRemovedValues_Error(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewBufferString(programmaticChangesTestDoc))
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "document should be valid")
+
+	s := a.Workflows[0].Steps[0]
+	s.Parameters[0].Object.Value = nil
+	s.RequestBody.Replacements[0].Value = nil
+
+	errs := a.Validate(ctx)
+	messages := make([]string, 0, len(errs))
+	for _, e := range errs {
+		messages = append(messages, e.Error())
+	}
+	assertMessagesContain(t, []string{"`parameter.value` is required", "payloadReplacement.value is required"}, messages)
+}
+
+func TestArazzo_Validate_InjectedNullActionParameter_Success(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	a, validationErrs, err := arazzo.Unmarshal(ctx, bytes.NewBufferString(programmaticChangesTestDoc))
+	require.NoError(t, err, "unmarshal should succeed")
+	require.Empty(t, validationErrs, "document should be valid")
+
+	action := a.Workflows[0].Steps[0].OnSuccess[0].Object
+	action.Parameters = append(action.Parameters, nil)
+
+	assert.Empty(t, a.Validate(ctx), "nil action parameters should be skipped")
+}
+
+func TestSourceDescription_Validate_InvalidTypeWithoutCore_Error(t *testing.T) {
+	t.Parallel()
+
+	sd := &arazzo.SourceDescription{
+		Name: "api",
+		URL:  "https://example.com/openapi.yaml",
+		Type: "bogus",
+	}
+
+	errs := sd.Validate(t.Context())
+	require.NotEmpty(t, errs, "validation should fail")
+	assert.Contains(t, errors.Join(errs...).Error(), "sourceDescription.type must be one of", "should report the invalid type")
 }

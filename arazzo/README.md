@@ -20,6 +20,38 @@
   </p>
 </p>
 
+## Supported versions
+
+| Arazzo version | Support |
+| -------------- | ------- |
+| [1.1.x](https://spec.openapis.org/arazzo/v1.1.0) | Read, write, walk and validate, including AsyncAPI steps (`channelPath`, `action`, `correlationId`), `dependsOn`, `timeout`, Selector Objects, action `parameters`, `$self` and the stricter 1.1 runtime expression grammar. AsyncAPI documents are not loaded, so references into them are only checked structurally. |
+| [1.0.x](https://spec.openapis.org/arazzo/v1.0.1) | Read, write, walk and validate. |
+
+Any patch release of a supported minor version is accepted (including prerelease suffixes such as `1.1.0-rc1`). Validation follows the version declared by the document, so using an Arazzo 1.1 feature in a document that declares `arazzo: 1.0.x` is reported as an error. Use `arazzo.Upgrade` (or `openapi arazzo upgrade`) to move a 1.0.x document to 1.1.0. The upgrade pins `jsonpath` and `xpath` criteria to the versions Arazzo 1.0 implied, so their meaning doesn't change.
+
+Where the Arazzo Specification text and its JSON Schema disagree, validation follows the specification text.
+
+### Migrating step and workflow outputs
+
+Arazzo 1.1 allows an output to be either a runtime expression or a Selector Object, so `arazzo.Outputs` is now a map of `*arazzo.OutputValue` instead of `expression.Expression`:
+
+```go
+// Before
+step.Outputs = sequencedmap.New(sequencedmap.NewElem[string, expression.Expression]("petId", "$response.body#/id"))
+
+// After
+step.Outputs = sequencedmap.New(sequencedmap.NewElem("petId", arazzo.NewOutputValueFromExpression("$response.body#/id")))
+
+for name, output := range step.Outputs.All() {
+	if output.IsExpression() {
+		fmt.Println(name, *output.GetExpression())
+	}
+	if output.IsSelector() {
+		fmt.Println(name, output.GetSelector().Selector)
+	}
+}
+```
+
 <!-- START USAGE EXAMPLES -->
 
 ## Read and parse an Arazzo document from a file
@@ -139,6 +171,35 @@ for item := range arazzo.Walk(ctx, a) {
 }
 ```
 
+## Upgrade an Arazzo 1.0.x document to the latest supported version
+
+Shows loading a document, upgrading it and validating the result.
+
+```go
+ctx := context.Background()
+
+f, err := os.Open("testdata/simple.arazzo.yaml")
+if err != nil {
+	panic(err)
+}
+defer f.Close()
+
+a, _, err := arazzo.Unmarshal(ctx, f, arazzo.WithSkipValidation())
+if err != nil {
+	panic(err)
+}
+
+originalVersion := a.Arazzo
+
+upgraded, err := arazzo.Upgrade(ctx, a)
+if err != nil {
+	panic(err)
+}
+
+fmt.Printf("upgraded: %t, from: %s, to: %s\n", upgraded, originalVersion, a.Arazzo)
+fmt.Printf("validation errors: %d\n", len(a.Validate(ctx)))
+```
+
 ## Validate an Arazzo document
 
 Shows loading an invalid document and handling validation errors.
@@ -158,6 +219,77 @@ if err != nil {
 
 for _, err := range validationErrs {
 	fmt.Printf("%s\n", err.Error())
+}
+```
+
+## Validate an Arazzo document against its source descriptions
+
+Shows loading the OpenAPI and Arazzo documents a workflow references and checking its steps against them.
+
+```go
+ctx := context.Background()
+
+location := "testdata/sources/invalid.arazzo.yaml"
+
+f, err := os.Open(location)
+if err != nil {
+	panic(err)
+}
+defer f.Close()
+
+a, _, err := arazzo.Unmarshal(ctx, f)
+if err != nil {
+	panic(err)
+}
+
+sources, loadErrs := arazzo.LoadSourceDescriptions(ctx, a, arazzo.LoadSourcesOptions{DocumentLocation: location})
+fmt.Printf("load errors: %d\n", len(loadErrs))
+
+for i, err := range a.ValidateSources(ctx, sources) {
+	if i == 3 {
+		break
+	}
+	fmt.Printf("%s\n", err.Error())
+}
+```
+
+## Generate starter workflows from an OpenAPI document
+
+Shows generating a workflow calling some operations in order, wired together by the OpenAPI document's links.
+
+```go
+ctx := context.Background()
+
+location := "testdata/bootstrap/petstore.openapi.yaml"
+
+f, err := os.Open(location)
+if err != nil {
+	panic(err)
+}
+defer f.Close()
+
+doc, _, err := openapi.Unmarshal(ctx, f)
+if err != nil {
+	panic(err)
+}
+
+if _, err := doc.ResolveAllReferences(ctx, openapi.ResolveAllOptions{OpenAPILocation: location}); err != nil {
+	panic(err)
+}
+
+a, err := arazzo.BootstrapFromOpenAPI(doc, arazzo.BootstrapOptions{
+	SourceURL:    "./petstore.openapi.yaml",
+	OperationIDs: []string{"listPets", "getPet"},
+	WorkflowID:   "findPet",
+})
+if err != nil {
+	panic(err)
+}
+
+for _, step := range a.Workflows[0].Steps {
+	for _, parameter := range step.Parameters {
+		fmt.Printf("%s: %s = %s\n", step.StepID, parameter.Object.Name, parameter.Object.Value.Value)
+	}
 }
 ```
 

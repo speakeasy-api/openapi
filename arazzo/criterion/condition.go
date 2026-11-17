@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/speakeasy-api/openapi/arazzo/internal/specversion"
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/validation"
 	"go.yaml.in/yaml/v3"
@@ -85,7 +86,7 @@ func (s *Condition) Validate(valueNode *yaml.Node, opts ...validation.Option) []
 		errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("expression is required"), valueNode))
 	}
 
-	if err := s.Expression.Validate(); err != nil {
+	if err := s.Expression.Validate(specversion.ExpressionOptions(validation.NewOptions(opts...))...); err != nil {
 		errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("%s", err.Error()), valueNode))
 	}
 

@@ -5,6 +5,7 @@ import (
 	"github.com/speakeasy-api/openapi/jsonschema/oas3/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
+	values "github.com/speakeasy-api/openapi/values/core"
 )
 
 // init registers all Arazzo core types with the marshaller factory system
@@ -24,6 +25,8 @@ func init() {
 	marshaller.RegisterType(func() *Criterion { return &Criterion{} })
 	marshaller.RegisterType(func() *CriterionExpressionType { return &CriterionExpressionType{} })
 	marshaller.RegisterType(func() *CriterionTypeUnion { return &CriterionTypeUnion{} })
+	marshaller.RegisterType(func() *Selector { return &Selector{} })
+	marshaller.RegisterType(func() *values.EitherValue[Selector, string] { return &values.EitherValue[Selector, string]{} })
 
 	// Register Reusable types for core
 	marshaller.RegisterType(func() *Reusable[*Parameter] {
@@ -57,5 +60,8 @@ func init() {
 	})
 	marshaller.RegisterType(func() *sequencedmap.Map[string, marshaller.Node[string]] {
 		return &sequencedmap.Map[string, marshaller.Node[string]]{}
+	})
+	marshaller.RegisterType(func() *sequencedmap.Map[string, OutputValue] {
+		return &sequencedmap.Map[string, OutputValue]{}
 	})
 }

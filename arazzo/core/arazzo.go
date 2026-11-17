@@ -9,6 +9,7 @@ type Arazzo struct {
 	marshaller.CoreModel `model:"arazzo"`
 
 	Arazzo             marshaller.Node[string]               `key:"arazzo"`
+	Self               marshaller.Node[*string]              `key:"$self"`
 	Info               marshaller.Node[Info]                 `key:"info"`
 	SourceDescriptions marshaller.Node[[]*SourceDescription] `key:"sourceDescriptions" required:"true"`
 	Workflows          marshaller.Node[[]*Workflow]          `key:"workflows" required:"true"`

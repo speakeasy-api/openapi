@@ -1,8 +1,11 @@
 package core
 
 import (
-	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
+	values "github.com/speakeasy-api/openapi/values/core"
 )
 
-type Outputs = *sequencedmap.Map[string, marshaller.Node[string]]
+// OutputValue is either a Selector Object (Arazzo 1.1+) or a runtime expression string.
+type OutputValue = *values.EitherValue[Selector, string]
+
+type Outputs = *sequencedmap.Map[string, OutputValue]

@@ -113,6 +113,19 @@ type conflictKey struct {
 //  5. In dry-run mode, fixes are recorded without modifying the document but
 //     conflict detection still operates.
 func (e *Engine) ProcessErrors(ctx context.Context, doc *openapi.OpenAPI, errs []error) (*Result, error) {
+	return e.processErrors(ctx, doc, doc, errs)
+}
+
+// ProcessDocumentErrors is ProcessErrors for documents other than OpenAPI documents, such as Arazzo documents.
+// The doc is passed to each fix's Apply method and modified in-place. Fixes that implement validation.NodeFix are
+// also applied with Apply, as node-level editing is only supported for OpenAPI documents.
+func (e *Engine) ProcessDocumentErrors(ctx context.Context, doc any, errs []error) (*Result, error) {
+	return e.processErrors(ctx, doc, nil, errs)
+}
+
+// processErrors applies fixes to doc. oasDoc is the same document when it is an OpenAPI document, which enables
+// node fixes, and nil otherwise.
+func (e *Engine) processErrors(ctx context.Context, doc any, oasDoc *openapi.OpenAPI, errs []error) (*Result, error) {
 	if e.opts.Mode == ModeNone {
 		return &Result{}, nil
 	}
@@ -248,7 +261,7 @@ fixLoop:
 		// Node fixes are deferred until all model fixes have been applied, as
 		// marshalling syncs the model back over the YAML nodes.
 		// Their locations are only marked as modified once they apply.
-		if nodeFix, ok := fix.(validation.NodeFix); ok && doc.GetRootNode() != nil {
+		if nodeFix, ok := fix.(validation.NodeFix); ok && oasDoc != nil && oasDoc.GetRootNode() != nil {
 			nodeFixes = append(nodeFixes, pendingNodeFix{vErr: vErr, fix: nodeFix, key: key, index: len(result.Applied)})
 			result.Applied = append(result.Applied, makeAppliedFix(vErr, fix))
 			continue
@@ -272,11 +285,12 @@ fixLoop:
 		result.Applied = append(result.Applied, makeAppliedFix(vErr, fix))
 	}
 
-	if err := applyNodeFixes(ctx, doc, result, nodeFixes, modified); err != nil {
-		return result, err
+	// Node fixes are only deferred for OpenAPI documents.
+	if oasDoc == nil {
+		return result, nil
 	}
 
-	return result, nil
+	return result, applyNodeFixes(ctx, oasDoc, result, nodeFixes, modified)
 }
 
 type pendingNodeFix struct {

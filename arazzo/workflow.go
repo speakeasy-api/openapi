@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
+	"github.com/speakeasy-api/openapi/arazzo/internal/specversion"
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
@@ -21,7 +22,7 @@ type Workflows []*Workflow
 // Find will return the first workflow with the matching workflowId.
 func (w Workflows) Find(id string) *Workflow {
 	for _, workflow := range w {
-		if workflow.WorkflowID == id {
+		if workflow != nil && workflow.WorkflowID == id {
 			return workflow
 		}
 	}
@@ -86,9 +87,11 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 		errs = append(errs, w.Inputs.Validate(ctx, opts...)...)
 	}
 
+	exprOpts := specversion.ExpressionOptions(o)
+
 	for i, dependsOn := range w.DependsOn {
-		if dependsOn.IsExpression() {
-			if err := dependsOn.Validate(); err != nil {
+		if dependsOn.IsExpression(exprOpts...) {
+			if err := dependsOn.Validate(exprOpts...); err != nil {
 				errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("workflow.dependsOn expression is invalid: %w", err), core, core.DependsOn, i))
 			}
 
@@ -107,30 +110,39 @@ func (w *Workflow) Validate(ctx context.Context, opts ...validation.Option) []er
 	}
 
 	for _, step := range w.Steps {
+		if step == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, step.Validate(ctx, opts...)...)
 	}
 
 	for _, successAction := range w.SuccessActions {
+		if successAction == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, successAction.Validate(ctx, opts...)...)
 	}
 
 	for _, failureAction := range w.FailureActions {
+		if failureAction == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, failureAction.Validate(ctx, opts...)...)
 	}
 
-	for name, output := range w.Outputs.All() {
-		if !outputNameRegex.MatchString(name) {
-			errs = append(errs, validation.NewMapKeyError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("workflow.outputs name must be a valid name [`%s`]: `%s`", outputNameRegex.String(), name), core, core.Outputs, name))
-		}
-
-		if err := output.Validate(); err != nil {
-			errs = append(errs, validation.NewMapValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("workflow.outputs expression is invalid: %w", err), core, core.Outputs, name))
-		}
-	}
+	errs = append(errs, validateOutputs(ctx, "workflow", w.Outputs, core, core.Outputs, opts...)...)
 
 	for _, parameter := range w.Parameters {
+		if parameter == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
 		errs = append(errs, parameter.Validate(ctx, opts...)...)
 	}
+	errs = append(errs, validateParametersUnique("workflow", w.Parameters, core, core.Parameters)...)
 
 	w.Valid = len(errs) == 0 && core.GetValid()
 

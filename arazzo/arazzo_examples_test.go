@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/speakeasy-api/openapi/arazzo"
+	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/pointer"
 )
 
@@ -89,7 +90,7 @@ func Example_creating() {
 
 	fmt.Printf("%s", buf.String())
 	// Output:
-	// arazzo: 1.0.1
+	// arazzo: 1.1.0
 	// info:
 	//   title: My Workflow
 	//   summary: A summary
@@ -171,6 +172,36 @@ func Example_walking() {
 	// Workflow: simpleWorkflow
 }
 
+// Example_upgrading demonstrates how to upgrade an Arazzo 1.0.x document to the latest supported version.
+// Shows loading a document, upgrading it and validating the result.
+func Example_upgrading() {
+	ctx := context.Background()
+
+	f, err := os.Open("testdata/simple.arazzo.yaml")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	a, _, err := arazzo.Unmarshal(ctx, f, arazzo.WithSkipValidation())
+	if err != nil {
+		panic(err)
+	}
+
+	originalVersion := a.Arazzo
+
+	upgraded, err := arazzo.Upgrade(ctx, a)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("upgraded: %t, from: %s, to: %s\n", upgraded, originalVersion, a.Arazzo)
+	fmt.Printf("validation errors: %d\n", len(a.Validate(ctx)))
+	// Output:
+	// upgraded: true, from: 1.0.0, to: 1.1.0
+	// validation errors: 0
+}
+
 // Example_validating demonstrates how to validate an Arazzo document.
 // Shows loading an invalid document and handling validation errors.
 func Example_validating() {
@@ -192,4 +223,83 @@ func Example_validating() {
 	// Output:
 	// [3:3] error validation-required-field `info.version` is required
 	// [13:9] error validation-required-field step at least one of operationId, operationPath or workflowId fields must be set
+	// [22:13] error validation-required-field parameter.in is required within a step when workflowId is not set
+}
+
+// Example_validatingSources demonstrates how to validate an Arazzo document against its source descriptions.
+// Shows loading the OpenAPI and Arazzo documents a workflow references and checking its steps against them.
+func Example_validatingSources() {
+	ctx := context.Background()
+
+	location := "testdata/sources/invalid.arazzo.yaml"
+
+	f, err := os.Open(location)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	a, _, err := arazzo.Unmarshal(ctx, f)
+	if err != nil {
+		panic(err)
+	}
+
+	// Relative source description URLs are resolved against $self, or the document's location.
+	sources, loadErrs := arazzo.LoadSourceDescriptions(ctx, a, arazzo.LoadSourcesOptions{DocumentLocation: location})
+	fmt.Printf("load errors: %d\n", len(loadErrs))
+
+	// Only the first few errors are printed to keep the example short.
+	for i, err := range a.ValidateSources(ctx, sources) {
+		if i == 3 {
+			break
+		}
+		fmt.Printf("%s\n", err.Error())
+	}
+	// Output:
+	// load errors: 0
+	// [16:9] error validation-invalid-reference workflow.dependsOn references workflowId `missingWorkflow` which doesn't exist in sourceDescription `shared`
+	// [19:22] error validation-operation-not-found step.operationId `missingOperation` not found in sourceDescription `petstore`
+	// [21:24] error validation-operation-not-found step.operationPath `{$sourceDescriptions.petstore.url}#/paths/~1missing/get` doesn't reference an operation in sourceDescription `petstore`
+}
+
+// Example_bootstrapping demonstrates how to generate starter workflows from an OpenAPI document.
+// Shows generating a workflow calling some operations in order, wired together by the OpenAPI document's links.
+func Example_bootstrapping() {
+	ctx := context.Background()
+
+	location := "testdata/bootstrap/petstore.openapi.yaml"
+
+	f, err := os.Open(location)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	doc, _, err := openapi.Unmarshal(ctx, f)
+	if err != nil {
+		panic(err)
+	}
+
+	// Resolve references so parameters, request bodies and links declared as components are used.
+	if _, err := doc.ResolveAllReferences(ctx, openapi.ResolveAllOptions{OpenAPILocation: location}); err != nil {
+		panic(err)
+	}
+
+	a, err := arazzo.BootstrapFromOpenAPI(doc, arazzo.BootstrapOptions{
+		SourceURL:    "./petstore.openapi.yaml",
+		OperationIDs: []string{"listPets", "getPet"},
+		WorkflowID:   "findPet",
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	for _, step := range a.Workflows[0].Steps {
+		for _, parameter := range step.Parameters {
+			fmt.Printf("%s: %s = %s\n", step.StepID, parameter.Object.Name, parameter.Object.Value.Value)
+		}
+	}
+	// Output:
+	// listPets: species = $inputs.species
+	// getPet: petId = $steps.listPets.outputs.petId
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/speakeasy-api/openapi/jsonschema/oas3"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
+	"github.com/speakeasy-api/openapi/values"
 )
 
 // init registers all Arazzo types with the marshaller factory system
@@ -22,9 +23,15 @@ func init() {
 	marshaller.RegisterType(func() *SuccessAction { return &SuccessAction{} })
 	marshaller.RegisterType(func() *FailureAction { return &FailureAction{} })
 	marshaller.RegisterType(func() *Components { return &Components{} })
+	marshaller.RegisterType(func() *Selector { return &Selector{} })
+	marshaller.RegisterType(func() *OutputValue { return &OutputValue{} })
+	marshaller.RegisterType(func() *values.EitherValue[Selector, core.Selector, expression.Expression, string] {
+		return &values.EitherValue[Selector, core.Selector, expression.Expression, string]{}
+	})
 
 	// Register enum types
 	marshaller.RegisterType(func() *In { return new(In) })
+	marshaller.RegisterType(func() *StepAction { return new(StepAction) })
 
 	// Register Reusable types
 	marshaller.RegisterType(func() *Reusable[Parameter, *Parameter, *core.Parameter] {
@@ -55,5 +62,8 @@ func init() {
 	})
 	marshaller.RegisterType(func() *sequencedmap.Map[string, expression.Expression] {
 		return &sequencedmap.Map[string, expression.Expression]{}
+	})
+	marshaller.RegisterType(func() *sequencedmap.Map[string, *OutputValue] {
+		return &sequencedmap.Map[string, *OutputValue]{}
 	})
 }

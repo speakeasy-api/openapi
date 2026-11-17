@@ -8,10 +8,11 @@ import (
 type SuccessAction struct {
 	marshaller.CoreModel `model:"successAction"`
 
-	Name       marshaller.Node[string]       `key:"name"`
-	Type       marshaller.Node[string]       `key:"type"`
-	WorkflowID marshaller.Node[*string]      `key:"workflowId"`
-	StepID     marshaller.Node[*string]      `key:"stepId"`
-	Criteria   marshaller.Node[[]*Criterion] `key:"criteria"`
-	Extensions core.Extensions               `key:"extensions"`
+	Name       marshaller.Node[string]                  `key:"name"`
+	Type       marshaller.Node[string]                  `key:"type"`
+	WorkflowID marshaller.Node[*string]                 `key:"workflowId"`
+	StepID     marshaller.Node[*string]                 `key:"stepId"`
+	Parameters marshaller.Node[[]*Reusable[*Parameter]] `key:"parameters"`
+	Criteria   marshaller.Node[[]*Criterion]            `key:"criteria"`
+	Extensions core.Extensions                          `key:"extensions"`
 }

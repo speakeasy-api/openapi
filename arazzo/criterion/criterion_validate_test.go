@@ -3,6 +3,7 @@ package criterion_test
 import (
 	"testing"
 
+	"github.com/speakeasy-api/openapi/arazzo/core"
 	"github.com/speakeasy-api/openapi/arazzo/criterion"
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/pointer"
@@ -518,4 +519,48 @@ func TestCriterion_Validate_JsonPathKeywordMemberNames_Success(t *testing.T) {
 			assert.True(t, c.Valid, "criterion should be valid")
 		})
 	}
+}
+
+func TestCriterion_Validate_JsonPointerType_Error(t *testing.T) {
+	t.Parallel()
+
+	c := &criterion.Criterion{
+		Context:   pointer.From(expression.Expression("$response.body")),
+		Condition: "/status",
+		Type: criterion.CriterionTypeUnion{
+			Type: pointer.From(criterion.CriterionTypeJsonPointer),
+		},
+	}
+	require.NoError(t, c.Sync(t.Context()), "sync should succeed")
+
+	errs := c.Validate()
+	require.Len(t, errs, 1, "should only report the type error")
+	assert.Contains(t, errs[0].Error(), "type must be one of", "jsonpointer is not a valid criterion type")
+}
+
+func TestCriterionExpressionType_Validate_InvalidTypeWithVersion_Error(t *testing.T) {
+	t.Parallel()
+
+	cet := &criterion.CriterionExpressionType{Type: "invalid-type", Version: "v1"}
+	errs := cet.Validate()
+	require.NotEmpty(t, errs, "validation should fail")
+	assert.Contains(t, errs[0].Error(), "type must be one of [`jsonpath, xpath`]", "error message should match")
+}
+
+func TestCriterionTypeUnion_Populate_Success(t *testing.T) {
+	t.Parallel()
+
+	var c criterion.CriterionTypeUnion
+	require.NoError(t, c.Populate((*core.CriterionTypeUnion)(nil)), "populating from a nil core should succeed")
+	assert.Nil(t, c.Type, "type should not be set")
+	assert.Nil(t, c.ExpressionType, "expression type should not be set")
+}
+
+func TestCriterionTypeUnion_Populate_Error(t *testing.T) {
+	t.Parallel()
+
+	var c criterion.CriterionTypeUnion
+	err := c.Populate(42)
+	require.Error(t, err, "populating from an unexpected type should fail")
+	assert.Contains(t, err.Error(), "expected core.CriterionTypeUnion, got int", "error message should match")
 }

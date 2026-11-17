@@ -6,6 +6,7 @@ import (
 	"mime"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
+	"github.com/speakeasy-api/openapi/arazzo/internal/specversion"
 	"github.com/speakeasy-api/openapi/expression"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
@@ -43,19 +44,26 @@ func (r *RequestBody) Validate(ctx context.Context, opts ...validation.Option) [
 
 	// Validate payload only if it is a top-level Arazzo runtime expression
 	// Skip validation for values containing embedded expressions or arbitrary data
+	exprOpts := specversion.ExpressionOptions(validation.NewOptions(opts...))
+
 	if r.Payload != nil {
-		_, exp, err := expression.GetValueOrExpressionValue(r.Payload)
+		_, exp, err := expression.GetValueOrExpressionValue(r.Payload, exprOpts...)
 		if err == nil && exp != nil {
 			// Only validate if the entire payload IS an expression (not just contains expressions)
-			if err := exp.Validate(); err != nil {
+			if err := exp.Validate(exprOpts...); err != nil {
 				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("requestBody.payload expression is not valid: %w", err), core, core.Payload))
 			}
 		}
 		// If exp is nil, the payload is a value (not an expression) - no validation needed
 	}
 
+	replacementOpts := append(append([]validation.Option{}, opts...), validation.WithContextObject(r))
 	for _, replacement := range r.Replacements {
-		errs = append(errs, replacement.Validate(ctx, opts...)...)
+		if replacement == nil {
+			// null entries are reported as type mismatches when unmarshalling
+			continue
+		}
+		errs = append(errs, replacement.Validate(ctx, replacementOpts...)...)
 	}
 
 	r.Valid = len(errs) == 0 && core.GetValid()

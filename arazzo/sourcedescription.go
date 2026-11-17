@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/arazzo/core"
+	"github.com/speakeasy-api/openapi/arazzo/internal/specversion"
 	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/marshaller"
@@ -20,7 +22,7 @@ type SourceDescriptions []*SourceDescription
 // Find will return the first SourceDescription object with the provided name.
 func (s SourceDescriptions) Find(name string) *SourceDescription {
 	for _, sourceDescription := range s {
-		if sourceDescription.Name == name {
+		if sourceDescription != nil && sourceDescription.Name == name {
 			return sourceDescription
 		}
 	}
@@ -35,6 +37,8 @@ const (
 	SourceDescriptionTypeOpenAPI = "openapi"
 	// SourceDescriptionTypeArazzo represents a SourceDescription that describes an Arazzo document.
 	SourceDescriptionTypeArazzo = "arazzo"
+	// SourceDescriptionTypeAsyncAPI represents a SourceDescription that describes an AsyncAPI document. Arazzo 1.1+ only.
+	SourceDescriptionTypeAsyncAPI = "asyncapi"
 )
 
 // SourceDescription represents an Arazzo or OpenAPI document that is referenced by this Arazzo document.
@@ -70,11 +74,20 @@ func (s *SourceDescription) Validate(ctx context.Context, opts ...validation.Opt
 		}
 	}
 
-	switch s.Type {
-	case SourceDescriptionTypeOpenAPI:
-	case SourceDescriptionTypeArazzo:
-	default:
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("sourceDescription.type must be one of [`%s`]", strings.Join([]string{SourceDescriptionTypeOpenAPI, SourceDescriptionTypeArazzo}, ", ")), core, core.Type))
+	is11 := specversion.IsAtLeast11(validation.NewOptions(opts...))
+
+	allowedTypes := []string{SourceDescriptionTypeOpenAPI, SourceDescriptionTypeArazzo}
+	if is11 {
+		allowedTypes = []string{SourceDescriptionTypeOpenAPI, SourceDescriptionTypeAsyncAPI, SourceDescriptionTypeArazzo}
+	}
+
+	switch {
+	case s.Type == "" && !core.Type.Present:
+		// type is optional
+	case s.Type == SourceDescriptionTypeAsyncAPI && !is11:
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationSupportedVersion, specversion.Requires11Error("`sourceDescription.type` `asyncapi`"), core, core.Type))
+	case !slices.Contains(allowedTypes, string(s.Type)):
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationAllowedValues, fmt.Errorf("sourceDescription.type must be one of [`%s`]", strings.Join(allowedTypes, ", ")), core, core.Type))
 	}
 
 	s.Valid = len(errs) == 0 && core.GetValid()

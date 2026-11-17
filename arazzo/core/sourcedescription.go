@@ -10,6 +10,6 @@ type SourceDescription struct {
 
 	Name       marshaller.Node[string] `key:"name"`
 	URL        marshaller.Node[string] `key:"url"`
-	Type       marshaller.Node[string] `key:"type"`
+	Type       marshaller.Node[string] `key:"type" required:"false"`
 	Extensions core.Extensions         `key:"extensions"`
 }

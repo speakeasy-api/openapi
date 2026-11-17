@@ -392,6 +392,135 @@ func TestExpression_IsExpression(t *testing.T) {
 	}
 }
 
+func TestExpression_Validate_Arazzo11_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		e    Expression
+	}{
+		{name: "$self", e: "$self"},
+		{name: "$message.payload", e: "$message.payload"},
+		{name: "$message.payload with json pointer", e: "$message.payload#/orderId"},
+		{name: "$message.header", e: "$message.header.X-Correlation-Id"},
+		{name: "$response.body with json pointer", e: "$response.body#/id"},
+		{name: "$inputs with json pointer", e: "$inputs.order#/items/0"},
+		{name: "$inputs with dotted identifier", e: "$inputs.order.id"},
+		{name: "$outputs with json pointer", e: "$outputs.result#/value"},
+		{name: "$steps outputs", e: "$steps.get-pet_1.outputs.pet"},
+		{name: "$steps outputs with json pointer", e: "$steps.getPet.outputs.pet#/name"},
+		{name: "$workflows inputs", e: "$workflows.login.inputs.username"},
+		{name: "$workflows outputs with json pointer", e: "$workflows.login.outputs.token#/value"},
+		{name: "$sourceDescriptions operation", e: "$sourceDescriptions.petStore.findPetsByStatus"},
+		{name: "$sourceDescriptions url with json pointer", e: "{$sourceDescriptions.petStore.url}#/paths/~1pets/get"},
+		{name: "$components parameters", e: "$components.parameters.page"},
+		{name: "$components successActions", e: "$components.successActions.done"},
+		{name: "$components failureActions", e: "$components.failureActions.retry"},
+		{name: "$request.query name with dots", e: "$request.query.filter.status"},
+		{name: "$request.path name with unicode", e: "$request.path.héllo"},
+		{name: "$request.query name with escaped quote", e: `$request.query.a\"b`},
+		{name: "$request.query name with unicode escape", e: `$request.query.a\u0041`},
+		{name: "$sourceDescriptions reference with dots", e: "$sourceDescriptions.petStore.pets.list"},
+		{name: "$sourceDescriptions url without json pointer", e: "$sourceDescriptions.petStore.url"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.NoError(t, tt.e.Validate(WithArazzo11Grammar()), "expression should be valid in the Arazzo 1.1 grammar")
+		})
+	}
+}
+
+func TestExpression_Validate_Arazzo11_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		e       Expression
+		wantErr string
+	}{
+		{name: "$self with extra parts", e: "$self.foo", wantErr: "expression is not valid, extra characters after $self: $self.foo"},
+		{name: "$message dotted payload", e: "$message.payload.orderId", wantErr: "expression is not valid, only json pointers are allowed after $message.payload: $message.payload.orderId"},
+		{name: "$steps without outputs", e: "$steps.getPet.pet", wantErr: "expression is not valid, expected $steps.<stepId>.outputs.<name>: $steps.getPet.pet"},
+		{name: "$steps with no output name", e: "$steps.getPet.outputs", wantErr: "expression is not valid, expected $steps.<stepId>.outputs.<name>: $steps.getPet.outputs"},
+		{name: "$workflows with unknown field", e: "$workflows.login.steps.s1", wantErr: "expression is not valid, expected $workflows.<workflowId>.inputs.<name> or $workflows.<workflowId>.outputs.<name>: $workflows.login.steps.s1"},
+		{name: "$sourceDescriptions without reference", e: "$sourceDescriptions.petStore", wantErr: "expression is not valid, expected $sourceDescriptions.<name>.<reference>: $sourceDescriptions.petStore"},
+		{name: "$components inputs", e: "$components.inputs.pet", wantErr: "expression is not valid, expected $components.<parameters|successActions|failureActions>.<name>: $components.inputs.pet"},
+		{name: "$inputs with invalid characters", e: "$inputs.pet!id", wantErr: "expression is not valid, expected a name matching [^[A-Za-z0-9._\\-]+$] after $inputs: $inputs.pet!id"},
+		{name: "json pointer on $statusCode", e: "$statusCode#/foo", wantErr: "expression is not valid, json pointers are not allowed in current context: $statusCode#/foo"},
+		{name: "unknown root", e: "$foo.bar", wantErr: "expression is not valid, must begin with one of [url, method, statusCode, request, response, inputs, outputs, steps, workflows, sourceDescriptions, components, message, self]: $foo.bar"},
+		{name: "$sourceDescriptions url with json pointer without braces", e: "$sourceDescriptions.petStore.url#/paths", wantErr: "expression is not valid, json pointers are not allowed in current context: $sourceDescriptions.petStore.url#/paths"},
+		{name: "$request.query name with raw quote", e: `$request.query.a"b`, wantErr: `expression is not valid, query reference name contains an invalid character '"': $request.query.a"b`},
+		{name: "$request.path name with invalid escape", e: `$request.path.a\x`, wantErr: `expression is not valid, path reference name contains an invalid escape sequence ` + "`\\x`" + `: $request.path.a\x`},
+		{name: "$request.query name with incomplete unicode escape", e: `$request.query.a\u12`, wantErr: `expression is not valid, query reference name contains an incomplete unicode escape sequence: $request.query.a\u12`},
+		{name: "$request.query without name", e: "$request.query", wantErr: "expression is not valid, expected name after $request.query: $request.query"},
+		{name: "$request.query name with trailing backslash", e: `$request.query.a\`, wantErr: `expression is not valid, query reference name contains an incomplete escape sequence: $request.query.a\`},
+		{name: "$request.query name with invalid unicode escape", e: `$request.query.a\u00zz`, wantErr: `expression is not valid, query reference name contains an invalid unicode escape sequence: $request.query.a\u00zz`},
+		{name: "$request without reference", e: "$request", wantErr: "expression is not valid, expected one of [header, query, path, body, payload] after $request: $request"},
+		{name: "$request with unknown reference", e: "$request.foo", wantErr: "expression is not valid, expected one of [header, query, path, body, payload] after $request: $request.foo"},
+		{name: "$request.header without token", e: "$request.header", wantErr: "expression is not valid, expected token after $request.header: $request.header"},
+		{name: "$request.header with invalid token", e: "$request.header.a(b", wantErr: "header reference must be a valid token [^[!#$%&'*+\\-.^_`|~\\dA-Za-z]+$]: $request.header.a(b"},
+		{name: "$steps with invalid output name", e: "$steps.getPet.outputs.pet!", wantErr: "expression is not valid, output name must match [^[A-Za-z0-9._\\-]+$]: $steps.getPet.outputs.pet!"},
+		{name: "$workflows with invalid input name", e: "$workflows.login.inputs.user!", wantErr: "expression is not valid, inputs name must match [^[A-Za-z0-9._\\-]+$]: $workflows.login.inputs.user!"},
+		{name: "$sourceDescriptions with empty reference", e: "$sourceDescriptions.petStore.", wantErr: "expression is not valid, expected $sourceDescriptions.<name>.<reference>: $sourceDescriptions.petStore."},
+		{name: "$sourceDescriptions with invalid reference", e: `$sourceDescriptions.petStore.a"b`, wantErr: `expression is not valid, source reference contains an invalid character '"': $sourceDescriptions.petStore.a"b`},
+		{name: "$components with invalid name", e: "$components.parameters.page!", wantErr: "expression is not valid, component name must match [^[A-Za-z0-9._\\-]+$]: $components.parameters.page!"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := tt.e.Validate(WithArazzo11Grammar())
+			require.EqualError(t, err, tt.wantErr, "expression should be invalid in the Arazzo 1.1 grammar")
+		})
+	}
+}
+
+func TestExpression_Validate_Arazzo11OnlyRoots_ErrorWithoutOption(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		e    Expression
+	}{
+		{name: "$self", e: "$self"},
+		{name: "$message", e: "$message.payload"},
+		{name: "payload source", e: "$response.payload"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			require.Error(t, tt.e.Validate(), "Arazzo 1.1 only expressions should be invalid without the Arazzo 1.1 grammar")
+		})
+	}
+}
+
+func TestExpression_IsExpression_Arazzo11(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		e            Expression
+		wantDefault  bool
+		wantArazzo11 bool
+	}{
+		{name: "$self", e: "$self", wantDefault: false, wantArazzo11: true},
+		{name: "$message", e: "$message.payload#/id", wantDefault: false, wantArazzo11: true},
+		{name: "$url", e: "$url", wantDefault: true, wantArazzo11: true},
+		{name: "literal", e: "not an expression", wantDefault: false, wantArazzo11: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.wantDefault, tt.e.IsExpression(), "default grammar recognition should match")
+			assert.Equal(t, tt.wantArazzo11, tt.e.IsExpression(WithArazzo11Grammar()), "Arazzo 1.1 grammar recognition should match")
+		})
+	}
+}
+
 func TestExpression_GetType(t *testing.T) {
 	t.Parallel()
 	e := Expression("$request.body#/some/path")

@@ -13,6 +13,7 @@ go run ./cmd/update-lint-docs
 echo ""
 echo "📋 Summary:"
 echo "  • Updated openapi/linter/README.md with rules from the OpenAPI linter registry"
+echo "  • Updated arazzo/linter/README.md with rules from the Arazzo linter registry"
 echo ""
 echo "💡 Rule documentation is automatically generated from the Rule interface methods."
 echo "   To update the docs, modify the rule's Description(), Link(), etc. methods and re-run this task."

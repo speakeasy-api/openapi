@@ -1,0 +1,60 @@
+arazzo: 1.1.0
+info:
+  title: Clean workflows
+  description: Lists pets and fetches the first one, retrying while the store is busy.
+  version: 1.0.0
+sourceDescriptions:
+  - name: petstore
+    url: ../sources/petstore.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: fetchFirstPet
+    summary: Fetch the first pet in the store
+    inputs:
+      type: object
+      properties:
+        limit:
+          type: integer
+    steps:
+      - stepId: list
+        operationId: listPets
+        parameters:
+          - reference: $components.parameters.limit
+            value: $inputs.limit
+        successCriteria:
+          - condition: $statusCode == 200
+        onSuccess:
+          - name: noPets
+            type: end
+            criteria:
+              - condition: $response.body#/0 == null
+        onFailure:
+          - reference: $components.failureActions.retryBusy
+        outputs:
+          firstPetId: $response.body#/0/id
+      - stepId: fetch
+        operationId: getPet
+        parameters:
+          - name: petId
+            in: path
+            value: $steps.list.outputs.firstPetId
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          pet: $response.body
+    outputs:
+      pet: $steps.fetch.outputs.pet
+components:
+  parameters:
+    limit:
+      name: limit
+      in: query
+      value: 10
+  failureActions:
+    retryBusy:
+      name: retryBusy
+      type: retry
+      retryAfter: 1
+      retryLimit: 3
+      criteria:
+        - condition: $statusCode == 503

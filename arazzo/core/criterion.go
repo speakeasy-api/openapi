@@ -84,23 +84,39 @@ func (c *CriterionTypeUnion) SyncChanges(ctx context.Context, model any, valueNo
 	tf := mv.FieldByName("Type")
 	ef := mv.FieldByName("ExpressionType")
 
-	tv, err := marshaller.SyncValue(ctx, tf.Interface(), &c.Type, valueNode, false)
-	if err != nil {
-		return nil, err
+	// Only reuse the existing node for the side of the union of the same kind, so switching between a string and
+	// an Expression Type Object (or vice versa) creates a new node rather than updating the old one.
+	resolvedNode := yml.ResolveAlias(valueNode)
+	var scalarNode, mappingNode *yaml.Node
+	if resolvedNode != nil {
+		switch resolvedNode.Kind {
+		case yaml.ScalarNode:
+			scalarNode = valueNode
+		case yaml.MappingNode:
+			mappingNode = valueNode
+		case yaml.DocumentNode, yaml.SequenceNode, yaml.AliasNode:
+		}
 	}
 
-	ev, err := marshaller.SyncValue(ctx, ef.Interface(), &c.ExpressionType, valueNode, false)
-	if err != nil {
-		return nil, err
-	}
+	if tf.Kind() == reflect.Ptr && !tf.IsNil() {
+		c.ExpressionType = nil
 
-	if tv != nil {
+		tv, err := marshaller.SyncValue(ctx, tf.Interface(), &c.Type, scalarNode, false)
 		c.SetRootNode(tv)
-		return tv, nil
-	} else {
-		c.SetRootNode(ev)
-		return ev, nil
+		return tv, err
 	}
+
+	c.Type = nil
+
+	if ef.Kind() == reflect.Ptr && ef.IsNil() {
+		c.ExpressionType = nil
+		c.SetRootNode(nil)
+		return nil, nil
+	}
+
+	ev, err := marshaller.SyncValue(ctx, ef.Interface(), &c.ExpressionType, mappingNode, false)
+	c.SetRootNode(ev)
+	return ev, err
 }
 
 type Criterion struct {
