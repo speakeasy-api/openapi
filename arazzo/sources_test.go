@@ -251,6 +251,12 @@ func TestLoadSourceDescriptions_NotLoaded(t *testing.T) {
 			expected: []string{"warning: sourceDescription `api` at `broken.yaml` is not an OpenAPI 3.x, AsyncAPI or Arazzo document"},
 		},
 		{
+			name:     "document that can't be decoded",
+			url:      "undecodable.yaml",
+			files:    fstest.MapFS{"undecodable.yaml": {Data: []byte("openapi: !!int abc\n")}},
+			expected: []string{"warning: sourceDescription `api` at `undecodable.yaml` could not be parsed: yaml: cannot decode !!str `abc` as a !!int"},
+		},
+		{
 			name:       "declared type doesn't match content",
 			sourceType: "openapi",
 			url:        "shared.yaml",
