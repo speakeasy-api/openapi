@@ -40,5 +40,27 @@ func TestComponents_Validate_Error(t *testing.T) {
 			doc:      minimalDoc("components:\n  requestBodies: {}\n"),
 			expected: []string{"warning:" + validation.RuleValidationUnknownProperties},
 		},
+		{
+			name:     "reference tag with an unknown property",
+			doc:      minimalDoc("components:\n  tags:\n    t:\n      $ref: '#/components/tags/u'\n      colour: red\n"),
+			expected: []string{"warning:" + validation.RuleValidationUnknownProperties},
+		},
+	})
+}
+
+func TestComponents_Validate_Success(t *testing.T) {
+	t.Parallel()
+
+	runValidationCases(t, []validationCase{
+		{
+			name:     "component keys use every allowed character",
+			doc:      minimalDoc("components:\n  messages:\n    order-placed.v1_X:\n      name: OrderPlaced\n"),
+			expected: []string{},
+		},
+		{
+			name:     "component references",
+			doc:      minimalDoc("components:\n  messages:\n    m:\n      $ref: '#/components/messages/n'\n  tags:\n    t:\n      $ref: '#/components/tags/u'\n"),
+			expected: []string{},
+		},
 	})
 }

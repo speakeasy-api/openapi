@@ -74,6 +74,7 @@ func (b *Bindings) GetBindingVersion(protocol string) string {
 		return ""
 	}
 	_, versionNode, found := yml.GetMapElementNodes(context.Background(), yml.ResolveAlias(binding), "bindingVersion")
+	versionNode = yml.ResolveAlias(versionNode)
 	if !found || versionNode == nil {
 		return ""
 	}
@@ -122,7 +123,7 @@ func (b *Bindings) Validate(_ context.Context, opts ...validation.Option) []erro
 			continue
 		}
 		if _, versionNode, found := yml.GetMapElementNodes(context.Background(), node, "bindingVersion"); found {
-			if v := yml.ResolveAlias(versionNode); v == nil || v.Kind != yaml.ScalarNode || v.Tag == "!!null" {
+			if v := yml.ResolveAlias(versionNode); v == nil || v.Kind != yaml.ScalarNode || v.Tag != "!!str" {
 				errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError("bindings."+protocol+".bindingVersion", "bindings.%s.bindingVersion expected `string`", protocol), versionNode))
 			}
 		}

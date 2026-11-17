@@ -168,16 +168,9 @@ func (s *Server) Validate(ctx context.Context, opts ...validation.Option) []erro
 		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("server.host `%s` must not include a scheme, use server.protocol instead", s.Host), c, c.Host))
 	}
 
-	for _, name := range expressionVariables(s.Host) {
-		if s.Variables == nil || !s.Variables.Has(name) {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("server.host variable `%s` is not defined in server.variables", name), c, c.Host))
-		}
-	}
-	for _, name := range expressionVariables(s.GetPathname()) {
-		if s.Variables == nil || !s.Variables.Has(name) {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("server.pathname variable `%s` is not defined in server.variables", name), c, c.Pathname))
-		}
-	}
+	hasVariable := func(name string) bool { return s.Variables != nil && s.Variables.Has(name) }
+	errs = append(errs, validateExpressionVariables(s.Host, hasVariable, "server.host", "server.variables", c, c.Host)...)
+	errs = append(errs, validateExpressionVariables(s.GetPathname(), hasVariable, "server.pathname", "server.variables", c, c.Pathname)...)
 
 	if s.Variables != nil {
 		for _, variable := range s.Variables.All() {

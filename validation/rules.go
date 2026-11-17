@@ -128,8 +128,8 @@ var ruleInfoByID = map[string]RuleInfo{
 	},
 	RuleValidationUnknownProperties: {
 		Summary:     "Unknown property.",
-		Description: "The object contains a property that is not defined by the specification and is not an extension. Unknown properties are preserved but ignored by tooling.",
-		HowToFix:    "Remove the property, correct its spelling, or prefix it with `x-` to make it an extension.",
+		Description: "The object contains a property that is not defined by the specification, or not defined by the document's specification version, and is not an extension. Unknown properties are preserved but ignored by tooling. Properties the specification explicitly forbids, such as `action` in an AsyncAPI Operation Trait, are reported as errors.",
+		HowToFix:    "Remove the property or correct its spelling. If it needs a newer specification version, such as an AsyncAPI 3.1 binding, upgrade the document's version. If it is a custom property, prefix it with `x-` to make it an extension.",
 	},
 }
 

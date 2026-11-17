@@ -347,8 +347,8 @@ func (t *Tag) Validate(ctx context.Context, opts ...validation.Option) []error {
 		if t.ExternalDocs != nil {
 			errs = append(errs, t.ExternalDocs.Validate(ctx, opts...)...)
 		}
-		errs = append(errs, unknownPropertyErrors(core, "tag")...)
 	}
+	errs = append(errs, unknownPropertyErrors(core, "tag")...)
 
 	t.Valid = noErrors(errs) && coreValid(core)
 

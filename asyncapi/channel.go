@@ -143,16 +143,13 @@ func (c *Channel) Validate(ctx context.Context, opts ...validation.Option) []err
 	cc := c.GetCore()
 	errs := []error{}
 
-	if c.Address != nil && strings.ContainsAny(*c.Address, "?#") {
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("channel.address `%s` must not contain query parameters or fragments", *c.Address), cc, cc.Address))
+	// `#` isn't rejected as a fragment because it is a valid topic segment for protocols such as MQTT.
+	if c.Address != nil && strings.Contains(*c.Address, "?") {
+		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("channel.address `%s` must not contain query parameters", *c.Address), cc, cc.Address))
 	}
 
 	addressVariables := expressionVariables(c.GetAddress())
-	for _, name := range addressVariables {
-		if c.Parameters == nil || !c.Parameters.Has(name) {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("channel.address parameter `%s` is not defined in channel.parameters", name), cc, cc.Address))
-		}
-	}
+	errs = append(errs, validateExpressionVariables(c.GetAddress(), func(name string) bool { return c.Parameters != nil && c.Parameters.Has(name) }, "channel.address", "channel.parameters", cc, cc.Address)...)
 
 	if c.Parameters != nil {
 		for name, parameter := range c.Parameters.All() {

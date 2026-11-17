@@ -31,6 +31,11 @@ func TestServer_Validate_Error(t *testing.T) {
 			expected: []string{"error:" + validation.RuleValidationRequiredField},
 		},
 		{
+			name:     "host with an empty expression",
+			doc:      minimalDoc("servers:\n  prod:\n    host: '{}.example.com'\n    protocol: mqtt\n"),
+			expected: []string{"error:" + validation.RuleValidationInvalidFormat},
+		},
+		{
 			name:     "variable default is not in enum",
 			doc:      minimalDoc("servers:\n  prod:\n    host: '{region}.example.com'\n    protocol: mqtt\n    variables:\n      region:\n        enum: [eu, us]\n        default: au\n"),
 			expected: []string{"error:" + validation.RuleValidationAllowedValues},

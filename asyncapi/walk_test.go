@@ -26,6 +26,16 @@ func walkPointers(t *testing.T, a *asyncapi.AsyncAPI, matcher func(pointers *[]s
 	return pointers
 }
 
+func TestWalk_MissingChannel_Success(t *testing.T) {
+	t.Parallel()
+
+	a, _ := unmarshal(t, minimalDoc("operations:\n  o:\n    action: send\n"))
+	pointers := walkPointers(t, a, func(p *[]string) asyncapi.Matcher {
+		return asyncapi.Matcher{ReferenceObject: func(*asyncapi.ReferenceObject) error { *p = append(*p, ""); return nil }}
+	})
+	assert.Empty(t, pointers, "an omitted channel should not be visited")
+}
+
 func TestWalk_Locations_Success(t *testing.T) {
 	t.Parallel()
 

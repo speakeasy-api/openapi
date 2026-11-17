@@ -328,7 +328,7 @@ func (t *OperationTrait) Validate(ctx context.Context, opts ...validation.Option
 
 	c := t.GetCore()
 	errs := validateOperationFields(ctx, t.Security, t.Tags, t.ExternalDocs, t.Bindings, t.Reply, c, c.Tags, "operationTrait", opts...)
-	errs = append(errs, unknownPropertyErrors(c, "operationTrait")...)
+	errs = append(errs, unknownPropertyErrors(c, "operationTrait", "action", "channel", "messages", "traits")...)
 
 	t.Valid = noErrors(errs) && coreValid(c)
 

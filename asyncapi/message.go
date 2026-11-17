@@ -211,7 +211,10 @@ func validateMessageFields(ctx context.Context, f messageFields, c validation.Co
 	errs := []error{}
 
 	if f.headers != nil {
-		if types := f.headers.GetSchema().GetSchema().GetType(); len(types) > 0 && !slices.Contains(types, "object") {
+		// Boolean schemas declare no type, so they can't be an object schema either.
+		if f.headers.GetSchema().IsBool() {
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationTypeMismatch, fmt.Errorf("%s.headers must be a schema of type `object`, got a boolean schema", object), c, headersNode))
+		} else if types := f.headers.GetSchema().GetSchema().GetType(); len(types) > 0 && !slices.Contains(types, "object") {
 			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationTypeMismatch, fmt.Errorf("%s.headers must be a schema of type `object`", object), c, headersNode))
 		}
 		errs = append(errs, f.headers.Validate(ctx, opts...)...)
@@ -383,7 +386,7 @@ func (t *MessageTrait) Validate(ctx context.Context, opts ...validation.Option) 
 		bindings:      t.Bindings,
 		examples:      t.Examples,
 	}, c, c.Headers, c.ContentType, c.Tags, "messageTrait", opts...)
-	errs = append(errs, unknownPropertyErrors(c, "messageTrait")...)
+	errs = append(errs, unknownPropertyErrors(c, "messageTrait", "payload", "traits")...)
 
 	t.Valid = noErrors(errs) && coreValid(c)
 

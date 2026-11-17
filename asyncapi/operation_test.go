@@ -38,6 +38,16 @@ func TestOperation_Validate_Error(t *testing.T) {
 			expected: []string{"error:" + validation.RuleValidationDuplicateKey},
 		},
 		{
+			name:     "empty channel reference object",
+			doc:      minimalDoc("operations:\n  o:\n    action: send\n    channel: {}\n"),
+			expected: []string{"error:" + validation.RuleValidationRequiredField},
+		},
+		{
+			name:     "operation trait sets forbidden fields",
+			doc:      minimalDoc("components:\n  operationTraits:\n    t:\n      action: send\n      channel:\n        $ref: '#/channels/c'\n      messages: []\n      traits: []\n"),
+			expected: []string{"error:" + validation.RuleValidationUnknownProperties, "error:" + validation.RuleValidationUnknownProperties, "error:" + validation.RuleValidationUnknownProperties, "error:" + validation.RuleValidationUnknownProperties},
+		},
+		{
 			name:     "unknown operation property",
 			doc:      minimalDoc("operations:\n  o:\n    action: send\n    operationId: legacy\n    channel:\n      $ref: '#/channels/c'\n"),
 			expected: []string{"warning:" + validation.RuleValidationUnknownProperties},

@@ -341,8 +341,11 @@ func (w *walker) walkOperation(operation *Operation, loc Locations) bool {
 	if !w.visit(mf, loc) {
 		return false
 	}
-	if !w.walkReferenceObject(&operation.Channel, child(loc, mf, "channel")) {
-		return false
+	// Channel is a required value field, so skip it when the document omits it rather than visiting an empty object.
+	if operation.Channel.Reference != "" || operation.Channel.GetCore().GetRootNode() != nil {
+		if !w.walkReferenceObject(&operation.Channel, child(loc, mf, "channel")) {
+			return false
+		}
 	}
 	if !w.walkOperationFields(operation.Security, operation.Tags, operation.ExternalDocs, operation.Bindings, nil, loc, mf) {
 		return false

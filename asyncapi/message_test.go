@@ -53,7 +53,17 @@ func TestMessage_Validate_Error(t *testing.T) {
 		{
 			name:     "message trait cannot set a payload",
 			doc:      minimalDoc("components:\n  messageTraits:\n    t:\n      payload:\n        type: object\n"),
-			expected: []string{"warning:" + validation.RuleValidationUnknownProperties},
+			expected: []string{"error:" + validation.RuleValidationUnknownProperties},
+		},
+		{
+			name:     "headers are a boolean schema",
+			doc:      minimalDoc("components:\n  messages:\n    m:\n      headers: true\n"),
+			expected: []string{"error:" + validation.RuleValidationTypeMismatch},
+		},
+		{
+			name:     "message trait headers are a boolean schema",
+			doc:      minimalDoc("components:\n  messageTraits:\n    t:\n      headers: false\n"),
+			expected: []string{"error:" + validation.RuleValidationTypeMismatch},
 		},
 	})
 }

@@ -21,6 +21,16 @@ func TestChannel_Validate_Error(t *testing.T) {
 			expected: []string{"error:" + validation.RuleValidationRequiredField},
 		},
 		{
+			name:     "repeated undefined address parameter is reported once",
+			doc:      minimalDoc("channels:\n  c:\n    address: orders.{id}.{id}\n"),
+			expected: []string{"error:" + validation.RuleValidationRequiredField},
+		},
+		{
+			name:     "address with an empty expression",
+			doc:      minimalDoc("channels:\n  c:\n    address: orders.{}\n"),
+			expected: []string{"error:" + validation.RuleValidationInvalidFormat},
+		},
+		{
 			name:     "parameter is not used in the address",
 			doc:      minimalDoc("channels:\n  c:\n    address: orders\n    parameters:\n      id: {}\n"),
 			expected: []string{"error:" + validation.RuleValidationInvalidTarget},
@@ -46,6 +56,11 @@ func TestChannel_Validate_Error(t *testing.T) {
 			expected: []string{"error:" + validation.RuleValidationRequiredField},
 		},
 		{
+			name:     "null channel reference",
+			doc:      minimalDoc("channels:\n  c:\n    $ref: null\n"),
+			expected: []string{"error:" + validation.RuleValidationRequiredField},
+		},
+		{
 			name:     "inline message is validated",
 			doc:      minimalDoc("channels:\n  c:\n    messages:\n      m:\n        contentType: 'json;;'\n"),
 			expected: []string{"error:" + validation.RuleValidationInvalidFormat},
@@ -60,6 +75,11 @@ func TestChannel_Validate_Success(t *testing.T) {
 		{
 			name:     "address parameters defined",
 			doc:      minimalDoc("channels:\n  c:\n    address: users.{userId}.{event}\n    parameters:\n      userId:\n        location: $message.payload#/user/id\n      event:\n        $ref: '#/components/parameters/event'\n"),
+			expected: []string{},
+		},
+		{
+			name:     "address with an MQTT multi-level wildcard",
+			doc:      minimalDoc("channels:\n  c:\n    address: sensors/#\n"),
 			expected: []string{},
 		},
 		{

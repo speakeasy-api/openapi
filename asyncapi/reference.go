@@ -88,7 +88,9 @@ func (r *Reference[T, V, C]) Validate(ctx context.Context, opts ...validation.Op
 
 	switch {
 	case r.Reference != nil:
-		if err := r.Reference.Validate(); err != nil {
+		if *r.Reference == "" {
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`$ref` must not be empty"), c, c.Reference))
+		} else if err := r.Reference.Validate(); err != nil {
 			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("reference.$ref is invalid: %w", err), c, c.Reference))
 		}
 	case r.Object != nil:
@@ -114,7 +116,12 @@ func (r *Reference[T, V, C]) Populate(source any) error {
 	}
 
 	if s.Reference.Present {
-		r.Reference = pointer.From(references.Reference(*s.Reference.Value))
+		// `$ref: null` is kept as an empty reference so validation reports it instead of population panicking.
+		ref := ""
+		if s.Reference.Value != nil {
+			ref = *s.Reference.Value
+		}
+		r.Reference = pointer.From(references.Reference(ref))
 	} else if err := marshaller.PopulateWithContext(s.Object, &r.Object, nil); err != nil {
 		return err
 	}

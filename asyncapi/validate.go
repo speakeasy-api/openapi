@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/internal/asyncapiversion"
@@ -23,7 +24,8 @@ var (
 	// nameKeyRegex is the pattern Servers Object and Channel parameter keys must match.
 	nameKeyRegex = regexp.MustCompile(`^[A-Za-z0-9_\-]+$`)
 	// expressionVariableRegex matches `{name}` variables in server hosts, pathnames and channel addresses.
-	expressionVariableRegex = regexp.MustCompile(`\{([^{}]+)\}`)
+	// Empty `{}` expressions are matched too, so they can be reported as invalid.
+	expressionVariableRegex = regexp.MustCompile(`\{([^{}]*)\}`)
 	// runtimeExpressionRegex matches the runtime expressions used by correlation IDs, parameters and reply addresses.
 	runtimeExpressionRegex = regexp.MustCompile(`^\$message\.(header|payload)(#.*)?$`)
 )
@@ -68,8 +70,9 @@ func noErrors(errs []error) bool {
 }
 
 // unknownPropertyErrors returns a warning for each property of the object that is neither a defined field nor an extension.
-// The properties are preserved, so documents still round-trip unchanged.
-func unknownPropertyErrors(c marshaller.CoreModeler, object string) []error {
+// The properties are preserved, so documents still round-trip unchanged. Properties listed in forbidden, such as
+// Operation Object fields that an Operation Trait must not set, are reported as errors instead.
+func unknownPropertyErrors(c marshaller.CoreModeler, object string, forbidden ...string) []error {
 	props := c.GetUnknownProperties()
 	if len(props) == 0 {
 		return nil
@@ -80,6 +83,10 @@ func unknownPropertyErrors(c marshaller.CoreModeler, object string) []error {
 		node := c.GetRootNode()
 		if keyNode, _, ok := yml.GetMapElementNodes(context.Background(), node, prop); ok {
 			node = keyNode
+		}
+		if slices.Contains(forbidden, prop) {
+			errs = append(errs, validation.NewValidationError(validation.SeverityError, validation.RuleValidationUnknownProperties, fmt.Errorf("%s must not contain `%s`", object, prop), node))
+			continue
 		}
 		errs = append(errs, validation.NewValidationError(validation.SeverityWarning, validation.RuleValidationUnknownProperties, fmt.Errorf("%s has unknown property `%s`", object, prop), node))
 	}
@@ -102,14 +109,31 @@ func validateRuntimeExpression(expr string) error {
 	return nil
 }
 
-// expressionVariables returns the names of the `{name}` variables used in the provided value, in order of appearance.
+// expressionVariables returns the unique names of the `{name}` variables used in the provided value, in order of
+// first appearance. An empty `{}` expression is returned as an empty name.
 func expressionVariables(value string) []string {
 	matches := expressionVariableRegex.FindAllStringSubmatch(value, -1)
 	names := make([]string, 0, len(matches))
 	for _, m := range matches {
-		names = append(names, m[1])
+		if !slices.Contains(names, m[1]) {
+			names = append(names, m[1])
+		}
 	}
 	return names
+}
+
+// validateExpressionVariables reports each `{name}` variable in value that is empty or not defined.
+func validateExpressionVariables(value string, defined func(string) bool, field, container string, c validation.CoreModeler, node validation.ValueNodeGetter) []error {
+	errs := []error{}
+	for _, name := range expressionVariables(value) {
+		switch {
+		case name == "":
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("%s `%s` contains an empty `{}` expression", field, value), c, node))
+		case !defined(name):
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("%s variable `%s` is not defined in %s", field, name, container), c, node))
+		}
+	}
+	return errs
 }
 
 func validateAbsoluteURL(value, field string) error {

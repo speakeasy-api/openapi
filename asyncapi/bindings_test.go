@@ -65,7 +65,26 @@ func TestBindings_Validate_Error(t *testing.T) {
 			doc:      minimalDoc("channels:\n  c:\n    bindings:\n      kafka:\n        bindingVersion:\n          major: 0\n"),
 			expected: []string{"error:" + validation.RuleValidationTypeMismatch},
 		},
+		{
+			name:     "binding version is a number",
+			doc:      minimalDoc("channels:\n  c:\n    bindings:\n      kafka:\n        bindingVersion: 1\n"),
+			expected: []string{"error:" + validation.RuleValidationTypeMismatch},
+		},
+		{
+			name:     "binding version is a boolean",
+			doc:      minimalDoc("channels:\n  c:\n    bindings:\n      kafka:\n        bindingVersion: true\n"),
+			expected: []string{"error:" + validation.RuleValidationTypeMismatch},
+		},
 	})
+}
+
+func TestBindings_GetBindingVersion_Alias_Success(t *testing.T) {
+	t.Parallel()
+
+	a, _ := unmarshal(t, minimalDoc("x-versions:\n  kafka: &bv 0.5.0\nchannels:\n  c:\n    bindings:\n      kafka:\n        bindingVersion: *bv\n"))
+	bindings := a.GetChannels().GetOrZero("c").GetObject().GetBindings().GetObject()
+	require.NotNil(t, bindings, "bindings should be parsed")
+	assert.Equal(t, "0.5.0", bindings.GetBindingVersion("kafka"), "aliased binding version should be resolved")
 }
 
 func TestBindings_GetBindingVersion_Success(t *testing.T) {
