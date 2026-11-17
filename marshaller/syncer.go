@@ -205,23 +205,29 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 			return nil, fmt.Errorf("syncChanges expected NodeMutator, got %s", fieldTarget.Type())
 		}
 
-		keyNode, valNode, err := nodeMutator.SyncValue(ctx, key, sourceInt)
-		if err != nil {
-			return nil, err
-		}
-
-		// Optional fields with a non-pointer scalar type can't represent being unset, so their zero value is treated
-		// as unset rather than written out as an empty value. The core still holds the synced zero value.
-		if field.Tag.Get("required") == "false" && isZeroScalar(sourceVal) {
-			valNode = nil
-		}
-
-		if valNode != nil {
-			valueNode = yml.CreateOrUpdateMapNodeElement(ctx, key, keyNode, valNode, valueNode)
+		// An explicit null is how a document says a value is unset, the same as leaving it out. Keep an authored
+		// null while the value is still unset, so documents round-trip unchanged.
+		if isNilValue(sourceVal) && hasNullMapValue(ctx, valueNode, key) {
 			nodeMutator.SetPresent(true)
 		} else {
-			valueNode = yml.DeleteMapNodeElement(ctx, key, valueNode)
-			nodeMutator.SetPresent(false)
+			keyNode, valNode, err := nodeMutator.SyncValue(ctx, key, sourceInt)
+			if err != nil {
+				return nil, err
+			}
+
+			// Optional fields with a non-pointer scalar type can't represent being unset, so their zero value is treated
+			// as unset rather than written out as an empty value. The core still holds the synced zero value.
+			if field.Tag.Get("required") == "false" && isZeroScalar(sourceVal) {
+				valNode = nil
+			}
+
+			if valNode != nil {
+				valueNode = yml.CreateOrUpdateMapNodeElement(ctx, key, keyNode, valNode, valueNode)
+				nodeMutator.SetPresent(true)
+			} else {
+				valueNode = yml.DeleteMapNodeElement(ctx, key, valueNode)
+				nodeMutator.SetPresent(false)
+			}
 		}
 
 		// Check if this field is required for validity
@@ -581,6 +587,26 @@ func isZeroScalar(v reflect.Value) bool {
 	default:
 		return false
 	}
+}
+
+// isNilValue returns true if v is a nil pointer, map, slice or interface.
+func isNilValue(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Interface:
+		return v.IsNil()
+	default:
+		return false
+	}
+}
+
+// hasNullMapValue returns true if the mapping node has the key with an explicit null value.
+func hasNullMapValue(ctx context.Context, mapNode *yaml.Node, key string) bool {
+	if mapNode == nil {
+		return false
+	}
+	_, valueNode, found := yml.GetMapElementNodes(ctx, mapNode, key)
+	valueNode = yml.ResolveAlias(valueNode)
+	return found && valueNode != nil && valueNode.Kind == yaml.ScalarNode && valueNode.Tag == "!!null"
 }
 
 func dereferenceType(typ reflect.Type) reflect.Type {

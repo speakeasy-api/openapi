@@ -49,9 +49,50 @@ type Message struct {
 	Traits []*ReferencedMessageTrait
 	// Extensions provides a list of extensions to the Message Object.
 	Extensions *extensions.Extensions
+
+	// effective is set by the last call to AsyncAPI.ResolveAllReferences, guarded by resolutionMu.
+	effective *effectiveView[Message]
 }
 
 var _ interfaces.Model[core.Message] = (*Message)(nil)
+
+// GetEffective returns the message with its traits applied, as computed by the last call to
+// AsyncAPI.ResolveAllReferences. A message without traits is its own effective view. Returns nil if the message has
+// traits that haven't been applied.
+//
+// The effective message is a separate snapshot: it doesn't change the authored document, and editing it has no
+// effect on the document.
+func (m *Message) GetEffective() *Message {
+	if m == nil {
+		return nil
+	}
+	if len(m.Traits) == 0 {
+		return m
+	}
+	return m.effectiveView().get()
+}
+
+// GetTraitSource reports where a top-level field of the effective message came from: the index in Traits of the
+// trait that supplied it, or -1 if the message sets it itself. ok is false if the field isn't in the effective
+// message or traits haven't been applied.
+func (m *Message) GetTraitSource(field string) (index int, ok bool) {
+	return m.effectiveView().source(field)
+}
+
+func (m *Message) effectiveView() *effectiveView[Message] {
+	if m == nil {
+		return nil
+	}
+	resolutionMu.RLock()
+	defer resolutionMu.RUnlock()
+	return m.effective
+}
+
+func (m *Message) setEffective(view *effectiveView[Message]) {
+	resolutionMu.Lock()
+	defer resolutionMu.Unlock()
+	m.effective = view
+}
 
 // GetHeaders returns the headers schema, or nil if not set.
 func (m *Message) GetHeaders() *jsonschema.SchemaUnion {

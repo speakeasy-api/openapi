@@ -54,9 +54,50 @@ type Operation struct {
 	Reply *ReferencedOperationReply
 	// Extensions provides a list of extensions to the Operation Object.
 	Extensions *extensions.Extensions
+
+	// effective is set by the last call to AsyncAPI.ResolveAllReferences, guarded by resolutionMu.
+	effective *effectiveView[Operation]
 }
 
 var _ interfaces.Model[core.Operation] = (*Operation)(nil)
+
+// GetEffective returns the operation with its traits applied, as computed by the last call to
+// AsyncAPI.ResolveAllReferences. An operation without traits is its own effective view. Returns nil if the operation
+// has traits that haven't been applied.
+//
+// The effective operation is a separate snapshot: it doesn't change the authored document, and editing it has no
+// effect on the document.
+func (o *Operation) GetEffective() *Operation {
+	if o == nil {
+		return nil
+	}
+	if len(o.Traits) == 0 {
+		return o
+	}
+	return o.effectiveView().get()
+}
+
+// GetTraitSource reports where a top-level field of the effective operation came from: the index in Traits of the
+// trait that supplied it, or -1 if the operation sets it itself. ok is false if the field isn't in the effective
+// operation or traits haven't been applied.
+func (o *Operation) GetTraitSource(field string) (index int, ok bool) {
+	return o.effectiveView().source(field)
+}
+
+func (o *Operation) effectiveView() *effectiveView[Operation] {
+	if o == nil {
+		return nil
+	}
+	resolutionMu.RLock()
+	defer resolutionMu.RUnlock()
+	return o.effective
+}
+
+func (o *Operation) setEffective(view *effectiveView[Operation]) {
+	resolutionMu.Lock()
+	defer resolutionMu.Unlock()
+	o.effective = view
+}
 
 // GetAction returns the action, or an empty action if not set.
 func (o *Operation) GetAction() OperationAction {

@@ -44,7 +44,8 @@ type (
 
 // Reference is either an inline object or an AsyncAPI Reference Object to one.
 //
-// References are not resolved by this package yet, so GetObject only returns inline objects.
+// Reference Objects are resolved explicitly by AsyncAPI.ResolveAllReferences. Until then GetObject only returns
+// inline objects.
 type Reference[T any, V interfaces.Validator[T], C marshaller.CoreModeler] struct {
 	marshaller.Model[core.Reference[C]]
 
@@ -52,6 +53,10 @@ type Reference[T any, V interfaces.Validator[T], C marshaller.CoreModeler] struc
 	Reference *references.Reference
 	// Object is the inline object. Set when this is not a Reference Object.
 	Object *T
+
+	// resolved and resolvedRef are set by the last call to AsyncAPI.ResolveAllReferences, guarded by resolutionMu.
+	resolved    *T
+	resolvedRef references.Reference
 }
 
 var _ interfaces.Model[core.Reference[*core.Server]] = (*ReferencedServer)(nil)
@@ -69,12 +74,50 @@ func (r *Reference[T, V, C]) GetReference() references.Reference {
 	return *r.Reference
 }
 
-// GetObject returns the inline object, or nil if this is a Reference Object.
+// GetObject returns the inline object. For a Reference Object it returns the object it resolved to in the last call
+// to AsyncAPI.ResolveAllReferences, following any chain of references, or nil if it hasn't been resolved.
 func (r *Reference[T, V, C]) GetObject() *T {
-	if r == nil || r.IsReference() {
+	if r == nil {
 		return nil
 	}
-	return r.Object
+	if !r.IsReference() {
+		return r.Object
+	}
+	resolutionMu.RLock()
+	defer resolutionMu.RUnlock()
+	return r.resolved
+}
+
+// IsResolved returns true if this is an inline object, or a Reference Object that has been resolved.
+func (r *Reference[T, V, C]) IsResolved() bool {
+	return r != nil && r.GetObject() != nil
+}
+
+// GetResolvedReference returns the absolute location of the object a Reference Object resolved to, after following
+// any chain of references. It is empty for inline objects and unresolved references.
+func (r *Reference[T, V, C]) GetResolvedReference() references.Reference {
+	if r == nil {
+		return ""
+	}
+	resolutionMu.RLock()
+	defer resolutionMu.RUnlock()
+	return r.resolvedRef
+}
+
+// GetNavigableNode returns the inline or resolved object so JSON pointers can navigate through references.
+func (r *Reference[T, V, C]) GetNavigableNode() (any, error) {
+	obj := r.GetObject()
+	if obj == nil {
+		return nil, fmt.Errorf("reference `%s` is not resolved", r.GetReference())
+	}
+	return obj, nil
+}
+
+func (r *Reference[T, V, C]) setResolved(obj *T, ref references.Reference) {
+	resolutionMu.Lock()
+	defer resolutionMu.Unlock()
+	r.resolved = obj
+	r.resolvedRef = ref
 }
 
 // Validate validates the reference, or the inline object.
@@ -137,6 +180,62 @@ type ReferenceObject struct {
 
 	// Reference is the URI of the referenced object.
 	Reference references.Reference
+
+	// resolved and resolvedRef are set by the last call to AsyncAPI.ResolveAllReferences, guarded by resolutionMu.
+	resolved    any
+	resolvedRef references.Reference
+}
+
+// GetResolvedObject returns the object the reference resolved to in the last call to AsyncAPI.ResolveAllReferences:
+// a *Channel, *Message or *Server depending on where the Reference Object is used. Returns nil if it hasn't been
+// resolved.
+func (r *ReferenceObject) GetResolvedObject() any {
+	if r == nil {
+		return nil
+	}
+	resolutionMu.RLock()
+	defer resolutionMu.RUnlock()
+	return r.resolved
+}
+
+// GetResolvedReference returns the absolute location of the resolved object, or an empty reference if unresolved.
+func (r *ReferenceObject) GetResolvedReference() references.Reference {
+	if r == nil {
+		return ""
+	}
+	resolutionMu.RLock()
+	defer resolutionMu.RUnlock()
+	return r.resolvedRef
+}
+
+// IsResolved returns true if the reference has been resolved.
+func (r *ReferenceObject) IsResolved() bool {
+	return r.GetResolvedObject() != nil
+}
+
+// GetChannel returns the resolved channel, or nil if unresolved or the reference is not to a channel.
+func (r *ReferenceObject) GetChannel() *Channel {
+	channel, _ := r.GetResolvedObject().(*Channel)
+	return channel
+}
+
+// GetMessage returns the resolved message, or nil if unresolved or the reference is not to a message.
+func (r *ReferenceObject) GetMessage() *Message {
+	message, _ := r.GetResolvedObject().(*Message)
+	return message
+}
+
+// GetServer returns the resolved server, or nil if unresolved or the reference is not to a server.
+func (r *ReferenceObject) GetServer() *Server {
+	server, _ := r.GetResolvedObject().(*Server)
+	return server
+}
+
+func (r *ReferenceObject) setResolved(obj any, ref references.Reference) {
+	resolutionMu.Lock()
+	defer resolutionMu.Unlock()
+	r.resolved = obj
+	r.resolvedRef = ref
 }
 
 var _ interfaces.Model[core.ReferenceObject] = (*ReferenceObject)(nil)
