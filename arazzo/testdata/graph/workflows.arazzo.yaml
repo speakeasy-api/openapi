@@ -43,6 +43,11 @@ workflows:
             workflowId: $sourceDescriptions.shared.cleanup
             criteria:
               - condition: $statusCode == 409
+          - name: retryBusy
+            type: goto
+            stepId: findPet
+            criteria:
+              - condition: $statusCode == 503
       - stepId: notify
         workflowId: registerOwner
         onFailure:

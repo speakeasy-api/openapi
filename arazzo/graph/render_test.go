@@ -52,6 +52,9 @@ workflows:
   - workflowId: main
     summary: "Say \"hi\" <b>#1</b>\\now"
     steps: []
+  - workflowId: multiline
+    summary: "one\r\ntwo\rthree\nfour"
+    steps: []
 `)
 	g, err := graph.Build(doc, graph.Options{})
 	require.NoError(t, err, "build should succeed")
@@ -62,11 +65,15 @@ workflows:
   subgraph wf0 ["Say #quot;hi#quot; #lt;b#gt;#35;1#lt;/b#gt;\now"]
     w0(["main"])
   end
+  subgraph wf1 ["one two three four"]
+    w1(["multiline"])
+  end
 `, mermaid.String(), "mermaid labels should be escaped")
 
 	var dot bytes.Buffer
 	require.NoError(t, g.WriteDOT(&dot), "write should succeed")
 	assert.Contains(t, dot.String(), `label="Say \"hi\" <b>#1</b>\\now";`, "dot labels should be escaped")
+	assert.Contains(t, dot.String(), `label="one\ntwo\nthree\nfour";`, "dot line breaks should be escaped")
 	assert.NotContains(t, dot.String(), " -> ", "a workflow without steps should have no edges")
 }
 

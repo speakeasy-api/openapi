@@ -27,7 +27,7 @@ digraph arazzo {
   w0s0 -> w0s1;
   w0s1 -> w1s0 [label="dependsOn", color="#757575", style=dotted];
   w0s1 -> x1 [label="giveUp", color="#c62828", style=dashed];
-  w0s1 -> w0s1 [label="retryBusy", color="#c62828", style=dashed];
+  w0s1 -> w0s0 [label="retryBusy", color="#c62828", style=dashed];
   w0s2 -> w1 [label="runs", style=bold];
   w0s2 -> w0s0 [label="backToStart", color="#c62828", style=dashed];
   w1 -> w1s0;

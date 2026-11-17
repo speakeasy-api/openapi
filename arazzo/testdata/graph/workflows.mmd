@@ -20,7 +20,7 @@ flowchart TB
   w0s0 --> w0s1
   w0s1 -.->|"dependsOn"| w1s0
   w0s1 -.->|"giveUp"| x1
-  w0s1 -.->|"retryBusy"| w0s1
+  w0s1 -.->|"retryBusy"| w0s0
   w0s2 ==>|"runs"| w1
   w0s2 -.->|"backToStart"| w0s0
   w1 --> w1s0

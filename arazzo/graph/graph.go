@@ -306,13 +306,15 @@ func (b *builder) stepRef(w *arazzo.Workflow, ref string) *Node {
 	return b.externalNode(ref, label)
 }
 
-// externalNode returns the external node for the reference, creating it the first time the reference is seen.
+// externalNode returns the external node for the reference and label, creating it the first time they are seen. The
+// label is part of the key as a bare stepId resolves to a different step in each workflow.
 func (b *builder) externalNode(ref, label string) *Node {
-	if node, ok := b.external[ref]; ok {
+	key := ref + "\x00" + label
+	if node, ok := b.external[key]; ok {
 		return node
 	}
 	node := &Node{ID: "x" + strconv.Itoa(len(b.g.External)), Kind: NodeExternal, Label: label}
-	b.external[ref] = node
+	b.external[key] = node
 	b.g.External = append(b.g.External, node)
 	return node
 }

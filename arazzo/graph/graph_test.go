@@ -84,7 +84,7 @@ func TestBuild_Success(t *testing.T) {
 		"findPet -next-> adopt",
 		"adopt -dependsOn-> register (dependsOn)",
 		"adopt -failure-> shared.cleanup (giveUp)",
-		"adopt -retry-> adopt (retryBusy)",
+		"adopt -failure-> findPet (retryBusy)",
 		"notify -runs-> registerOwner (runs)",
 		"notify -failure-> findPet (backToStart)",
 		"registerOwner -start-> register",
@@ -154,6 +154,12 @@ workflows:
           - name: back
             type: goto
             stepId: first
+  - workflowId: other
+    steps:
+      - stepId: elsewhere
+        operationId: e
+        dependsOn:
+          - missing
 `)
 
 	g, err := graph.Build(doc, graph.Options{})
@@ -164,7 +170,7 @@ workflows:
 	assert.Empty(t, steps[0].Detail, "a target matching the stepId should not be repeated")
 	assert.Equal(t, "$sourceDescriptions.events.channels.pets", steps[2].Detail, "detail should be the channelPath")
 	assert.Empty(t, steps[3].Detail, "a step without a target has no detail")
-	require.Len(t, g.Workflows, 2, "duplicate workflows should both be drawn")
+	require.Len(t, g.Workflows, 3, "duplicate workflows should both be drawn")
 
 	expected := []string{
 		"main -start-> first",
@@ -175,6 +181,8 @@ workflows:
 		"third -next-> noTarget",
 		"main -start-> duplicate",
 		"duplicate -success-> first (back)",
+		"other -start-> elsewhere",
+		"elsewhere -dependsOn-> other.steps.missing (dependsOn)",
 	}
 	assert.Equal(t, expected, edges(g), "actions after an unconditional action should be left out")
 }

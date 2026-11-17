@@ -163,8 +163,8 @@ func (g *Graph) WriteDOT(w io.Writer) error {
 }
 
 var (
-	mermaidReplacer = strings.NewReplacer("#", "#35;", `"`, "#quot;", "<", "#lt;", ">", "#gt;", "\n", " ")
-	dotReplacer     = strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`)
+	mermaidReplacer = strings.NewReplacer("#", "#35;", `"`, "#quot;", "<", "#lt;", ">", "#gt;", "\r\n", " ", "\r", " ", "\n", " ")
+	dotReplacer     = strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\r\n", `\n`, "\r", `\n`, "\n", `\n`)
 )
 
 // mermaidText escapes text for use within a quoted Mermaid label.

@@ -226,10 +226,14 @@ $CLI arazzo graph arazzo/testdata/graph/workflows.arazzo.yaml dist/test/test-ara
 diff -u arazzo/testdata/graph/workflows.mmd dist/test/test-arazzo-graph.mmd
 $CLI arazzo graph arazzo/testdata/graph/workflows.arazzo.yaml dist/test/test-arazzo-graph.dot > /dev/null 2>&1
 diff -u arazzo/testdata/graph/workflows.dot dist/test/test-arazzo-graph.dot
-$CLI arazzo graph --workflow registerOwner --direction LR arazzo/testdata/speakeasybar.arazzo.yaml > /dev/null 2>&1 && {
+if $CLI arazzo graph --workflow registerOwner arazzo/testdata/speakeasybar.arazzo.yaml > dist/test/test-arazzo-graph-missing.txt 2>&1; then
     echo "    ❌ Expected arazzo graph to fail for an unknown workflow"
     exit 1
-}
+fi
+if ! grep -q "workflow \`registerOwner\` not found" dist/test/test-arazzo-graph-missing.txt; then
+    echo "    ❌ Expected arazzo graph to report the unknown workflow"
+    exit 1
+fi
 $CLI arazzo graph --format dot --direction LR arazzo/testdata/speakeasybar.arazzo.yaml > /dev/null 2>&1
 
 # Test arazzo validation with known bad file (should fail)
