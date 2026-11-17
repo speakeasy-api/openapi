@@ -193,6 +193,39 @@ func TestMarshal_NewDocument_Success(t *testing.T) {
 	assert.Empty(t, validationErrs, "new document should be valid")
 }
 
+func TestValidate_NewDocument_Success(t *testing.T) {
+	t.Parallel()
+
+	a := asyncapi.NewAsyncAPI()
+	a.Info = asyncapi.Info{
+		Title:   "Orders",
+		Version: "0.1.0",
+		Tags:    []*asyncapi.Tag{{Name: pointer.From("orders")}},
+	}
+
+	assert.Empty(t, a.Validate(t.Context()), "new document should have no validation errors")
+	assert.True(t, a.Valid, "new document built in code should be valid")
+	assert.True(t, a.Info.Valid, "info built in code should be valid")
+}
+
+func TestValidate_Nil_Success(t *testing.T) {
+	t.Parallel()
+
+	var a *asyncapi.AsyncAPI
+	assert.Nil(t, a.Validate(t.Context()), "validating a nil document should not panic")
+}
+
+func TestSupportedMinorVersions_ReturnsCopy(t *testing.T) {
+	t.Parallel()
+
+	versions := asyncapi.SupportedMinorVersions()
+	assert.Equal(t, []string{"3.0", "3.1"}, versions, "should return the supported minor versions")
+
+	versions[0] = "9.9"
+	assert.Equal(t, []string{"3.0", "3.1"}, asyncapi.SupportedMinorVersions(), "mutating the result should not change the policy")
+	assert.True(t, asyncapi.IsSupportedVersion("3.0.0"), "version policy should be unchanged")
+}
+
 func TestUnmarshal_Versions_Success(t *testing.T) {
 	t.Parallel()
 
@@ -263,6 +296,11 @@ func TestUnmarshal_ValidationErrors_Error(t *testing.T) {
 			name:          "tag without name",
 			doc:           "asyncapi: 3.1.0\ninfo:\n  title: T\n  version: '1'\n  tags:\n    - description: d\n",
 			expectedRules: []string{validation.RuleValidationRequiredField},
+		},
+		{
+			name:          "tag without name still validates external docs",
+			doc:           "asyncapi: 3.1.0\ninfo:\n  title: T\n  version: '1'\n  tags:\n    - externalDocs:\n        description: d\n",
+			expectedRules: []string{validation.RuleValidationRequiredField, validation.RuleValidationRequiredField},
 		},
 		{
 			name:          "external docs without url",

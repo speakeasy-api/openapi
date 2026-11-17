@@ -89,6 +89,14 @@ then:
 			doc:  "type: number\ndefault: 1\n",
 		},
 		{
+			name: "unquoted yaml date default for string type",
+			doc:  "type: string\ndefault: 2024-01-01\n",
+		},
+		{
+			name: "integral float default for integer type",
+			doc:  "type: integer\ndefault: 2.0\n",
+		},
+		{
 			name: "draft 07 format does not apply asyncapi discriminator rules",
 			doc:  "schemaFormat: application/schema+json;version=draft-07\nschema:\n  type: object\n  discriminator: missing\n",
 		},
@@ -151,6 +159,12 @@ func TestSchemaUnion_Validate_Error(t *testing.T) {
 		{
 			name:          "default must conform to type",
 			doc:           "type: string\ndefault: 1\n",
+			expectedRules: []string{"error:" + validation.RuleValidationTypeMismatch},
+			expectedLines: []int{2},
+		},
+		{
+			name:          "non integral default beyond float precision for integer type",
+			doc:           "type: integer\ndefault: 1.0000000000000001\n",
 			expectedRules: []string{"error:" + validation.RuleValidationTypeMismatch},
 			expectedLines: []int{2},
 		},

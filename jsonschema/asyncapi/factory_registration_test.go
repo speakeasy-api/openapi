@@ -8,6 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/jsonschema/asyncapi/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
+	"github.com/speakeasy-api/openapi/values"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,6 +28,9 @@ func TestFactoryRegistration_Success(t *testing.T) {
 		{name: "Items", typ: reflect.TypeOf(asyncapi.Items{})},
 		{name: "Dependency", typ: reflect.TypeOf(asyncapi.Dependency{})},
 		{name: "Type", typ: reflect.TypeOf(asyncapi.Type{})},
+		{name: "schema or bool either value", typ: reflect.TypeOf(values.EitherValue[asyncapi.Schema, core.Schema, bool, bool]{})},
+		{name: "slice of schemas", typ: reflect.TypeOf([]*asyncapi.JSONSchema{})},
+		{name: "map of dependencies", typ: reflect.TypeOf(sequencedmap.Map[string, *asyncapi.Dependency]{})},
 		{name: "map of schemas", typ: reflect.TypeOf(sequencedmap.Map[string, *asyncapi.JSONSchema]{})},
 		{name: "map of schema unions", typ: reflect.TypeOf(sequencedmap.Map[string, *asyncapi.SchemaUnion]{})},
 		{name: "core Schema", typ: reflect.TypeOf(core.Schema{})},

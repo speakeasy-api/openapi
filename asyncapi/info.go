@@ -161,7 +161,7 @@ func (i *Info) Validate(ctx context.Context, opts ...validation.Option) []error 
 		errs = append(errs, i.ExternalDocs.Validate(ctx, opts...)...)
 	}
 
-	i.Valid = len(errs) == 0 && core.GetValid()
+	i.Valid = len(errs) == 0 && coreValid(core)
 
 	return errs
 }
@@ -230,7 +230,7 @@ func (c *Contact) Validate(_ context.Context, _ ...validation.Option) []error {
 		}
 	}
 
-	c.Valid = len(errs) == 0 && core.GetValid()
+	c.Valid = len(errs) == 0 && coreValid(core)
 
 	return errs
 }
@@ -287,7 +287,7 @@ func (l *License) Validate(_ context.Context, _ ...validation.Option) []error {
 		}
 	}
 
-	l.Valid = len(errs) == 0 && core.GetValid()
+	l.Valid = len(errs) == 0 && coreValid(core)
 
 	return errs
 }
@@ -349,15 +349,16 @@ func (t *Tag) Validate(ctx context.Context, opts ...validation.Option) []error {
 		if err := t.Ref.Validate(); err != nil {
 			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, err, core, core.Ref))
 		}
-	case t.Name == nil || *t.Name == "":
-		errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`tag.name` is required"), core, core.Name))
 	default:
+		if t.Name == nil || *t.Name == "" {
+			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationRequiredField, errors.New("`tag.name` is required"), core, core.Name))
+		}
 		if t.ExternalDocs != nil {
 			errs = append(errs, t.ExternalDocs.Validate(ctx, opts...)...)
 		}
 	}
 
-	t.Valid = len(errs) == 0 && core.GetValid()
+	t.Valid = len(errs) == 0 && coreValid(core)
 
 	return errs
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"mime"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -15,10 +16,16 @@ import (
 // Latest is the latest AsyncAPI Specification version supported, used as the default for new documents.
 const Latest = "3.1.0"
 
-// SupportedMinorVersions are the `major.minor` AsyncAPI Specification versions supported.
+// supportedMinorVersions are the `major.minor` AsyncAPI Specification versions supported.
+// Kept private so callers cannot change the version policy process-wide.
+var supportedMinorVersions = []string{"3.0", "3.1"}
+
+// SupportedMinorVersions returns a copy of the `major.minor` AsyncAPI Specification versions supported.
 // Any patch release (and permitted suffix) of a supported minor version is accepted, as the
 // specification states the patch version is not considered by tooling.
-var SupportedMinorVersions = []string{"3.0", "3.1"}
+func SupportedMinorVersions() []string {
+	return slices.Clone(supportedMinorVersions)
+}
 
 // versionRegex matches the AsyncAPI version string grammar `major.minor.patch` where the patch
 // may be suffixed by a hyphen and extra alphanumeric characters.
@@ -76,12 +83,7 @@ func (v Version) MinorLine() string {
 
 // IsSupported returns true if the version belongs to a supported minor line.
 func (v Version) IsSupported() bool {
-	for _, supported := range SupportedMinorVersions {
-		if v.MinorLine() == supported {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(supportedMinorVersions, v.MinorLine())
 }
 
 // IsSupported returns true if the provided AsyncAPI version string is valid and belongs to a supported minor line.
@@ -95,8 +97,8 @@ func IsSupported(v string) bool {
 
 // SupportedVersionPatterns returns the supported versions in a human readable form, e.g. `3.0.x`.
 func SupportedVersionPatterns() []string {
-	patterns := make([]string, 0, len(SupportedMinorVersions))
-	for _, v := range SupportedMinorVersions {
+	patterns := make([]string, 0, len(supportedMinorVersions))
+	for _, v := range supportedMinorVersions {
 		patterns = append(patterns, v+".x")
 	}
 	return patterns

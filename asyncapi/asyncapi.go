@@ -22,14 +22,17 @@ import (
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/values"
+	"go.yaml.in/yaml/v3"
 )
 
 // Version is the latest version of the AsyncAPI Specification that this package supports, used for new documents.
 const Version = asyncapiversion.Latest
 
-// SupportedMinorVersions are the `major.minor` AsyncAPI Specification versions supported by this package.
+// SupportedMinorVersions returns a copy of the `major.minor` AsyncAPI Specification versions supported by this package.
 // Any patch release (and permitted suffix) of a supported minor version is accepted.
-var SupportedMinorVersions = asyncapiversion.SupportedMinorVersions
+func SupportedMinorVersions() []string {
+	return asyncapiversion.SupportedMinorVersions()
+}
 
 // IsSupportedVersion returns true if the provided AsyncAPI version string is valid and belongs to a supported minor version.
 func IsSupportedVersion(v string) bool {
@@ -163,6 +166,10 @@ func (a *AsyncAPI) Sync(ctx context.Context) error {
 
 // Validate will validate the AsyncAPI document against the AsyncAPI Specification.
 func (a *AsyncAPI) Validate(ctx context.Context, opts ...validation.Option) []error {
+	if a == nil {
+		return nil
+	}
+
 	core := a.GetCore()
 	errs := []error{}
 
@@ -190,7 +197,17 @@ func (a *AsyncAPI) Validate(ctx context.Context, opts ...validation.Option) []er
 	// A missing `info` is reported as a required field when unmarshalling.
 	errs = append(errs, a.Info.Validate(ctx, opts...)...)
 
-	a.Valid = len(errs) == 0 && core.GetValid()
+	a.Valid = len(errs) == 0 && coreValid(core)
 
 	return errs
+}
+
+// coreValid reports whether a core model is free of unmarshalling errors. Models built in code rather than
+// parsed have no root node and no unmarshalling errors, so they are treated as valid.
+func coreValid(c interface {
+	GetRootNode() *yaml.Node
+	GetValid() bool
+},
+) bool {
+	return c.GetRootNode() == nil || c.GetValid()
 }

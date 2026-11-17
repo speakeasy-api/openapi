@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"net/url"
 	"slices"
 	"strconv"
@@ -182,7 +183,8 @@ func nodeMatchesType(node *yaml.Node, typ string) bool {
 		return typ == "array"
 	case yaml.ScalarNode:
 		switch n.ShortTag() {
-		case "!!str":
+		case "!!str", "!!timestamp":
+			// Unquoted YAML dates such as 2024-01-01 resolve to !!timestamp but are strings in JSON.
 			return typ == "string"
 		case "!!bool":
 			return typ == "boolean"
@@ -195,8 +197,9 @@ func nodeMatchesType(node *yaml.Node, typ string) bool {
 				return true
 			}
 			if typ == "integer" {
-				f, err := strconv.ParseFloat(n.Value, 64)
-				return err == nil && f == math.Trunc(f)
+				// Use an exact decimal so values like 1.0000000000000001 aren't rounded to an integer.
+				r, ok := new(big.Rat).SetString(n.Value)
+				return ok && r.IsInt()
 			}
 		}
 	case yaml.DocumentNode, yaml.AliasNode:
