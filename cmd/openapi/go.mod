@@ -6,8 +6,8 @@ require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.1
 	charm.land/lipgloss/v2 v2.1.0
-	github.com/speakeasy-api/openapi v1.26.4-0.20261116012745-bdb0d271330e
-	github.com/speakeasy-api/openapi/openapi/linter/customrules v0.0.0-20261116012745-bdb0d271330e
+	github.com/speakeasy-api/openapi v1.26.5-0.20261117001351-36d00b32f5d8
+	github.com/speakeasy-api/openapi/openapi/linter/customrules v0.0.0-20261117001351-36d00b32f5d8
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
 	go.yaml.in/yaml/v3 v3.0.6
@@ -40,7 +40,6 @@ require (
 	github.com/speakeasy-api/yaml-jsonpath v0.0.0-20261016002013-07e5f48e6d17 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/xo/terminfo v1.0.0 // indirect
-	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
