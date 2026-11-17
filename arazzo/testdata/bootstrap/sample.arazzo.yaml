@@ -1,0 +1,82 @@
+arazzo: 1.1.0
+info:
+  title: Pet adoption workflows
+  summary: Workflows for finding and adopting pets
+  description: A new Arazzo document template ready to populate. Replace the source description with your own OpenAPI document and update the workflows to call its operations.
+  version: 1.0.0
+sourceDescriptions:
+  - name: petStore
+    url: https://api.example.com/openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: adoptPet
+    summary: Find an available pet and adopt it
+    description: Searches for an available pet of the requested species, then adopts the first one found.
+    inputs:
+      type: object
+      properties:
+        species:
+          type: string
+          description: The species of pet to adopt
+        ownerName:
+          type: string
+          description: The name of the new owner
+      required:
+        - species
+        - ownerName
+    steps:
+      - stepId: findPets
+        description: Find available pets of the requested species, succeeding when at least one is found
+        operationId: $sourceDescriptions.petStore.findPets
+        parameters:
+          - reference: $components.parameters.apiVersion
+          - name: species
+            in: query
+            value: $inputs.species
+          - name: status
+            in: query
+            value: available
+        successCriteria:
+          - condition: $statusCode == 200
+          - context: $response.body
+            condition: $[0]
+            type:
+              type: jsonpath
+              version: rfc9535
+        outputs:
+          petId: $response.body#/0/id
+      - stepId: adoptPet
+        description: Adopt the first pet found
+        operationId: $sourceDescriptions.petStore.adoptPet
+        parameters:
+          - reference: $components.parameters.apiVersion
+          - name: petId
+            in: path
+            value: $steps.findPets.outputs.petId
+        requestBody:
+          contentType: application/json
+          payload:
+            ownerName: $inputs.ownerName
+        successCriteria:
+          - condition: $statusCode == 201
+        outputs:
+          adoptionId: $response.body#/id
+    failureActions:
+      - reference: $components.failureActions.retryWhenBusy
+    outputs:
+      petId: $steps.findPets.outputs.petId
+      adoptionId: $steps.adoptPet.outputs.adoptionId
+components:
+  parameters:
+    apiVersion:
+      name: X-API-Version
+      in: header
+      value: "2025-01-01"
+  failureActions:
+    retryWhenBusy:
+      name: retryWhenBusy
+      type: retry
+      retryAfter: 1
+      retryLimit: 3
+      criteria:
+        - condition: $statusCode == 503

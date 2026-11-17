@@ -9,4 +9,6 @@ func Apply(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(lintCmd)
 	rootCmd.AddCommand(listRulesCmd)
 	rootCmd.AddCommand(graphCmd)
+	rootCmd.AddCommand(bootstrapCmd)
+	rootCmd.AddCommand(exploreCmd)
 }
