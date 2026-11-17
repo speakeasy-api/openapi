@@ -40,6 +40,20 @@ func (v *effectiveView[T]) source(field string) (int, bool) {
 	return index, ok
 }
 
+// authoredSource reports a field written in an object without traits as set by the object itself.
+func authoredSource(root *yaml.Node, field string) (int, bool) {
+	root = yml.ResolveAlias(root)
+	if root == nil || root.Kind != yaml.MappingNode {
+		return 0, false
+	}
+	for i := 0; i+1 < len(root.Content); i += 2 {
+		if root.Content[i].Value == field && !isNull(root.Content[i+1]) {
+			return -1, true
+		}
+	}
+	return 0, false
+}
+
 // traitPatch is a trait's node and the document it came from, empty for the root document.
 type traitPatch struct {
 	node        *yaml.Node
@@ -117,7 +131,7 @@ func isNull(node *yaml.Node) bool {
 }
 
 type merger struct {
-	// nodeDocs records the document of nodes copied from documents other than the root document.
+	// nodeDocs records the document each copied node came from, empty for the root document.
 	nodeDocs map[*yaml.Node]string
 }
 
@@ -173,9 +187,7 @@ func (m *merger) copy(node *yaml.Node, doc string) *yaml.Node {
 	for i, child := range node.Content {
 		c.Content[i] = m.copy(child, doc)
 	}
-	if doc != "" {
-		m.nodeDocs[&c] = doc
-	}
+	m.nodeDocs[&c] = doc
 	return &c
 }
 
@@ -201,7 +213,8 @@ func (rc *resolveCall) applyOperationTraits(ctx context.Context, op *Operation, 
 
 	targetDoc := rc.documentOf("", base)
 	patches := make([]traitPatch, 0, len(op.Traits))
-	authored := diagnosticKeys(op.Validate(ctx, rc.validationOpts...))
+	authored := diagnosticSet{}
+	authored.add(op.Validate(ctx, rc.validationOpts...), targetDoc)
 	sameDocument := true
 	for _, trait := range op.Traits {
 		obj := trait.GetObject()
@@ -212,7 +225,7 @@ func (rc *resolveCall) applyOperationTraits(ctx context.Context, op *Operation, 
 		doc := rc.documentOf(string(trait.GetResolvedReference()), base)
 		sameDocument = sameDocument && doc == targetDoc
 		patches = append(patches, traitPatch{node: obj.GetCore().GetRootNode(), docLocation: doc})
-		authored.add(obj.Validate(ctx, rc.validationOpts...))
+		authored.add(obj.Validate(ctx, rc.validationOpts...), doc)
 	}
 
 	node, sources, nodeDocs := mergeTraits(op.GetCore().GetRootNode(), targetDoc, patches, operationTraitForbidden)
@@ -222,7 +235,7 @@ func (rc *resolveCall) applyOperationTraits(ctx context.Context, op *Operation, 
 		rc.addErrors([]error{validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, err, op.GetCore().GetRootNode())}, base)
 		return
 	}
-	rc.inheritedErrors(effective.Validate(ctx, rc.validationOpts...), authored, nodeDocs, base)
+	rc.inheritedErrors(effective.Validate(ctx, rc.validationOpts...), authored, nodeDocs, targetDoc, base)
 
 	op.setEffective(&effectiveView[Operation]{object: &effective, sources: sources})
 	rc.track(func() { op.setEffective(nil) })
@@ -236,7 +249,8 @@ func (rc *resolveCall) applyMessageTraits(ctx context.Context, message *Message,
 
 	targetDoc := rc.documentOf("", base)
 	patches := make([]traitPatch, 0, len(message.Traits))
-	authored := diagnosticKeys(message.Validate(ctx, rc.validationOpts...))
+	authored := diagnosticSet{}
+	authored.add(message.Validate(ctx, rc.validationOpts...), targetDoc)
 	sameDocument := true
 	for _, trait := range message.Traits {
 		obj := trait.GetObject()
@@ -247,7 +261,7 @@ func (rc *resolveCall) applyMessageTraits(ctx context.Context, message *Message,
 		doc := rc.documentOf(string(trait.GetResolvedReference()), base)
 		sameDocument = sameDocument && doc == targetDoc
 		patches = append(patches, traitPatch{node: obj.GetCore().GetRootNode(), docLocation: doc})
-		authored.add(obj.Validate(ctx, rc.validationOpts...))
+		authored.add(obj.Validate(ctx, rc.validationOpts...), doc)
 	}
 
 	node, sources, nodeDocs := mergeTraits(message.GetCore().GetRootNode(), targetDoc, patches, messageTraitForbidden)
@@ -257,7 +271,7 @@ func (rc *resolveCall) applyMessageTraits(ctx context.Context, message *Message,
 		rc.addErrors([]error{validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, err, message.GetCore().GetRootNode())}, base)
 		return
 	}
-	rc.inheritedErrors(effective.Validate(ctx, rc.validationOpts...), authored, nodeDocs, base)
+	rc.inheritedErrors(effective.Validate(ctx, rc.validationOpts...), authored, nodeDocs, targetDoc, base)
 
 	message.setEffective(&effectiveView[Message]{object: &effective, sources: sources})
 	rc.track(func() { message.setEffective(nil) })
@@ -275,44 +289,45 @@ func (rc *resolveCall) resolveEffective(ctx context.Context, effective any, same
 
 // inheritedErrors records diagnostics that only appear once traits are applied, such as an invalid combination of
 // a trait's and the target's values. Diagnostics already reported for the authored target or traits are skipped.
-func (rc *resolveCall) inheritedErrors(errs []error, authored diagnosticSet, nodeDocs map[*yaml.Node]string, base location) {
+func (rc *resolveCall) inheritedErrors(errs []error, authored diagnosticSet, nodeDocs map[*yaml.Node]string, targetDoc string, base location) {
 	for _, err := range errs {
 		var vErr *validation.Error
 		if !errors.As(err, &vErr) {
 			continue
 		}
-		if authored.has(vErr) {
+		doc, ok := nodeDocs[vErr.Node]
+		if !ok {
+			doc = targetDoc
+		}
+		if authored.has(vErr, doc) {
 			continue
 		}
-		if doc, ok := nodeDocs[vErr.Node]; ok && vErr.DocumentLocation == "" {
+		if doc != "" && vErr.DocumentLocation == "" {
 			vErr.DocumentLocation = doc
 		}
 		rc.addErrors([]error{err}, base)
 	}
 }
 
+// diagnosticKey identifies a diagnostic by where it was found, including the document, and its rule.
 type diagnosticKey struct {
+	doc          string
 	line, column int
 	rule         string
 }
 
 type diagnosticSet map[diagnosticKey]bool
 
-func diagnosticKeys(errs []error) diagnosticSet {
-	set := diagnosticSet{}
-	set.add(errs)
-	return set
-}
-
-func (s diagnosticSet) add(errs []error) {
+// add records diagnostics found in the provided document, empty for the root document.
+func (s diagnosticSet) add(errs []error, doc string) {
 	for _, err := range errs {
 		var vErr *validation.Error
 		if errors.As(err, &vErr) {
-			s[diagnosticKey{line: vErr.GetLineNumber(), column: vErr.GetColumnNumber(), rule: vErr.Rule}] = true
+			s[diagnosticKey{doc: doc, line: vErr.GetLineNumber(), column: vErr.GetColumnNumber(), rule: vErr.Rule}] = true
 		}
 	}
 }
 
-func (s diagnosticSet) has(vErr *validation.Error) bool {
-	return s[diagnosticKey{line: vErr.GetLineNumber(), column: vErr.GetColumnNumber(), rule: vErr.Rule}]
+func (s diagnosticSet) has(vErr *validation.Error, doc string) bool {
+	return s[diagnosticKey{doc: doc, line: vErr.GetLineNumber(), column: vErr.GetColumnNumber(), rule: vErr.Rule}]
 }

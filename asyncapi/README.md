@@ -47,9 +47,15 @@ validationErrs, err := doc.ResolveAllReferences(ctx, asyncapi.ResolveAllOptions{
 	VirtualFS:        fsys,                 // optional, defaults to the local file system
 	HTTPClient:       client,               // optional, defaults to http.DefaultClient
 })
+if err != nil {
+	return err // only for failures that stop resolution, such as a cancelled context
+}
+for _, vErr := range validationErrs {
+	fmt.Println(vErr)
+}
 
 operation := doc.Operations.GetOrZero("placeOrder").GetObject()
-channel := operation.Channel.GetChannel()
+fmt.Println(operation.Channel.GetChannel().GetAddress())
 for _, message := range operation.Messages {
 	fmt.Println(message.GetMessage().GetName())
 }
@@ -62,13 +68,16 @@ for _, message := range operation.Messages {
 
 ### Effective operations and messages
 
-After resolution, `GetEffective` returns an operation or message with its traits applied, as a separate snapshot:
+After resolution, `GetEffective` returns an operation or message with its traits applied, as a separate snapshot. An operation or message without traits is returned as itself.
 
 ```go
 effective := operation.GetEffective()
 fmt.Println(effective.GetSummary())
 
-index, ok := operation.GetTraitSource("summary") // index into Traits, or -1 if the operation sets it
+// index is the position in Traits, or -1 if the operation sets the field itself.
+if index, ok := operation.GetTraitSource("summary"); ok {
+	fmt.Println("summary comes from", index)
+}
 ```
 
 Traits are applied with JSON Merge Patch in declaration order, and the object's own values win:

@@ -495,6 +495,41 @@ operations:
 	assert.Equal(t, "from trait", effective.GetSummary(), "allowed trait fields should apply")
 }
 
+func TestResolveAllReferences_UntraitedSources_Success(t *testing.T) {
+	t.Parallel()
+
+	a, errs := resolveDoc(t, operationTraitsDoc, asyncapi.ResolveAllOptions{})
+	require.Empty(t, errs, "resolution should report nothing")
+
+	operation := a.GetOperations().GetOrZero("o").GetObject()
+	operation.Traits = nil
+
+	assert.Same(t, operation, operation.GetEffective(), "an operation without traits is its own effective view")
+	source, ok := operation.GetTraitSource("action")
+	assert.True(t, ok, "a field written on the operation should have a source")
+	assert.Equal(t, -1, source, "a field written on the operation should come from the operation")
+	_, ok = operation.GetTraitSource("summary")
+	assert.False(t, ok, "a field from a removed trait should have no source")
+
+	message := asyncapi.Message{}
+	_, ok = message.GetTraitSource("name")
+	assert.False(t, ok, "an absent field should have no source")
+}
+
+func TestResolveAllReferences_InlinedReference_Success(t *testing.T) {
+	t.Parallel()
+
+	a, errs := resolveDoc(t, inDocumentResolutionDoc, asyncapi.ResolveAllOptions{})
+	require.Empty(t, errs, "resolution should report nothing")
+
+	server := a.GetServers().GetOrZero("prod")
+	require.NotEmpty(t, server.GetResolvedReference(), "reference should be resolved")
+
+	server.Object = server.GetObject()
+	server.Reference = nil
+	assert.Empty(t, server.GetResolvedReference(), "an inline object has no resolved reference")
+}
+
 func TestResolveAllReferences_Refresh_Success(t *testing.T) {
 	t.Parallel()
 

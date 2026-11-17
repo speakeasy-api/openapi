@@ -96,7 +96,7 @@ func (r *Reference[T, V, C]) IsResolved() bool {
 // GetResolvedReference returns the absolute location of the object a Reference Object resolved to, after following
 // any chain of references. It is empty for inline objects and unresolved references.
 func (r *Reference[T, V, C]) GetResolvedReference() references.Reference {
-	if r == nil {
+	if r == nil || !r.IsReference() {
 		return ""
 	}
 	resolutionMu.RLock()

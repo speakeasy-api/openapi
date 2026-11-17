@@ -840,6 +840,26 @@ func TestSync_ExplicitNull_Success(t *testing.T) {
 	}
 }
 
+func TestSync_ExplicitNull_NewCore_Success(t *testing.T) {
+	t.Parallel()
+
+	var node yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte("stringField: s\nstringPtrField: null\nboolField: true\nintField: 1\nfloat64Field: 1.5\n"), &node), "yaml should parse")
+
+	// Sync into a fresh core that was never populated from the node.
+	highModel := tests.TestPrimitiveHighModel{StringField: "s", BoolField: true, IntField: 1, Float64Field: 1.5}
+	_, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), node.Content[0], false)
+	require.NoError(t, err, "sync should succeed")
+
+	field := highModel.GetCore().StringPtrField
+	require.True(t, field.Present, "kept null should be present")
+	require.NotNil(t, field.KeyNode, "key node should point at the authored key")
+	require.Equal(t, "stringPtrField", field.KeyNode.Value, "key node should be the authored key")
+	require.NotNil(t, field.ValueNode, "value node should point at the authored null")
+	require.Equal(t, "!!null", field.ValueNode.Tag, "value node should be the authored null")
+	require.Nil(t, field.Value, "value should be unset")
+}
+
 func TestSync_ExtensionModification_Success(t *testing.T) {
 	t.Parallel()
 

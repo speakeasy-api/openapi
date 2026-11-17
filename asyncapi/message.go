@@ -57,11 +57,11 @@ type Message struct {
 var _ interfaces.Model[core.Message] = (*Message)(nil)
 
 // GetEffective returns the message with its traits applied, as computed by the last call to
-// AsyncAPI.ResolveAllReferences. A message without traits is its own effective view. Returns nil if the message has
-// traits that haven't been applied.
+// AsyncAPI.ResolveAllReferences. Returns nil if the message has traits that haven't been applied.
 //
-// The effective message is a separate snapshot: it doesn't change the authored document, and editing it has no
-// effect on the document.
+// For a message with traits the result is a separate snapshot: editing it has no effect on the document. A message
+// without traits is its own effective view, so GetEffective returns the message itself and editing the result edits
+// the document.
 func (m *Message) GetEffective() *Message {
 	if m == nil {
 		return nil
@@ -74,8 +74,14 @@ func (m *Message) GetEffective() *Message {
 
 // GetTraitSource reports where a top-level field of the effective message came from: the index in Traits of the
 // trait that supplied it, or -1 if the message sets it itself. ok is false if the field isn't in the effective
-// message or traits haven't been applied.
+// message or traits haven't been applied. For a message without traits, fields written in the document report -1.
 func (m *Message) GetTraitSource(field string) (index int, ok bool) {
+	if m == nil {
+		return 0, false
+	}
+	if len(m.Traits) == 0 {
+		return authoredSource(m.GetCore().GetRootNode(), field)
+	}
 	return m.effectiveView().source(field)
 }
 

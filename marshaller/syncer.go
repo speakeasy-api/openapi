@@ -206,9 +206,11 @@ func syncChanges(ctx context.Context, source any, target any, valueNode *yaml.No
 		}
 
 		// An explicit null is how a document says a value is unset, the same as leaving it out. Keep an authored
-		// null while the value is still unset, so documents round-trip unchanged.
-		if isNilValue(sourceVal) && hasNullMapValue(ctx, valueNode, key) {
-			nodeMutator.SetPresent(true)
+		// null while the value is still unset, so documents round-trip unchanged, and point the backing node at it.
+		if nullKeyNode, nullValueNode := nullMapEntry(ctx, valueNode, key); isNilValue(sourceVal) && nullValueNode != nil {
+			if _, err := nodeMutator.Unmarshal(ctx, "", nullKeyNode, nullValueNode); err != nil {
+				return nil, err
+			}
 		} else {
 			keyNode, valNode, err := nodeMutator.SyncValue(ctx, key, sourceInt)
 			if err != nil {
@@ -599,14 +601,17 @@ func isNilValue(v reflect.Value) bool {
 	}
 }
 
-// hasNullMapValue returns true if the mapping node has the key with an explicit null value.
-func hasNullMapValue(ctx context.Context, mapNode *yaml.Node, key string) bool {
+// nullMapEntry returns the key and value nodes of the mapping entry for key if its value is an explicit null.
+func nullMapEntry(ctx context.Context, mapNode *yaml.Node, key string) (*yaml.Node, *yaml.Node) {
 	if mapNode == nil {
-		return false
+		return nil, nil
 	}
-	_, valueNode, found := yml.GetMapElementNodes(ctx, mapNode, key)
-	valueNode = yml.ResolveAlias(valueNode)
-	return found && valueNode != nil && valueNode.Kind == yaml.ScalarNode && valueNode.Tag == "!!null"
+	keyNode, valueNode, found := yml.GetMapElementNodes(ctx, mapNode, key)
+	resolved := yml.ResolveAlias(valueNode)
+	if !found || resolved == nil || resolved.Kind != yaml.ScalarNode || resolved.Tag != "!!null" {
+		return nil, nil
+	}
+	return keyNode, valueNode
 }
 
 func dereferenceType(typ reflect.Type) reflect.Type {

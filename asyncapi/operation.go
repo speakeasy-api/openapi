@@ -62,11 +62,11 @@ type Operation struct {
 var _ interfaces.Model[core.Operation] = (*Operation)(nil)
 
 // GetEffective returns the operation with its traits applied, as computed by the last call to
-// AsyncAPI.ResolveAllReferences. An operation without traits is its own effective view. Returns nil if the operation
-// has traits that haven't been applied.
+// AsyncAPI.ResolveAllReferences. Returns nil if the operation has traits that haven't been applied.
 //
-// The effective operation is a separate snapshot: it doesn't change the authored document, and editing it has no
-// effect on the document.
+// For an operation with traits the result is a separate snapshot: editing it has no effect on the document. An
+// operation without traits is its own effective view, so GetEffective returns the operation itself and editing the
+// result edits the document.
 func (o *Operation) GetEffective() *Operation {
 	if o == nil {
 		return nil
@@ -79,8 +79,14 @@ func (o *Operation) GetEffective() *Operation {
 
 // GetTraitSource reports where a top-level field of the effective operation came from: the index in Traits of the
 // trait that supplied it, or -1 if the operation sets it itself. ok is false if the field isn't in the effective
-// operation or traits haven't been applied.
+// operation or traits haven't been applied. For an operation without traits, fields written in the document report -1.
 func (o *Operation) GetTraitSource(field string) (index int, ok bool) {
+	if o == nil {
+		return 0, false
+	}
+	if len(o.Traits) == 0 {
+		return authoredSource(o.GetCore().GetRootNode(), field)
+	}
 	return o.effectiveView().source(field)
 }
 
