@@ -2,7 +2,7 @@
 
 ## Local CI toolchain
 
-`.mise.toml` pins Go to `1.26.0`, the minimum version declared by `go.work` and
+`.mise.toml` pins Go to `1.26.7`, the minimum version declared by `go.work` and
 all module files. It sets `GOTOOLCHAIN=local` so dependency or tooling changes
 cannot silently select a newer Go version. GitHub CI also selects Go from
 `go.work`. Keep the mise pin aligned when intentionally changing the minimum.

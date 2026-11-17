@@ -1,11 +1,11 @@
 module github.com/speakeasy-api/openapi/cmd/openapi
 
-go 1.26.0
+go 1.26.7
 
 require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.1
-	charm.land/lipgloss/v2 v2.0.6
+	charm.land/lipgloss/v2 v2.1.0
 	github.com/speakeasy-api/openapi v1.26.4-0.20261116012745-bdb0d271330e
 	github.com/speakeasy-api/openapi/openapi/linter/customrules v0.0.0-20261116012745-bdb0d271330e
 	github.com/spf13/cobra v1.10.2
@@ -40,7 +40,8 @@ require (
 	github.com/speakeasy-api/yaml-jsonpath v0.0.0-20261016002013-07e5f48e6d17 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/xo/terminfo v1.0.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/net v0.61.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 )
