@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/speakeasy-api/openapi/arazzo"
+	"github.com/speakeasy-api/openapi/arazzo/internal/actions"
 	"github.com/speakeasy-api/openapi/linter"
 	"github.com/speakeasy-api/openapi/validation"
 )
@@ -98,7 +99,7 @@ func reachableSteps(a *arazzo.Arazzo, w *arazzo.Workflow) []bool {
 
 		next := i + 1
 		continues := true
-		for _, action := range successActions(a, w, s) {
+		for _, action := range actions.Success(a, w, s) {
 			if action.Type == arazzo.SuccessActionTypeGoto {
 				mark(action.StepID)
 			}
@@ -107,7 +108,7 @@ func reachableSteps(a *arazzo.Arazzo, w *arazzo.Workflow) []bool {
 				break
 			}
 		}
-		for _, action := range failureActions(a, w, s) {
+		for _, action := range actions.Failure(a, w, s) {
 			if action.Type == arazzo.FailureActionTypeGoto {
 				mark(action.StepID)
 			}

@@ -33,6 +33,9 @@ $CLI spec bootstrap --help > /dev/null
 $CLI arazzo validate --help > /dev/null
 $CLI arazzo lint --help > /dev/null
 $CLI arazzo list-rules --help > /dev/null
+$CLI arazzo graph --help > /dev/null
+$CLI arazzo bootstrap --help > /dev/null
+$CLI arazzo explore --help > /dev/null
 $CLI overlay apply --help > /dev/null
 $CLI overlay validate --help > /dev/null
 $CLI overlay compare --help > /dev/null
@@ -219,6 +222,43 @@ fi
 $CLI arazzo list-rules > /dev/null
 $CLI arazzo list-rules --format json > /dev/null
 
+# Test arazzo graph rendering against the golden files
+echo "  ✓ Testing arazzo graph..."
+$CLI arazzo graph arazzo/testdata/graph/workflows.arazzo.yaml dist/test/test-arazzo-graph.mmd > /dev/null 2>&1
+diff -u arazzo/testdata/graph/workflows.mmd dist/test/test-arazzo-graph.mmd
+$CLI arazzo graph arazzo/testdata/graph/workflows.arazzo.yaml dist/test/test-arazzo-graph.dot > /dev/null 2>&1
+diff -u arazzo/testdata/graph/workflows.dot dist/test/test-arazzo-graph.dot
+if $CLI arazzo graph --workflow registerOwner arazzo/testdata/speakeasybar.arazzo.yaml > dist/test/test-arazzo-graph-missing.txt 2>&1; then
+    echo "    ❌ Expected arazzo graph to fail for an unknown workflow"
+    exit 1
+fi
+if ! grep -q "workflow \`registerOwner\` not found" dist/test/test-arazzo-graph-missing.txt; then
+    echo "    ❌ Expected arazzo graph to report the unknown workflow"
+    exit 1
+fi
+$CLI arazzo graph --format dot --direction LR arazzo/testdata/speakeasybar.arazzo.yaml > /dev/null 2>&1
+
+# Test arazzo bootstrap: generated documents should match the golden files, validate against their source and lint clean
+echo "  ✓ Testing arazzo bootstrap..."
+$CLI arazzo bootstrap dist/test/test-arazzo-bootstrap-sample.arazzo.yaml > /dev/null 2>&1
+diff -u arazzo/testdata/bootstrap/sample.arazzo.yaml dist/test/test-arazzo-bootstrap-sample.arazzo.yaml
+$CLI arazzo validate --skip-sources dist/test/test-arazzo-bootstrap-sample.arazzo.yaml > /dev/null
+cp arazzo/testdata/bootstrap/petstore.openapi.yaml dist/test/test-arazzo-bootstrap.openapi.yaml
+$CLI arazzo bootstrap --from dist/test/test-arazzo-bootstrap.openapi.yaml dist/test/test-arazzo-bootstrap.arazzo.yaml > /dev/null 2>&1
+diff -u <(sed 's#./petstore.openapi.yaml#./test-arazzo-bootstrap.openapi.yaml#' arazzo/testdata/bootstrap/petstore.arazzo.yaml) dist/test/test-arazzo-bootstrap.arazzo.yaml
+$CLI arazzo validate dist/test/test-arazzo-bootstrap.arazzo.yaml > /dev/null
+$CLI arazzo lint dist/test/test-arazzo-bootstrap.arazzo.yaml > /dev/null
+$CLI arazzo bootstrap --from dist/test/test-arazzo-bootstrap.openapi.yaml --operations createPet,getPet --workflow-id createAndFetch dist/test/test-arazzo-bootstrap-operations.arazzo.yaml > /dev/null 2>&1
+$CLI arazzo validate dist/test/test-arazzo-bootstrap-operations.arazzo.yaml > /dev/null
+if $CLI arazzo bootstrap --from dist/test/test-arazzo-bootstrap.openapi.yaml --tag missing > dist/test/test-arazzo-bootstrap-missing.txt 2>&1; then
+    echo "    ❌ Expected arazzo bootstrap to fail for an unknown tag"
+    exit 1
+fi
+if ! grep -q "no operations found for tag \`missing\`" dist/test/test-arazzo-bootstrap-missing.txt; then
+    echo "    ❌ Expected arazzo bootstrap to report the unknown tag"
+    exit 1
+fi
+
 # Test arazzo validation with known bad file (should fail)
 echo "  ✓ Testing arazzo validation with known bad file..."
 if $CLI arazzo validate --skip-sources arazzo/testdata/invalid.arazzo.yaml > /dev/null 2>&1; then
@@ -297,7 +337,7 @@ echo "   - Tested all command help outputs"
 echo "   - Validated known good and bad files"
 echo "   - Tested bootstrap, upgrade, inline, clean, sanitize, bundle, join commands"
 echo "   - Compared outputs with expected results"
-echo "   - Tested arazzo validation, lint and list-rules"
+echo "   - Tested arazzo validation, lint, list-rules, graph and bootstrap"
 echo "   - Tested overlay validation, apply, and compare"
 echo "   - Tested error cases and edge conditions"
 echo "   - Validated all generated files"

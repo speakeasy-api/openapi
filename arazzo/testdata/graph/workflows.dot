@@ -1,0 +1,35 @@
+digraph arazzo {
+  rankdir=TB;
+  node [shape=box, style=rounded, fontname="Helvetica"];
+  edge [fontname="Helvetica", fontsize=10];
+  subgraph cluster_wf0 {
+    label="Find a pet and adopt it";
+    style=rounded;
+    w0 [label="adoptPet", shape=oval];
+    w0s0 [label="findPet\nlistPets"];
+    w0s1 [label="adopt\n{$sourceDescriptions.petstore.url}#/paths/~1pets~1{petId}/post"];
+    w0s2 [label="notify\nworkflow registerOwner"];
+  }
+  subgraph cluster_wf1 {
+    label="registerOwner";
+    style=rounded;
+    w1 [label="registerOwner", shape=oval];
+    w1s0 [label="register\ncreateOwner"];
+  }
+  x0 [label="shared.audit", style="rounded,dashed"];
+  x1 [label="shared.cleanup", style="rounded,dashed"];
+  x2 [label="shared.audit.steps.log", style="rounded,dashed"];
+  w0 -> w1 [label="dependsOn", color="#757575", style=dotted];
+  w0 -> x0 [label="dependsOn", color="#757575", style=dotted];
+  w0 -> w0s0;
+  w0s0 -> w0s2 [label="tooMany", color="#2e7d32"];
+  w0s0 -> w0s0 [label="retryBusy", color="#c62828", style=dashed];
+  w0s0 -> w0s1;
+  w0s1 -> w1s0 [label="dependsOn", color="#757575", style=dotted];
+  w0s1 -> x1 [label="giveUp", color="#c62828", style=dashed];
+  w0s1 -> w0s0 [label="retryBusy", color="#c62828", style=dashed];
+  w0s2 -> w1 [label="runs", style=bold];
+  w0s2 -> w0s0 [label="backToStart", color="#c62828", style=dashed];
+  w1 -> w1s0;
+  w1s0 -> x2 [label="dependsOn", color="#757575", style=dotted];
+}
