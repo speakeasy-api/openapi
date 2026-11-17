@@ -515,6 +515,43 @@ components:
 `,
 			wantErrs: []string{"exclusiveMaximum expected `boolean`, got `number`"},
 		},
+		{
+			name: "number_top_level_ref_in_3_0_component_schema",
+			yml: `
+openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    S:
+      $ref: 1
+`,
+			wantErrs: []string{"[10:13] error validation-type-mismatch schema.$ref expected `string`, got `number`"},
+		},
+		{
+			name: "boolean_top_level_ref_with_siblings_in_3_0_parameter_schema",
+			yml: `
+openapi: 3.0.3
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /items:
+    get:
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            $ref: true
+            exclusiveMinimum: 5
+      responses:
+        '200':
+          description: OK
+`,
+			wantErrs: []string{"[13:19] error validation-type-mismatch schema.$ref expected `string`, got `boolean`"},
+		},
 	}
 
 	for _, tt := range tests {
