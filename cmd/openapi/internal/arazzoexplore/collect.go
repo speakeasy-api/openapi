@@ -78,9 +78,16 @@ func workflowItem(a *arazzo.Arazzo, w *arazzo.Workflow) Item {
 	d.list("Success actions", successActions(a, w.SuccessActions, ""))
 	d.list("Failure actions", failureActions(a, w.FailureActions, ""))
 	d.list("Outputs", outputs(w.Outputs))
-	d.field("Steps", strconv.Itoa(len(w.Steps)))
 
-	return Item{Kind: KindWorkflow, Label: w.WorkflowID, Summary: deref(w.Summary), Details: d.lines}
+	steps := 0
+	for _, s := range w.Steps {
+		if s != nil {
+			steps++
+		}
+	}
+	d.field("Steps", strconv.Itoa(steps))
+
+	return Item{Kind: KindWorkflow, Label: oneLine(w.WorkflowID), Summary: oneLine(deref(w.Summary)), Details: d.lines}
 }
 
 func stepItem(a *arazzo.Arazzo, w *arazzo.Workflow, s *arazzo.Step) Item {
@@ -105,7 +112,12 @@ func stepItem(a *arazzo.Arazzo, w *arazzo.Workflow, s *arazzo.Step) Item {
 
 	d.list("Outputs", outputs(s.Outputs))
 
-	return Item{Kind: KindStep, Label: s.StepID, Badge: badge, Summary: target, Details: d.lines}
+	return Item{Kind: KindStep, Label: oneLine(s.StepID), Badge: badge, Summary: oneLine(target), Details: d.lines}
+}
+
+// oneLine joins the lines of a value with spaces, for values shown in a row.
+func oneLine(value string) string {
+	return strings.Join(strings.Fields(value), " ")
 }
 
 // stepTarget returns the badge, target and label of the target of a step.
@@ -135,7 +147,8 @@ func stepTarget(s *arazzo.Step) (string, string, string) {
 	}
 }
 
-// details builds the detail lines of a row.
+// details builds the detail lines of a row. Every detail line is a single terminal line, so values with line breaks
+// (such as CommonMark descriptions) continue on indented lines.
 type details struct {
 	lines []string
 }
@@ -143,7 +156,7 @@ type details struct {
 // field adds a `Name: value` line, skipping empty values.
 func (d *details) field(name, value string) {
 	if value != "" {
-		d.lines = append(d.lines, name+": "+value)
+		d.add(name+": ", "  ", value)
 	}
 }
 
@@ -154,7 +167,18 @@ func (d *details) list(name string, entries []string) {
 	}
 	d.lines = append(d.lines, name+":")
 	for _, e := range entries {
-		d.lines = append(d.lines, "  - "+e)
+		d.add("  - ", "    ", e)
+	}
+}
+
+// add adds a value prefixed by prefix, with any further lines of the value prefixed by indent.
+func (d *details) add(prefix, indent, value string) {
+	for i, line := range strings.Split(strings.TrimRight(strings.ReplaceAll(value, "\r\n", "\n"), "\n"), "\n") {
+		if i == 0 {
+			d.lines = append(d.lines, prefix+line)
+		} else {
+			d.lines = append(d.lines, indent+line)
+		}
 	}
 }
 
@@ -472,11 +496,14 @@ func outputs(o arazzo.Outputs) []string {
 		switch {
 		case v == nil:
 			out = append(out, name)
-		case v.IsSelector():
+		case v.GetSelector() != nil:
 			sel := v.GetSelector()
 			out = append(out, fmt.Sprintf("%s: %s from %s (%s)", name, sel.Selector, sel.Context, sel.Type.GetType()))
-		default:
+		case v.GetExpression() != nil:
 			out = append(out, name+": "+v.GetExpression().String())
+		default:
+			// An output without a value, which validation reports.
+			out = append(out, name)
 		}
 	}
 	return out

@@ -60,7 +60,10 @@ workflows:
 			inputFile:      "-",
 			stdin:          stdinDoc,
 			expectedView:   []string{"piped", "only", "Arazzo vunknown · Arazzo 1.1.0 · 1 workflows"},
-			expectedStderr: "reading document from stdin",
+			expectedStderr: "Note: reading document from stdin; interactive TUI requires /dev/tty for keyboard input.\n" +
+				"⚠️  Found 2 validation errors in document:\n" +
+				"  1. [3:10] error validation-required-field `info.title` is required\n" +
+				"  2. [4:12] error validation-required-field `info.version` is required\n\n",
 		},
 	}
 
@@ -73,7 +76,7 @@ workflows:
 			for _, expected := range tt.expectedView {
 				assert.Contains(t, view, expected, "view should contain the expected content")
 			}
-			assert.Contains(t, stderr, tt.expectedStderr, "stderr should contain the expected output")
+			assert.Equal(t, tt.expectedStderr, stderr, "stderr should match exactly")
 		})
 	}
 }

@@ -65,6 +65,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		key := msg.String()
 
+		// Only consecutive presses form the "gg" sequence.
+		if key != "g" {
+			m.lastKey = ""
+		}
+
 		switch key {
 		case "q", "ctrl+c":
 			if !m.showHelp {

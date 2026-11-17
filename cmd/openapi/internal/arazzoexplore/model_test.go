@@ -107,6 +107,8 @@ func TestModel_Navigation_Success(t *testing.T) {
 		{name: "down stops at the bottom", keys: []tea.KeyPressMsg{key('G'), key('j')}, expected: 5},
 		{name: "gg jumps to the top", keys: []tea.KeyPressMsg{key('G'), key('g'), key('g')}, expected: 0},
 		{name: "a single g doesn't move", keys: []tea.KeyPressMsg{key('G'), key('g')}, expected: 5},
+		{name: "another key interrupts gg", keys: []tea.KeyPressMsg{key('G'), key('g'), key('e'), key('g')}, expected: 5},
+		{name: "a key swallowed by help interrupts gg", keys: []tea.KeyPressMsg{key('G'), key('g'), key('?'), key('?'), key('g')}, expected: 5},
 		{name: "next workflow", keys: []tea.KeyPressMsg{key(']')}, expected: 3},
 		{name: "next workflow stays on the last", keys: []tea.KeyPressMsg{key(']'), key(']')}, expected: 3},
 		{name: "previous workflow from a step", keys: []tea.KeyPressMsg{key('G'), key('[')}, expected: 3},
