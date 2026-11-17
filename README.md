@@ -70,7 +70,7 @@
 
 ### [arazzo](./arazzo)
 
-The `arazzo` package provides an API for working with Arazzo 1.0.x and 1.1.x documents including reading, creating, mutating, walking, validating, linting, upgrading and graphing them.
+The `arazzo` package provides an API for working with Arazzo 1.0.x and 1.1.x documents including reading, creating, mutating, walking, validating, linting, upgrading and graphing them, and bootstrapping them from OpenAPI documents.
 
 ### [openapi](./openapi)
 
@@ -149,6 +149,7 @@ The CLI provides four main command groups:
   - `lint` - Lint an Arazzo workflow document for semantic issues, style and security concerns, with optional fixes
   - `list-rules` - List the available Arazzo lint rules
   - `graph` - Render the workflows of an Arazzo document as a Mermaid or Graphviz DOT diagram
+  - `bootstrap` - Generate starter Arazzo workflows from an OpenAPI document, or create an example Arazzo document
 
 - **`openapi overlay`** - Commands for working with OpenAPI overlays ([documentation](./cmd/openapi/commands/overlay/README.md))
   - `apply` - Apply an overlay to an OpenAPI specification
@@ -202,6 +203,9 @@ openapi arazzo lint --fix ./workflow.arazzo.yaml
 
 # Render the workflows of an Arazzo document as a Mermaid flowchart
 openapi arazzo graph ./workflow.arazzo.yaml
+
+# Generate starter Arazzo workflows from an OpenAPI document
+openapi arazzo bootstrap --from ./openapi.yaml ./workflows.arazzo.yaml
 
 # Validate a Swagger 2.0 document
 openapi swagger validate ./api.swagger.yaml

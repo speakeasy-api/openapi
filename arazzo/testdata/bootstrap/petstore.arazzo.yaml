@@ -1,0 +1,117 @@
+arazzo: 1.1.0
+info:
+  title: Pet Store API workflows
+  description: Starter workflows generated from Pet Store API 2.0.0. Review each step's parameters, request body and success criteria, then add outputs or chain further steps as needed.
+  version: 1.0.0
+sourceDescriptions:
+  - name: petStoreAPI
+    url: ./petstore.openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: pets
+    summary: Calls the `pets` operations in order
+    description: Find, create and fetch pets
+    inputs:
+      type: object
+      properties:
+        species:
+          type: string
+          enum:
+            - dog
+            - cat
+          description: The species of pet
+        createPetBody:
+          type: object
+          description: The pet to create
+      required:
+        - species
+        - createPetBody
+    steps:
+      - stepId: listPets
+        description: List pets
+        operationId: listPets
+        parameters:
+          - name: species
+            in: query
+            value: $inputs.species
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          petId: $response.body#/0/id
+      - stepId: createPet
+        description: Create a pet
+        operationId: createPet
+        requestBody:
+          contentType: application/json
+          payload: $inputs.createPetBody
+        successCriteria:
+          - condition: $statusCode == 201
+      - stepId: getPet
+        description: Get a pet
+        operationId: getPet
+        parameters:
+          - name: petId
+            in: path
+            value: $steps.listPets.outputs.petId
+        successCriteria:
+          - context: $statusCode
+            condition: ^2\d\d$
+            type: regex
+  - workflowId: adoption
+    summary: Adopt a new pet
+    inputs:
+      type: object
+      properties:
+        createPetBody:
+          type: object
+          description: The pet to create
+        note:
+          type: string
+          description: A note for the adoption
+      required:
+        - createPetBody
+        - note
+    steps:
+      - stepId: createPet
+        description: Create a pet
+        operationId: createPet
+        requestBody:
+          contentType: application/json
+          payload: $inputs.createPetBody
+        successCriteria:
+          - condition: $statusCode == 201
+        outputs:
+          petId: $response.body#/id
+          requestBody: $response.body#/owner
+      - stepId: postPetsPetIdAdopt
+        description: Adopt a pet
+        operationPath: '{$sourceDescriptions.petStoreAPI.url}#/paths/~1pets~1{petId}~1adopt/post'
+        parameters:
+          - name: petId
+            in: path
+            value: $steps.createPet.outputs.petId
+          - name: X-Channel
+            in: header
+            value: web
+          - name: note
+            in: query
+            value: $inputs.note
+        requestBody:
+          contentType: application/json
+          payload: $steps.createPet.outputs.requestBody
+        successCriteria:
+          - condition: $statusCode == 200
+  - workflowId: default
+    summary: Calls the operations without tags in order
+    steps:
+      - stepId: health
+        operationId: health
+        successCriteria:
+          - context: $statusCode
+            condition: ^2\d\d$
+            type: regex
+      - stepId: purgeHealth
+        description: Purge caches
+        operationPath: '{$sourceDescriptions.petStoreAPI.url}#/paths/~1health/additionalOperations/PURGE'
+        successCriteria:
+          - condition: $statusCode == 204

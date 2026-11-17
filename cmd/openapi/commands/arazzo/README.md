@@ -13,6 +13,7 @@ Arazzo workflows describe sequences of API calls and their dependencies. These c
   - [`lint`](#lint)
   - [`list-rules`](#list-rules)
   - [`graph`](#graph)
+  - [`bootstrap`](#bootstrap)
 - [What is Arazzo?](#what-is-arazzo)
   - [Example Arazzo Document](#example-arazzo-document)
 - [Common Use Cases](#common-use-cases)
@@ -314,6 +315,120 @@ flowchart TB
   linkStyle 0 stroke:#757575
   linkStyle 3 stroke:#c62828
 ```
+
+### `bootstrap`
+
+Create a new Arazzo document, either with starter workflows generated from an OpenAPI document, or as an example demonstrating best practices.
+
+```bash
+# Generate a workflow per tag from an OpenAPI document
+openapi arazzo bootstrap --from ./openapi.yaml ./workflows.arazzo.yaml
+
+# Only generate the workflows for some tags (`default` selects the operations without tags)
+openapi arazzo bootstrap --from ./openapi.yaml --tag pets --tag default ./workflows.arazzo.yaml
+
+# Generate a single workflow calling some operations in order
+openapi arazzo bootstrap --from ./openapi.yaml --operations createPet,getPet,adoptPet --workflow-id adoptPet ./workflows.arazzo.yaml
+
+# Create an example Arazzo document and print it to stdout
+openapi arazzo bootstrap
+```
+
+| Flag            | Description                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------- |
+| `--from`        | OpenAPI document to generate workflows from                                                       |
+| `--tag`         | Only generate the workflows for these tags (repeatable or comma separated)                        |
+| `--operations`  | Generate a single workflow calling these operationIds in order (comma separated)                  |
+| `--workflow-id` | `workflowId` of the workflow generated for `--operations` (default `main`)                        |
+| `--source-name` | Name of the OpenAPI source description (default derived from the OpenAPI document's `info.title`) |
+
+With `--from`, there is one workflow per tag, calling the tag's operations in the order they appear in the document. Operations without tags go in a workflow named `default`, and an operation with several tags is in the workflow for each of them. Each step:
+
+- Targets its operation by `operationId`, or by `operationPath` if the operation doesn't have one
+- Passes the operation's required parameters, and its request body when it's required
+- Takes those values from workflow inputs, typed from the operation's schemas
+- Succeeds on the operation's first documented 2xx status code, or any 2xx status code if it only documents a range or a default response
+
+When an earlier step's successful response declares an [OpenAPI link](https://spec.openapis.org/oas/latest.html#link-object) to the operation, the value comes from that step instead: link expressions such as `$response.body#/id` become outputs of the earlier step, and constants are used as they are. Link values that embed expressions in a string, such as `"pet {$response.body#/id}"`, fall back to a workflow input.
+
+The source description's `url` is the OpenAPI document's path relative to the output file (or to the current directory when writing to stdout), so the generated document passes [`validate`](#validate) and [`lint`](#lint) straight away. Review the generated steps before using them: the workflows call every operation of a tag in document order, which won't always be a meaningful flow.
+
+For example, these operations:
+
+```yaml
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      tags: [pets]
+      parameters:
+        - name: species
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [dog, cat]
+      responses:
+        "200":
+          description: The pets
+          links:
+            getFirstPet:
+              operationId: getPet
+              parameters:
+                petId: $response.body#/0/id
+  /pets/{petId}:
+    get:
+      operationId: getPet
+      tags: [pets]
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The pet
+```
+
+generate this workflow:
+
+```yaml
+workflows:
+  - workflowId: pets
+    summary: Calls the `pets` operations in order
+    inputs:
+      type: object
+      properties:
+        species:
+          type: string
+          enum:
+            - dog
+            - cat
+      required:
+        - species
+    steps:
+      - stepId: listPets
+        operationId: listPets
+        parameters:
+          - name: species
+            in: query
+            value: $inputs.species
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          petId: $response.body#/0/id
+      - stepId: getPet
+        operationId: getPet
+        parameters:
+          - name: petId
+            in: path
+            value: $steps.listPets.outputs.petId
+        successCriteria:
+          - condition: $statusCode == 200
+```
+
+Without `--from`, the example document has a workflow with inputs and outputs, steps that pass values to each other, success criteria, and reusable parameter and failure action components.
 
 ## What is Arazzo?
 
