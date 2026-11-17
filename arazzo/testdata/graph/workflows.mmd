@@ -1,0 +1,32 @@
+flowchart TB
+  subgraph wf0 ["Find a pet and adopt it"]
+    w0(["adoptPet"])
+    w0s0["findPet<br/>listPets"]
+    w0s1["adopt<br/>{$sourceDescriptions.petstore.url}#35;/paths/~1pets~1{petId}/post"]
+    w0s2["notify<br/>workflow registerOwner"]
+  end
+  subgraph wf1 ["registerOwner"]
+    w1(["registerOwner"])
+    w1s0["register<br/>createOwner"]
+  end
+  x0{{"shared.audit"}}
+  x1{{"shared.cleanup"}}
+  x2{{"shared.audit.steps.log"}}
+  w0 -.->|"dependsOn"| w1
+  w0 -.->|"dependsOn"| x0
+  w0 --> w0s0
+  w0s0 -->|"tooMany"| w0s2
+  w0s0 -.->|"retryBusy"| w0s0
+  w0s0 --> w0s1
+  w0s1 -.->|"dependsOn"| w1s0
+  w0s1 -.->|"giveUp"| x1
+  w0s1 -.->|"retryBusy"| w0s0
+  w0s2 ==>|"runs"| w1
+  w0s2 -.->|"backToStart"| w0s0
+  w1 --> w1s0
+  w1s0 -.->|"dependsOn"| x2
+  linkStyle 0,1,6,12 stroke:#757575
+  linkStyle 3 stroke:#2e7d32
+  linkStyle 4,7,8,10 stroke:#c62828
+  classDef external stroke-dasharray: 5 5
+  class x0,x1,x2 external

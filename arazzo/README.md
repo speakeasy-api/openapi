@@ -253,6 +253,46 @@ for i, err := range a.ValidateSources(ctx, sources) {
 }
 ```
 
+## Generate starter workflows from an OpenAPI document
+
+Shows generating a workflow calling some operations in order, wired together by the OpenAPI document's links.
+
+```go
+ctx := context.Background()
+
+location := "testdata/bootstrap/petstore.openapi.yaml"
+
+f, err := os.Open(location)
+if err != nil {
+	panic(err)
+}
+defer f.Close()
+
+doc, _, err := openapi.Unmarshal(ctx, f)
+if err != nil {
+	panic(err)
+}
+
+if _, err := doc.ResolveAllReferences(ctx, openapi.ResolveAllOptions{OpenAPILocation: location}); err != nil {
+	panic(err)
+}
+
+a, err := arazzo.BootstrapFromOpenAPI(doc, arazzo.BootstrapOptions{
+	SourceURL:    "./petstore.openapi.yaml",
+	OperationIDs: []string{"listPets", "getPet"},
+	WorkflowID:   "findPet",
+})
+if err != nil {
+	panic(err)
+}
+
+for _, step := range a.Workflows[0].Steps {
+	for _, parameter := range step.Parameters {
+		fmt.Printf("%s: %s = %s\n", step.StepID, parameter.Object.Name, parameter.Object.Value.Value)
+	}
+}
+```
+
 <!-- END USAGE EXAMPLES -->
 
 ## Contributing

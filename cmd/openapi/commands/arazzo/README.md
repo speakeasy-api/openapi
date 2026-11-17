@@ -10,6 +10,11 @@ Arazzo workflows describe sequences of API calls and their dependencies. These c
 - [Available Commands](#available-commands)
   - [`validate`](#validate)
   - [`upgrade`](#upgrade)
+  - [`lint`](#lint)
+  - [`list-rules`](#list-rules)
+  - [`graph`](#graph)
+  - [`bootstrap`](#bootstrap)
+  - [`explore`](#explore)
 - [What is Arazzo?](#what-is-arazzo)
   - [Example Arazzo Document](#example-arazzo-document)
 - [Common Use Cases](#common-use-cases)
@@ -113,6 +118,366 @@ arazzo: 1.1.0
             type:
               type: jsonpath
               version: draft-goessner-dispatch-jsonpath-00
+```
+
+### `lint`
+
+Lint an Arazzo workflow document for semantic issues, style and security concerns. Lint reports everything [`validate`](#validate) does, plus lint rules such as:
+
+- Steps that can never run, and workflows or steps that depend on each other in a cycle
+- Unused components, workflow inputs and step outputs
+- Steps without `successCriteria`, and retries without `retryAfter`
+- Source descriptions without a `type`, or loaded over plain HTTP
+
+```bash
+# Lint an Arazzo workflow document, checking it against its source descriptions
+openapi arazzo lint ./workflow.arazzo.yaml
+
+# Only lint the document itself, without loading its source descriptions
+openapi arazzo lint --skip-sources ./workflow.arazzo.yaml
+
+# Use the recommended ruleset and disable a rule
+openapi arazzo lint --ruleset recommended --disable style-step-success-criteria ./workflow.arazzo.yaml
+
+# Output as JSON
+openapi arazzo lint --format json ./workflow.arazzo.yaml
+
+# Add a per-rule summary table to the text output
+openapi arazzo lint --summary ./workflow.arazzo.yaml
+
+# Lint from stdin
+cat ./workflow.arazzo.yaml | openapi arazzo lint
+
+# Apply fixes that don't need input, previewing them first
+openapi arazzo lint --fix --dry-run ./workflow.arazzo.yaml
+openapi arazzo lint --fix ./workflow.arazzo.yaml
+
+# Also be prompted for fixes that need input, such as a missing info description
+openapi arazzo lint --fix-interactive ./workflow.arazzo.yaml
+```
+
+| Flag                | Description                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `-f, --format`      | Output format: `text` (default) or `json`                                            |
+| `-r, --ruleset`     | Ruleset to use: `all` (default) or `recommended`                                     |
+| `-c, --config`      | Path to a lint config file (default `~/.openapi/arazzo-lint.yaml`)                   |
+| `-d, --disable`     | Rule IDs to disable (can be repeated)                                                |
+| `--summary`         | Print a per-rule summary table of findings                                           |
+| `--skip-sources`    | Don't load source descriptions to check the document against them                    |
+| `--fix`             | Apply fixes that don't need input and write the file back                            |
+| `--fix-interactive` | Apply all fixes, prompting for the ones that need input                              |
+| `--dry-run`         | Show the fixes that would be applied without changing the file (requires a fix flag) |
+
+The configuration file uses the same format as `openapi spec lint`, but is kept separate as the rules and rulesets differ:
+
+```yaml
+extends: recommended
+
+rules:
+  - id: style-step-success-criteria
+    severity: error
+  - id: semantic-unused-step-output
+    disabled: true
+```
+
+The available fixes remove unused components, set a source description's `type` (from the loaded document when the source was loaded, otherwise by asking), and add an `info.description` (by asking). Fixes aren't supported when reading from stdin.
+
+Before `--fix`:
+
+```yaml
+sourceDescriptions:
+  - name: petstore
+    url: ./petstore.openapi.yaml
+# ...
+components:
+  parameters:
+    unusedParam:
+      name: limit
+      in: query
+      value: 10
+```
+
+After:
+
+```yaml
+sourceDescriptions:
+  - name: petstore
+    url: ./petstore.openapi.yaml
+    type: openapi
+# ...
+```
+
+See the [Arazzo linter documentation](../../../../arazzo/linter/README.md) for every rule.
+
+### `list-rules`
+
+List the available Arazzo lint rules with their category, default severity, fix guidance and rulesets.
+
+```bash
+# List all rules
+openapi arazzo list-rules
+
+# Filter by category or ruleset
+openapi arazzo list-rules --category semantic
+openapi arazzo list-rules --ruleset recommended
+
+# Output as JSON
+openapi arazzo list-rules --format json
+```
+
+| Flag           | Description                                         |
+| -------------- | --------------------------------------------------- |
+| `-f, --format` | Output format: `text` (default) or `json`           |
+| `--category`   | Filter by category: `semantic`, `style`, `security` |
+| `--ruleset`    | Filter by ruleset: `all` or `recommended`           |
+
+### `graph`
+
+Render the workflows of an Arazzo document as a [Mermaid](https://mermaid.js.org/) flowchart or a [Graphviz](https://graphviz.org/) DOT digraph.
+
+```bash
+# Print a Mermaid flowchart, ready to paste into Markdown or GitHub
+openapi arazzo graph ./workflow.arazzo.yaml
+
+# Write a DOT file (the format is inferred from .dot and .gv extensions) and render it with Graphviz
+openapi arazzo graph ./workflow.arazzo.yaml ./workflow.dot
+dot -Tsvg ./workflow.dot -o ./workflow.svg
+
+# Only render one workflow, laid out left to right
+openapi arazzo graph --workflow adoptPet --direction LR ./workflow.arazzo.yaml
+
+# Render from stdin
+cat ./workflow.arazzo.yaml | openapi arazzo graph
+```
+
+| Flag              | Description                                                                      |
+| ----------------- | -------------------------------------------------------------------------------- |
+| `-f, --format`    | Output format: `mermaid` (default) or `dot` (default for `.dot` and `.gv` files) |
+| `-w, --workflow`  | Only render the workflow with this `workflowId`                                  |
+| `-d, --direction` | Layout direction: `TB` (top to bottom, default) or `LR` (left to right)          |
+
+Each workflow is drawn as a group, starting from a node named after its `workflowId`, containing its steps and the operation, operation path, channel or workflow each one targets. The edges show:
+
+| Edge                                 | Mermaid     | DOT         |
+| ------------------------------------ | ----------- | ----------- |
+| A step following on to the next step | solid       | solid       |
+| A success action `goto`              | solid green | solid green |
+| A failure action `goto` or `retry`   | dashed red  | dashed red  |
+| A workflow or step `dependsOn` entry | dashed grey | dotted grey |
+| A step running another workflow      | thick       | bold        |
+
+Steps run in order unless a success action ends the workflow or goes elsewhere. Actions are taken in order and the first that applies wins, so an action without `criteria` always applies: the actions after it aren't drawn, and a step only follows on to the next step if none of its success actions apply unconditionally. Workflow level actions apply to every step unless the step has an action with the same name. Workflows and steps outside the diagram, such as those in other Arazzo documents referenced by `sourceDescriptions` or left out by `--workflow`, are drawn with dashed borders.
+
+For example, this workflow:
+
+```yaml
+workflows:
+  - workflowId: adoptPet
+    dependsOn:
+      - registerOwner
+    steps:
+      - stepId: findPet
+        operationId: listPets
+        onSuccess:
+          - name: noPets
+            type: end
+            criteria:
+              - condition: $response.body#/0 == null
+      - stepId: adopt
+        operationId: adoptPet
+        onFailure:
+          - name: retryBusy
+            type: retry
+            retryAfter: 1
+  - workflowId: registerOwner
+    steps:
+      - stepId: register
+        operationId: createOwner
+```
+
+renders as:
+
+```mermaid
+flowchart TB
+  subgraph wf0 ["adoptPet"]
+    w0(["adoptPet"])
+    w0s0["findPet<br/>listPets"]
+    w0s1["adopt<br/>adoptPet"]
+  end
+  subgraph wf1 ["registerOwner"]
+    w1(["registerOwner"])
+    w1s0["register<br/>createOwner"]
+  end
+  w0 -.->|"dependsOn"| w1
+  w0 --> w0s0
+  w0s0 --> w0s1
+  w0s1 -.->|"retryBusy"| w0s1
+  w1 --> w1s0
+  linkStyle 0 stroke:#757575
+  linkStyle 3 stroke:#c62828
+```
+
+### `bootstrap`
+
+Create a new Arazzo document, either with starter workflows generated from an OpenAPI document, or as an example demonstrating best practices.
+
+```bash
+# Generate a workflow per tag from an OpenAPI document
+openapi arazzo bootstrap --from ./openapi.yaml ./workflows.arazzo.yaml
+
+# Only generate the workflows for some tags (`default` selects the operations without tags)
+openapi arazzo bootstrap --from ./openapi.yaml --tag pets --tag default ./workflows.arazzo.yaml
+
+# Generate a single workflow calling some operations in order
+openapi arazzo bootstrap --from ./openapi.yaml --operations createPet,getPet,adoptPet --workflow-id adoptPet ./workflows.arazzo.yaml
+
+# Create an example Arazzo document and print it to stdout
+openapi arazzo bootstrap
+```
+
+| Flag            | Description                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------- |
+| `--from`        | OpenAPI document to generate workflows from                                                       |
+| `--tag`         | Only generate the workflows for these tags (repeatable or comma separated)                        |
+| `--operations`  | Generate a single workflow calling these operationIds in order (comma separated)                  |
+| `--workflow-id` | `workflowId` of the workflow generated for `--operations` (default `main`)                        |
+| `--source-name` | Name of the OpenAPI source description (default derived from the OpenAPI document's `info.title`) |
+
+With `--from`, there is one workflow per tag, calling the tag's operations in the order they appear in the document. Operations without tags go in the `default` workflow (along with any operations tagged `default`), and an operation with several tags is in the workflow for each of them. Each step:
+
+- Targets its operation by `operationId`, or by `operationPath` if the operation doesn't have one
+- Passes the operation's required parameters, and its request body when it's required
+- Takes those values from workflow inputs, typed from the operation's schemas. Steps share the input for the same parameter, and different parameters whose names would clash get a numbered input instead (such as `id2`)
+- Succeeds on the operation's documented 2xx status codes (`$statusCode == 200`, or a regex criterion such as `^(200|202)$` for several), or any 2xx status code if it documents the `2XX` range or no 2xx status codes
+
+When an earlier step's 2xx response declares an [OpenAPI link](https://spec.openapis.org/oas/latest.html#link-object) to the operation, the value comes from that step instead: link expressions such as `$response.body#/id` become outputs of the earlier step, and constants are used as they are. Link values that embed expressions in a string, such as `"pet {$response.body#/id}"`, fall back to a workflow input.
+
+The source description's `url` is the OpenAPI document's path relative to the output file (or to the current directory when writing to stdout), so the generated document passes [`validate`](#validate) and [`lint`](#lint) straight away. Review the generated steps before using them: the workflows call every operation of a tag in document order, which won't always be a meaningful flow.
+
+For example, these operations:
+
+```yaml
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      tags: [pets]
+      parameters:
+        - name: species
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [dog, cat]
+      responses:
+        "200":
+          description: The pets
+          links:
+            getFirstPet:
+              operationId: getPet
+              parameters:
+                petId: $response.body#/0/id
+  /pets/{petId}:
+    get:
+      operationId: getPet
+      tags: [pets]
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The pet
+```
+
+generate this workflow:
+
+```yaml
+workflows:
+  - workflowId: pets
+    summary: Calls the `pets` operations in order
+    inputs:
+      type: object
+      properties:
+        species:
+          type: string
+          enum:
+            - dog
+            - cat
+      required:
+        - species
+    steps:
+      - stepId: listPets
+        operationId: listPets
+        parameters:
+          - name: species
+            in: query
+            value: $inputs.species
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          petId: $response.body#/0/id
+      - stepId: getPet
+        operationId: getPet
+        parameters:
+          - name: petId
+            in: path
+            value: $steps.listPets.outputs.petId
+        successCriteria:
+          - condition: $statusCode == 200
+```
+
+Without `--from`, the example document has a workflow with inputs and outputs, steps that pass values to each other, success criteria, and reusable parameter and failure action components.
+
+### `explore`
+
+Browse the workflows of an Arazzo document in an interactive terminal UI, the Arazzo counterpart of `openapi spec explore`.
+
+```bash
+# Explore an Arazzo document
+openapi arazzo explore ./workflow.arazzo.yaml
+
+# Explore from stdin
+cat ./workflow.arazzo.yaml | openapi arazzo explore
+```
+
+Each workflow is listed with its steps underneath it. Steps have a badge for what they target: `OP` for an `operationId`, `PATH` for an `operationPath`, `FLOW` for a `workflowId`, and `SEND`, `RECV` or `CHAN` for an AsyncAPI `channelPath`. Expand a row to see its details:
+
+- **Workflows:** summary, description, `dependsOn`, inputs (with types and which are required), parameters, success and failure actions, and outputs
+- **Steps:** target, `correlationId` and `timeout`, `dependsOn`, parameters, request body, success criteria, success and failure actions, and outputs
+
+Parameters and actions that reference `components` are shown resolved, noting the component they came from. A step's actions include the workflow level actions it inherits, marked `(from workflow)`, unless the step overrides them with an action of the same name. Validation errors are listed before the explorer starts, but don't stop the document being explored.
+
+| Key           | Action                               |
+| ------------- | ------------------------------------ |
+| `↑`/`k`       | Move up                              |
+| `↓`/`j`       | Move down                            |
+| `gg` / `G`    | Jump to the top / bottom             |
+| `Ctrl-U`      | Scroll up by half a screen           |
+| `Ctrl-D`      | Scroll down by half a screen         |
+| `[` / `]`     | Jump to the previous / next workflow |
+| `Enter`/Space | Toggle details                       |
+| `e` / `E`     | Expand / collapse all details        |
+| `?`           | Toggle help                          |
+| `q`/`Ctrl+C`  | Quit                                 |
+
+For example, the [`graph`](#graph) test fixture with its first step expanded:
+
+```text
+▶ adoptPet  Find a pet and adopt it
+  ▼ OP   findPet  listPets
+      Operation: listPets
+      On success:
+        - noPets: end the workflow when $response.body#/0 == null
+        - tooMany: go to step notify when $response.body#/100 != null
+      On failure:
+        - retryBusy: retry after 1s when $statusCode == 503 (from $components.failureActions.retryBusy) (from workflow)
+  ▶ PATH adopt  {$sourceDescriptions.petstore.url}#/paths/~1pets~1{petId}/post
+  ▶ FLOW notify  registerOwner
+▶ registerOwner
+  ▶ OP   register  createOwner
 ```
 
 ## What is Arazzo?

@@ -1,0 +1,71 @@
+arazzo: 1.1.0
+info:
+  title: Lint issues
+  version: 1.0.0
+sourceDescriptions:
+  - name: petstore
+    url: ../sources/petstore.openapi.yaml
+  - name: legacy
+    url: http://api.example.com/openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: adopt
+    dependsOn:
+      - release
+    inputs:
+      type: object
+      properties:
+        petId:
+          type: integer
+        unused:
+          type: string
+    steps:
+      - stepId: fetch
+        operationId: $sourceDescriptions.petstore.getPet
+        parameters:
+          - name: petId
+            in: path
+            value: $inputs.petId
+        outputs:
+          pet: $response.body
+          unusedOutput: $response.body#/name
+        onSuccess:
+          - name: done
+            type: end
+        onFailure:
+          - name: retryNow
+            type: retry
+      - stepId: orphan
+        operationId: $sourceDescriptions.petstore.listPets
+        successCriteria:
+          - condition: $statusCode == 200
+    outputs:
+      pet: $steps.fetch.outputs.pet
+  - workflowId: release
+    summary: Releases pets, and depends on adopting them
+    dependsOn:
+      - adopt
+    steps:
+      - stepId: first
+        operationId: $sourceDescriptions.petstore.listPets
+        dependsOn:
+          - second
+        successCriteria:
+          - condition: $statusCode == 200
+      - stepId: second
+        operationId: $sourceDescriptions.petstore.listPets
+        dependsOn:
+          - first
+        successCriteria:
+          - condition: $statusCode == 200
+components:
+  parameters:
+    unusedParam:
+      name: limit
+      in: query
+      value: 10
+  failureActions:
+    unusedRetry:
+      name: unusedRetry
+      type: retry
+      retryAfter: 1
