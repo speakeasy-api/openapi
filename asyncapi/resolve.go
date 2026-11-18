@@ -475,28 +475,28 @@ type chainResult[T any] struct {
 
 // resolveChain resolves a reference, following further references until it reaches an object. Each reference is
 // resolved against the document containing it, and a reference seen twice in the same chain is reported as a cycle.
-func resolveChain[T any](ctx context.Context, rc *resolveCall, kind string, ref references.Reference, base location, unmarshal references.Unmarshal[T], next func(*T) references.Reference) (*chainResult[T], error) {
+func resolveChain[T any](ctx context.Context, rc *resolveCall, kind string, ref references.Reference, base location, unmarshal references.Unmarshal[T], next func(*T) references.Reference) (chainResult[T], error) {
 	var chain []string
 	for {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return chainResult[T]{}, err
 		}
 		if err := rc.checkAccess(ref, base); err != nil {
-			return nil, err
+			return chainResult[T]{}, err
 		}
 
 		abs, err := absoluteReference(ref, base.uri)
 		if err != nil {
-			return nil, fmt.Errorf("%s reference `%s` is invalid: %w", kind, ref, err)
+			return chainResult[T]{}, fmt.Errorf("%s reference `%s` is invalid: %w", kind, ref, err)
 		}
 		if slices.Contains(chain, abs) {
-			return nil, &circularReferenceError{chain: append(chain, abs)}
+			return chainResult[T]{}, &circularReferenceError{chain: append(chain, abs)}
 		}
 		chain = append(chain, abs)
 
 		if root, ok := base.doc.(*AsyncAPI); ok && ref.GetURI() == "" {
 			if err := checkLocalTarget[T](root, ref, kind); err != nil {
-				return nil, err
+				return chainResult[T]{}, err
 			}
 		}
 
@@ -509,10 +509,10 @@ func resolveChain[T any](ctx context.Context, rc *resolveCall, kind string, ref 
 			HTTPClient:          rc.opts.HTTPClient,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve %s reference `%s`: %w", kind, ref, err)
+			return chainResult[T]{}, fmt.Errorf("failed to resolve %s reference `%s`: %w", kind, ref, err)
 		}
 		if res == nil || res.Object == nil {
-			return nil, fmt.Errorf("%s reference `%s` resolved to nothing", kind, ref)
+			return chainResult[T]{}, fmt.Errorf("%s reference `%s` resolved to nothing", kind, ref)
 		}
 
 		nextBase := base
@@ -531,7 +531,7 @@ func resolveChain[T any](ctx context.Context, rc *resolveCall, kind string, ref 
 			continue
 		}
 
-		return &chainResult[T]{obj: res.Object, ref: references.Reference(abs), base: nextBase}, nil
+		return chainResult[T]{obj: res.Object, ref: references.Reference(abs), base: nextBase}, nil
 	}
 }
 
@@ -652,20 +652,20 @@ func nextReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](r
 }
 
 // resolveWrapperChain resolves a reference to an object of type T, which may be reached through other references.
-func resolveWrapperChain[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, rc *resolveCall, kind string, ref references.Reference, base location) (*chainResult[T], error) {
+func resolveWrapperChain[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, rc *resolveCall, kind string, ref references.Reference, base location) (chainResult[T], error) {
 	res, err := resolveChain(ctx, rc, kind, ref, base, unmarshalReference[T, V, C], nextReference[T, V, C])
 	if err != nil {
-		return nil, err
+		return chainResult[T]{}, err
 	}
 	obj := res.obj.GetObject()
 	if obj == nil {
-		return nil, fmt.Errorf("%s reference `%s` doesn't point to a %s", kind, ref, kind)
+		return chainResult[T]{}, fmt.Errorf("%s reference `%s` doesn't point to a %s", kind, ref, kind)
 	}
 	resolvedRef := res.ref
 	if res.obj.IsReference() {
 		resolvedRef = res.obj.GetResolvedReference()
 	}
-	return &chainResult[T]{obj: obj, ref: resolvedRef, base: res.base}, nil
+	return chainResult[T]{obj: obj, ref: resolvedRef, base: res.base}, nil
 }
 
 func resolveReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, rc *resolveCall, r *Reference[T, V, C], kind string, base location) {
@@ -677,9 +677,6 @@ func resolveReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler
 	res, err := resolveWrapperChain[T, V, C](ctx, rc, kind, r.GetReference(), base)
 	if err != nil {
 		rc.referenceError(err, base, c, c.Reference)
-		return
-	}
-	if res == nil {
 		return
 	}
 
@@ -699,13 +696,25 @@ func resolveReferenceObject[T any, V interfaces.Validator[T], C marshaller.CoreM
 		rc.referenceError(err, base, c, c.Reference)
 		return
 	}
-	if res == nil {
-		return
-	}
 
 	r.setResolved(res.obj, res.ref)
 	rc.track(func() { r.setResolved(nil, "") })
 	rc.loaded(ctx, res.obj, res.base)
+}
+
+// unmarshalModel returns an unmarshaller for a model that is its own Reference Object, such as a tag.
+func unmarshalModel[T any, C any, PT interface {
+	*T
+	marshaller.CoreAccessor[C]
+}](parentName string) references.Unmarshal[T] {
+	return func(ctx context.Context, node *yaml.Node, skipValidation bool) (*T, []error, error) {
+		var model T
+		validationErrs, err := marshaller.UnmarshalNode[C](ctx, parentName, node, PT(&model))
+		if skipValidation {
+			validationErrs = nil
+		}
+		return &model, validationErrs, err
+	}
 }
 
 func (rc *resolveCall) resolveTag(ctx context.Context, tag *Tag, base location) {
@@ -713,14 +722,6 @@ func (rc *resolveCall) resolveTag(ctx context.Context, tag *Tag, base location) 
 		return
 	}
 
-	unmarshal := func(ctx context.Context, node *yaml.Node, skipValidation bool) (*Tag, []error, error) {
-		var t Tag
-		validationErrs, err := marshaller.UnmarshalNode(ctx, "tag", node, &t)
-		if skipValidation {
-			validationErrs = nil
-		}
-		return &t, validationErrs, err
-	}
 	next := func(t *Tag) references.Reference {
 		if t.IsReference() {
 			return *t.Ref
@@ -729,12 +730,9 @@ func (rc *resolveCall) resolveTag(ctx context.Context, tag *Tag, base location) 
 	}
 
 	c := tag.GetCore()
-	res, err := resolveChain(ctx, rc, "tag", *tag.Ref, base, unmarshal, next)
+	res, err := resolveChain(ctx, rc, "tag", *tag.Ref, base, unmarshalModel[Tag, core.Tag]("tag"), next)
 	if err != nil {
 		rc.referenceError(err, base, c, c.Ref)
-		return
-	}
-	if res == nil {
 		return
 	}
 
@@ -748,14 +746,6 @@ func (rc *resolveCall) resolveExternalDocs(ctx context.Context, docs *ExternalDo
 		return
 	}
 
-	unmarshal := func(ctx context.Context, node *yaml.Node, skipValidation bool) (*ExternalDocumentation, []error, error) {
-		var d ExternalDocumentation
-		validationErrs, err := marshaller.UnmarshalNode(ctx, "externalDocs", node, &d)
-		if skipValidation {
-			validationErrs = nil
-		}
-		return &d, validationErrs, err
-	}
 	next := func(d *ExternalDocumentation) references.Reference {
 		if d.IsReference() {
 			return *d.Ref
@@ -764,12 +754,9 @@ func (rc *resolveCall) resolveExternalDocs(ctx context.Context, docs *ExternalDo
 	}
 
 	c := docs.GetCore()
-	res, err := resolveChain(ctx, rc, "external documentation", *docs.Ref, base, unmarshal, next)
+	res, err := resolveChain(ctx, rc, "external documentation", *docs.Ref, base, unmarshalModel[ExternalDocumentation, schemacore.ExternalDocumentation]("externalDocs"), next)
 	if err != nil {
 		rc.referenceError(err, base, c, c.Ref)
-		return
-	}
-	if res == nil {
 		return
 	}
 
@@ -786,14 +773,11 @@ func unmarshalSchemaUnion(ctx context.Context, node *yaml.Node, skipValidation b
 		return nil, validationErrs, err
 	}
 
-	var schema jsonschema.SchemaUnion
-	if err := schema.Populate(c); err != nil {
-		return nil, validationErrs, err
-	}
 	if skipValidation {
 		validationErrs = nil
 	}
-	return &schema, validationErrs, nil
+	var schema jsonschema.SchemaUnion
+	return &schema, validationErrs, schema.Populate(c)
 }
 
 func nextSchemaReference(schema *jsonschema.SchemaUnion) references.Reference {
