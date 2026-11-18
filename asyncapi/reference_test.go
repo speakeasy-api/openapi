@@ -35,6 +35,48 @@ func TestReference_NilGetters_Success(t *testing.T) {
 	var refObj *asyncapi.ReferenceObject
 	assert.Equal(t, references.Reference(""), refObj.GetReference(), "nil reference object should have an empty reference")
 	assert.Nil(t, refObj.Validate(t.Context()), "nil reference object should have no diagnostics")
+	assert.Nil(t, refObj.GetResolvedObject(), "nil reference object should have no resolved object")
+	assert.Equal(t, references.Reference(""), refObj.GetResolvedReference(), "nil reference object should have no resolved reference")
+	assert.False(t, refObj.IsResolved(), "nil reference object should not be resolved")
+	assert.Nil(t, refObj.GetChannel(), "nil reference object should have no channel")
+	assert.Nil(t, refObj.GetMessage(), "nil reference object should have no message")
+	assert.Nil(t, refObj.GetServer(), "nil reference object should have no server")
+}
+
+func TestReference_Unresolved_Success(t *testing.T) {
+	t.Parallel()
+
+	refObj := asyncapi.NewReferenceObject("#/channels/c")
+	assert.False(t, refObj.IsResolved(), "unresolved reference object should not be resolved")
+	assert.Equal(t, references.Reference(""), refObj.GetResolvedReference(), "unresolved reference object should have no resolved reference")
+	assert.Nil(t, refObj.GetChannel(), "unresolved reference object should have no channel")
+
+	ref := &asyncapi.ReferencedServer{Reference: pointer.From(references.Reference("#/components/servers/s"))}
+	assert.False(t, ref.IsResolved(), "unresolved reference should not be resolved")
+	_, err := ref.GetNavigableNode()
+	require.Error(t, err, "unresolved reference should not be navigable")
+	assert.Equal(t, "reference `#/components/servers/s` is not resolved", err.Error(), "navigation error should name the reference")
+}
+
+func TestReference_Resolved_Success(t *testing.T) {
+	t.Parallel()
+
+	a, validationErrs := unmarshal(t, minimalDoc("channels:\n  c:\n    address: c\noperations:\n  o:\n    action: send\n    channel:\n      $ref: '#/channels/c'\n"))
+	require.Empty(t, validationErrs, "document should be valid")
+	errs, err := a.ResolveAllReferences(t.Context(), asyncapi.ResolveAllOptions{})
+	require.NoError(t, err, "resolution should not fail")
+	require.Empty(t, errs, "resolution should report nothing")
+
+	channel := &a.GetOperations().GetOrZero("o").GetObject().Channel
+	assert.True(t, channel.IsResolved(), "resolved reference object should be resolved")
+	assert.Same(t, a.GetChannels().GetOrZero("c").GetObject(), channel.GetResolvedObject(), "resolved object should be the channel")
+	assert.Nil(t, channel.GetMessage(), "a channel reference should have no message")
+	assert.Nil(t, channel.GetServer(), "a channel reference should have no server")
+
+	inline := a.GetChannels().GetOrZero("c")
+	node, err := inline.GetNavigableNode()
+	require.NoError(t, err, "inline object should be navigable")
+	assert.Same(t, inline.GetObject(), node, "navigable node should be the inline object")
 }
 
 func TestReference_Getters_Success(t *testing.T) {

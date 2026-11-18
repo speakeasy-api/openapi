@@ -99,6 +99,45 @@ func TestOperation_Validate_Nil_Success(t *testing.T) {
 	})
 }
 
+func TestOperation_GetEffective_Success(t *testing.T) {
+	t.Parallel()
+
+	untraited := &asyncapi.Operation{Action: asyncapi.OperationActionSend}
+	assert.Same(t, untraited, untraited.GetEffective(), "an operation without traits should be its own effective view")
+	assert.Nil(t, (*asyncapi.Operation)(nil).GetEffective(), "a nil operation should have no effective view")
+
+	unapplied := &asyncapi.Operation{Traits: []*asyncapi.ReferencedOperationTrait{{Object: &asyncapi.OperationTrait{}}}}
+	assert.Nil(t, unapplied.GetEffective(), "an operation whose traits haven't been applied should have no effective view")
+}
+
+func TestOperation_GetTraitSource_NotFound(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		operation *asyncapi.Operation
+	}{
+		{
+			name:      "nil operation",
+			operation: nil,
+		},
+		{
+			name:      "traits not applied",
+			operation: &asyncapi.Operation{Summary: pointer.From("s"), Traits: []*asyncapi.ReferencedOperationTrait{{Object: &asyncapi.OperationTrait{}}}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			index, ok := tt.operation.GetTraitSource("summary")
+			assert.False(t, ok, "field should have no source")
+			assert.Zero(t, index, "index should be zero without a source")
+		})
+	}
+}
+
 func TestOperation_Getters_Success(t *testing.T) {
 	t.Parallel()
 

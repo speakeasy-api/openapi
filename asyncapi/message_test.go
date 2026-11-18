@@ -364,6 +364,45 @@ func TestMessageExample_Getters_Success(t *testing.T) {
 	}
 }
 
+func TestMessage_GetEffective_Success(t *testing.T) {
+	t.Parallel()
+
+	untraited := &asyncapi.Message{Name: pointer.From("m")}
+	assert.Same(t, untraited, untraited.GetEffective(), "a message without traits should be its own effective view")
+	assert.Nil(t, (*asyncapi.Message)(nil).GetEffective(), "a nil message should have no effective view")
+
+	unapplied := &asyncapi.Message{Traits: []*asyncapi.ReferencedMessageTrait{{Object: &asyncapi.MessageTrait{}}}}
+	assert.Nil(t, unapplied.GetEffective(), "a message whose traits haven't been applied should have no effective view")
+}
+
+func TestMessage_GetTraitSource_NotFound(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		message *asyncapi.Message
+	}{
+		{
+			name:    "nil message",
+			message: nil,
+		},
+		{
+			name:    "traits not applied",
+			message: &asyncapi.Message{Name: pointer.From("m"), Traits: []*asyncapi.ReferencedMessageTrait{{Object: &asyncapi.MessageTrait{}}}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			index, ok := tt.message.GetTraitSource("name")
+			assert.False(t, ok, "field should have no source")
+			assert.Zero(t, index, "index should be zero without a source")
+		})
+	}
+}
+
 func TestCorrelationID_Getters_Success(t *testing.T) {
 	t.Parallel()
 
