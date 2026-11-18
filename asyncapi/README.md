@@ -2,7 +2,9 @@
 <p align="center">An API for working with <a href="https://www.asyncapi.com/docs/reference/specification/v3.1.0">AsyncAPI 3.x documents</a> including: read, walk, create, mutate, resolve and validate.</p>
 
 > [!NOTE]
-> This package is under active development. Its API may still change before it's listed as a supported specification in the repository README.
+> This package is new, so its API may still change in minor releases.
+
+To validate a document from the command line, use [`openapi asyncapi validate`](../cmd/openapi/commands/asyncapi/README.md).
 
 ## Supported versions
 

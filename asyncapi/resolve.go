@@ -29,12 +29,18 @@ import (
 // each piece of state is written once per call, so contention is negligible, and models stay safe to copy.
 var resolutionMu sync.RWMutex
 
+// ErrExternalReferencesDisabled is wrapped by the diagnostics reported for references to other documents when
+// ResolveAllOptions.DisableExternalRefs is set, so callers can tell references that weren't followed apart from
+// broken ones with errors.Is.
+var ErrExternalReferencesDisabled = errors.New("external references are disabled")
+
 // ResolveAllOptions are the options available when resolving all references in an AsyncAPI document.
 type ResolveAllOptions struct {
 	// AsyncAPILocation is the absolute file path or URL of the document. Relative references to other documents are
 	// resolved against it. Without it, only references within the document and absolute references can be resolved.
 	AsyncAPILocation string
-	// DisableExternalRefs reports references to other documents as errors instead of loading them.
+	// DisableExternalRefs reports references to other documents as errors instead of loading them. The errors wrap
+	// ErrExternalReferencesDisabled.
 	DisableExternalRefs bool
 	// VirtualFS is used for file based references. If not provided the local file system is used.
 	VirtualFS system.VirtualFS
@@ -537,7 +543,7 @@ func (rc *resolveCall) checkAccess(ref references.Reference, base location) erro
 		return nil
 	}
 	if rc.opts.DisableExternalRefs {
-		return fmt.Errorf("reference `%s` is to another document and external references are disabled", ref)
+		return fmt.Errorf("reference `%s` is to another document and %w", ref, ErrExternalReferencesDisabled)
 	}
 	if base.uri == "" && !isAbsoluteLocation(uri) {
 		return fmt.Errorf("relative reference `%s` can't be resolved because the document's location is unknown, set ResolveAllOptions.AsyncAPILocation", ref)

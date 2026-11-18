@@ -49,10 +49,10 @@ func TestValidateArazzo_Success(t *testing.T) {
 			expectedStderr: []string{"✅ Arazzo document is valid - 0 errors\n"},
 		},
 		{
-			name:           "hints don't fail validation",
+			name:           "warnings don't fail validation",
 			file:           "-",
 			stdin:          validateAsyncAPISourceInput,
-			expectedStderr: []string{"Validating Arazzo document from stdin", "✅ Arazzo document is valid - 0 errors, 1 warnings or hints:", "1. [7:10] hint validation-invalid-reference sourceDescription `events` is an AsyncAPI document"},
+			expectedStderr: []string{"Validating Arazzo document from stdin", "✅ Arazzo document is valid - 0 errors, 1 warnings or hints:", "1. [7:10] warning validation-invalid-reference sourceDescription `events` could not be loaded from `./events.yaml`"},
 		},
 	}
 
