@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	arazzoCmd "github.com/speakeasy-api/openapi/cmd/openapi/commands/arazzo"
+	asyncapiCmd "github.com/speakeasy-api/openapi/cmd/openapi/commands/asyncapi"
 	openapiCmd "github.com/speakeasy-api/openapi/cmd/openapi/commands/openapi"
 	overlayCmd "github.com/speakeasy-api/openapi/cmd/openapi/commands/overlay"
 	swaggerCmd "github.com/speakeasy-api/openapi/cmd/openapi/commands/swagger"
@@ -60,8 +61,8 @@ func getVersionInfo() (string, string, string) {
 
 var rootCmd = &cobra.Command{
 	Use:   "openapi",
-	Short: "OpenAPI toolkit for working with OpenAPI specifications, overlays, and Arazzo workflows",
-	Long: `A comprehensive toolkit for working with OpenAPI specifications and Arazzo workflows.
+	Short: "OpenAPI toolkit for working with OpenAPI specifications, overlays, Arazzo workflows and AsyncAPI documents",
+	Long: `A comprehensive toolkit for working with OpenAPI specifications, Arazzo workflows and AsyncAPI documents.
 
 This CLI provides tools for:
 
@@ -73,6 +74,9 @@ OpenAPI Specifications:
 
 Arazzo Workflows:
 - Validate Arazzo workflow documents for compliance
+
+AsyncAPI Documents:
+- Validate AsyncAPI 3.x documents for compliance
 
 OpenAPI Overlays:
 - Apply overlays to modify OpenAPI specifications
@@ -124,6 +128,15 @@ Arazzo workflows describe sequences of API calls and their dependencies.
 These commands help you validate and work with Arazzo documents.`,
 }
 
+var asyncapiCmds = &cobra.Command{
+	Use:   "asyncapi",
+	Short: "Work with AsyncAPI documents",
+	Long: `Commands for working with AsyncAPI documents.
+
+AsyncAPI documents describe message-driven APIs: the channels an application uses
+and the messages it sends and receives. These commands work with AsyncAPI 3.x.`,
+}
+
 func init() {
 	// Get version information (prioritizes ldflags, falls back to build info)
 	currentVersion, currentCommit, currentDate := getVersionInfo()
@@ -154,6 +167,9 @@ func init() {
 	// Add Arazzo workflow validation command
 	arazzoCmd.Apply(arazzoCmds)
 
+	// Add AsyncAPI commands
+	asyncapiCmd.Apply(asyncapiCmds)
+
 	// Add overlay subcommands using the Apply function
 	overlayCmd.Apply(overlayCmds)
 
@@ -161,6 +177,7 @@ func init() {
 	rootCmd.AddCommand(openapiCmds)
 	rootCmd.AddCommand(swaggerCmds)
 	rootCmd.AddCommand(arazzoCmds)
+	rootCmd.AddCommand(asyncapiCmds)
 	rootCmd.AddCommand(overlayCmds)
 
 	// Top-level shortcut: openapi oq → openapi spec query

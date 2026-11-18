@@ -1,0 +1,67 @@
+arazzo: 1.1.0
+info:
+  title: Invalid AsyncAPI targets
+  version: 1.0.0
+sourceDescriptions:
+  - name: orders
+    url: ./orders.asyncapi.yaml
+    type: asyncapi
+  - name: untypedOrders
+    url: ./orders.asyncapi.yaml
+  - name: untypedPetstore
+    url: ./petstore.openapi.yaml
+workflows:
+  - workflowId: main
+    inputs:
+      type: object
+      properties:
+        correlationId:
+          type: string
+    steps:
+      - stepId: missingOperation
+        operationId: $sourceDescriptions.orders.missing
+        action: send
+      - stepId: componentOperation
+        operationId: $sourceDescriptions.orders.reusableSend
+        action: send
+      - stepId: channelByAddress
+        channelPath: "{$sourceDescriptions.orders.url}#/channels/orders.confirmed"
+        action: receive
+      - stepId: notAChannel
+        channelPath: "{$sourceDescriptions.orders.url}#/operations/placeOrder"
+        action: receive
+      - stepId: operationPathIntoAsyncAPI
+        operationPath: "{$sourceDescriptions.orders.url}#/operations/placeOrder"
+      - stepId: untypedWithoutAction
+        operationId: $sourceDescriptions.untypedOrders.placeOrder
+      - stepId: undeclaredParameters
+        operationId: $sourceDescriptions.orders.placeOrder
+        action: send
+        parameters:
+          - name: unknownHeader
+            in: header
+            value: abc
+          - name: orderId
+            in: path
+            value: "1"
+      - stepId: receiveWithBody
+        operationId: $sourceDescriptions.orders.confirmOrder
+        action: receive
+        requestBody:
+          payload:
+            orderId: "1"
+      - stepId: correlationWithoutDeclaration
+        channelPath: "{$sourceDescriptions.orders.url}#/components/channels/orderStatus"
+        action: receive
+        correlationId: $inputs.correlationId
+      # An explicitly empty messages list doesn't fall back to the channel's messages, which declare requestId.
+      - stepId: operationWithoutMessages
+        operationId: $sourceDescriptions.orders.noMessages
+        action: send
+        parameters:
+          - name: requestId
+            in: header
+            value: abc
+      - stepId: actionOnOpenAPI
+        operationId: $sourceDescriptions.untypedPetstore.listPets
+        action: send

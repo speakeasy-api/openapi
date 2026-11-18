@@ -22,6 +22,12 @@ info:
 paths: {}
 `
 
+const sourcesTestAsyncAPI = `asyncapi: 3.0.0
+info:
+  title: Events
+  version: 1.0.0
+`
+
 // mockHTTPClient returns canned responses keyed by URL.
 type mockHTTPClient struct {
 	responses  map[string]string
@@ -134,6 +140,21 @@ func TestLoadSourceDescriptions_Success(t *testing.T) {
 			expectedLocation: "https://example.com/openapi.yaml",
 			expectedType:     arazzo.SourceDescriptionTypeOpenAPI,
 		},
+		{
+			name:             "asyncapi 3.0 source detected from content",
+			url:              "events.yaml",
+			files:            fstest.MapFS{"events.yaml": {Data: []byte(sourcesTestAsyncAPI)}},
+			expectedLocation: "events.yaml",
+			expectedType:     arazzo.SourceDescriptionTypeAsyncAPI,
+		},
+		{
+			name:             "declared asyncapi 3.1 source over http",
+			sourceType:       "asyncapi",
+			url:              "https://example.com/events.yaml",
+			responses:        map[string]string{"https://example.com/events.yaml": "asyncapi: 3.1.0\ninfo:\n  title: Events\n  version: 1.0.0\n"},
+			expectedLocation: "https://example.com/events.yaml",
+			expectedType:     arazzo.SourceDescriptionTypeAsyncAPI,
+		},
 	}
 
 	for _, tt := range tests {
@@ -155,6 +176,7 @@ func TestLoadSourceDescriptions_Success(t *testing.T) {
 			assert.Equal(t, tt.expectedType, doc.Type, "type should match")
 			assert.Equal(t, tt.expectedType == arazzo.SourceDescriptionTypeOpenAPI, doc.OpenAPI != nil, "OpenAPI document should be set for OpenAPI sources")
 			assert.Equal(t, tt.expectedType == arazzo.SourceDescriptionTypeArazzo, doc.Arazzo != nil, "Arazzo document should be set for Arazzo sources")
+			assert.Equal(t, tt.expectedType == arazzo.SourceDescriptionTypeAsyncAPI, doc.AsyncAPI != nil, "AsyncAPI document should be set for AsyncAPI sources")
 		})
 	}
 }
@@ -221,16 +243,24 @@ func TestLoadSourceDescriptions_NotLoaded(t *testing.T) {
 			},
 		},
 		{
-			name:       "declared asyncapi source",
-			sourceType: "asyncapi",
-			url:        "asyncapi.yaml",
-			expected:   []string{"hint: sourceDescription `api` is an AsyncAPI document, steps targeting it are not checked against the source"},
+			name:     "unsupported asyncapi 2.x source",
+			url:      "events.yaml",
+			files:    fstest.MapFS{"events.yaml": {Data: []byte("asyncapi: 2.6.0\ninfo:\n  title: Events\n  version: 1.0.0\nchannels:\n  orders:\n    publish:\n      message:\n        payload:\n          type: object\n")}},
+			expected: []string{"warning: sourceDescription `api` is an AsyncAPI 2.6.0 document, only AsyncAPI 3.0 and 3.1 are supported so steps targeting it are not checked"},
 		},
 		{
-			name:     "detected asyncapi source",
-			url:      "events.yaml",
-			files:    fstest.MapFS{"events.yaml": {Data: []byte("asyncapi: 3.0.0\n")}},
-			expected: []string{"hint: sourceDescription `api` is an AsyncAPI document, steps targeting it are not checked against the source"},
+			name:       "declared asyncapi source is an openapi document",
+			sourceType: "asyncapi",
+			url:        "petstore.yaml",
+			files:      fstest.MapFS{"petstore.yaml": {Data: []byte(sourcesTestOpenAPI)}},
+			expected:   []string{"error: sourceDescription `api` is declared as type `asyncapi` but `petstore.yaml` is an openapi document"},
+		},
+		{
+			name:       "declared openapi source is an asyncapi document",
+			sourceType: "openapi",
+			url:        "events.yaml",
+			files:      fstest.MapFS{"events.yaml": {Data: []byte(sourcesTestAsyncAPI)}},
+			expected:   []string{"error: sourceDescription `api` is declared as type `openapi` but `events.yaml` is an asyncapi document"},
 		},
 		{
 			name:     "unknown document",
@@ -308,6 +338,49 @@ paths:
 	require.Len(t, errs, 1, "should warn about the unresolved reference")
 	assert.Contains(t, severityMessages(errs)[0], "warning: sourceDescription `api` has references that could not be resolved, some checks may be skipped", "warning should match")
 	assert.NotNil(t, sources.Get("api"), "source should still be loaded")
+}
+
+func TestLoadSourceDescriptions_UnresolvedAsyncAPIReferences_Success(t *testing.T) {
+	t.Parallel()
+
+	files := fstest.MapFS{"events.yaml": {Data: []byte(`asyncapi: 3.0.0
+info:
+  title: Events
+  version: 1.0.0
+channels:
+  orders:
+    $ref: "./missing.yaml#/channels/orders"
+`)}}
+
+	a := sourcesTestDoc(t, "", "asyncapi", "events.yaml")
+	sources, errs := arazzo.LoadSourceDescriptions(t.Context(), a, arazzo.LoadSourcesOptions{VirtualFS: files})
+	require.Len(t, errs, 1, "should warn about the unresolved reference")
+	assert.Contains(t, severityMessages(errs)[0], "warning: sourceDescription `api` has references that could not be resolved, some checks may be skipped", "warning should match")
+	assert.NotNil(t, sources.Get("api").AsyncAPI, "source should still be loaded")
+}
+
+func TestLoadSourceDescriptions_AsyncAPIResolutionWarnings_Success(t *testing.T) {
+	t.Parallel()
+
+	// A reference to a Protobuf resource isn't resolved and is reported as a warning by the asyncapi package, it
+	// doesn't stop anything being checked.
+	files := fstest.MapFS{"events.yaml": {Data: []byte(`asyncapi: 3.0.0
+info:
+  title: Events
+  version: 1.0.0
+components:
+  messages:
+    Order:
+      payload:
+        schemaFormat: application/vnd.google.protobuf;version=3
+        schema:
+          $ref: "./order.proto"
+`)}}
+
+	a := sourcesTestDoc(t, "", "asyncapi", "events.yaml")
+	sources, errs := arazzo.LoadSourceDescriptions(t.Context(), a, arazzo.LoadSourcesOptions{VirtualFS: files})
+	assert.Empty(t, errs, "warnings from resolution shouldn't be reported")
+	assert.NotNil(t, sources.Get("api").AsyncAPI, "source should be loaded")
 }
 
 func TestLoadSourceDescriptions_SkipsIncompleteSourceDescriptions_Success(t *testing.T) {

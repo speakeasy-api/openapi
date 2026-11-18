@@ -1,10 +1,11 @@
 // Package asyncapi provides an API for working with AsyncAPI 3.x documents including reading, creating,
 // mutating, walking and validating them.
 //
-// The package supports the AsyncAPI 3.0 and 3.1 minor lines and models the complete 3.x document. It is under
-// active development: references are parsed and validated but not yet resolved, so validation only covers what can
-// be checked within each object. Protocol bindings and schemas in formats other than AsyncAPI and JSON Schema are
-// preserved unchanged but their contents are not validated.
+// The package supports the AsyncAPI 3.0 and 3.1 minor lines and models the complete 3.x document. Unmarshal and
+// Validate check each object locally without reading files or making network requests. ResolveAllReferences is the
+// explicit step that loads referenced resources, applies traits and runs the checks that need referenced objects.
+// Protocol bindings and schemas in formats other than AsyncAPI and JSON Schema are preserved unchanged but their
+// contents are not validated. See the package README for the full list of support limits.
 package asyncapi
 
 import (
@@ -61,6 +62,9 @@ type AsyncAPI struct {
 	Components *Components
 	// Extensions provides a list of extensions to the AsyncAPI Object.
 	Extensions *extensions.Extensions
+
+	// resolution is the state built by the last call to ResolveAllReferences, guarded by resolutionMu.
+	resolution *resolutionState
 }
 
 var _ interfaces.Model[core.AsyncAPI] = (*AsyncAPI)(nil)

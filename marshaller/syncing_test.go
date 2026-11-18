@@ -793,6 +793,73 @@ x-sync: sync extension
 	require.Equal(t, expectedYAML, string(actualYAML))
 }
 
+func TestSync_ExplicitNull_Success(t *testing.T) {
+	t.Parallel()
+
+	input := "stringField: s\nstringPtrField: null\nboolField: true\nintField: 1\nfloat64Field: 1.5\n"
+
+	cases := []struct {
+		name     string
+		value    *string
+		expected string
+	}{
+		{
+			name:     "unset value keeps the authored null",
+			value:    nil,
+			expected: input,
+		},
+		{
+			name:     "set value replaces the authored null",
+			value:    pointer.From("set"),
+			expected: "stringField: s\nstringPtrField: set\nboolField: true\nintField: 1\nfloat64Field: 1.5\n",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var node yaml.Node
+			require.NoError(t, yaml.Unmarshal([]byte(input), &node), "yaml should parse")
+
+			var highModel tests.TestPrimitiveHighModel
+			_, err := marshaller.UnmarshalNode(t.Context(), "", &node, &highModel)
+			require.NoError(t, err, "unmarshal should succeed")
+			require.True(t, highModel.GetCore().StringPtrField.Present, "explicit null should be present")
+
+			highModel.StringPtrField = tt.value
+
+			resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+			require.NoError(t, err, "sync should succeed")
+
+			actualYAML, err := yaml.Marshal(resultNode)
+			require.NoError(t, err, "yaml should marshal")
+			require.Equal(t, tt.expected, string(actualYAML), "synced yaml should match")
+			require.True(t, highModel.GetCore().StringPtrField.Present, "field should still be present")
+		})
+	}
+}
+
+func TestSync_ExplicitNull_NewCore_Success(t *testing.T) {
+	t.Parallel()
+
+	var node yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte("stringField: s\nstringPtrField: null\nboolField: true\nintField: 1\nfloat64Field: 1.5\n"), &node), "yaml should parse")
+
+	// Sync into a fresh core that was never populated from the node.
+	highModel := tests.TestPrimitiveHighModel{StringField: "s", BoolField: true, IntField: 1, Float64Field: 1.5}
+	_, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), node.Content[0], false)
+	require.NoError(t, err, "sync should succeed")
+
+	field := highModel.GetCore().StringPtrField
+	require.True(t, field.Present, "kept null should be present")
+	require.NotNil(t, field.KeyNode, "key node should point at the authored key")
+	require.Equal(t, "stringPtrField", field.KeyNode.Value, "key node should be the authored key")
+	require.NotNil(t, field.ValueNode, "value node should point at the authored null")
+	require.Equal(t, "!!null", field.ValueNode.Tag, "value node should be the authored null")
+	require.Nil(t, field.Value, "value should be unset")
+}
+
 func TestSync_ExtensionModification_Success(t *testing.T) {
 	t.Parallel()
 

@@ -297,9 +297,32 @@ type Tag struct {
 	ExternalDocs *ExternalDocumentation
 	// Extensions provides a list of extensions to the Tag Object.
 	Extensions *extensions.Extensions
+
+	// resolved is set by the last call to AsyncAPI.ResolveAllReferences, guarded by resolutionMu.
+	resolved *Tag
 }
 
 var _ interfaces.Model[core.Tag] = (*Tag)(nil)
+
+// GetResolved returns the tag itself, or for a Reference Object the tag it resolved to in the last call to
+// AsyncAPI.ResolveAllReferences. Returns nil for an unresolved Reference Object.
+func (t *Tag) GetResolved() *Tag {
+	if t == nil {
+		return nil
+	}
+	if !t.IsReference() {
+		return t
+	}
+	resolutionMu.RLock()
+	defer resolutionMu.RUnlock()
+	return t.resolved
+}
+
+func (t *Tag) setResolved(tag *Tag) {
+	resolutionMu.Lock()
+	defer resolutionMu.Unlock()
+	t.resolved = tag
+}
 
 // IsReference returns true if the tag is a Reference Object.
 func (t *Tag) IsReference() bool {

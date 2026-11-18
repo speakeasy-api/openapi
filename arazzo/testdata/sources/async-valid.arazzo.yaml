@@ -1,0 +1,80 @@
+arazzo: 1.1.0
+info:
+  title: Mixed OpenAPI and AsyncAPI workflow
+  version: 1.0.0
+sourceDescriptions:
+  - name: petstore
+    url: ./petstore.openapi.yaml
+    type: openapi
+  - name: asyncOrderApi
+    url: ./orders.asyncapi.yaml
+    type: asyncapi
+workflows:
+  - workflowId: orderPet
+    inputs:
+      type: object
+      properties:
+        correlationId:
+          type: string
+        productDetails:
+          type: object
+          properties:
+            productId:
+              type: string
+            quantity:
+              type: integer
+    steps:
+      - stepId: list
+        operationId: $sourceDescriptions.petstore.listPets
+        parameters:
+          - name: limit
+            in: query
+            value: 10
+      # The async step example from the Arazzo 1.1 specification.
+      - stepId: placeOrder
+        description: This step demonstrates the action of sending a message payload to place an order
+        operationId: $sourceDescriptions.asyncOrderApi.placeOrder
+        action: send
+        parameters:
+          - name: requestId
+            in: header
+            value: $inputs.correlationId
+        requestBody:
+          payload:
+            productId: $inputs.productDetails.productId
+            quantity: $inputs.productDetails.quantity
+      - stepId: confirmOrder
+        description: This step demonstrates the action of receiving a message payload to confirm an order
+        operationId: $sourceDescriptions.asyncOrderApi.confirmOrder
+        correlationId: $inputs.correlationId
+        action: receive
+        dependsOn:
+          - placeOrder
+        timeout: 6000
+        parameters:
+          # Declared by a trait of a message in another file, matched case-insensitively.
+          - name: CorrelationId
+            in: header
+            value: $inputs.correlationId
+        outputs:
+          # The specification's example uses `$message.payload.orderId`, which its expression grammar doesn't allow.
+          orderId: $message.payload#/orderId
+      - stepId: watchStatus
+        channelPath: "{$sourceDescriptions.asyncOrderApi.url}#/components/channels/orderStatus"
+        action: receive
+      - stepId: legacyOrder
+        channelPath: "{$sourceDescriptions.asyncOrderApi.url}#/channels/orders~1legacy"
+        action: send
+      # Headers using composition can't be checked, so any header is accepted.
+      - stepId: audit
+        channelPath: "{$sourceDescriptions.asyncOrderApi.url}#/channels/audit"
+        action: send
+        parameters:
+          - name: anything
+            in: header
+            value: abc
+      # The step action is written from the workflow's perspective and the AsyncAPI operation action from the
+      # application's, so differing actions are not reported.
+      - stepId: confirmFromWorkflowSide
+        operationId: $sourceDescriptions.asyncOrderApi.confirmOrder
+        action: send

@@ -35,8 +35,9 @@ type Locations = walkpkg.Locations[MatchFunc]
 // you are interested in. Returning walk.ErrTerminate from a function can be used to signal the caller to stop.
 //
 // Reference wrappers (the Referenced* types) are visited at their location, followed by their inline object if they
-// are not a Reference Object. Reference Objects are not resolved, so the objects they point to are visited only at
-// their own authored location. Schemas are visited as SchemaUnion values but are not descended into.
+// are not a Reference Object. Walking doesn't follow references, even after AsyncAPI.ResolveAllReferences, so the
+// objects they point to are visited only at their own authored location. Schemas are visited as SchemaUnion values but
+// are not descended into.
 type Matcher struct {
 	AsyncAPI                        func(*AsyncAPI) error
 	Info                            func(*Info) error
