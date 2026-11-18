@@ -590,7 +590,10 @@ func TestResolveAllReferences_NoImplicitIO_Success(t *testing.T) {
 
 	errs, err := a.ResolveAllReferences(t.Context(), asyncapi.ResolveAllOptions{AsyncAPILocation: "api.yaml", DisableExternalRefs: true, VirtualFS: files, HTTPClient: client})
 	require.NoError(t, err, "resolution should not fail")
-	assert.Len(t, errs, 2, "disabled external references should be reported")
+	require.Len(t, errs, 2, "disabled external references should be reported")
+	for _, e := range errs {
+		require.ErrorIs(t, e, asyncapi.ErrExternalReferencesDisabled, "disabled references should be identifiable")
+	}
 	assert.Zero(t, files.opened.Load(), "no files should be read before resolution is allowed")
 	assert.Zero(t, client.requests.Load(), "no requests should be made before resolution is allowed")
 

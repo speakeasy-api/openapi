@@ -57,6 +57,26 @@ func TestSourceDescriptionTypeRule_LoadedSourceFix_Success(t *testing.T) {
 	assert.Equal(t, arazzo.SourceDescriptionType(arazzo.SourceDescriptionTypeArazzo), a.SourceDescriptions[1].Type, "type should be set")
 }
 
+func TestSourceDescriptionTypeRule_LoadedAsyncAPISourceFix_Success(t *testing.T) {
+	t.Parallel()
+
+	a := parseDoc(t, sourcesDoc("1.1.0", untypedSources))
+	sources, loadErrs := arazzo.LoadSourceDescriptions(t.Context(), a, arazzo.LoadSourcesOptions{
+		VirtualFS: fstest.MapFS{
+			"typed.yaml":   {Data: []byte("openapi: 3.1.0\ninfo:\n  title: Typed\n  version: 1.0.0\n")},
+			"untyped.yaml": {Data: []byte("asyncapi: 3.0.0\ninfo:\n  title: Events\n  version: 1.0.0\n")},
+		},
+	})
+	require.Empty(t, loadErrs, "sources should load")
+
+	fix := sourceTypeFix(t, a, sources)
+	assert.False(t, fix.Interactive(), "fix should not need input when the source was loaded")
+	assert.Equal(t, "Set the type of sourceDescription `untyped` to `asyncapi`", fix.Description(), "description should match")
+
+	require.NoError(t, fix.Apply(a), "fix should apply")
+	assert.Equal(t, arazzo.SourceDescriptionType(arazzo.SourceDescriptionTypeAsyncAPI), a.SourceDescriptions[1].Type, "type should be set")
+}
+
 func TestSourceDescriptionTypeRule_InteractiveFix_Success(t *testing.T) {
 	t.Parallel()
 

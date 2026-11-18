@@ -70,6 +70,10 @@
 
 The `arazzo` package provides an API for working with Arazzo 1.0.x and 1.1.x documents including reading, creating, mutating, walking, validating, linting, upgrading and graphing them, and bootstrapping them from OpenAPI documents.
 
+### [asyncapi](./asyncapi)
+
+The `asyncapi` package provides an API for working with AsyncAPI 3.0.x and 3.1.x documents including reading, creating, mutating, walking and validating them, resolving references within and across documents, and applying operation and message traits.
+
 ### [openapi](./openapi)
 
 The `openapi` package provides an API for working with OpenAPI documents including reading, creating, mutating, walking, validating, upgrading, and linting them. Supports OpenAPI 3.0.x, 3.1.x, and 3.2.x specifications.
@@ -86,7 +90,7 @@ The `overlay` package provides an API for working with OpenAPI Overlays includin
 
 ## CLI Tool
 
-This repository also provides a comprehensive CLI tool for working with OpenAPI specifications, Arazzo workflows, and OpenAPI overlays.
+This repository also provides a comprehensive CLI tool for working with OpenAPI specifications, Arazzo workflows, AsyncAPI documents and OpenAPI overlays.
 
 ### Installation
 
@@ -118,7 +122,7 @@ For manual installation, upgrade instructions, custom installation options, and 
 
 ### Usage
 
-The CLI provides four main command groups:
+The CLI provides five main command groups:
 
 - **`openapi spec`** - Commands for working with OpenAPI specifications ([documentation](./cmd/openapi/commands/openapi/README.md))
   - `bootstrap` - Create a new OpenAPI document with best practice examples
@@ -142,13 +146,16 @@ The CLI provides four main command groups:
   - `upgrade` - Upgrade a Swagger 2.0 specification to OpenAPI 3.0
 
 - **`openapi arazzo`** - Commands for working with Arazzo workflow documents ([documentation](./cmd/openapi/commands/arazzo/README.md))
-  - `validate` - Validate an Arazzo workflow document, including against the OpenAPI and Arazzo documents it references
+  - `validate` - Validate an Arazzo workflow document, including against the OpenAPI, AsyncAPI and Arazzo documents it references
   - `upgrade` - Upgrade an Arazzo workflow document to the latest supported version (1.1.0)
   - `lint` - Lint an Arazzo workflow document for semantic issues, style and security concerns, with optional fixes
   - `list-rules` - List the available Arazzo lint rules
   - `graph` - Render the workflows of an Arazzo document as a Mermaid or Graphviz DOT diagram
   - `bootstrap` - Generate starter Arazzo workflows from an OpenAPI document, or create an example Arazzo document
   - `explore` - Interactively explore the workflows of an Arazzo document
+
+- **`openapi asyncapi`** - Commands for working with AsyncAPI documents ([documentation](./cmd/openapi/commands/asyncapi/README.md))
+  - `validate` - Validate an AsyncAPI 3.x document, optionally following references to other files and URLs
 
 - **`openapi overlay`** - Commands for working with OpenAPI overlays ([documentation](./cmd/openapi/commands/overlay/README.md))
   - `apply` - Apply an overlay to an OpenAPI specification
@@ -208,6 +215,12 @@ openapi arazzo bootstrap --from ./openapi.yaml ./workflows.arazzo.yaml
 
 # Interactively explore the workflows of an Arazzo document
 openapi arazzo explore ./workflow.arazzo.yaml
+
+# Validate an AsyncAPI document without reading anything outside it
+openapi asyncapi validate ./asyncapi.yaml
+
+# Validate an AsyncAPI document and the files and URLs it references, failing on warnings
+openapi asyncapi validate --resolve --strict ./asyncapi.yaml
 
 # Validate a Swagger 2.0 document
 openapi swagger validate ./api.swagger.yaml
