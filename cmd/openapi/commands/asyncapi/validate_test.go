@@ -213,12 +213,15 @@ func TestApply_Success(t *testing.T) {
 	root := &cobra.Command{Use: "openapi"}
 	Apply(root)
 
+	// The command isn't executed here: on failure it exits the process, so validateAsyncAPI is tested directly.
 	cmd, _, err := root.Find([]string{"validate"})
 	require.NoError(t, err, "validate command should be registered")
 	assert.Same(t, GetValidateCommand(), cmd, "registered command should be the validate command")
-
-	root.SetArgs([]string{"validate", testdata + "validate/orders.asyncapi.yaml"})
-	require.NoError(t, root.ExecuteContext(t.Context()), "validating a valid document should succeed")
+	assert.Equal(t, []string{"resolve", "base-uri", "strict"}, []string{
+		cmd.Flags().Lookup("resolve").Name,
+		cmd.Flags().Lookup("base-uri").Name,
+		cmd.Flags().Lookup("strict").Name,
+	}, "validate command should register its flags")
 }
 
 func TestSummarize_NonValidationErrors_Success(t *testing.T) {
