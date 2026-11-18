@@ -40,6 +40,18 @@ func CopyNode(node *yaml.Node) *yaml.Node {
 	return &c
 }
 
+// sameContent reports whether a node and a copy of it (see CopyNode) have the same content. Aliases are equal if they
+// point to the same node, and are not followed, so recursive aliases are safe.
+func sameContent(a, b *yaml.Node) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	if a.Kind == yaml.AliasNode || b.Kind == yaml.AliasNode {
+		return a.Kind == b.Kind && a.Alias == b.Alias
+	}
+	return a.Kind == b.Kind && a.Tag == b.Tag && a.Value == b.Value && slices.EqualFunc(a.Content, b.Content, sameContent)
+}
+
 // writableNode returns the node a changed value can be written to: the node itself if nothing else shares it, a
 // copy of it if it is anchored, or nil if it is nil or an alias and a new node is needed.
 func writableNode(node *yaml.Node) *yaml.Node {
@@ -198,7 +210,7 @@ func DeleteMapNodeElement(ctx context.Context, key string, mapNode *yaml.Node) *
 func CreateOrUpdateSliceNode(ctx context.Context, elements []*yaml.Node, valueNode *yaml.Node) *yaml.Node {
 	resolvedValueNode := ResolveAlias(valueNode)
 	if resolvedValueNode != nil {
-		if IsShared(valueNode) && slices.EqualFunc(resolvedValueNode.Content, elements, EqualNodes) {
+		if IsShared(valueNode) && slices.EqualFunc(resolvedValueNode.Content, elements, sameContent) {
 			return valueNode
 		}
 		if node := writableNode(valueNode); node != nil {

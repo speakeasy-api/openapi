@@ -230,6 +230,17 @@ func TestCreateOrUpdateSliceNode_SharedNodes_Success(t *testing.T) {
 	}
 }
 
+func TestCreateOrUpdateSliceNode_RecursiveSharedNode_Success(t *testing.T) {
+	t.Parallel()
+
+	anchored := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Anchor: "r"}
+	anchored.Content = []*yaml.Node{yml.CreateStringNode("x"), {Kind: yaml.AliasNode, Value: "r", Alias: anchored}}
+
+	elements := []*yaml.Node{yml.CopyNode(anchored.Content[0]), yml.CopyNode(anchored.Content[1])}
+	result := yml.CreateOrUpdateSliceNode(t.Context(), elements, anchored)
+	assert.Same(t, anchored, result, "an unchanged recursive sequence should be kept")
+}
+
 func TestCreateOrUpdateMapNodeElement_Success(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -55,15 +55,20 @@ func (r *orphanResolver) walk(node *yaml.Node) {
 	}
 }
 
-// copyWithoutAnchors deep copies a node, removing anchors. Aliases inside it are kept and checked as the copy is
-// walked.
+// copyWithoutAnchors deep copies a node, removing anchors. Aliases inside it are copied but still point to the same
+// anchored nodes, and are checked as the copy is walked.
 func copyWithoutAnchors(node *yaml.Node) *yaml.Node {
 	c := *node
 	c.Anchor = ""
 	if node.Content != nil {
 		c.Content = make([]*yaml.Node, len(node.Content))
 		for i, child := range node.Content {
-			if child != nil && child.Kind != yaml.AliasNode {
+			switch {
+			case child == nil:
+			case child.Kind == yaml.AliasNode:
+				alias := *child
+				child = &alias
+			default:
 				child = copyWithoutAnchors(child)
 			}
 			c.Content[i] = child
