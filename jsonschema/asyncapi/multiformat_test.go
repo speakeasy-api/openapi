@@ -6,9 +6,11 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/jsonschema/asyncapi"
+	"github.com/speakeasy-api/openapi/jsonschema/asyncapi/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/references"
+	"github.com/speakeasy-api/openapi/yml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
@@ -298,4 +300,264 @@ func TestSchemaUnion_GetSchemaFormat_Success(t *testing.T) {
 
 	avro := asyncapi.NewSchemaUnionFromMultiFormat(asyncapi.NewMultiFormatSchema("application/vnd.apache.avro;version=1.9.0", nil))
 	assert.Equal(t, "application/vnd.apache.avro;version=1.9.0", avro.GetSchemaFormat("3.0.0"), "multi format schemas should use their declared format")
+}
+
+func TestMultiFormatSchema_Getters_Nil_Success(t *testing.T) {
+	t.Parallel()
+
+	var m *asyncapi.MultiFormatSchema
+
+	assert.Empty(t, m.GetSchemaFormat(), "nil multi format schema should have no schema format")
+	assert.Nil(t, m.GetSchema(), "nil multi format schema should have no schema")
+	assert.Equal(t, 0, m.GetExtensions().Len(), "nil multi format schema should have empty extensions")
+}
+
+func TestMultiFormatSchema_Getters_Populated_Success(t *testing.T) {
+	t.Parallel()
+
+	u, validationErrs := unmarshalSchemaUnion(t, "schemaFormat: application/vnd.apache.avro;version=1.9.0\nschema:\n  type: record\nx-owner: team\n")
+	require.Empty(t, validationErrs, "should have no unmarshal errors")
+
+	m := u.GetMultiFormat()
+	assert.Equal(t, "application/vnd.apache.avro;version=1.9.0", m.GetSchemaFormat(), "schema format should match")
+	require.NotNil(t, m.GetSchema(), "schema should be set")
+	assert.Equal(t, 3, m.GetSchema().GetRootNode().Line, "schema root node line should match")
+	assert.Equal(t, 1, m.GetExtensions().Len(), "extensions should be parsed")
+	assert.True(t, m.GetExtensions().Has("x-owner"), "extension should be present")
+}
+
+func TestSchemaDefinition_Getters_Nil_Success(t *testing.T) {
+	t.Parallel()
+
+	var d *asyncapi.SchemaDefinition
+
+	assert.Nil(t, d.GetCore(), "nil definition should have no core")
+	assert.Nil(t, d.GetRootNode(), "nil definition should have no root node")
+	assert.Nil(t, d.GetSchema(), "nil definition should have no schema")
+	assert.Nil(t, d.GetRaw(), "nil definition should have no raw value")
+	assert.False(t, d.IsReference(), "nil definition should not be a reference")
+	assert.Equal(t, references.Reference(""), d.GetReference(), "nil definition should have an empty reference")
+	assert.NotPanics(t, func() { d.SetCore(&core.SchemaDefinition{}) }, "setting the core of a nil definition should be a no-op")
+}
+
+func TestSchemaDefinition_GetReference_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	refMapping := yml.CreateMapNode(ctx, []*yaml.Node{
+		yml.CreateStringNode("$ref"),
+		yml.CreateStringNode("./user.avsc"),
+	})
+
+	tests := []struct {
+		name                string
+		definition          *asyncapi.SchemaDefinition
+		expectedRef         references.Reference
+		expectedIsReference bool
+	}{
+		{
+			name:                "typed reference object",
+			definition:          asyncapi.NewSchemaDefinitionFromSchema(asyncapi.NewJSONSchemaFromReference("#/components/schemas/User")),
+			expectedRef:         "#/components/schemas/User",
+			expectedIsReference: true,
+		},
+		{
+			name:       "typed schema",
+			definition: asyncapi.NewSchemaDefinitionFromSchema(asyncapi.NewJSONSchemaFromBool(true)),
+		},
+		{
+			name:       "no raw value",
+			definition: asyncapi.NewSchemaDefinitionFromRaw(nil),
+		},
+		{
+			name:       "raw string",
+			definition: asyncapi.NewSchemaDefinitionFromRaw(yml.CreateStringNode("message Point {}")),
+		},
+		{
+			name: "raw mapping with non scalar $ref",
+			definition: asyncapi.NewSchemaDefinitionFromRaw(yml.CreateMapNode(ctx, []*yaml.Node{
+				yml.CreateStringNode("$ref"),
+				yml.CreateMapNode(ctx, nil),
+			})),
+		},
+		{
+			name: "raw mapping without $ref",
+			definition: asyncapi.NewSchemaDefinitionFromRaw(yml.CreateMapNode(ctx, []*yaml.Node{
+				yml.CreateStringNode("type"),
+				yml.CreateStringNode("record"),
+			})),
+		},
+		{
+			name:                "raw reference object",
+			definition:          asyncapi.NewSchemaDefinitionFromRaw(refMapping),
+			expectedRef:         "./user.avsc",
+			expectedIsReference: true,
+		},
+		{
+			name:                "raw alias to reference object",
+			definition:          asyncapi.NewSchemaDefinitionFromRaw(&yaml.Node{Kind: yaml.AliasNode, Alias: refMapping}),
+			expectedRef:         "./user.avsc",
+			expectedIsReference: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.expectedRef, tt.definition.GetReference(), "reference should match")
+			assert.Equal(t, tt.expectedIsReference, tt.definition.IsReference(), "IsReference should match")
+		})
+	}
+}
+
+func TestSchemaDefinition_SetCore_Success(t *testing.T) {
+	t.Parallel()
+
+	raw := yml.CreateStringNode("message Point {}")
+	d := asyncapi.NewSchemaDefinitionFromRaw(nil)
+
+	d.SetCore(&core.SchemaDefinition{Raw: raw})
+	assert.Same(t, raw, d.GetCore().Raw, "core should be set")
+
+	d.SetCore(nil)
+	assert.Same(t, raw, d.GetCore().Raw, "setting a nil core should be a no-op")
+}
+
+func TestSchemaDefinition_Populate_Success(t *testing.T) {
+	t.Parallel()
+
+	u, validationErrs := unmarshalSchemaUnion(t, "schemaFormat: application/schema+json;version=draft-07\nschema:\n  type: string\n")
+	require.Empty(t, validationErrs, "should have no unmarshal errors")
+	parsed := u.GetMultiFormat().GetSchema().GetCore()
+
+	d := asyncapi.NewSchemaDefinitionFromRaw(yml.CreateStringNode("stale"))
+	require.NoError(t, d.Populate(*parsed), "populating from a core value should succeed")
+
+	assert.Nil(t, d.GetRaw(), "raw value should be replaced")
+	assert.Equal(t, []string{"string"}, d.GetSchema().GetSchema().GetType(), "typed schema should be populated")
+	assert.Same(t, parsed.GetRootNode(), d.GetRootNode(), "root node should be taken from the core")
+}
+
+func TestSchemaDefinition_Populate_NilCore_Success(t *testing.T) {
+	t.Parallel()
+
+	raw := yml.CreateStringNode("message Point {}")
+	d := asyncapi.NewSchemaDefinitionFromRaw(raw)
+	require.NoError(t, d.Populate((*core.SchemaDefinition)(nil)), "populating from a nil core should succeed")
+
+	assert.Same(t, raw, d.GetRaw(), "definition should be unchanged")
+}
+
+func TestSchemaDefinition_Populate_Error(t *testing.T) {
+	t.Parallel()
+
+	d := &asyncapi.SchemaDefinition{}
+	err := d.Populate("schema")
+	require.EqualError(t, err, "expected core.SchemaDefinition, got string", "populating from the wrong type should fail")
+}
+
+func TestSchemaUnion_Getters_Nil_Success(t *testing.T) {
+	t.Parallel()
+
+	var u *asyncapi.SchemaUnion
+
+	assert.Nil(t, u.GetCore(), "nil union should have no core")
+	assert.Nil(t, u.GetRootNode(), "nil union should have no root node")
+	assert.False(t, u.IsSchema(), "nil union should not be a schema")
+	assert.Nil(t, u.GetSchema(), "nil union should have no schema")
+	assert.False(t, u.IsMultiFormat(), "nil union should not be a multi format schema")
+	assert.Nil(t, u.GetMultiFormat(), "nil union should have no multi format schema")
+	assert.False(t, u.IsReference(), "nil union should not be a reference")
+	assert.Equal(t, references.Reference(""), u.GetRef(), "nil union should have an empty reference")
+	assert.Equal(t, "application/vnd.aai.asyncapi+json;version=3.1.0", u.GetSchemaFormat("3.1.0"), "nil union should use the native format")
+	assert.NotPanics(t, func() { u.SetCore(&core.SchemaUnion{}) }, "setting the core of a nil union should be a no-op")
+}
+
+func TestSchemaUnion_SetCore_Success(t *testing.T) {
+	t.Parallel()
+
+	root := yml.CreateStringNode("root")
+	c := &core.SchemaUnion{}
+	c.SetRootNode(root)
+
+	u := asyncapi.NewSchemaUnionFromSchema(asyncapi.NewJSONSchemaFromBool(true))
+	u.SetCore(c)
+	assert.Same(t, root, u.GetRootNode(), "core should be set")
+
+	u.SetCore(nil)
+	assert.Same(t, root, u.GetRootNode(), "setting a nil core should be a no-op")
+}
+
+func TestSchemaUnion_Populate_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                 string
+		doc                  string
+		expectedIsSchema     bool
+		expectedIsMulti      bool
+		expectedSchemaFormat string
+	}{
+		{
+			name:                 "native schema",
+			doc:                  "type: string\n",
+			expectedIsSchema:     true,
+			expectedSchemaFormat: "application/vnd.aai.asyncapi+json;version=3.0.0",
+		},
+		{
+			name:                 "multi format schema",
+			doc:                  "schemaFormat: application/vnd.apache.avro;version=1.9.0\nschema:\n  type: record\n",
+			expectedIsMulti:      true,
+			expectedSchemaFormat: "application/vnd.apache.avro;version=1.9.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			parsed, validationErrs := unmarshalSchemaUnion(t, tt.doc)
+			require.Empty(t, validationErrs, "should have no unmarshal errors")
+
+			u := &asyncapi.SchemaUnion{
+				Schema:      asyncapi.NewJSONSchemaFromBool(true),
+				MultiFormat: asyncapi.NewMultiFormatSchema("stale", nil),
+			}
+			require.NoError(t, u.Populate(*parsed.GetCore()), "populating from a core value should succeed")
+
+			assert.Equal(t, tt.expectedIsSchema, u.IsSchema(), "IsSchema should match")
+			assert.Equal(t, tt.expectedIsMulti, u.IsMultiFormat(), "IsMultiFormat should match")
+			assert.Equal(t, tt.expectedSchemaFormat, u.GetSchemaFormat("3.0.0"), "schema format should match")
+			assert.Same(t, parsed.GetRootNode(), u.GetRootNode(), "root node should be taken from the core")
+		})
+	}
+}
+
+func TestSchemaUnion_Populate_EmptyCore_Success(t *testing.T) {
+	t.Parallel()
+
+	u := asyncapi.NewSchemaUnionFromSchema(asyncapi.NewJSONSchemaFromBool(true))
+	require.NoError(t, u.Populate(&core.SchemaUnion{}), "populating from an empty core should succeed")
+
+	assert.Nil(t, u.GetSchema(), "schema should be cleared")
+	assert.Nil(t, u.GetMultiFormat(), "multi format schema should be cleared")
+}
+
+func TestSchemaUnion_Populate_NilCore_Success(t *testing.T) {
+	t.Parallel()
+
+	schema := asyncapi.NewJSONSchemaFromBool(true)
+	u := asyncapi.NewSchemaUnionFromSchema(schema)
+	require.NoError(t, u.Populate((*core.SchemaUnion)(nil)), "populating from a nil core should succeed")
+
+	assert.Same(t, schema, u.GetSchema(), "union should be unchanged")
+}
+
+func TestSchemaUnion_Populate_Error(t *testing.T) {
+	t.Parallel()
+
+	u := &asyncapi.SchemaUnion{}
+	err := u.Populate(true)
+	require.EqualError(t, err, "expected core.SchemaUnion, got bool", "populating from the wrong type should fail")
 }

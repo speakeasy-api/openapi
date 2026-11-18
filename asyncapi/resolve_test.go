@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -14,6 +15,7 @@ import (
 	"testing/fstest"
 
 	"github.com/speakeasy-api/openapi/asyncapi"
+	jsonschema "github.com/speakeasy-api/openapi/jsonschema/asyncapi"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
@@ -655,4 +657,315 @@ func TestResolveAllReferences_ConcurrentReads_Success(t *testing.T) {
 	wg.Wait()
 	require.NoError(t, err, "resolution should not fail")
 	assert.NotNil(t, operation.Channel.GetChannel(), "channel should be resolved")
+}
+
+func TestResolveAllReferences_EveryKindFromAnotherDocument_Success(t *testing.T) {
+	t.Parallel()
+
+	location := "testdata/resolve/api.yaml"
+	data, err := os.ReadFile(location)
+	require.NoError(t, err, "fixture should be readable")
+
+	a, errs := resolveDoc(t, string(data), asyncapi.ResolveAllOptions{AsyncAPILocation: location})
+	assert.Empty(t, errorsOnly(errs), "resolution should report no errors")
+
+	info := a.GetInfo()
+	assert.Equal(t, "orders", info.Tags[0].GetResolved().GetName(), "tag should resolve through a chain in another document")
+	assert.Equal(t, "https://example.com/guide", a.GetResolvedExternalDocs(info.ExternalDocs).GetURL(), "external docs should resolve through a chain in another document")
+
+	server := a.GetServers().GetOrZero("prod").GetObject()
+	require.NotNil(t, server, "server should resolve")
+	assert.Equal(t, "{region}.example.com", server.GetHost(), "server should come from the other document")
+	assert.Equal(t, "eu", server.Variables.GetOrZero("region").GetObject().GetDefault(), "server variable should resolve")
+	assert.Equal(t, "X-API-Key", server.Security[0].GetObject().GetName(), "server security scheme should resolve")
+	assert.Equal(t, "orders", server.Tags[0].GetResolved().GetName(), "server tag should resolve")
+	assert.Equal(t, "https://example.com/guide", a.GetResolvedExternalDocs(server.ExternalDocs).GetURL(), "server external docs should resolve")
+	assert.Equal(t, "0.5.0", server.Bindings.GetObject().GetBindingVersion("kafka"), "server bindings should resolve")
+
+	channel := a.GetChannels().GetOrZero("orders").GetObject()
+	assert.Same(t, server, channel.Servers[0].GetServer(), "channel server should resolve")
+	assert.Equal(t, "The order ID.", channel.Parameters.GetOrZero("orderId").GetObject().GetDescription(), "parameter should resolve")
+	assert.NotNil(t, channel.Bindings.GetObject(), "channel bindings should resolve")
+
+	operation := a.GetOperations().GetOrZero("placeOrder").GetObject()
+	assert.Equal(t, "X-API-Key", operation.Security[0].GetObject().GetName(), "operation security scheme should resolve")
+	assert.Equal(t, "Tracked operation.", operation.Traits[0].GetObject().GetSummary(), "operation trait should resolve")
+	assert.Equal(t, "Tracked operation.", operation.GetEffective().GetSummary(), "operation trait should apply")
+	assert.Equal(t, "$message.header#/replyTo", operation.Reply.GetObject().Address.GetObject().GetLocation(), "reply and reply address should resolve")
+
+	message := operation.Messages[0].GetMessage()
+	require.NotNil(t, message, "message should resolve")
+	assert.Equal(t, "OrderPlaced", message.GetName(), "message should come from the other document")
+	assert.Equal(t, "$message.payload#/id", message.CorrelationID.GetObject().GetLocation(), "correlation ID should resolve")
+	assert.Equal(t, "application/json", message.Traits[0].GetObject().GetContentType(), "message trait should resolve")
+	assert.Equal(t, "application/json", message.GetEffective().GetContentType(), "message trait should apply")
+}
+
+// resolveCancellingFS cancels resolution when a file is opened, while still serving the file.
+type resolveCancellingFS struct {
+	files  fstest.MapFS
+	cancel context.CancelFunc
+}
+
+func (c *resolveCancellingFS) Open(name string) (fs.File, error) {
+	c.cancel()
+	return c.files.Open(name)
+}
+
+func TestResolveAllReferences_CancelledWhileFollowing_Error(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		doc   string
+		files fstest.MapFS
+	}{
+		{
+			name:  "reference object chain",
+			doc:   minimalDoc("channels:\n  c:\n    $ref: './c.yaml#/c'\n"),
+			files: fstest.MapFS{"c.yaml": {Data: []byte("c:\n  $ref: '#/d'\nd:\n  address: d\n")}},
+		},
+		{
+			name:  "schema chain",
+			doc:   minimalDoc("components:\n  schemas:\n    s:\n      $ref: './s.yaml#/s'\n"),
+			files: fstest.MapFS{"s.yaml": {Data: []byte("s:\n  $ref: '#/t'\nt:\n  type: object\n")}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			a, validationErrs := unmarshal(t, tt.doc)
+			require.Empty(t, errorsOnly(validationErrs), "document should be valid before resolution")
+
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			errs, err := a.ResolveAllReferences(ctx, asyncapi.ResolveAllOptions{AsyncAPILocation: "api.yaml", VirtualFS: &resolveCancellingFS{files: tt.files, cancel: cancel}})
+			require.ErrorIs(t, err, context.Canceled, "cancelled resolution should return the cancellation")
+			assert.Empty(t, errs, "cancellation should not be reported as a reference problem")
+		})
+	}
+}
+
+func TestResolveAllReferences_Messages_Error(t *testing.T) {
+	t.Parallel()
+
+	files := fstest.MapFS{
+		"null.yaml":  {Data: []byte("c:\n  $ref: null\n")},
+		"mf.json":    {Data: []byte(`{"schemaFormat": "application/vnd.apache.avro;version=1.9.0", "schema": {}}`)},
+		"alias.yaml": {Data: []byte("x: &f application/vnd.apache.avro;version=1.9.0\nschemaFormat: *f\n")},
+	}
+	const avroSchema = "    avro:\n      schemaFormat: application/vnd.apache.avro;version=1.9.0\n      schema: {}\n"
+
+	tests := []struct {
+		name     string
+		doc      string
+		location string
+		expected []string
+	}{
+		{
+			name:     "reference cycle",
+			doc:      minimalDoc("components:\n  channels:\n    a:\n      $ref: '#/components/channels/b'\n    b:\n      $ref: '#/components/channels/a'\n"),
+			location: "api.yaml",
+			expected: []string{
+				"[8:13] error validation-circular-reference circular reference: api.yaml#/components/channels/b -> api.yaml#/components/channels/a -> api.yaml#/components/channels/b",
+				"[10:13] error validation-circular-reference circular reference: api.yaml#/components/channels/a -> api.yaml#/components/channels/b -> api.yaml#/components/channels/a",
+			},
+		},
+		{
+			name:     "wrong kind of target",
+			doc:      minimalDoc("channels:\n  c:\n    $ref: '#/components/messages/m'\ncomponents:\n  messages:\n    m:\n      name: m\n"),
+			location: "api.yaml",
+			expected: []string{"[7:11] error validation-invalid-reference channel reference `#/components/messages/m` points to a message, not a channel"},
+		},
+		{
+			name:     "invalid document location",
+			doc:      minimalDoc("channels:\n  c:\n    $ref: './c.yaml#/c'\n"),
+			location: "http://[::1",
+			expected: []string{"[7:11] error validation-invalid-reference channel reference `./c.yaml#/c` is invalid: invalid reference format: parse \"http://[::1\": missing ']' in host"},
+		},
+		{
+			name:     "absolute path without the document location",
+			doc:      minimalDoc("channels:\n  c:\n    $ref: '/abs/c.yaml#/c'\n"),
+			expected: []string{"[7:11] error validation-invalid-reference failed to resolve channel reference `/abs/c.yaml#/c`: open /abs/c.yaml: file does not exist"},
+		},
+		{
+			name:     "target is an empty reference",
+			doc:      minimalDoc("channels:\n  c:\n    $ref: './null.yaml#/c'\n"),
+			location: "api.yaml",
+			expected: []string{"[7:11] error validation-invalid-reference channel reference `./null.yaml#/c` doesn't point to a channel"},
+		},
+		{
+			name:     "target is unset",
+			doc:      minimalDoc("channels:\n  c:\n    externalDocs:\n      $ref: '#/info/externalDocs'\n"),
+			location: "api.yaml",
+			expected: []string{"[8:13] error validation-invalid-reference external documentation reference `#/info/externalDocs` resolved to nothing"},
+		},
+		{
+			name:     "missing tag",
+			doc:      minimalDoc("channels:\n  c:\n    tags:\n      - $ref: '#/components/tags/missing'\n"),
+			location: "api.yaml",
+			expected: []string{"[8:15] error validation-invalid-reference tag reference `#/components/tags/missing` target not found: not found -- struct is nil at /components/tags"},
+		},
+		{
+			name:     "missing external documentation",
+			doc:      minimalDoc("channels:\n  c:\n    externalDocs:\n      $ref: '#/components/externalDocs/missing'\n"),
+			location: "api.yaml",
+			expected: []string{"[8:13] error validation-invalid-reference external documentation reference `#/components/externalDocs/missing` target not found: not found -- struct is nil at /components/externalDocs"},
+		},
+		{
+			name:     "missing schema",
+			doc:      minimalDoc("components:\n  schemas:\n    s:\n      $ref: '#/components/schemas/missing'\n"),
+			location: "api.yaml",
+			expected: []string{"[8:7] error validation-invalid-reference schema reference `#/components/schemas/missing` target not found: not found -- key missing not found in sequencedmap.Map"},
+		},
+		{
+			name:     "missing JSON Schema resource",
+			doc:      minimalDoc("components:\n  schemas:\n    s:\n      schemaFormat: application/schema+json;version=draft-07\n      schema:\n        $ref: './missing.json'\n"),
+			location: "api.yaml",
+			expected: []string{"[10:9] error validation-invalid-reference failed to resolve schema application/schema+json;version=draft-07 reference `./missing.json`: open missing.json: file does not exist"},
+		},
+		{
+			name:     "JSON Schema resource declares a different format",
+			doc:      minimalDoc("components:\n  schemas:\n    s:\n      schemaFormat: application/schema+json;version=draft-07\n      schema:\n        $ref: './mf.json'\n"),
+			location: "api.yaml",
+			expected: []string{"[10:9] error validation-invalid-reference schema reference `./mf.json` is declared as `application/schema+json;version=draft-07` but its target is `application/vnd.apache.avro;version=1.9.0`"},
+		},
+		{
+			name:     "missing in-document foreign schema",
+			doc:      minimalDoc("components:\n  schemas:\n    s:\n      schemaFormat: application/raml+yaml;version=1.0\n      schema:\n        $ref: '#/components/schemas/missing'\n"),
+			location: "api.yaml",
+			expected: []string{"[10:9] error validation-invalid-reference schema application/raml+yaml;version=1.0 reference `#/components/schemas/missing` target not found: not found -- key missing not found in sequencedmap.Map"},
+		},
+		{
+			name:     "in-document foreign schema declares a different format",
+			doc:      minimalDoc("components:\n  schemas:\n    s:\n      schemaFormat: application/raml+yaml;version=1.0\n      schema:\n        $ref: '#/components/schemas/avro'\n" + avroSchema),
+			location: "api.yaml",
+			expected: []string{"[10:9] error validation-invalid-reference schema reference `#/components/schemas/avro` is declared as `application/raml+yaml;version=1.0` but its target is `application/vnd.apache.avro;version=1.9.0`"},
+		},
+		{
+			name:     "missing foreign schema resource",
+			doc:      minimalDoc("components:\n  schemas:\n    s:\n      schemaFormat: application/vnd.apache.avro;version=1.9.0\n      schema:\n        $ref: './missing.avsc'\n"),
+			location: "api.yaml",
+			expected: []string{"[10:9] error validation-invalid-reference failed to resolve raw application/vnd.apache.avro;version=1.9.0 reference `./missing.avsc`: open missing.avsc: file does not exist"},
+		},
+		{
+			name:     "foreign schema resource declares a different format through an alias",
+			doc:      minimalDoc("components:\n  schemas:\n    s:\n      schemaFormat: application/raml+yaml;version=1.0\n      schema:\n        $ref: './alias.yaml'\n"),
+			location: "api.yaml",
+			expected: []string{"[10:9] error validation-invalid-reference schema reference `./alias.yaml` is declared as `application/raml+yaml;version=1.0` but its target is `application/vnd.apache.avro;version=1.9.0`"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, errs := resolveDoc(t, tt.doc, asyncapi.ResolveAllOptions{AsyncAPILocation: tt.location, VirtualFS: files})
+			actual := make([]string, 0, len(errs))
+			for _, err := range errs {
+				actual = append(actual, err.Error())
+			}
+			assert.Equal(t, tt.expected, actual, "resolution errors should match")
+		})
+	}
+}
+
+func TestResolveAllReferences_SchemaFormats_Success(t *testing.T) {
+	t.Parallel()
+
+	files := fstest.MapFS{
+		"order.json": {Data: []byte(`{"type": "object"}`)},
+		"union.avsc": {Data: []byte(`["null", "string"]`)},
+	}
+	doc := minimalDoc(`components:
+  schemas:
+    jsonSchema:
+      schemaFormat: application/schema+json;version=draft-07
+      schema:
+        $ref: './order.json'
+    inDocument:
+      schemaFormat: application/vnd.apache.avro;version=1.9.0
+      schema:
+        $ref: '#/components/schemas/avro'
+    avro:
+      schemaFormat: application/vnd.apache.avro;version=1.9.0
+      schema:
+        type: string
+    avroUnion:
+      schemaFormat: application/vnd.apache.avro;version=1.9.0
+      schema:
+        $ref: './union.avsc'
+`)
+	a, errs := resolveDoc(t, doc, asyncapi.ResolveAllOptions{AsyncAPILocation: "api.yaml", VirtualFS: files})
+	assert.Empty(t, errs, "resolution should report nothing")
+	schemas := a.GetComponents().Schemas
+
+	jsonSchema := a.GetResolvedSchema(schemas.GetOrZero("jsonSchema"))
+	require.NotNil(t, jsonSchema, "JSON Schema resource should resolve")
+	assert.Equal(t, "application/schema+json;version=draft-07", jsonSchema.SchemaFormat, "declared format should be kept")
+	assert.Equal(t, []string{"object"}, jsonSchema.Schema.GetSchema().GetSchema().GetType(), "JSON Schema resource should be interpreted")
+	assert.Equal(t, "order.json", string(jsonSchema.Reference), "reference should be absolute")
+
+	inDocument := a.GetResolvedSchema(schemas.GetOrZero("inDocument"))
+	require.NotNil(t, inDocument, "in-document foreign schema should resolve")
+	assert.Same(t, schemas.GetOrZero("avro"), inDocument.Schema, "in-document foreign schema should resolve to the component")
+	assert.Equal(t, "application/vnd.apache.avro;version=1.9.0", inDocument.SchemaFormat, "declared format should be kept")
+	assert.Equal(t, "api.yaml#/components/schemas/avro", string(inDocument.Reference), "reference should be absolute")
+
+	avroUnion := a.GetResolvedSchema(schemas.GetOrZero("avroUnion"))
+	require.NotNil(t, avroUnion, "foreign schema resource that isn't a mapping should resolve")
+	assert.Nil(t, avroUnion.Schema, "foreign schema should not be interpreted")
+	assert.Equal(t, "[\"null\", \"string\"]\n", nodeString(t, avroUnion.Raw.Content[0]), "foreign schema content should be preserved unchanged")
+}
+
+func TestResolveAllReferences_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	a, _ := unmarshal(t, inDocumentResolutionDoc)
+	operation := a.GetOperations().GetOrZero("placeOrder").GetObject()
+	payload := a.GetComponents().Messages.GetOrZero("placed").GetObject().Payload
+	inline := &asyncapi.ExternalDocumentation{URL: pointer.From("https://example.com")}
+
+	var missing *asyncapi.AsyncAPI
+	assert.Nil(t, missing.GetResolvedSchema(payload), "a nil document should have no resolved schema")
+	assert.Nil(t, a.GetResolvedSchema(nil), "a nil schema should have no resolution")
+	assert.Nil(t, a.GetResolvedSchema(payload), "an unresolved document should have no resolved schema")
+	assert.Nil(t, missing.GetResolvedExternalDocs(inline), "a nil document should have no resolved external docs")
+	assert.Nil(t, a.GetResolvedExternalDocs(nil), "nil external docs should have no resolution")
+	assert.Same(t, inline, a.GetResolvedExternalDocs(inline), "inline external docs should be returned as is")
+	assert.Nil(t, a.GetResolvedExternalDocs(operation.ExternalDocs), "an unresolved reference should have no resolved external docs")
+}
+
+func TestResolveAllReferences_NilDocument_Success(t *testing.T) {
+	t.Parallel()
+
+	var a *asyncapi.AsyncAPI
+	errs, err := a.ResolveAllReferences(t.Context(), asyncapi.ResolveAllOptions{})
+	require.NoError(t, err, "resolving a nil document should not fail")
+	assert.Nil(t, errs, "resolving a nil document should report nothing")
+}
+
+func TestResolveAllReferences_UnsyncableDocument_Error(t *testing.T) {
+	t.Parallel()
+
+	a, _ := unmarshal(t, minimalDoc("components:\n  schemas:\n    s:\n      type: object\n"))
+	a.GetComponents().Schemas.Set("empty", jsonschema.NewSchemaUnionFromSchema(&jsonschema.JSONSchema{}))
+
+	errs, err := a.ResolveAllReferences(t.Context(), asyncapi.ResolveAllOptions{})
+	require.EqualError(t, err, "failed to sync AsyncAPI document: EitherValue has neither Left nor Right set", "a document that can't be synced should fail")
+	assert.Nil(t, errs, "nothing should be reported when resolution doesn't start")
+}
+
+func TestResolveAllReferences_InvalidVersion_Success(t *testing.T) {
+	t.Parallel()
+
+	a, _ := unmarshal(t, "asyncapi: three\ninfo:\n  title: T\n  version: '1'\nchannels:\n  c:\n    $ref: '#/components/channels/c'\ncomponents:\n  channels:\n    c:\n      address: c\n")
+
+	errs, err := a.ResolveAllReferences(t.Context(), asyncapi.ResolveAllOptions{})
+	require.NoError(t, err, "resolution should not fail")
+	assert.Empty(t, errs, "resolution should report nothing")
+	assert.Equal(t, "c", a.GetChannels().GetOrZero("c").GetObject().GetAddress(), "references should resolve regardless of the version")
 }

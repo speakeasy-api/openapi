@@ -166,7 +166,7 @@ func (s *Schema) validateDefault() []error {
 	}
 
 	core := s.GetCore()
-	return []error{validation.NewValueError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError("schema.default", "schema.default must conform to the schema type [`%s`]", strings.Join(types, "`, `")), core, core.Default)}
+	return []error{validation.NewValueError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError("schema.default", "must conform to the schema type [`%s`]", strings.Join(types, "`, `")), core, core.Default)}
 }
 
 // nodeMatchesType reports whether a YAML value conforms to a JSON Schema primitive type.
@@ -306,7 +306,7 @@ func (m *MultiFormatSchema) Validate(ctx context.Context, opts ...validation.Opt
 	default:
 		if format.Kind == asyncapiversion.SchemaFormatKindProtobuf && m.Schema != nil && !m.Schema.IsReference() {
 			if raw := yml.ResolveAlias(m.Schema.Raw); raw != nil && (raw.Kind != yaml.ScalarNode || raw.ShortTag() != "!!str") {
-				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError("multiFormatSchema.schema", "multiFormatSchema.schema for Protocol Buffers must be inlined as a string"), core, core.Schema))
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError("multiFormatSchema.schema", "for Protocol Buffers must be inlined as a string"), core, core.Schema))
 			}
 		}
 		errs = append(errs, validation.NewValueError(validation.SeverityWarning, validation.RuleValidationUnsupportedFormat, fmt.Errorf("multiFormatSchema.schemaFormat `%s` is not supported for validation, the schema was not validated", m.SchemaFormat), core, core.SchemaFormat))
@@ -376,7 +376,7 @@ func rootCauses(err *jsValidator.ValidationError, root *yaml.Node) []error {
 		if len(t.Want) > 1 {
 			want = "one of [" + want + "]"
 		}
-		return []error{validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, "%s expected %s, got `%s`", parentName, want, t.Got), target)}
+		return []error{validation.NewValidationError(validation.SeverityError, validation.RuleValidationTypeMismatch, validation.NewTypeMismatchError(parentName, "expected %s, got `%s`", want, t.Got), target)}
 	case *kind.Required:
 		return []error{validation.NewValidationError(validation.SeverityError, validation.RuleValidationRequiredField, fmt.Errorf("`%s` %s", parentName, strings.ReplaceAll(msg, "'", "`")), target)}
 	default:

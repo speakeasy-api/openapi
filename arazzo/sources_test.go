@@ -362,8 +362,8 @@ channels:
 func TestLoadSourceDescriptions_AsyncAPIResolutionWarnings_Success(t *testing.T) {
 	t.Parallel()
 
-	// A schema format that isn't validated is reported as a warning by the asyncapi package, it doesn't stop
-	// anything being checked.
+	// A reference to a Protobuf resource isn't resolved and is reported as a warning by the asyncapi package, it
+	// doesn't stop anything being checked.
 	files := fstest.MapFS{"events.yaml": {Data: []byte(`asyncapi: 3.0.0
 info:
   title: Events
@@ -372,10 +372,10 @@ components:
   messages:
     Order:
       payload:
-        schemaFormat: application/vnd.apache.avro;version=1.9.0
+        schemaFormat: application/vnd.google.protobuf;version=3
         schema:
-          $ref: "./order.avsc"
-`)}, "order.avsc": {Data: []byte(`{"type": "record", "name": "Order", "fields": []}`)}}
+          $ref: "./order.proto"
+`)}}
 
 	a := sourcesTestDoc(t, "", "asyncapi", "events.yaml")
 	sources, errs := arazzo.LoadSourceDescriptions(t.Context(), a, arazzo.LoadSourcesOptions{VirtualFS: files})

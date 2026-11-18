@@ -2,6 +2,7 @@ package asyncapi_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -9,7 +10,9 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/asyncapi"
+	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/pointer"
+	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -137,6 +140,30 @@ func errorsOnly(errs []error) []error {
 		}
 	}
 	return out
+}
+
+// validatable is implemented by every high-level model.
+type validatable interface {
+	Validate(ctx context.Context, opts ...validation.Option) []error
+}
+
+// nilValidateCase pairs a case name with a typed nil model whose Validate method must be nil-safe.
+type nilValidateCase struct {
+	name  string
+	model validatable
+}
+
+// runNilValidateCases checks that validating each typed nil model returns no errors.
+func runNilValidateCases(t *testing.T, tests []nilValidateCase) {
+	t.Helper()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Nil(t, tt.model.Validate(t.Context()), "validating a nil model should return nil")
+		})
+	}
 }
 
 func readTestdata(t *testing.T, name string) string {
@@ -419,6 +446,111 @@ func TestUnmarshal_Error(t *testing.T) {
 			require.Error(t, err, "unmarshal should fail")
 		})
 	}
+}
+
+func TestAsyncAPI_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	exts := extensions.New(extensions.NewElem("x-owner", nil))
+	populated := &asyncapi.AsyncAPI{
+		AsyncAPI:           "3.0.0",
+		ID:                 pointer.From("urn:example:orders"),
+		Info:               asyncapi.Info{Title: "Orders"},
+		Servers:            sequencedmap.New(sequencedmap.NewElem("prod", &asyncapi.ReferencedServer{Object: &asyncapi.Server{Host: "example.com"}})),
+		DefaultContentType: pointer.From("application/json"),
+		Channels:           sequencedmap.New(sequencedmap.NewElem("c", &asyncapi.ReferencedChannel{Object: &asyncapi.Channel{}})),
+		Operations:         sequencedmap.New(sequencedmap.NewElem("o", &asyncapi.ReferencedOperation{Object: &asyncapi.Operation{}})),
+		Components:         &asyncapi.Components{},
+		Extensions:         exts,
+	}
+	unset := &asyncapi.AsyncAPI{}
+
+	type getters struct {
+		asyncAPI           string
+		id                 string
+		info               *asyncapi.Info
+		servers            *sequencedmap.Map[string, *asyncapi.ReferencedServer]
+		defaultContentType string
+		channels           *sequencedmap.Map[string, *asyncapi.ReferencedChannel]
+		operations         *sequencedmap.Map[string, *asyncapi.ReferencedOperation]
+		components         *asyncapi.Components
+		extensions         *extensions.Extensions
+	}
+
+	tests := []struct {
+		name     string
+		doc      *asyncapi.AsyncAPI
+		expected getters
+	}{
+		{
+			name:     "nil document returns defaults",
+			doc:      nil,
+			expected: getters{extensions: extensions.New()},
+		},
+		{
+			name:     "unset fields return defaults",
+			doc:      unset,
+			expected: getters{info: &unset.Info, extensions: extensions.New()},
+		},
+		{
+			name: "populated fields are returned",
+			doc:  populated,
+			expected: getters{
+				asyncAPI:           "3.0.0",
+				id:                 "urn:example:orders",
+				info:               &populated.Info,
+				servers:            populated.Servers,
+				defaultContentType: "application/json",
+				channels:           populated.Channels,
+				operations:         populated.Operations,
+				components:         populated.Components,
+				extensions:         exts,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			actual := getters{
+				asyncAPI:           tt.doc.GetAsyncAPI(),
+				id:                 tt.doc.GetID(),
+				info:               tt.doc.GetInfo(),
+				servers:            tt.doc.GetServers(),
+				defaultContentType: tt.doc.GetDefaultContentType(),
+				channels:           tt.doc.GetChannels(),
+				operations:         tt.doc.GetOperations(),
+				components:         tt.doc.GetComponents(),
+				extensions:         tt.doc.GetExtensions(),
+			}
+			assert.Equal(t, tt.expected, actual, "getters should return expected values")
+		})
+	}
+}
+
+func TestAsyncAPI_GetInfo_ReturnsField(t *testing.T) {
+	t.Parallel()
+
+	a := asyncapi.NewAsyncAPI()
+	a.GetInfo().Title = "Orders"
+	assert.Equal(t, "Orders", a.Info.Title, "GetInfo should return a pointer to the document's Info field")
+}
+
+func TestAsyncAPI_Sync_Success(t *testing.T) {
+	t.Parallel()
+
+	a, validationErrs := unmarshal(t, streetlightsDoc)
+	require.Empty(t, validationErrs, "should have no validation errors")
+
+	a.Info.Title = "Streetlights Events"
+	a.DefaultContentType = pointer.From("application/cloudevents+json")
+	require.NoError(t, a.Sync(t.Context()), "sync should succeed")
+
+	c := a.GetCore()
+	assert.Equal(t, "Streetlights Events", c.Info.Value.Title.Value, "core info title should be synced")
+	assert.Equal(t, "application/cloudevents+json", *c.DefaultContentType.Value, "core default content type should be synced")
+	assert.Equal(t, "application/cloudevents+json", c.DefaultContentType.ValueNode.Value, "yaml node should be synced")
 }
 
 func TestIsSupportedVersion_Success(t *testing.T) {

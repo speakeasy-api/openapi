@@ -59,6 +59,145 @@ operations:
     $ref: "./missing.yaml#/operations/listen"
 `
 
+const asyncAPIEdgeCasesSource = `asyncapi: 3.1.0
+info:
+  title: Edge cases
+  version: 1.0.0
+channels:
+  refHeaders:
+    address: ref
+    messages:
+      withRefHeaders:
+        headers:
+          $ref: "#/components/schemas/Headers"
+  multiFormatHeaders:
+    address: multi
+    messages:
+      withMultiFormatHeaders:
+        headers:
+          schemaFormat: application/schema+json;version=draft-07
+          schema:
+            type: object
+            properties:
+              traceId:
+                type: string
+  unresolvedChannel:
+    $ref: "./missing.yaml#/channels/unresolved"
+operations:
+  danglingChannel:
+    action: send
+    channel:
+      $ref: "./missing.yaml#/channels/unresolved"
+components:
+  schemas:
+    Headers:
+      type: object
+      properties:
+        traceId:
+          type: string
+`
+
+const asyncAPIEdgeCasesOpenAPI = `openapi: 3.1.0
+info:
+  title: Petstore
+  version: 1.0.0
+paths: {}
+`
+
+func TestArazzo_ValidateSources_AsyncAPIEdgeCases_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		step     string
+		expected []string
+	}{
+		{
+			name:     "parameter without a location is skipped",
+			step:     "channelPath: \"{$sourceDescriptions.events.url}#/channels/refHeaders\"\n        parameters:\n          - name: anything\n            value: abc",
+			expected: []string{},
+		},
+		{
+			name:     "malformed channelPath is left to structural validation",
+			step:     "channelPath: not-a-path",
+			expected: []string{},
+		},
+		{
+			name:     "channelPath to an unknown source is left to structural validation",
+			step:     "channelPath: \"{$sourceDescriptions.unknown.url}#/channels/refHeaders\"",
+			expected: []string{},
+		},
+		{
+			name:     "channelPath to a source declared as another type is left to Validate",
+			step:     "channelPath: \"{$sourceDescriptions.petstore.url}#/channels/refHeaders\"",
+			expected: []string{},
+		},
+		{
+			name:     "channelPath pointer without a leading slash",
+			step:     "channelPath: \"{$sourceDescriptions.events.url}#channels/refHeaders\"",
+			expected: []string{"error: step.channelPath `{$sourceDescriptions.events.url}#channels/refHeaders` doesn't reference a channel in sourceDescription `events`"},
+		},
+		{
+			name:     "unresolved channel skips undeclared header checks",
+			step:     "channelPath: \"{$sourceDescriptions.events.url}#/channels/unresolvedChannel\"\n        parameters:\n          - name: undeclared\n            in: header\n            value: abc",
+			expected: []string{},
+		},
+		{
+			name:     "operation with an unresolved channel skips undeclared header checks",
+			step:     "operationId: $sourceDescriptions.events.danglingChannel\n        parameters:\n          - name: undeclared\n            in: header\n            value: abc",
+			expected: []string{},
+		},
+		{
+			name:     "headers schema from a reference",
+			step:     "channelPath: \"{$sourceDescriptions.events.url}#/channels/refHeaders\"\n        parameters:\n          - name: TraceId\n            in: header\n            value: abc\n          - name: undeclared\n            in: header\n            value: abc",
+			expected: []string{"warning: step.parameters `undeclared` in `header` is not a header of any message of channel `/channels/refHeaders` in sourceDescription `events`"},
+		},
+		{
+			name:     "headers schema in a multi-format schema",
+			step:     "channelPath: \"{$sourceDescriptions.events.url}#/channels/multiFormatHeaders\"\n        parameters:\n          - name: traceId\n            in: header\n            value: abc\n          - name: undeclared\n            in: header\n            value: abc",
+			expected: []string{"warning: step.parameters `undeclared` in `header` is not a header of any message of channel `/channels/multiFormatHeaders` in sourceDescription `events`"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+
+			doc := `arazzo: 1.1.0
+info:
+  title: Edge cases
+  version: 1.0.0
+sourceDescriptions:
+  - name: events
+    url: events.yaml
+    type: asyncapi
+  - name: petstore
+    url: petstore.yaml
+    type: openapi
+workflows:
+  - workflowId: main
+    steps:
+      - stepId: step
+        action: send
+        ` + tt.step + `
+`
+			a, _, err := arazzo.Unmarshal(ctx, bytes.NewBufferString(doc), arazzo.WithSkipValidation())
+			require.NoError(t, err, "unmarshal should succeed")
+
+			sources, _ := arazzo.LoadSourceDescriptions(ctx, a, arazzo.LoadSourcesOptions{
+				VirtualFS: fstest.MapFS{
+					"events.yaml":   {Data: []byte(asyncAPIEdgeCasesSource)},
+					"petstore.yaml": {Data: []byte(asyncAPIEdgeCasesOpenAPI)},
+				},
+			})
+			require.NotNil(t, sources.Get("events"), "AsyncAPI source should be loaded")
+
+			assert.Equal(t, tt.expected, severityMessages(a.ValidateSources(ctx, sources)), "source validation messages should match")
+		})
+	}
+}
+
 func TestArazzo_ValidateSources_AsyncAPIPartialTarget_Success(t *testing.T) {
 	t.Parallel()
 
