@@ -6,7 +6,7 @@ require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.1
 	charm.land/lipgloss/v2 v2.1.0
-	github.com/speakeasy-api/openapi v1.26.6-0.20261117052855-40c8fb72eeeb
+	github.com/speakeasy-api/openapi v1.27.1-0.20261118011054-2ce30242b46b
 	github.com/speakeasy-api/openapi/openapi/linter/customrules v0.0.0-20261117052855-40c8fb72eeeb
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
