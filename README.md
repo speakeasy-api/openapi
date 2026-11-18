@@ -38,8 +38,6 @@
     <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
     <!-- Release Version Badge -->
     <a href="https://github.com/speakeasy-api/openapi/releases/latest"><img alt="Release" src="https://img.shields.io/github/release/speakeasy-api/openapi.svg?style=for-the-badge"></a>
-    <!-- Go Report Card Badge -->
-    <a href="https://goreportcard.com/report/github.com/speakeasy-api/openapi"><img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/speakeasy-api/openapi?style=for-the-badge"></a>
     <!-- Security Badge -->
     <a href="https://github.com/speakeasy-api/openapi/actions/workflows/ci.yaml"><img alt="Security" src="https://img.shields.io/badge/security-scanned-green.svg?style=for-the-badge&logo=security"></a>
     <!-- CI Badge -->
