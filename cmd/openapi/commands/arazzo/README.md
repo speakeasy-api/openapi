@@ -48,14 +48,15 @@ This command checks for:
 - Source description references and validity
 - Step success and failure action definitions
 
-By default the OpenAPI and Arazzo documents referenced by `sourceDescriptions` are also loaded, and the workflows are checked against them:
+By default the OpenAPI, AsyncAPI and Arazzo documents referenced by `sourceDescriptions` are also loaded, and the workflows are checked against them:
 
-- `operationId`, `operationPath` and `workflowId` targets (including `dependsOn` entries) exist
+- `operationId`, `operationPath`, `channelPath` and `workflowId` targets (including `dependsOn` entries) exist
 - Step parameters match the target operation's parameters by name and location
 - Required parameters and request bodies are supplied
 - Parameters passed to workflows in other Arazzo documents match their inputs
+- AsyncAPI steps only send headers declared by the target's messages, and use `correlationId` with messages that declare one (warnings)
 
-Relative source URLs are resolved against the document's `$self`, or its file location. A source that can't be loaded is reported as a warning, and AsyncAPI sources are reported with a hint and not checked. Only errors make validation fail.
+Relative source URLs are resolved against the document's `$self`, or its file location. A source that can't be loaded is reported as a warning, as are AsyncAPI 2.x sources, which aren't supported. Only errors make validation fail. See the [arazzo package README](../../../../arazzo/README.md#asyncapi-sources) for exactly what is checked for AsyncAPI sources.
 
 | Flag             | Description                                                                                            |
 | ---------------- | ------------------------------------------------------------------------------------------------------ |

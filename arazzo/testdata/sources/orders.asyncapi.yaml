@@ -1,0 +1,74 @@
+asyncapi: 3.0.0
+info:
+  title: Orders
+  version: 1.0.0
+channels:
+  orderRequests:
+    address: orders/{orderId}/requests
+    parameters:
+      orderId:
+        description: The order ID.
+    messages:
+      placeOrder:
+        $ref: "#/components/messages/PlaceOrder"
+  orderConfirmations:
+    address: orders.confirmed
+    messages:
+      orderConfirmed:
+        $ref: "./orders.messages.yaml#/components/messages/OrderConfirmed"
+  orders/legacy:
+    address: legacy.orders
+    messages:
+      legacyOrder:
+        payload:
+          type: object
+  audit:
+    address: audit
+    messages:
+      auditEvent:
+        headers:
+          allOf:
+            - type: object
+              properties:
+                source:
+                  type: string
+        payload:
+          type: object
+operations:
+  placeOrder:
+    action: send
+    channel:
+      $ref: "#/channels/orderRequests"
+    messages:
+      - $ref: "#/channels/orderRequests/messages/placeOrder"
+  confirmOrder:
+    action: receive
+    channel:
+      $ref: "#/channels/orderConfirmations"
+components:
+  channels:
+    orderStatus:
+      address: orders.status
+      messages:
+        status:
+          payload:
+            type: object
+  operations:
+    reusableSend:
+      action: send
+      channel:
+        $ref: "#/channels/orderRequests"
+  messages:
+    PlaceOrder:
+      headers:
+        type: object
+        properties:
+          requestId:
+            type: string
+      payload:
+        type: object
+        properties:
+          productId:
+            type: string
+          quantity:
+            type: integer

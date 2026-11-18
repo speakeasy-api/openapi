@@ -22,14 +22,26 @@
 
 ## Supported versions
 
-| Arazzo version | Support |
-| -------------- | ------- |
-| [1.1.x](https://spec.openapis.org/arazzo/v1.1.0) | Read, write, walk and validate, including AsyncAPI steps (`channelPath`, `action`, `correlationId`), `dependsOn`, `timeout`, Selector Objects, action `parameters`, `$self` and the stricter 1.1 runtime expression grammar. AsyncAPI documents are not loaded, so references into them are only checked structurally. |
-| [1.0.x](https://spec.openapis.org/arazzo/v1.0.1) | Read, write, walk and validate. |
+| Arazzo version                                   | Support                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [1.1.x](https://spec.openapis.org/arazzo/v1.1.0) | Read, write, walk and validate, including AsyncAPI steps (`channelPath`, `action`, `correlationId`), `dependsOn`, `timeout`, Selector Objects, action `parameters`, `$self` and the stricter 1.1 runtime expression grammar. AsyncAPI 3.0 and 3.1 sources are checked by `ValidateSources` (see below); AsyncAPI 2.x sources are reported as unsupported and only checked structurally. |
+| [1.0.x](https://spec.openapis.org/arazzo/v1.0.1) | Read, write, walk and validate.                                                                                                                                                                                                                                                                                                                                                         |
 
 Any patch release of a supported minor version is accepted (including prerelease suffixes such as `1.1.0-rc1`). Validation follows the version declared by the document, so using an Arazzo 1.1 feature in a document that declares `arazzo: 1.0.x` is reported as an error. Use `arazzo.Upgrade` (or `openapi arazzo upgrade`) to move a 1.0.x document to 1.1.0. The upgrade pins `jsonpath` and `xpath` criteria to the versions Arazzo 1.0 implied, so their meaning doesn't change.
 
 Where the Arazzo Specification text and its JSON Schema disagree, validation follows the specification text.
+
+### AsyncAPI sources
+
+`LoadSourceDescriptions` loads AsyncAPI 3.0 and 3.1 sources with the [asyncapi](../asyncapi) package and resolves their references, using the same file system and HTTP client as OpenAPI sources. `ValidateSources` then checks AsyncAPI steps against them:
+
+- `operationId` must be a key of the root `operations` map. Operations in `components` are reusable definitions, not operations of the application, so they don't match.
+- `channelPath` must be a JSON Pointer to a channel's key under `/channels` or `/components/channels`, for example `{$sourceDescriptions.events.url}#/channels/orderCreated`. A channel's `address` is not its key.
+- `operationPath` can't target an AsyncAPI source, as Arazzo AsyncAPI steps use `operationId` or `channelPath`.
+- Header parameters should be declared by the headers schema of one of the messages the step can send or receive (the operation's `messages`, or all messages of its channel), including headers added by message traits. Other parameter locations have no AsyncAPI meaning. Both are reported as warnings.
+- A `receive` step with a `requestBody`, or with a `correlationId` when none of its messages declare one, is reported as a warning.
+
+Some things are deliberately not checked. A step's `action` isn't compared with the AsyncAPI operation's `action`, as the step describes the workflow's side of the exchange and the operation the application's, and Arazzo doesn't define how they relate. Correlation values, payloads, bindings and channel address parameters are runtime concerns. Checks that something isn't declared are skipped when a reference couldn't be resolved or a headers schema uses composition or a non JSON Schema format.
 
 ### Migrating step and workflow outputs
 
@@ -224,7 +236,7 @@ for _, err := range validationErrs {
 
 ## Validate an Arazzo document against its source descriptions
 
-Shows loading the OpenAPI and Arazzo documents a workflow references and checking its steps against them.
+Shows loading the OpenAPI, AsyncAPI and Arazzo documents a workflow references and checking its steps against them.
 
 ```go
 ctx := context.Background()
