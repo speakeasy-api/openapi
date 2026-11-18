@@ -35,13 +35,80 @@ func TestResolveAllReferences_Checks_Error(t *testing.T) {
 			opts:     asyncapi.ResolveAllOptions{AsyncAPILocation: "https://example.com/api.yaml"},
 			expected: []string{"[14:15] error validation-invalid-reference message reference `ht tp://invalid url#/m` is invalid: invalid relative URL: parse \"ht tp://invalid url\": first path segment in URL cannot contain colon"},
 		},
+		{
+			name: "root operation reply channel outside the root channels",
+			doc: minimalDoc(`channels:
+  c:
+    address: c
+operations:
+  o:
+    action: send
+    channel:
+      $ref: '#/channels/c'
+    reply:
+      channel:
+        $ref: '#/components/channels/r'
+components:
+  channels:
+    r:
+      address: r
+`),
+			expected: []string{"[15:15] error validation-invalid-target operation.reply.channel `#/components/channels/r` must point to an entry in the root `channels` of the same document"},
+		},
+		{
+			name: "reply message that is not a message of the reply channel",
+			doc: minimalDoc(`channels:
+  c:
+    address: c
+  r:
+    address: r
+    messages:
+      ok:
+        name: ok
+operations:
+  o:
+    action: send
+    channel:
+      $ref: '#/channels/c'
+    reply:
+      channel:
+        $ref: '#/channels/r'
+      messages:
+        - $ref: '#/components/messages/m'
+components:
+  messages:
+    m:
+      name: m
+`),
+			expected: []string{"[22:17] error validation-invalid-target operation.reply.messages[0] `#/components/messages/m` must point to a message of the channel `#/channels/r`"},
+		},
+		{
+			name: "reply address with a reply channel that has a fixed address",
+			doc: minimalDoc(`channels:
+  c:
+    address: c
+  r:
+    address: r
+operations:
+  o:
+    action: send
+    channel:
+      $ref: '#/channels/c'
+    reply:
+      address:
+        location: $message.header#/replyTo
+      channel:
+        $ref: '#/channels/r'
+`),
+			expected: []string{"[19:15] error validation-invalid-target operation.reply.channel `#/channels/r` must have a null or absent address because operation.reply.address is set, got `r`"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, errs := traitsResolve(t, tt.doc, tt.opts)
+			_, errs := resolveIgnoringValidation(t, tt.doc, tt.opts)
 			assert.Equal(t, tt.expected, errorStrings(errs), "resolution diagnostics should match")
 		})
 	}
@@ -72,7 +139,7 @@ func TestResolveAllReferences_Checks_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, errs := traitsResolve(t, tt.doc, asyncapi.ResolveAllOptions{})
+			_, errs := resolveIgnoringValidation(t, tt.doc, asyncapi.ResolveAllOptions{})
 			assert.Empty(t, errorStrings(errs), "cross-object checks should report nothing")
 		})
 	}

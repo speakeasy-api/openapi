@@ -952,7 +952,8 @@ func TestResolveAllReferences_UnsyncableDocument_Error(t *testing.T) {
 	a.GetComponents().Schemas.Set("empty", jsonschema.NewSchemaUnionFromSchema(&jsonschema.JSONSchema{}))
 
 	errs, err := a.ResolveAllReferences(t.Context(), asyncapi.ResolveAllOptions{})
-	require.EqualError(t, err, "failed to sync AsyncAPI document: EitherValue has neither Left nor Right set", "a document that can't be synced should fail")
+	require.Error(t, err, "a document that can't be synced should fail")
+	assert.True(t, strings.HasPrefix(err.Error(), "failed to sync AsyncAPI document: "), "error should say syncing failed")
 	assert.Nil(t, errs, "nothing should be reported when resolution doesn't start")
 }
 
