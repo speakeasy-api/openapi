@@ -3,20 +3,41 @@ package yml
 import (
 	"context"
 	"reflect"
+	"slices"
 	"strconv"
 
 	"go.yaml.in/yaml/v3"
 )
 
+// An anchored node is shared with every alias that points to it. The CreateOrUpdate functions below never change a
+// shared node: an unchanged value keeps the existing node (and so any alias or anchor), a changed value behind an
+// alias gets a node of its own, and a changed anchored value is written to a copy of the anchored node. Aliases to
+// an anchored node that is replaced or removed are turned into copies of it by ResolveOrphanedAliases when the
+// document is marshalled, so they keep their value.
+
+// writableNode returns the node a changed value can be written to: the node itself if nothing else shares it, a
+// copy of it if it is anchored, or nil if it is nil or an alias and a new node is needed.
+func writableNode(node *yaml.Node) *yaml.Node {
+	switch {
+	case node == nil, node.Kind == yaml.AliasNode:
+		return nil
+	case node.Anchor != "":
+		c := *node
+		return &c
+	default:
+		return node
+	}
+}
+
 func CreateOrUpdateKeyNode(ctx context.Context, key string, keyNode *yaml.Node) *yaml.Node {
 	if keyNode != nil {
-		resolvedKeyNode := ResolveAlias(keyNode)
-		if resolvedKeyNode == nil {
-			resolvedKeyNode = keyNode
+		if resolvedKeyNode := ResolveAlias(keyNode); resolvedKeyNode != nil && resolvedKeyNode.Value == key {
+			return keyNode
 		}
-
-		resolvedKeyNode.Value = key
-		return keyNode
+		if node := writableNode(keyNode); node != nil {
+			node.Value = key
+			return node
+		}
 	}
 
 	cfg := GetConfigFromContext(ctx)
@@ -38,9 +59,14 @@ func CreateOrUpdateScalarNode(ctx context.Context, value any, valueNode *yaml.No
 	resolvedValueNode := ResolveAlias(valueNode)
 
 	if resolvedValueNode != nil {
-		resolvedValueNode.Value = convNode.Value
-		resolvedValueNode.Tag = convNode.Tag // Also update the tag to match the new value type
-		return valueNode
+		if resolvedValueNode.Kind == yaml.ScalarNode && resolvedValueNode.Value == convNode.Value && resolvedValueNode.Tag == convNode.Tag {
+			return valueNode
+		}
+		if node := writableNode(valueNode); node != nil {
+			node.Value = convNode.Value
+			node.Tag = convNode.Tag // Also update the tag to match the new value type
+			return node
+		}
 	}
 
 	cfg := GetConfigFromContext(ctx)
@@ -145,8 +171,13 @@ func DeleteMapNodeElement(ctx context.Context, key string, mapNode *yaml.Node) *
 func CreateOrUpdateSliceNode(ctx context.Context, elements []*yaml.Node, valueNode *yaml.Node) *yaml.Node {
 	resolvedValueNode := ResolveAlias(valueNode)
 	if resolvedValueNode != nil {
-		resolvedValueNode.Content = elements
-		return valueNode
+		if slices.Equal(resolvedValueNode.Content, elements) {
+			return valueNode
+		}
+		if node := writableNode(valueNode); node != nil {
+			node.Content = elements
+			return node
+		}
 	}
 
 	return &yaml.Node{
