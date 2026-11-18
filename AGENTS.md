@@ -207,6 +207,10 @@ Avoid using `min`, `max`, `new`, `len`, `cap`, `copy`, `delete`, `error`, `any` 
 
 - Convert `if-else if` chains to `switch` statements when comparing the same variable.
 
+### nilaway: Guard Pointer Parameters in Helpers
+
+`nilaway` follows nil values across packages and reports `Potential nil panic detected` when a helper dereferences a pointer parameter that some caller anywhere can pass as nil, even if the helper's direct callers check first. Add an explicit nil check in the helper itself (for example `case node == nil, node.Kind == yaml.AliasNode:`) rather than relying on callers.
+
 ### thelper: Mark Test Helper Closures
 
 Test helper functions accepting `*testing.T` must start with `t.Helper()`. This includes anonymous helper closures stored in table-driven test cases, even when they only call another helper. Top-level `TestXxx` functions and `t.Run` callbacks are test entry points, not helpers, and do not need `t.Helper()`.

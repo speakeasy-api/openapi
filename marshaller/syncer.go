@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	"github.com/speakeasy-api/openapi/yml"
@@ -316,6 +317,15 @@ func syncArraySlice(ctx context.Context, source any, target any, valueNode *yaml
 	// we need to match source elements with their corresponding target core models
 	// by identity (RootNode) rather than by array position to preserve elements.
 	reorderedTargets, reorderedNodes := reorderArrayElements(sourceVal, targetVal, valueNode)
+
+	// The elements of a shared sequence are shared too, so sync into copies of them. CreateOrUpdateSliceNode keeps
+	// the shared sequence if nothing changed.
+	if yml.IsShared(valueNode) {
+		reorderedNodes = slices.Clone(reorderedNodes)
+		for i, node := range reorderedNodes {
+			reorderedNodes[i] = yml.CopyNode(node)
+		}
+	}
 
 	elements := make([]*yaml.Node, sourceVal.Len())
 
