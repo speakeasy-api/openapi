@@ -35,7 +35,8 @@ document's location) and the workflows are checked against them:
 - step parameters match the target operation's parameters by name and location
 - required parameters and request bodies are supplied
 - parameters passed to workflows match their inputs
-- AsyncAPI steps only send headers their messages declare
+- AsyncAPI step header parameters are checked against the headers their
+  messages declare (warning)
 
 Sources that can't be loaded, including AsyncAPI 2.x sources, are reported as
 warnings. Use --skip-sources to only validate the document itself, for example
