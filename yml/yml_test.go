@@ -2,6 +2,7 @@ package yml_test
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/yml"
@@ -34,19 +35,6 @@ func TestCreateOrUpdateKeyNode_Success(t *testing.T) {
 			},
 			expected: "updated-key",
 		},
-		{
-			name: "update alias key node",
-			key:  "alias-key",
-			keyNode: &yaml.Node{
-				Kind: yaml.AliasNode,
-				Alias: &yaml.Node{
-					Value: "original",
-					Kind:  yaml.ScalarNode,
-					Tag:   "!!str",
-				},
-			},
-			expected: "alias-key",
-		},
 	}
 
 	for _, tt := range tests {
@@ -56,14 +44,8 @@ func TestCreateOrUpdateKeyNode_Success(t *testing.T) {
 			result := yml.CreateOrUpdateKeyNode(ctx, tt.key, tt.keyNode)
 
 			require.NotNil(t, result)
-			if tt.keyNode != nil && tt.keyNode.Kind == yaml.AliasNode {
-				assert.Equal(t, tt.expected, result.Alias.Value)
-				assert.Equal(t, yaml.AliasNode, result.Kind)
-			} else {
-				resolvedNode := yml.ResolveAlias(result)
-				assert.Equal(t, tt.expected, resolvedNode.Value)
-				assert.Equal(t, yaml.ScalarNode, result.Kind)
-			}
+			assert.Equal(t, tt.expected, result.Value)
+			assert.Equal(t, yaml.ScalarNode, result.Kind)
 		})
 	}
 }
@@ -117,6 +99,164 @@ func TestCreateOrUpdateScalarNode_Success(t *testing.T) {
 			assert.Equal(t, yaml.ScalarNode, result.Kind)
 		})
 	}
+}
+
+// sharedNodes returns an anchored node and an alias to it.
+func sharedNodes(anchored *yaml.Node) (*yaml.Node, *yaml.Node) {
+	return anchored, &yaml.Node{Kind: yaml.AliasNode, Value: anchored.Anchor, Alias: anchored}
+}
+
+// Selectors for which of the shared nodes a test passes in.
+func anchoredInput(anchored, _ *yaml.Node) *yaml.Node { return anchored }
+func aliasInput(_, alias *yaml.Node) *yaml.Node       { return alias }
+
+func TestCreateOrUpdateScalarNode_SharedNodes_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		value          string
+		input          func(anchored, alias *yaml.Node) *yaml.Node
+		expectSame     bool
+		expectedKind   yaml.Kind
+		expectedValue  string
+		expectedAnchor string
+	}{
+		{name: "unchanged alias is kept", value: "foo", input: aliasInput, expectSame: true, expectedKind: yaml.AliasNode, expectedValue: "x"},
+		{name: "changed alias gets its own node", value: "bar", input: aliasInput, expectedKind: yaml.ScalarNode, expectedValue: "bar"},
+		{name: "unchanged anchored node is kept", value: "foo", input: anchoredInput, expectSame: true, expectedKind: yaml.ScalarNode, expectedValue: "foo", expectedAnchor: "x"},
+		{name: "changed anchored node is copied", value: "bar", input: anchoredInput, expectedKind: yaml.ScalarNode, expectedValue: "bar", expectedAnchor: "x"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			anchored, alias := sharedNodes(&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "foo", Anchor: "x"})
+			input := tt.input(anchored, alias)
+
+			result := yml.CreateOrUpdateScalarNode(t.Context(), tt.value, input)
+			require.NotNil(t, result, "result should not be nil")
+			assert.Equal(t, tt.expectSame, result == input, "whether the existing node is reused should match")
+			assert.Equal(t, tt.expectedKind, result.Kind, "node kind should match")
+			assert.Equal(t, tt.expectedValue, result.Value, "node value should match")
+			assert.Equal(t, tt.expectedAnchor, result.Anchor, "node anchor should match")
+			assert.Equal(t, "foo", anchored.Value, "the shared anchored node should not change")
+		})
+	}
+}
+
+func TestCreateOrUpdateScalarNode_UnsharedNode_Success(t *testing.T) {
+	t.Parallel()
+
+	node := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "foo"}
+	result := yml.CreateOrUpdateScalarNode(t.Context(), "bar", node)
+	assert.Same(t, node, result, "an unshared node should be updated in place")
+	assert.Equal(t, "bar", node.Value, "node value should be updated")
+}
+
+func TestCreateOrUpdateKeyNode_SharedNodes_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		key            string
+		input          func(anchored, alias *yaml.Node) *yaml.Node
+		expectSame     bool
+		expectedKind   yaml.Kind
+		expectedValue  string
+		expectedAnchor string
+	}{
+		{name: "unchanged alias is kept", key: "foo", input: aliasInput, expectSame: true, expectedKind: yaml.AliasNode, expectedValue: "x"},
+		{name: "changed alias gets its own node", key: "bar", input: aliasInput, expectedKind: yaml.ScalarNode, expectedValue: "bar"},
+		{name: "changed anchored node is copied", key: "bar", input: anchoredInput, expectedKind: yaml.ScalarNode, expectedValue: "bar", expectedAnchor: "x"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			anchored, alias := sharedNodes(&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "foo", Anchor: "x"})
+			input := tt.input(anchored, alias)
+
+			result := yml.CreateOrUpdateKeyNode(t.Context(), tt.key, input)
+			require.NotNil(t, result, "result should not be nil")
+			assert.Equal(t, tt.expectSame, result == input, "whether the existing node is reused should match")
+			assert.Equal(t, tt.expectedKind, result.Kind, "node kind should match")
+			assert.Equal(t, tt.expectedValue, result.Value, "node value should match")
+			assert.Equal(t, tt.expectedAnchor, result.Anchor, "node anchor should match")
+			assert.Equal(t, "foo", anchored.Value, "the shared anchored node should not change")
+		})
+	}
+}
+
+func TestCreateOrUpdateSliceNode_SharedNodes_Success(t *testing.T) {
+	t.Parallel()
+
+	one := yml.CreateStringNode("one")
+	two := yml.CreateStringNode("two")
+
+	tests := []struct {
+		name           string
+		elements       []*yaml.Node
+		input          func(anchored, alias *yaml.Node) *yaml.Node
+		expectSame     bool
+		expectedKind   yaml.Kind
+		expectedAnchor string
+	}{
+		{name: "unchanged alias is kept", elements: []*yaml.Node{one}, input: aliasInput, expectSame: true, expectedKind: yaml.AliasNode},
+		{name: "alias with equal copied elements is kept", elements: []*yaml.Node{yml.CopyNode(one)}, input: aliasInput, expectSame: true, expectedKind: yaml.AliasNode},
+		{name: "anchored node with equal copied elements is kept", elements: []*yaml.Node{yml.CopyNode(one)}, input: anchoredInput, expectSame: true, expectedKind: yaml.SequenceNode, expectedAnchor: "s"},
+		{name: "changed alias gets its own node", elements: []*yaml.Node{one, two}, input: aliasInput, expectedKind: yaml.SequenceNode},
+		{name: "changed anchored node is copied", elements: []*yaml.Node{one, two}, input: anchoredInput, expectedKind: yaml.SequenceNode, expectedAnchor: "s"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			anchored, alias := sharedNodes(&yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Anchor: "s", Content: []*yaml.Node{one}})
+			input := tt.input(anchored, alias)
+
+			result := yml.CreateOrUpdateSliceNode(t.Context(), tt.elements, input)
+			require.NotNil(t, result, "result should not be nil")
+			assert.Equal(t, tt.expectSame, result == input, "whether the existing node is reused should match")
+			assert.Equal(t, tt.expectedKind, result.Kind, "node kind should match")
+			assert.Equal(t, tt.expectedAnchor, result.Anchor, "node anchor should match")
+			assert.True(t, slices.EqualFunc(tt.elements, yml.ResolveAlias(result).Content, yml.EqualNodes), "node elements should match")
+			assert.Same(t, one, anchored.Content[0], "the shared anchored node should not change")
+			assert.Len(t, anchored.Content, 1, "the shared anchored node should not change")
+		})
+	}
+}
+
+func TestCopyNode_Success(t *testing.T) {
+	t.Parallel()
+
+	anchored := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "v", Anchor: "a"}
+	alias := &yaml.Node{Kind: yaml.AliasNode, Value: "a", Alias: anchored}
+	value := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "v"}
+	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Anchor: "m", Content: []*yaml.Node{yml.CreateStringNode("k"), value, yml.CreateStringNode("a"), alias, nil}}
+
+	c := yml.CopyNode(node)
+	assert.NotSame(t, node, c, "the node should be copied")
+	assert.Equal(t, "m", c.Anchor, "the anchor should be kept")
+	assert.NotSame(t, value, c.Content[1], "children should be copied")
+	assert.Equal(t, "v", c.Content[1].Value, "copied children should keep their values")
+	assert.Same(t, alias, c.Content[3], "aliases should not be followed")
+	assert.Nil(t, c.Content[4], "nil children should be kept")
+	assert.Nil(t, yml.CopyNode(nil), "a nil node should copy to nil")
+}
+
+func TestCreateOrUpdateSliceNode_RecursiveSharedNode_Success(t *testing.T) {
+	t.Parallel()
+
+	anchored := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Anchor: "r"}
+	anchored.Content = []*yaml.Node{yml.CreateStringNode("x"), {Kind: yaml.AliasNode, Value: "r", Alias: anchored}}
+
+	elements := []*yaml.Node{yml.CopyNode(anchored.Content[0]), yml.CopyNode(anchored.Content[1])}
+	result := yml.CreateOrUpdateSliceNode(t.Context(), elements, anchored)
+	assert.Same(t, anchored, result, "an unchanged recursive sequence should be kept")
 }
 
 func TestCreateOrUpdateMapNodeElement_Success(t *testing.T) {

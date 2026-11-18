@@ -8,6 +8,7 @@ import (
 	"github.com/speakeasy-api/openapi/internal/testutils"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/marshaller/tests"
+	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/yml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -506,6 +507,126 @@ x-float-ext: *floatAlias
 
 	outputYAML := buf.String()
 	assert.Equal(t, inputYAML, outputYAML)
+}
+
+// TestMarshal_ChangedAliases_PrimitiveFields_Success tests that changing a field that shares a node with another
+// field through an alias only changes that field.
+func TestMarshal_ChangedAliases_PrimitiveFields_Success(t *testing.T) {
+	t.Parallel()
+
+	// stringField is synced before stringPtrField, so the reversed document has the alias synced first.
+	anchorFirst := "stringField: &x foo\nstringPtrField: *x\nboolField: true\nintField: 1\nfloat64Field: 1.5\n"
+	aliasFirst := "stringPtrField: &x foo\nstringField: *x\nboolField: true\nintField: 1\nfloat64Field: 1.5\n"
+
+	cases := []struct {
+		name     string
+		input    string
+		edit     func(m *tests.TestPrimitiveHighModel)
+		expected string
+	}{
+		{
+			name:     "unchanged values keep the anchor and alias",
+			input:    anchorFirst,
+			edit:     func(m *tests.TestPrimitiveHighModel) {},
+			expected: anchorFirst,
+		},
+		{
+			name:     "changing the anchored value keeps the aliased value",
+			input:    anchorFirst,
+			edit:     func(m *tests.TestPrimitiveHighModel) { m.StringField = "bar" },
+			expected: "stringField: &x bar\nstringPtrField: foo\nboolField: true\nintField: 1\nfloat64Field: 1.5\n",
+		},
+		{
+			name:     "changing the aliased value keeps the anchored value",
+			input:    anchorFirst,
+			edit:     func(m *tests.TestPrimitiveHighModel) { m.StringPtrField = pointer.From("bar") },
+			expected: "stringField: &x foo\nstringPtrField: bar\nboolField: true\nintField: 1\nfloat64Field: 1.5\n",
+		},
+		{
+			name:     "changing the anchored value synced after its alias keeps the aliased value",
+			input:    aliasFirst,
+			edit:     func(m *tests.TestPrimitiveHighModel) { m.StringPtrField = pointer.From("bar") },
+			expected: "stringPtrField: &x bar\nstringField: foo\nboolField: true\nintField: 1\nfloat64Field: 1.5\n",
+		},
+		{
+			name:     "removing the anchored value keeps the aliased value",
+			input:    aliasFirst,
+			edit:     func(m *tests.TestPrimitiveHighModel) { m.StringPtrField = nil },
+			expected: "stringField: foo\nboolField: true\nintField: 1\nfloat64Field: 1.5\n",
+		},
+		{
+			name:  "removing an anchored folded value keeps the aliased value stable",
+			input: "stringPtrField: &x >\n    a\n      b\nstringField: *x\nboolField: true\nintField: 1\nfloat64Field: 1.5\n",
+			edit:  func(m *tests.TestPrimitiveHighModel) { m.StringPtrField = nil },
+			// The copy replacing the alias is restyled as a literal block, like any folded scalar with a
+			// more-indented line, so its value doesn't change when it's encoded.
+			expected: "stringField: |\n    a\n      b\nboolField: true\nintField: 1\nfloat64Field: 1.5\n",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			model := &tests.TestPrimitiveHighModel{}
+			validationErrs, err := marshaller.Unmarshal(t.Context(), strings.NewReader(tt.input), model)
+			require.NoError(t, err, "unmarshal should succeed")
+			require.Empty(t, validationErrs, "input should be valid")
+
+			tt.edit(model)
+
+			var buf bytes.Buffer
+			require.NoError(t, marshaller.Marshal(t.Context(), model, &buf), "marshal should succeed")
+			assert.Equal(t, tt.expected, buf.String(), "only the changed field should change")
+		})
+	}
+}
+
+// TestMarshal_ChangedAliases_ArrayElements_Success tests that changing an element of a sequence shared through an
+// alias only changes that field's sequence.
+func TestMarshal_ChangedAliases_ArrayElements_Success(t *testing.T) {
+	t.Parallel()
+
+	input := "requiredField: r\nrequiredArray: &l\n    - a\n    - b\noptionalArray: *l\nrequiredStruct:\n    stringField: s\n    boolField: true\n    intField: 1\n    float64Field: 1.5\n"
+
+	cases := []struct {
+		name     string
+		edit     func(m *tests.TestValidationHighModel)
+		expected string
+	}{
+		{
+			name:     "unchanged sequences keep the anchor and alias",
+			edit:     func(m *tests.TestValidationHighModel) {},
+			expected: input,
+		},
+		{
+			name:     "changing an element of the anchored sequence keeps the aliased sequence",
+			edit:     func(m *tests.TestValidationHighModel) { m.RequiredArray = []string{"z", "b"} },
+			expected: "requiredField: r\nrequiredArray: &l\n    - z\n    - b\noptionalArray:\n    - a\n    - b\nrequiredStruct:\n    stringField: s\n    boolField: true\n    intField: 1\n    float64Field: 1.5\n",
+		},
+		{
+			name:     "changing an element of the aliased sequence keeps the anchored sequence",
+			edit:     func(m *tests.TestValidationHighModel) { m.OptionalArray = []string{"z", "b"} },
+			expected: "requiredField: r\nrequiredArray: &l\n    - a\n    - b\noptionalArray:\n    - z\n    - b\nrequiredStruct:\n    stringField: s\n    boolField: true\n    intField: 1\n    float64Field: 1.5\n",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			model := &tests.TestValidationHighModel{}
+			validationErrs, err := marshaller.Unmarshal(t.Context(), strings.NewReader(input), model)
+			require.NoError(t, err, "unmarshal should succeed")
+			require.Empty(t, validationErrs, "input should be valid")
+
+			tt.edit(model)
+
+			var buf bytes.Buffer
+			require.NoError(t, marshaller.Marshal(t.Context(), model, &buf), "marshal should succeed")
+			assert.Equal(t, tt.expected, buf.String(), "only the changed sequence should change")
+		})
+	}
 }
 
 // TestMarshal_ExtensiveAliases_ArrayElements_Success tests alias preservation in array elements
