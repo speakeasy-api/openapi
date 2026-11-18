@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// traitsResolve unmarshals a document, ignoring its local diagnostics, and resolves its references.
-func traitsResolve(t *testing.T, doc string, opts asyncapi.ResolveAllOptions) (*asyncapi.AsyncAPI, []error) {
+// resolveIgnoringValidation unmarshals a document, ignoring its local diagnostics, and resolves its references.
+func resolveIgnoringValidation(t *testing.T, doc string, opts asyncapi.ResolveAllOptions) (*asyncapi.AsyncAPI, []error) {
 	t.Helper()
 
 	a, _ := unmarshal(t, doc)
@@ -42,7 +42,7 @@ components:
       traits:
         - $ref: '#/components/messageTraits/missing'
 `)
-	a, errs := traitsResolve(t, doc, asyncapi.ResolveAllOptions{})
+	a, errs := resolveIgnoringValidation(t, doc, asyncapi.ResolveAllOptions{})
 	assert.Equal(t, []string{
 		"[15:15] error validation-invalid-reference operation trait reference `#/components/operationTraits/missing` target not found: not found -- struct is nil at /components/operationTraits/missing",
 		"[22:17] error validation-invalid-reference message trait reference `#/components/messageTraits/missing` target not found: not found -- struct is nil at /components/messageTraits/missing",
@@ -130,7 +130,7 @@ t:
   description: from trait
 `)}}
 	doc := minimalDoc("components:\n  operations:\n    o:\n      $ref: './ops.yaml#/o'\n")
-	a, errs := traitsResolve(t, doc, asyncapi.ResolveAllOptions{AsyncAPILocation: "api.yaml", VirtualFS: files})
+	a, errs := resolveIgnoringValidation(t, doc, asyncapi.ResolveAllOptions{AsyncAPILocation: "api.yaml", VirtualFS: files})
 	assert.Empty(t, errs, "resolution should report nothing")
 
 	operation := a.GetComponents().Operations.GetOrZero("o").GetObject()
@@ -158,7 +158,7 @@ func TestApplyTraits_ExternalTraitDiagnostic_Success(t *testing.T) {
       traits:
         - $ref: './traits.yaml#/t'
 `)
-	a, errs := traitsResolve(t, doc, asyncapi.ResolveAllOptions{AsyncAPILocation: "api.yaml", VirtualFS: files})
+	a, errs := resolveIgnoringValidation(t, doc, asyncapi.ResolveAllOptions{AsyncAPILocation: "api.yaml", VirtualFS: files})
 	assert.Equal(t, []string{"[3:14] error validation-type-mismatch schema.default must conform to the schema type [`object`] (document: traits.yaml)"}, errorStrings(errs), "the inherited diagnostic should be reported")
 	require.Len(t, errs, 1, "one diagnostic should be reported")
 
@@ -182,7 +182,7 @@ func TestApplyTraits_MessageRefresh_Success(t *testing.T) {
       traits:
         - contentType: application/json
 `)
-	a, errs := traitsResolve(t, doc, asyncapi.ResolveAllOptions{})
+	a, errs := resolveIgnoringValidation(t, doc, asyncapi.ResolveAllOptions{})
 	require.Empty(t, errs, "resolution should report nothing")
 
 	message := a.GetComponents().Messages.GetOrZero("m").GetObject()

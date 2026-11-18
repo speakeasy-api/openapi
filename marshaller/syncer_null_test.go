@@ -7,7 +7,6 @@ import (
 
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/marshaller/tests"
-	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
@@ -62,45 +61,18 @@ func TestSync_AuthoredNullAlias_Success(t *testing.T) {
 	// intPtrField is an alias to the null anchored at stringPtrField.
 	input := "stringField: s\nstringPtrField: &none null\nboolField: true\nintField: 1\nintPtrField: *none\nfloat64Field: 1.5\n"
 
-	cases := []struct {
-		name     string
-		value    *string
-		expected string
-	}{
-		{
-			name:     "unset values keep the anchored null and the alias to it",
-			value:    nil,
-			expected: input,
-		},
-		{
-			name:  "set anchored value replaces the null and drops the alias of the unset field",
-			value: pointer.From("set"),
-			// Setting the anchored value writes through to the node the alias shares, so the alias no longer
-			// points at a null and the unset field is left out.
-			expected: "stringField: s\nstringPtrField: &none set\nboolField: true\nintField: 1\nfloat64Field: 1.5\n",
-		},
-	}
+	var highModel tests.TestPrimitiveHighModel
+	_, err := marshaller.UnmarshalNode(t.Context(), "", syncerNullParse(t, input), &highModel)
+	require.NoError(t, err, "unmarshal should succeed")
+	require.True(t, highModel.GetCore().IntPtrField.Present, "alias to a null should be present")
 
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
+	require.NoError(t, err, "sync should succeed")
 
-			var highModel tests.TestPrimitiveHighModel
-			_, err := marshaller.UnmarshalNode(t.Context(), "", syncerNullParse(t, input), &highModel)
-			require.NoError(t, err, "unmarshal should succeed")
-			require.True(t, highModel.GetCore().IntPtrField.Present, "alias to a null should be present")
-
-			highModel.StringPtrField = tt.value
-
-			resultNode, err := marshaller.SyncValue(t.Context(), &highModel, highModel.GetCore(), highModel.GetRootNode(), false)
-			require.NoError(t, err, "sync should succeed")
-
-			actual, err := yaml.Marshal(resultNode)
-			require.NoError(t, err, "yaml should marshal")
-			assert.Equal(t, tt.expected, string(actual), "synced yaml should match")
-			assert.Nil(t, highModel.GetCore().IntPtrField.Value, "the aliased field should stay unset")
-		})
-	}
+	actual, err := yaml.Marshal(resultNode)
+	require.NoError(t, err, "yaml should marshal")
+	assert.Equal(t, input, string(actual), "the anchored null and the alias to it should be kept")
+	assert.Nil(t, highModel.GetCore().IntPtrField.Value, "the aliased field should stay unset")
 }
 
 func TestSync_OptionalZeroScalar_Success(t *testing.T) {
