@@ -282,7 +282,6 @@ func applyFixes(ctx context.Context, fixOpts fix.Options, doc *openapi.OpenAPI, 
 	return nil
 }
 
-
 // lazyPrompter defers TerminalPrompter creation until an interactive fix is
 // actually encountered, avoiding unnecessary setup when all fixes are non-interactive.
 type lazyPrompter struct {

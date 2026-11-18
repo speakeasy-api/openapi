@@ -18,6 +18,7 @@ echo "  ✓ Testing help commands..."
 $CLI --help > /dev/null
 $CLI spec --help > /dev/null
 $CLI arazzo --help > /dev/null
+$CLI asyncapi --help > /dev/null
 $CLI overlay --help > /dev/null
 
 # Test all subcommands help
@@ -36,6 +37,7 @@ $CLI arazzo list-rules --help > /dev/null
 $CLI arazzo graph --help > /dev/null
 $CLI arazzo bootstrap --help > /dev/null
 $CLI arazzo explore --help > /dev/null
+$CLI asyncapi validate --help > /dev/null
 $CLI overlay apply --help > /dev/null
 $CLI overlay validate --help > /dev/null
 $CLI overlay compare --help > /dev/null
@@ -203,6 +205,36 @@ if $CLI arazzo validate arazzo/testdata/sources/invalid.arazzo.yaml > /dev/null 
     exit 1
 fi
 $CLI arazzo validate --skip-sources arazzo/testdata/sources/invalid.arazzo.yaml > /dev/null
+$CLI arazzo validate arazzo/testdata/sources/async-valid.arazzo.yaml > /dev/null
+if $CLI arazzo validate arazzo/testdata/sources/async-invalid.arazzo.yaml > /dev/null 2>&1; then
+    echo "    ❌ Expected arazzo validation to fail for a document that doesn't match its AsyncAPI sources"
+    exit 1
+fi
+
+# Test AsyncAPI validation
+echo "  ✓ Testing asyncapi validation..."
+$CLI asyncapi validate asyncapi/testdata/streetlights-3.0.yaml > /dev/null 2>&1
+$CLI asyncapi validate asyncapi/testdata/complete-3.1.yaml > /dev/null 2>&1
+$CLI asyncapi validate --resolve asyncapi/testdata/validate/orders.asyncapi.yaml > /dev/null 2>&1
+$CLI asyncapi validate --resolve --base-uri asyncapi/testdata/validate/orders.asyncapi.yaml < asyncapi/testdata/validate/orders.asyncapi.yaml > /dev/null 2>&1
+# References to other documents aren't followed without --resolve, which is a warning that only fails with --strict
+$CLI asyncapi validate asyncapi/testdata/validate/broken-ref.asyncapi.yaml > dist/test/test-asyncapi-unresolved.txt 2>&1
+if ! grep -q "use --resolve to validate them" dist/test/test-asyncapi-unresolved.txt; then
+    echo "    ❌ Expected asyncapi validate to report references it didn't follow"
+    exit 1
+fi
+if $CLI asyncapi validate --strict asyncapi/testdata/validate/orders.asyncapi.yaml > /dev/null 2>&1; then
+    echo "    ❌ Expected asyncapi validate --strict to fail on warnings"
+    exit 1
+fi
+for f in broken-ref invalid v2; do
+    resolve=""
+    [ "$f" = "broken-ref" ] && resolve="--resolve"
+    if $CLI asyncapi validate $resolve asyncapi/testdata/validate/$f.asyncapi.yaml > /dev/null 2>&1; then
+        echo "    ❌ Expected asyncapi validation to fail for $f.asyncapi.yaml"
+        exit 1
+    fi
+done
 
 # Test arazzo linting
 echo "  ✓ Testing arazzo lint..."
@@ -338,6 +370,7 @@ echo "   - Validated known good and bad files"
 echo "   - Tested bootstrap, upgrade, inline, clean, sanitize, bundle, join commands"
 echo "   - Compared outputs with expected results"
 echo "   - Tested arazzo validation, lint, list-rules, graph and bootstrap"
+echo "   - Tested asyncapi validation"
 echo "   - Tested overlay validation, apply, and compare"
 echo "   - Tested error cases and edge conditions"
 echo "   - Validated all generated files"

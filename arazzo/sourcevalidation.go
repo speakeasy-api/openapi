@@ -25,13 +25,19 @@ var (
 // ValidateSources validates the Arazzo document against the documents loaded for its sourceDescriptions (see
 // LoadSourceDescriptions). It checks that:
 //
-//   - operationId, operationPath and workflowId targets exist in the referenced source
+//   - operationId, operationPath, channelPath and workflowId targets exist in the referenced source
 //   - step parameters match a parameter of the target operation by name and location
 //   - required operation parameters and required request bodies are supplied by the step
 //   - parameters passed to a workflow in an Arazzo source match the workflow's inputs
+//   - AsyncAPI steps only send headers declared by the target's messages, and a correlationId is only used with
+//     messages that declare one
 //
-// Sources that weren't loaded (unavailable, or AsyncAPI) are skipped. Problems that may still work at runtime, such
-// as a header parameter the operation doesn't declare, are reported as warnings.
+// AsyncAPI operations are found by their key in the root operations map and channels by a JSON Pointer to their key
+// (not their address). An AsyncAPI step's action is not compared with the AsyncAPI operation's action, as they're
+// written from different perspectives.
+//
+// Sources that weren't loaded (unavailable, or an unsupported AsyncAPI version) are skipped. Problems that may still
+// work at runtime, such as a header parameter the operation doesn't declare, are reported as warnings.
 func (a *Arazzo) ValidateSources(ctx context.Context, sources *SourceDocuments) []error {
 	if a == nil || sources == nil {
 		return nil
@@ -84,21 +90,23 @@ func (a *Arazzo) validateStepSources(sources *SourceDocuments, w *Workflow, s *S
 	core := s.GetCore()
 	errs := []error{}
 
-	if s.ChannelPath != nil {
-		_, name, _, _ := s.ChannelPath.GetParts()
-		// Sources declared as another type are reported by Validate, and AsyncAPI sources aren't loaded, so a loaded
-		// source with an omitted type is a channelPath into a document that isn't AsyncAPI.
-		doc := sources.Get(name)
-		if sd := a.SourceDescriptions.Find(name); sd != nil && sd.Type == "" && doc != nil {
-			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.channelPath references sourceDescription `%s` which is an %s document, not an AsyncAPI document", name, doc.Type), core, core.ChannelPath))
-		}
-	}
-
 	switch {
 	case s.OperationID != nil:
-		errs = append(errs, a.validateOperationStep(sources, w, s, core.OperationID)...)
+		sd, doc := a.operationIDSourceDocument(sources, s)
+		switch {
+		case doc != nil && doc.AsyncAPI != nil:
+			errs = append(errs, a.validateAsyncStep(sources, s)...)
+		default:
+			// Validate reports action on sources declared as another type, an omitted type is only known once loaded.
+			if s.Action != nil && sd != nil && doc != nil && sd.Type == "" {
+				errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidReference, fmt.Errorf("step.action is only applicable to asyncapi steps, sourceDescription `%s` is an %s document", sd.Name, doc.Type), core, core.Action))
+			}
+			errs = append(errs, a.validateOperationStep(sources, w, s, core.OperationID)...)
+		}
 	case s.OperationPath != nil:
 		errs = append(errs, a.validateOperationStep(sources, w, s, core.OperationPath)...)
+	case s.ChannelPath != nil:
+		errs = append(errs, a.validateAsyncStep(sources, s)...)
 	case s.WorkflowID != nil:
 		errs = append(errs, a.validateRemoteWorkflowTarget(sources, "step", s.WorkflowID, s.Parameters, core, core.Parameters, core.WorkflowID)...)
 	}
@@ -313,6 +321,9 @@ func (a *Arazzo) findTargetOperation(sources *SourceDocuments, s *Step) (*target
 		if doc == nil {
 			return nil, nil
 		}
+		if doc.AsyncAPI != nil {
+			return nil, fmt.Errorf("step.operationPath can't reference AsyncAPI sourceDescription `%s`, use operationId or channelPath for AsyncAPI steps", matches[1])
+		}
 		if doc.OpenAPI == nil {
 			return nil, fmt.Errorf("step.operationPath references sourceDescription `%s` which is an %s document, not an OpenAPI document", matches[1], doc.Type)
 		}
@@ -323,29 +334,39 @@ func (a *Arazzo) findTargetOperation(sources *SourceDocuments, s *Step) (*target
 		return target, nil
 	}
 
-	sd := s.operationSourceDescription(a)
-	if sd == nil {
-		return nil, nil
-	}
-	doc := sources.Get(sd.Name)
-	if doc == nil {
+	sd, doc := a.operationIDSourceDocument(sources, s)
+	if sd == nil || doc == nil {
 		return nil, nil
 	}
 	if doc.OpenAPI == nil {
 		return nil, fmt.Errorf("step.operationId references sourceDescription `%s` which is an %s document, not an OpenAPI document", sd.Name, doc.Type)
 	}
 
-	operationID := s.OperationID.String()
-	if s.OperationID.IsExpression(expression.WithArazzo11Grammar()) {
-		_, _, parts, _ := s.OperationID.GetParts()
-		operationID = strings.Join(parts, ".")
-	}
-
+	operationID := stepOperationID(s)
 	target := findOperationByID(doc.OpenAPI, operationID)
 	if target == nil {
 		return nil, fmt.Errorf("step.operationId `%s` not found in sourceDescription `%s`", operationID, sd.Name)
 	}
 	return target, nil
+}
+
+// operationIDSourceDocument returns the source description targeted by the step's operationId and its loaded
+// document. The document is nil if the source description can't be determined or wasn't loaded.
+func (a *Arazzo) operationIDSourceDocument(sources *SourceDocuments, s *Step) (*SourceDescription, *SourceDocument) {
+	sd := s.operationSourceDescription(a)
+	if sd == nil {
+		return nil, nil
+	}
+	return sd, sources.Get(sd.Name)
+}
+
+// stepOperationID returns the operationId the step targets, without the `$sourceDescriptions.<name>.` prefix.
+func stepOperationID(s *Step) string {
+	if s.OperationID.IsExpression(expression.WithArazzo11Grammar()) {
+		_, _, parts, _ := s.OperationID.GetParts()
+		return strings.Join(parts, ".")
+	}
+	return s.OperationID.String()
 }
 
 func findOperationByID(doc *openapi.OpenAPI, operationID string) *targetOperation {
