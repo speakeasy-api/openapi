@@ -2,12 +2,14 @@ package asyncapi
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/validation"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -191,6 +193,32 @@ func TestValidateAsyncAPI_StdinReadError(t *testing.T) {
 	err := validateAsyncAPI(t.Context(), "-", validateOptions{}, errReader{}, &stderr)
 	require.Error(t, err, "validation should fail")
 	assert.Contains(t, err.Error(), "failed to read stdin", "error should match")
+}
+
+func TestValidateAsyncAPI_CancelledContext_Error(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	var stderr bytes.Buffer
+	err := validateAsyncAPI(ctx, testdata+"validate/orders.asyncapi.yaml", validateOptions{}, strings.NewReader(""), &stderr)
+	require.Error(t, err, "validation should fail")
+	assert.Equal(t, "failed to resolve references: context canceled", err.Error(), "error should match")
+}
+
+func TestApply_Success(t *testing.T) {
+	t.Parallel()
+
+	root := &cobra.Command{Use: "openapi"}
+	Apply(root)
+
+	cmd, _, err := root.Find([]string{"validate"})
+	require.NoError(t, err, "validate command should be registered")
+	assert.Same(t, GetValidateCommand(), cmd, "registered command should be the validate command")
+
+	root.SetArgs([]string{"validate", testdata + "validate/orders.asyncapi.yaml"})
+	require.NoError(t, root.ExecuteContext(t.Context()), "validating a valid document should succeed")
 }
 
 func TestSummarize_NonValidationErrors_Success(t *testing.T) {
