@@ -1,9 +1,11 @@
 // Package asyncapi provides an API for working with AsyncAPI 3.x documents including reading, creating,
-// mutating and validating them.
+// mutating, walking and validating them.
 //
-// The package currently supports the AsyncAPI 3.0 and 3.1 minor lines. It is under active development: the root
-// document and Info Object are modelled, while servers, channels, operations and components are preserved as raw
-// values that will be replaced by typed models in a later release.
+// The package supports the AsyncAPI 3.0 and 3.1 minor lines and models the complete 3.x document. Unmarshal and
+// Validate check each object locally without reading files or making network requests. ResolveAllReferences is the
+// explicit step that loads referenced resources, applies traits and runs the checks that need referenced objects.
+// Protocol bindings and schemas in formats other than AsyncAPI and JSON Schema are preserved unchanged but their
+// contents are not validated. See the package README for the full list of support limits.
 package asyncapi
 
 import (
@@ -20,9 +22,8 @@ import (
 	"github.com/speakeasy-api/openapi/internal/interfaces"
 	jsonschema "github.com/speakeasy-api/openapi/jsonschema/asyncapi"
 	"github.com/speakeasy-api/openapi/marshaller"
+	"github.com/speakeasy-api/openapi/sequencedmap"
 	"github.com/speakeasy-api/openapi/validation"
-	"github.com/speakeasy-api/openapi/values"
-	"go.yaml.in/yaml/v3"
 )
 
 // Version is the latest version of the AsyncAPI Specification that this package supports, used for new documents.
@@ -49,18 +50,21 @@ type AsyncAPI struct {
 	ID *string
 	// Info provides metadata about the API.
 	Info Info
-	// Servers are the connection details of servers. Preserved as a raw value until servers are modelled.
-	Servers values.Value
+	// Servers are the connection details of servers, keyed by server name.
+	Servers *sequencedmap.Map[string, *ReferencedServer]
 	// DefaultContentType is the default content type used to encode and decode message payloads.
 	DefaultContentType *string
-	// Channels are the channels used by the application. Preserved as a raw value until channels are modelled.
-	Channels values.Value
-	// Operations are the operations the application implements. Preserved as a raw value until operations are modelled.
-	Operations values.Value
-	// Components hold reusable objects. Preserved as a raw value until components are modelled.
-	Components values.Value
+	// Channels are the channels used by the application, keyed by channel ID. A channel ID is not its address.
+	Channels *sequencedmap.Map[string, *ReferencedChannel]
+	// Operations are the operations the application implements, keyed by operation ID.
+	Operations *sequencedmap.Map[string, *ReferencedOperation]
+	// Components hold reusable objects.
+	Components *Components
 	// Extensions provides a list of extensions to the AsyncAPI Object.
 	Extensions *extensions.Extensions
+
+	// resolution is the state built by the last call to ResolveAllReferences, guarded by resolutionMu.
+	resolution *resolutionState
 }
 
 var _ interfaces.Model[core.AsyncAPI] = (*AsyncAPI)(nil)
@@ -100,6 +104,38 @@ func (a *AsyncAPI) GetDefaultContentType() string {
 		return ""
 	}
 	return *a.DefaultContentType
+}
+
+// GetServers returns the servers, or nil if not set.
+func (a *AsyncAPI) GetServers() *sequencedmap.Map[string, *ReferencedServer] {
+	if a == nil {
+		return nil
+	}
+	return a.Servers
+}
+
+// GetChannels returns the channels, or nil if not set.
+func (a *AsyncAPI) GetChannels() *sequencedmap.Map[string, *ReferencedChannel] {
+	if a == nil {
+		return nil
+	}
+	return a.Channels
+}
+
+// GetOperations returns the operations, or nil if not set.
+func (a *AsyncAPI) GetOperations() *sequencedmap.Map[string, *ReferencedOperation] {
+	if a == nil {
+		return nil
+	}
+	return a.Operations
+}
+
+// GetComponents returns the components, or nil if not set.
+func (a *AsyncAPI) GetComponents() *Components {
+	if a == nil {
+		return nil
+	}
+	return a.Components
 }
 
 // GetExtensions returns the extensions of the document. Returns an empty extensions map if not set.
@@ -179,7 +215,7 @@ func (a *AsyncAPI) Validate(ctx context.Context, opts ...validation.Option) []er
 		if !v.IsSupported() {
 			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationSupportedVersion, fmt.Errorf("asyncapi version `%s` is not supported, only AsyncAPI versions `%s` are supported", a.AsyncAPI, strings.Join(asyncapiversion.SupportedVersionPatterns(), "`, `")), core, core.AsyncAPI))
 		}
-		opts = append(opts, jsonschema.WithSchemaFormat(asyncapiversion.DefaultSchemaFormat(a.AsyncAPI)))
+		opts = append(opts, jsonschema.WithSchemaFormat(asyncapiversion.DefaultSchemaFormat(a.AsyncAPI)), withDocumentVersion(v))
 	}
 
 	if a.ID != nil {
@@ -197,17 +233,31 @@ func (a *AsyncAPI) Validate(ctx context.Context, opts ...validation.Option) []er
 	// A missing `info` is reported as a required field when unmarshalling.
 	errs = append(errs, a.Info.Validate(ctx, opts...)...)
 
-	a.Valid = len(errs) == 0 && coreValid(core)
+	if a.Servers != nil {
+		for name, server := range a.Servers.All() {
+			if !nameKeyRegex.MatchString(name) {
+				errs = append(errs, validation.NewMapKeyError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("servers key `%s` must match `%s`", name, nameKeyRegex.String()), core, core.Servers, name))
+			}
+			errs = append(errs, server.Validate(ctx, opts...)...)
+		}
+	}
+	if a.Channels != nil {
+		for _, channel := range a.Channels.All() {
+			errs = append(errs, channel.Validate(ctx, opts...)...)
+		}
+	}
+	if a.Operations != nil {
+		for _, operation := range a.Operations.All() {
+			errs = append(errs, operation.Validate(ctx, opts...)...)
+		}
+	}
+	if a.Components != nil {
+		errs = append(errs, a.Components.Validate(ctx, opts...)...)
+	}
+
+	errs = append(errs, unknownPropertyErrors(core, "asyncapi")...)
+
+	a.Valid = noErrors(errs) && coreValid(core)
 
 	return errs
-}
-
-// coreValid reports whether a core model is free of unmarshalling errors. Models built in code rather than
-// parsed have no root node and no unmarshalling errors, so they are treated as valid.
-func coreValid(c interface {
-	GetRootNode() *yaml.Node
-	GetValid() bool
-},
-) bool {
-	return c.GetRootNode() == nil || c.GetValid()
 }

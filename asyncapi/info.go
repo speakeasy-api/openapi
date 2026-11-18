@@ -142,26 +142,15 @@ func (i *Info) Validate(ctx context.Context, opts ...validation.Option) []error 
 		errs = append(errs, i.License.Validate(ctx, opts...)...)
 	}
 
-	tagNames := map[string]bool{}
-	for idx, tag := range i.Tags {
-		if tag == nil {
-			continue
-		}
-		errs = append(errs, tag.Validate(ctx, opts...)...)
-		if tag.IsReference() || tag.Name == nil {
-			continue
-		}
-		if tagNames[*tag.Name] {
-			errs = append(errs, validation.NewSliceError(validation.SeverityError, validation.RuleValidationDuplicateKey, fmt.Errorf("info.tags name `%s` is not unique", *tag.Name), core, core.Tags, idx))
-		}
-		tagNames[*tag.Name] = true
-	}
+	errs = append(errs, validateTags(ctx, i.Tags, core, core.Tags, "info.tags", opts...)...)
 
 	if i.ExternalDocs != nil {
 		errs = append(errs, i.ExternalDocs.Validate(ctx, opts...)...)
 	}
 
-	i.Valid = len(errs) == 0 && coreValid(core)
+	errs = append(errs, unknownPropertyErrors(core, "info")...)
+
+	i.Valid = noErrors(errs) && coreValid(core)
 
 	return errs
 }
@@ -229,8 +218,9 @@ func (c *Contact) Validate(_ context.Context, _ ...validation.Option) []error {
 			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("contact.email is not a valid email address: %w", err), core, core.Email))
 		}
 	}
+	errs = append(errs, unknownPropertyErrors(core, "contact")...)
 
-	c.Valid = len(errs) == 0 && coreValid(core)
+	c.Valid = noErrors(errs) && coreValid(core)
 
 	return errs
 }
@@ -286,8 +276,9 @@ func (l *License) Validate(_ context.Context, _ ...validation.Option) []error {
 			errs = append(errs, validation.NewValueError(validation.SeverityError, validation.RuleValidationInvalidFormat, fmt.Errorf("license.url is not a valid uri: %w", err), core, core.URL))
 		}
 	}
+	errs = append(errs, unknownPropertyErrors(core, "license")...)
 
-	l.Valid = len(errs) == 0 && coreValid(core)
+	l.Valid = noErrors(errs) && coreValid(core)
 
 	return errs
 }
@@ -306,9 +297,32 @@ type Tag struct {
 	ExternalDocs *ExternalDocumentation
 	// Extensions provides a list of extensions to the Tag Object.
 	Extensions *extensions.Extensions
+
+	// resolved is set by the last call to AsyncAPI.ResolveAllReferences, guarded by resolutionMu.
+	resolved *Tag
 }
 
 var _ interfaces.Model[core.Tag] = (*Tag)(nil)
+
+// GetResolved returns the tag itself, or for a Reference Object the tag it resolved to in the last call to
+// AsyncAPI.ResolveAllReferences. Returns nil for an unresolved Reference Object.
+func (t *Tag) GetResolved() *Tag {
+	if t == nil {
+		return nil
+	}
+	if !t.IsReference() {
+		return t
+	}
+	resolutionMu.RLock()
+	defer resolutionMu.RUnlock()
+	return t.resolved
+}
+
+func (t *Tag) setResolved(tag *Tag) {
+	resolutionMu.Lock()
+	defer resolutionMu.Unlock()
+	t.resolved = tag
+}
 
 // IsReference returns true if the tag is a Reference Object.
 func (t *Tag) IsReference() bool {
@@ -357,8 +371,9 @@ func (t *Tag) Validate(ctx context.Context, opts ...validation.Option) []error {
 			errs = append(errs, t.ExternalDocs.Validate(ctx, opts...)...)
 		}
 	}
+	errs = append(errs, unknownPropertyErrors(core, "tag")...)
 
-	t.Valid = len(errs) == 0 && coreValid(core)
+	t.Valid = noErrors(errs) && coreValid(core)
 
 	return errs
 }

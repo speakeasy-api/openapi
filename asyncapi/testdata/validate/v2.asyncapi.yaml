@@ -1,0 +1,10 @@
+asyncapi: 2.6.0
+info:
+  title: Orders
+  version: 1.0.0
+channels:
+  orders:
+    publish:
+      message:
+        payload:
+          type: object

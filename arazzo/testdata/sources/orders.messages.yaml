@@ -1,0 +1,19 @@
+components:
+  messages:
+    OrderConfirmed:
+      payload:
+        type: object
+        properties:
+          orderId:
+            type: string
+      correlationId:
+        location: $message.header#/correlationId
+      traits:
+        - $ref: "#/components/messageTraits/Correlated"
+  messageTraits:
+    Correlated:
+      headers:
+        type: object
+        properties:
+          correlationId:
+            type: string

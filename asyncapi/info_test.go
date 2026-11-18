@@ -283,6 +283,17 @@ func TestTag_Getters_Success(t *testing.T) {
 	}
 }
 
+func TestTag_GetResolved_Success(t *testing.T) {
+	t.Parallel()
+
+	inline := &asyncapi.Tag{Name: pointer.From("orders")}
+	assert.Same(t, inline, inline.GetResolved(), "an inline tag should resolve to itself")
+	assert.Nil(t, (*asyncapi.Tag)(nil).GetResolved(), "a nil tag should resolve to nothing")
+
+	unresolved := &asyncapi.Tag{Ref: pointer.From(references.Reference("#/components/tags/orders"))}
+	assert.Nil(t, unresolved.GetResolved(), "an unresolved reference tag should resolve to nothing")
+}
+
 func TestInfo_Validate_Success(t *testing.T) {
 	t.Parallel()
 

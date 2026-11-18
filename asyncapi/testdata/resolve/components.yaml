@@ -1,0 +1,68 @@
+# Objects of every kind referenced by api.yaml, which reference each other within this document.
+servers:
+  prod:
+    host: "{region}.example.com"
+    protocol: kafka
+    variables:
+      region:
+        $ref: "#/serverVariables/region"
+    security:
+      - $ref: "#/securitySchemes/apiKey"
+    tags:
+      - $ref: "#/tags/orders"
+    externalDocs:
+      $ref: "#/externalDocs/guide"
+    bindings:
+      $ref: "#/serverBindings/kafka"
+serverVariables:
+  region:
+    default: eu
+securitySchemes:
+  apiKey:
+    type: httpApiKey
+    name: X-API-Key
+    in: header
+tags:
+  orders:
+    name: orders
+  alias:
+    $ref: "#/tags/orders"
+externalDocs:
+  guide:
+    url: https://example.com/guide
+  alias:
+    $ref: "#/externalDocs/guide"
+serverBindings:
+  kafka:
+    kafka:
+      bindingVersion: 0.5.0
+channelBindings:
+  kafka:
+    kafka:
+      topic: orders
+parameters:
+  orderId:
+    description: The order ID.
+messages:
+  placed:
+    name: OrderPlaced
+    correlationId:
+      $ref: "#/correlationIds/order"
+    traits:
+      - $ref: "#/messageTraits/json"
+correlationIds:
+  order:
+    location: $message.payload#/id
+messageTraits:
+  json:
+    contentType: application/json
+operationTraits:
+  tracked:
+    summary: Tracked operation.
+replies:
+  byHeader:
+    address:
+      $ref: "#/replyAddresses/header"
+replyAddresses:
+  header:
+    location: $message.header#/replyTo

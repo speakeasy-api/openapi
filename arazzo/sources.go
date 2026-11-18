@@ -8,8 +8,10 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/speakeasy-api/openapi/asyncapi"
 	"github.com/speakeasy-api/openapi/internal/utils"
 	"github.com/speakeasy-api/openapi/openapi"
 	"github.com/speakeasy-api/openapi/system"
@@ -45,6 +47,8 @@ type SourceDocument struct {
 	OpenAPI *openapi.OpenAPI
 	// Arazzo is the loaded document if it is an Arazzo document.
 	Arazzo *Arazzo
+	// AsyncAPI is the loaded document if it is an AsyncAPI 3.x document, with its references resolved.
+	AsyncAPI *asyncapi.AsyncAPI
 }
 
 // SourceDocuments are the documents loaded for an Arazzo document's sourceDescriptions, keyed by source description name.
@@ -60,12 +64,13 @@ func (s *SourceDocuments) Get(name string) *SourceDocument {
 	return s.documents[name]
 }
 
-// LoadSourceDescriptions loads the OpenAPI and Arazzo documents referenced by the Arazzo document's
+// LoadSourceDescriptions loads the OpenAPI, AsyncAPI and Arazzo documents referenced by the Arazzo document's
 // sourceDescriptions so the document can be validated against them with ValidateSources.
 //
 // Problems loading a source are returned as warnings rather than errors, as a source may be temporarily
-// unavailable without the Arazzo document being invalid. AsyncAPI sources are not loaded and are reported with
-// a hint. A source description declaring a type that doesn't match the loaded document is reported as an error.
+// unavailable without the Arazzo document being invalid. This includes AsyncAPI documents of a version the asyncapi
+// package doesn't support, such as 2.x. A source description declaring a type that doesn't match the loaded document
+// is reported as an error.
 func LoadSourceDescriptions(ctx context.Context, a *Arazzo, opts LoadSourcesOptions) (*SourceDocuments, []error) {
 	sources := &SourceDocuments{documents: map[string]*SourceDocument{}}
 	if a == nil {
@@ -114,10 +119,6 @@ func loadSourceDescription(ctx context.Context, sd *SourceDescription, base stri
 		return []error{validation.NewValueError(validation.SeverityWarning, validation.RuleValidationInvalidReference, err, core, core.URL)}
 	}
 
-	if sd.Type == SourceDescriptionTypeAsyncAPI {
-		return nil, []error{asyncAPINotCheckedHint(sd)}
-	}
-
 	location, err := resolveSourceLocation(base, sd.URL)
 	if err != nil {
 		return nil, warn(fmt.Errorf("sourceDescription `%s` url can't be resolved: %w", sd.Name, err))
@@ -134,21 +135,26 @@ func loadSourceDescription(ctx context.Context, sd *SourceDescription, base stri
 		return nil, warn(fmt.Errorf("sourceDescription `%s` at `%s` is not an OpenAPI 3.x, AsyncAPI or Arazzo document", sd.Name, location))
 	case sd.Type != "" && sd.Type != detected:
 		return nil, []error{validation.NewValueError(validation.SeverityError, validation.RuleValidationTypeMismatch, fmt.Errorf("sourceDescription `%s` is declared as type `%s` but `%s` is an %s document", sd.Name, sd.Type, location, detected), core, core.Type)}
-	case detected == SourceDescriptionTypeAsyncAPI:
-		return nil, []error{asyncAPINotCheckedHint(sd)}
 	}
 
 	doc := &SourceDocument{Name: sd.Name, Location: location, Type: detected}
 
-	if detected == SourceDescriptionTypeArazzo {
+	switch detected {
+	case SourceDescriptionTypeArazzo:
 		doc.Arazzo, _, err = Unmarshal(ctx, bytes.NewReader(data), WithSkipValidation())
-	} else {
+	case SourceDescriptionTypeAsyncAPI:
+		doc.AsyncAPI, _, err = asyncapi.Unmarshal(ctx, bytes.NewReader(data), asyncapi.WithSkipValidation())
+	default:
 		doc.OpenAPI, _, err = openapi.Unmarshal(ctx, bytes.NewReader(data), openapi.WithSkipValidation())
 	}
 	if err != nil {
 		return nil, warn(fmt.Errorf("sourceDescription `%s` at `%s` could not be parsed: %w", sd.Name, location, err))
 	}
-	if doc.OpenAPI == nil {
+
+	switch {
+	case doc.AsyncAPI != nil:
+		return loadAsyncAPISource(ctx, doc, opts, warn)
+	case doc.OpenAPI == nil:
 		return doc, nil
 	}
 
@@ -173,9 +179,39 @@ func resolveSourceLocation(base, ref string) (string, error) {
 	return utils.JoinReference(base, ref)
 }
 
-func asyncAPINotCheckedHint(sd *SourceDescription) error {
-	core := sd.GetCore()
-	return validation.NewValueError(validation.SeverityHint, validation.RuleValidationInvalidReference, fmt.Errorf("sourceDescription `%s` is an AsyncAPI document, steps targeting it are not checked against the source", sd.Name), core, core.URL)
+// loadAsyncAPISource checks the AsyncAPI version is supported and resolves the document's references.
+func loadAsyncAPISource(ctx context.Context, doc *SourceDocument, opts LoadSourcesOptions, warn func(error) []error) (*SourceDocument, []error) {
+	if version := doc.AsyncAPI.GetAsyncAPI(); !asyncapi.IsSupportedVersion(version) {
+		return nil, warn(fmt.Errorf("sourceDescription `%s` is an AsyncAPI %s document, only AsyncAPI %s are supported so steps targeting it are not checked", doc.Name, version, strings.Join(asyncapi.SupportedMinorVersions(), " and ")))
+	}
+
+	// Unresolved references only reduce how much can be checked, so the source is still usable.
+	resolveErrs, err := doc.AsyncAPI.ResolveAllReferences(ctx, asyncapi.ResolveAllOptions{
+		AsyncAPILocation: doc.Location,
+		VirtualFS:        opts.VirtualFS,
+		HTTPClient:       opts.HTTPClient,
+	})
+	if err == nil {
+		err = firstResolutionError(resolveErrs)
+	}
+	if err != nil {
+		return doc, warn(fmt.Errorf("sourceDescription `%s` has references that could not be resolved, some checks may be skipped: %w", doc.Name, err))
+	}
+
+	return doc, nil
+}
+
+// firstResolutionError returns the first error from resolving an AsyncAPI document's references. Warnings and hints,
+// such as schema formats that aren't validated, don't stop anything being checked so they are ignored.
+func firstResolutionError(errs []error) error {
+	for _, err := range errs {
+		var vErr *validation.Error
+		if errors.As(err, &vErr) && vErr.Severity != validation.SeverityError {
+			continue
+		}
+		return err
+	}
+	return nil
 }
 
 func fetchSource(ctx context.Context, location string, opts LoadSourcesOptions) ([]byte, error) {

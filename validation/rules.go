@@ -21,6 +21,7 @@ const (
 	RuleValidationSupportedVersion        = "validation-supported-version"
 	RuleValidationCircularReference       = "validation-circular-reference"
 	RuleValidationUnsupportedFormat       = "validation-unsupported-format"
+	RuleValidationUnknownProperties       = "validation-unknown-properties"
 )
 
 type RuleInfo struct {
@@ -124,6 +125,11 @@ var ruleInfoByID = map[string]RuleInfo{
 		Summary:     "Content not validated.",
 		Description: "The content uses a format or language this tool can preserve but not validate, for example a non JSON Schema based schema format. The content has not been checked.",
 		HowToFix:    "Validate the content with a tool that supports its format, or use a supported format if full validation is required.",
+	},
+	RuleValidationUnknownProperties: {
+		Summary:     "Unknown property.",
+		Description: "The object contains a property that is not defined by the specification, or not defined by the document's specification version, and is not an extension. Unknown properties are preserved but ignored by tooling. Properties the specification explicitly forbids, such as `action` in an AsyncAPI Operation Trait, are reported as errors.",
+		HowToFix:    "Remove the property or correct its spelling. If it needs a newer specification version, such as an AsyncAPI 3.1 binding, upgrade the document's version. If it is a custom property, prefix it with `x-` to make it an extension.",
 	},
 }
 

@@ -75,9 +75,9 @@ func TestLintArazzo_Success(t *testing.T) {
 			expectedStdout: []string{`"results"`},
 		},
 		{
-			name:           "stdin",
-			file:           "-",
-			stdin:          `arazzo: 1.1.0
+			name: "stdin",
+			file: "-",
+			stdin: `arazzo: 1.1.0
 info:
   title: Stdin
   description: Read from stdin.
