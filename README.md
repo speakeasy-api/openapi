@@ -34,6 +34,8 @@
     <a href="https://spec.openapis.org/oas/v2.0.html"><img alt="Swagger Support" src="https://img.shields.io/badge/Swagger-2.0-85EA2D.svg?style=for-the-badge&logo=swagger"></a>
     <!-- Arazzo Support Badge -->
     <a href="https://www.speakeasy.com/openapi/arazzo"><img alt="Arazzo Support" src="https://img.shields.io/badge/Arazzo-1.0%20%7C%201.1-purple.svg?style=for-the-badge"></a>
+    <!-- AsyncAPI Support Badge -->
+    <a href="https://www.asyncapi.com/docs/reference/specification/latest"><img alt="AsyncAPI Support" src="https://img.shields.io/badge/AsyncAPI-3.0%20%7C%203.1-blue.svg?style=for-the-badge"></a>
     <!-- Line Break --><br/>
     <a href="https://pkg.go.dev/github.com/speakeasy-api/openapi"><img alt="Go Doc" src="https://img.shields.io/badge/godoc-reference-blue.svg?style=for-the-badge"></a>
     <!-- Release Version Badge -->
@@ -70,10 +72,6 @@
 
 The `arazzo` package provides an API for working with Arazzo 1.0.x and 1.1.x documents including reading, creating, mutating, walking, validating, linting, upgrading and graphing them, and bootstrapping them from OpenAPI documents.
 
-### [asyncapi](./asyncapi)
-
-The `asyncapi` package provides an API for working with AsyncAPI 3.0.x and 3.1.x documents including reading, creating, mutating, walking and validating them, resolving references within and across documents, and applying operation and message traits.
-
 ### [openapi](./openapi)
 
 The `openapi` package provides an API for working with OpenAPI documents including reading, creating, mutating, walking, validating, upgrading, and linting them. Supports OpenAPI 3.0.x, 3.1.x, and 3.2.x specifications.
@@ -87,6 +85,10 @@ The `swagger` package provides an API for working with Swagger 2.0 documents inc
 ### [overlay](./overlay)
 
 The `overlay` package provides an API for working with OpenAPI Overlays including applying overlays to specifications, comparing specifications to generate overlays, and validating overlay documents.
+
+### [asyncapi](./asyncapi)
+
+The `asyncapi` package provides an API for working with AsyncAPI 3.0.x and 3.1.x documents including reading, creating, mutating, walking and validating them, resolving references within and across documents, and applying operation and message traits.
 
 ## CLI Tool
 
