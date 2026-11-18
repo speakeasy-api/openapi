@@ -22,11 +22,13 @@ func TestFactoryRegistration_Success(t *testing.T) {
 		{name: "Contact", typ: reflect.TypeOf(asyncapi.Contact{})},
 		{name: "License", typ: reflect.TypeOf(asyncapi.License{})},
 		{name: "Tag", typ: reflect.TypeOf(asyncapi.Tag{})},
+		{name: "Tag slice", typ: reflect.TypeOf([]*asyncapi.Tag{})},
 		{name: "core AsyncAPI", typ: reflect.TypeOf(core.AsyncAPI{})},
 		{name: "core Info", typ: reflect.TypeOf(core.Info{})},
 		{name: "core Contact", typ: reflect.TypeOf(core.Contact{})},
 		{name: "core License", typ: reflect.TypeOf(core.License{})},
 		{name: "core Tag", typ: reflect.TypeOf(core.Tag{})},
+		{name: "core Tag slice", typ: reflect.TypeOf([]*core.Tag{})},
 	}
 
 	for _, tt := range tests {
