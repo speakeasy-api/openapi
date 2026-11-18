@@ -60,6 +60,24 @@ func TestResolveOrphanedAliases_Success(t *testing.T) {
 			},
 			expected: "b:\n    k: v\nc: v\n",
 		},
+		{
+			name:  "copy of a recursive node points its alias at the copy",
+			input: "a: &r\n  - x\n  - *r\nb: *r\n",
+			edit: func(t *testing.T, root *yaml.Node) {
+				t.Helper()
+				root.Content = root.Content[2:]
+			},
+			expected: "b: &r\n    - x\n    - *r\n",
+		},
+		{
+			name:  "comments on a replaced alias are kept",
+			input: "a: &x foo\n# head\nb: *x # line\n",
+			edit: func(t *testing.T, root *yaml.Node) {
+				t.Helper()
+				root.Content = root.Content[2:]
+			},
+			expected: "# head\nb: foo # line\n",
+		},
 	}
 
 	for _, tt := range tests {

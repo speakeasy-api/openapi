@@ -15,6 +15,31 @@ import (
 // an anchored node that is replaced or removed are turned into copies of it by ResolveOrphanedAliases when the
 // document is marshalled, so they keep their value.
 
+// IsShared reports whether a node is an alias or anchored, and so shared with other parts of the document. Changes
+// to the contents of a shared node must be made to copies of its contents.
+func IsShared(node *yaml.Node) bool {
+	return node != nil && (node.Kind == yaml.AliasNode || node.Anchor != "")
+}
+
+// CopyNode deep copies a node, keeping anchors. Aliases are not followed, the copy points to the same anchored
+// nodes.
+func CopyNode(node *yaml.Node) *yaml.Node {
+	if node == nil {
+		return nil
+	}
+	c := *node
+	if node.Content != nil {
+		c.Content = make([]*yaml.Node, len(node.Content))
+		for i, child := range node.Content {
+			if child != nil && child.Kind != yaml.AliasNode {
+				child = CopyNode(child)
+			}
+			c.Content[i] = child
+		}
+	}
+	return &c
+}
+
 // writableNode returns the node a changed value can be written to: the node itself if nothing else shares it, a
 // copy of it if it is anchored, or nil if it is nil or an alias and a new node is needed.
 func writableNode(node *yaml.Node) *yaml.Node {
@@ -168,10 +193,12 @@ func DeleteMapNodeElement(ctx context.Context, key string, mapNode *yaml.Node) *
 	return mapNode
 }
 
+// CreateOrUpdateSliceNode sets the elements of a sequence node. If the sequence is shared (an alias or anchored),
+// the elements are expected to be copies (see IsShared), and the existing node is kept if they are unchanged.
 func CreateOrUpdateSliceNode(ctx context.Context, elements []*yaml.Node, valueNode *yaml.Node) *yaml.Node {
 	resolvedValueNode := ResolveAlias(valueNode)
 	if resolvedValueNode != nil {
-		if slices.Equal(resolvedValueNode.Content, elements) {
+		if IsShared(valueNode) && slices.EqualFunc(resolvedValueNode.Content, elements, EqualNodes) {
 			return valueNode
 		}
 		if node := writableNode(valueNode); node != nil {

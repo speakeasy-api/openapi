@@ -2,6 +2,7 @@ package yml_test
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/speakeasy-api/openapi/yml"
@@ -204,6 +205,8 @@ func TestCreateOrUpdateSliceNode_SharedNodes_Success(t *testing.T) {
 		expectedAnchor string
 	}{
 		{name: "unchanged alias is kept", elements: []*yaml.Node{one}, input: aliasInput, expectSame: true, expectedKind: yaml.AliasNode},
+		{name: "alias with equal copied elements is kept", elements: []*yaml.Node{yml.CopyNode(one)}, input: aliasInput, expectSame: true, expectedKind: yaml.AliasNode},
+		{name: "anchored node with equal copied elements is kept", elements: []*yaml.Node{yml.CopyNode(one)}, input: anchoredInput, expectSame: true, expectedKind: yaml.SequenceNode, expectedAnchor: "s"},
 		{name: "changed alias gets its own node", elements: []*yaml.Node{one, two}, input: aliasInput, expectedKind: yaml.SequenceNode},
 		{name: "changed anchored node is copied", elements: []*yaml.Node{one, two}, input: anchoredInput, expectedKind: yaml.SequenceNode, expectedAnchor: "s"},
 	}
@@ -220,8 +223,9 @@ func TestCreateOrUpdateSliceNode_SharedNodes_Success(t *testing.T) {
 			assert.Equal(t, tt.expectSame, result == input, "whether the existing node is reused should match")
 			assert.Equal(t, tt.expectedKind, result.Kind, "node kind should match")
 			assert.Equal(t, tt.expectedAnchor, result.Anchor, "node anchor should match")
-			assert.Equal(t, tt.elements, yml.ResolveAlias(result).Content, "node elements should match")
-			assert.Equal(t, []*yaml.Node{one}, anchored.Content, "the shared anchored node should not change")
+			assert.True(t, slices.EqualFunc(tt.elements, yml.ResolveAlias(result).Content, yml.EqualNodes), "node elements should match")
+			assert.Same(t, one, anchored.Content[0], "the shared anchored node should not change")
+			assert.Len(t, anchored.Content, 1, "the shared anchored node should not change")
 		})
 	}
 }

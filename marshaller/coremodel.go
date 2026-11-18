@@ -177,8 +177,9 @@ func (c *CoreModel) Marshal(ctx context.Context, w io.Writer) error {
 			resetNodeStylesForYAML(nodeToMarshal, cfg)
 		}
 
-		yml.StabilizeFoldedScalars(nodeToMarshal)
+		// Resolve aliases first, so copies they're replaced with are stabilized too.
 		yml.ResolveOrphanedAliases(nodeToMarshal)
+		yml.StabilizeFoldedScalars(nodeToMarshal)
 
 		enc := yaml.NewEncoder(w)
 		enc.SetIndent(cfg.Indentation)
