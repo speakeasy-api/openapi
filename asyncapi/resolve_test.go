@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -786,11 +787,7 @@ func TestResolveAllReferences_Messages_Error(t *testing.T) {
 			location: "http://[::1",
 			expected: []string{"[7:11] error validation-invalid-reference channel reference `./c.yaml#/c` is invalid: invalid reference format: parse \"http://[::1\": missing ']' in host"},
 		},
-		{
-			name:     "absolute path without the document location",
-			doc:      minimalDoc("channels:\n  c:\n    $ref: '/abs/c.yaml#/c'\n"),
-			expected: []string{"[7:11] error validation-invalid-reference failed to resolve channel reference `/abs/c.yaml#/c`: open /abs/c.yaml: file does not exist"},
-		},
+
 		{
 			name:     "target is an empty reference",
 			doc:      minimalDoc("channels:\n  c:\n    $ref: './null.yaml#/c'\n"),
@@ -871,6 +868,20 @@ func TestResolveAllReferences_Messages_Error(t *testing.T) {
 			assert.Equal(t, tt.expected, actual, "resolution errors should match")
 		})
 	}
+}
+
+// An absolute path doesn't need the document's location, so it is attempted rather than refused. The path is built
+// for the current platform, as `/abs/c.yaml` isn't absolute on Windows.
+func TestResolveAllReferences_AbsolutePathWithoutLocation_Error(t *testing.T) {
+	t.Parallel()
+
+	abs, err := filepath.Abs(filepath.Join("missing", "c.yaml"))
+	require.NoError(t, err, "absolute path should be built")
+
+	_, errs := resolveDoc(t, minimalDoc("channels:\n  c:\n    $ref: '"+abs+"#/c'\n"), asyncapi.ResolveAllOptions{VirtualFS: fstest.MapFS{}})
+	require.Len(t, errs, 1, "the missing file should be reported")
+	assert.Contains(t, errs[0].Error(), "channel reference", "the error should be about the channel reference")
+	assert.NotContains(t, errs[0].Error(), "document's location is unknown", "an absolute path should not need the document's location")
 }
 
 func TestResolveAllReferences_SchemaFormats_Success(t *testing.T) {
