@@ -54,6 +54,14 @@ workflows:
         channelPath: "{$sourceDescriptions.orders.url}#/components/channels/orderStatus"
         action: receive
         correlationId: $inputs.correlationId
+      # An explicitly empty messages list doesn't fall back to the channel's messages, which declare requestId.
+      - stepId: operationWithoutMessages
+        operationId: $sourceDescriptions.orders.noMessages
+        action: send
+        parameters:
+          - name: requestId
+            in: header
+            value: abc
       - stepId: actionOnOpenAPI
         operationId: $sourceDescriptions.untypedPetstore.listPets
         action: send

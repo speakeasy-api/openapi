@@ -30,6 +30,7 @@ func TestArazzo_ValidateSources_AsyncAPI_Error(t *testing.T) {
 		"warning: step.parameters `orderId` in `path` has no meaning for AsyncAPI operation `placeOrder` in sourceDescription `orders`, only `header` parameters are sent with messages",
 		"warning: step.requestBody is not sent by a step with action `receive` targeting operation `confirmOrder` in sourceDescription `orders`",
 		"warning: step.correlationId is set but no message of channel `/components/channels/orderStatus` in sourceDescription `orders` declares a correlationId",
+		"warning: step.parameters `requestId` in `header` is not a header of any message of operation `noMessages` in sourceDescription `orders`",
 		"error: step.action is only applicable to asyncapi steps, sourceDescription `untypedPetstore` is an openapi document",
 	}
 

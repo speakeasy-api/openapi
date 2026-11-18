@@ -236,7 +236,7 @@ for _, err := range validationErrs {
 
 ## Validate an Arazzo document against its source descriptions
 
-Shows loading the OpenAPI, AsyncAPI and Arazzo documents a workflow references and checking its steps against them.
+Shows loading the OpenAPI and Arazzo documents a workflow references and checking its steps against them.
 
 ```go
 ctx := context.Background()

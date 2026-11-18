@@ -139,9 +139,10 @@ func newAsyncTarget(label string) *asyncTarget {
 	return &asyncTarget{complete: true, headers: map[string]bool{}, headersKnown: true, label: label}
 }
 
-// addOperationMessages adds the operation's messages, or all the messages of its channel if it doesn't list any.
+// addOperationMessages adds the operation's messages, or all the messages of its channel if it omits `messages`. An
+// explicitly empty `messages` list means the operation supports no messages.
 func (t *asyncTarget) addOperationMessages(operation *asyncapi.Operation) {
-	if refs := operation.GetMessages(); len(refs) > 0 {
+	if refs := operation.GetMessages(); refs != nil {
 		for _, ref := range refs {
 			t.addMessage(ref.GetMessage())
 		}

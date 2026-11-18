@@ -45,6 +45,11 @@ operations:
     action: receive
     channel:
       $ref: "#/channels/orderConfirmations"
+  noMessages:
+    action: send
+    channel:
+      $ref: "#/channels/orderRequests"
+    messages: []
 components:
   channels:
     orderStatus:

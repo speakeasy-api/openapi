@@ -227,7 +227,7 @@ func Example_validating() {
 }
 
 // Example_validatingSources demonstrates how to validate an Arazzo document against its source descriptions.
-// Shows loading the OpenAPI, AsyncAPI and Arazzo documents a workflow references and checking its steps against them.
+// Shows loading the OpenAPI and Arazzo documents a workflow references and checking its steps against them.
 func Example_validatingSources() {
 	ctx := context.Background()
 
