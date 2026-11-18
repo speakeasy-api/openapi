@@ -6,8 +6,11 @@ import (
 
 	"github.com/speakeasy-api/openapi/asyncapi"
 	"github.com/speakeasy-api/openapi/asyncapi/core"
+	schemacore "github.com/speakeasy-api/openapi/jsonschema/asyncapi/core"
 	"github.com/speakeasy-api/openapi/marshaller"
 	"github.com/speakeasy-api/openapi/sequencedmap"
+	"github.com/speakeasy-api/openapi/values"
+	valuescore "github.com/speakeasy-api/openapi/values/core"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,6 +60,12 @@ func TestFactoryRegistration_Success(t *testing.T) {
 		{name: "ReferencedSecurityScheme", typ: reflect.TypeOf(asyncapi.ReferencedSecurityScheme{})},
 		{name: "slice of referenced security schemes", typ: reflect.TypeOf([]*asyncapi.ReferencedSecurityScheme{})},
 		{name: "map of referenced channels", typ: reflect.TypeOf(sequencedmap.Map[string, *asyncapi.ReferencedChannel]{})},
+		{name: "ReferenceObject slice", typ: reflect.TypeOf([]*asyncapi.ReferenceObject{})},
+		{name: "MessageExample slice", typ: reflect.TypeOf([]*asyncapi.MessageExample{})},
+		{name: "map of external docs", typ: reflect.TypeOf(sequencedmap.Map[string, *asyncapi.ExternalDocumentation]{})},
+		{name: "map of tags", typ: reflect.TypeOf(sequencedmap.Map[string, *asyncapi.Tag]{})},
+		{name: "map of strings", typ: reflect.TypeOf(sequencedmap.Map[string, string]{})},
+		{name: "map of values", typ: reflect.TypeOf(sequencedmap.Map[string, values.Value]{})},
 		{name: "core AsyncAPI", typ: reflect.TypeOf(core.AsyncAPI{})},
 		{name: "core Info", typ: reflect.TypeOf(core.Info{})},
 		{name: "core Contact", typ: reflect.TypeOf(core.Contact{})},
@@ -84,6 +93,13 @@ func TestFactoryRegistration_Success(t *testing.T) {
 		{name: "core Reference to Server", typ: reflect.TypeOf(core.Reference[*core.Server]{})},
 		{name: "core slice of Reference to MessageTrait", typ: reflect.TypeOf([]*core.Reference[*core.MessageTrait]{})},
 		{name: "core map of Reference to Message", typ: reflect.TypeOf(sequencedmap.Map[string, *core.Reference[*core.Message]]{})},
+		{name: "core ReferenceObject slice", typ: reflect.TypeOf([]*core.ReferenceObject{})},
+		{name: "core MessageExample slice", typ: reflect.TypeOf([]*core.MessageExample{})},
+		{name: "core map of schemas", typ: reflect.TypeOf(sequencedmap.Map[string, *schemacore.SchemaUnion]{})},
+		{name: "core map of external docs", typ: reflect.TypeOf(sequencedmap.Map[string, *schemacore.ExternalDocumentation]{})},
+		{name: "core map of tags", typ: reflect.TypeOf(sequencedmap.Map[string, *core.Tag]{})},
+		{name: "core map of string nodes", typ: reflect.TypeOf(sequencedmap.Map[string, marshaller.Node[string]]{})},
+		{name: "core map of value nodes", typ: reflect.TypeOf(sequencedmap.Map[string, marshaller.Node[valuescore.Value]]{})},
 	}
 
 	for _, tt := range tests {
