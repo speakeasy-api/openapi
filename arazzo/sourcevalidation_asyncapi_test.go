@@ -185,12 +185,14 @@ workflows:
 			a, _, err := arazzo.Unmarshal(ctx, bytes.NewBufferString(doc), arazzo.WithSkipValidation())
 			require.NoError(t, err, "unmarshal should succeed")
 
-			sources, _ := arazzo.LoadSourceDescriptions(ctx, a, arazzo.LoadSourcesOptions{
+			sources, loadErrs := arazzo.LoadSourceDescriptions(ctx, a, arazzo.LoadSourcesOptions{
 				VirtualFS: fstest.MapFS{
 					"events.yaml":   {Data: []byte(asyncAPIEdgeCasesSource)},
 					"petstore.yaml": {Data: []byte(asyncAPIEdgeCasesOpenAPI)},
 				},
 			})
+			require.Len(t, loadErrs, 1, "should warn that the AsyncAPI source has unresolved references")
+			assert.Contains(t, severityMessages(loadErrs)[0], "warning: sourceDescription `events` has references that could not be resolved, some checks may be skipped", "load warning should match")
 			require.NotNil(t, sources.Get("events"), "AsyncAPI source should be loaded")
 
 			assert.Equal(t, tt.expected, severityMessages(a.ValidateSources(ctx, sources)), "source validation messages should match")
