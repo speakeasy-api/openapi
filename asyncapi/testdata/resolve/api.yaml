@@ -1,0 +1,38 @@
+# Resolves every kind of reference from another document, used by the resolution tests.
+asyncapi: 3.1.0
+info:
+  title: Every reference kind
+  version: "1"
+  tags:
+    - $ref: "./components.yaml#/tags/alias"
+  externalDocs:
+    $ref: "./components.yaml#/externalDocs/alias"
+servers:
+  prod:
+    $ref: "./components.yaml#/servers/prod"
+channels:
+  orders:
+    address: orders.{orderId}
+    servers:
+      - $ref: "#/servers/prod"
+    parameters:
+      orderId:
+        $ref: "./components.yaml#/parameters/orderId"
+    messages:
+      placed:
+        $ref: "./components.yaml#/messages/placed"
+    bindings:
+      $ref: "./components.yaml#/channelBindings/kafka"
+operations:
+  placeOrder:
+    action: send
+    channel:
+      $ref: "#/channels/orders"
+    messages:
+      - $ref: "#/channels/orders/messages/placed"
+    security:
+      - $ref: "./components.yaml#/securitySchemes/apiKey"
+    traits:
+      - $ref: "./components.yaml#/operationTraits/tracked"
+    reply:
+      $ref: "./components.yaml#/replies/byHeader"
