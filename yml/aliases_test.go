@@ -109,6 +109,21 @@ func TestResolveOrphanedAliases_Success(t *testing.T) {
 	}
 }
 
+func TestResolveOrphanedAliases_NilChildInCopy_Success(t *testing.T) {
+	t.Parallel()
+
+	removed := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Anchor: "s", Content: []*yaml.Node{yml.CreateStringNode("x"), nil}}
+	root := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{yml.CreateStringNode("b"), {Kind: yaml.AliasNode, Value: "s", Alias: removed}}}
+
+	yml.ResolveOrphanedAliases(root)
+
+	c := root.Content[1]
+	assert.Equal(t, yaml.SequenceNode, c.Kind, "the alias should be replaced with a copy")
+	assert.Empty(t, c.Anchor, "the copy should not keep the anchor")
+	assert.Equal(t, "x", c.Content[0].Value, "the copy should keep the values")
+	assert.Nil(t, c.Content[1], "nil children should be kept")
+}
+
 func TestResolveOrphanedAliases_Nil_Success(t *testing.T) {
 	t.Parallel()
 

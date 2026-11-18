@@ -230,6 +230,24 @@ func TestCreateOrUpdateSliceNode_SharedNodes_Success(t *testing.T) {
 	}
 }
 
+func TestCopyNode_Success(t *testing.T) {
+	t.Parallel()
+
+	anchored := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "v", Anchor: "a"}
+	alias := &yaml.Node{Kind: yaml.AliasNode, Value: "a", Alias: anchored}
+	value := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "v"}
+	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Anchor: "m", Content: []*yaml.Node{yml.CreateStringNode("k"), value, yml.CreateStringNode("a"), alias, nil}}
+
+	c := yml.CopyNode(node)
+	assert.NotSame(t, node, c, "the node should be copied")
+	assert.Equal(t, "m", c.Anchor, "the anchor should be kept")
+	assert.NotSame(t, value, c.Content[1], "children should be copied")
+	assert.Equal(t, "v", c.Content[1].Value, "copied children should keep their values")
+	assert.Same(t, alias, c.Content[3], "aliases should not be followed")
+	assert.Nil(t, c.Content[4], "nil children should be kept")
+	assert.Nil(t, yml.CopyNode(nil), "a nil node should copy to nil")
+}
+
 func TestCreateOrUpdateSliceNode_RecursiveSharedNode_Success(t *testing.T) {
 	t.Parallel()
 
