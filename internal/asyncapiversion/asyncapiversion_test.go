@@ -38,23 +38,40 @@ func TestParse_Error(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name  string
-		input string
+		name     string
+		input    string
+		expected string
 	}{
-		{name: "empty", input: ""},
-		{name: "missing patch", input: "3.1"},
-		{name: "empty suffix", input: "3.1.0-"},
-		{name: "non alphanumeric suffix", input: "3.1.0-rc.1"},
-		{name: "leading zero", input: "03.1.0"},
-		{name: "letters", input: "three.one.zero"},
+		{name: "empty", input: "", expected: "invalid version ``: expected `major.minor.patch` with an optional `-suffix`"},
+		{name: "missing patch", input: "3.1", expected: "invalid version `3.1`: expected `major.minor.patch` with an optional `-suffix`"},
+		{name: "empty suffix", input: "3.1.0-", expected: "invalid version `3.1.0-`: expected `major.minor.patch` with an optional `-suffix`"},
+		{name: "non alphanumeric suffix", input: "3.1.0-rc.1", expected: "invalid version `3.1.0-rc.1`: expected `major.minor.patch` with an optional `-suffix`"},
+		{name: "leading zero", input: "03.1.0", expected: "invalid version `03.1.0`: expected `major.minor.patch` with an optional `-suffix`"},
+		{name: "letters", input: "three.one.zero", expected: "invalid version `three.one.zero`: expected `major.minor.patch` with an optional `-suffix`"},
+		{
+			name:     "major out of range",
+			input:    "99999999999999999999.0.0",
+			expected: "invalid major version in `99999999999999999999.0.0`: strconv.Atoi: parsing \"99999999999999999999\": value out of range",
+		},
+		{
+			name:     "minor out of range",
+			input:    "3.99999999999999999999.0",
+			expected: "invalid minor version in `3.99999999999999999999.0`: strconv.Atoi: parsing \"99999999999999999999\": value out of range",
+		},
+		{
+			name:     "patch out of range",
+			input:    "3.1.99999999999999999999",
+			expected: "invalid patch version in `3.1.99999999999999999999`: strconv.Atoi: parsing \"99999999999999999999\": value out of range",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := Parse(tt.input)
-			require.Error(t, err, "parse should fail")
+			v, err := Parse(tt.input)
+			require.EqualError(t, err, tt.expected, "parse should fail with expected error")
+			assert.Nil(t, v, "version should be nil on error")
 		})
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/asyncapi"
+	"github.com/speakeasy-api/openapi/extensions"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/speakeasy-api/openapi/validation"
 	"github.com/stretchr/testify/assert"
@@ -419,6 +420,95 @@ func TestUnmarshal_Error(t *testing.T) {
 			require.Error(t, err, "unmarshal should fail")
 		})
 	}
+}
+
+func TestAsyncAPI_Getters_Success(t *testing.T) {
+	t.Parallel()
+
+	exts := extensions.New(extensions.NewElem("x-owner", nil))
+	populated := &asyncapi.AsyncAPI{
+		AsyncAPI:           "3.0.0",
+		ID:                 pointer.From("urn:example:orders"),
+		Info:               asyncapi.Info{Title: "Orders"},
+		DefaultContentType: pointer.From("application/json"),
+		Extensions:         exts,
+	}
+	unset := &asyncapi.AsyncAPI{}
+
+	type getters struct {
+		asyncAPI           string
+		id                 string
+		info               *asyncapi.Info
+		defaultContentType string
+		extensions         *extensions.Extensions
+	}
+
+	tests := []struct {
+		name     string
+		doc      *asyncapi.AsyncAPI
+		expected getters
+	}{
+		{
+			name:     "nil document returns defaults",
+			doc:      nil,
+			expected: getters{extensions: extensions.New()},
+		},
+		{
+			name:     "unset fields return defaults",
+			doc:      unset,
+			expected: getters{info: &unset.Info, extensions: extensions.New()},
+		},
+		{
+			name: "populated fields are returned",
+			doc:  populated,
+			expected: getters{
+				asyncAPI:           "3.0.0",
+				id:                 "urn:example:orders",
+				info:               &populated.Info,
+				defaultContentType: "application/json",
+				extensions:         exts,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			actual := getters{
+				asyncAPI:           tt.doc.GetAsyncAPI(),
+				id:                 tt.doc.GetID(),
+				info:               tt.doc.GetInfo(),
+				defaultContentType: tt.doc.GetDefaultContentType(),
+				extensions:         tt.doc.GetExtensions(),
+			}
+			assert.Equal(t, tt.expected, actual, "getters should return expected values")
+		})
+	}
+}
+
+func TestAsyncAPI_GetInfo_ReturnsField(t *testing.T) {
+	t.Parallel()
+
+	a := asyncapi.NewAsyncAPI()
+	a.GetInfo().Title = "Orders"
+	assert.Equal(t, "Orders", a.Info.Title, "GetInfo should return a pointer to the document's Info field")
+}
+
+func TestAsyncAPI_Sync_Success(t *testing.T) {
+	t.Parallel()
+
+	a, validationErrs := unmarshal(t, streetlightsDoc)
+	require.Empty(t, validationErrs, "should have no validation errors")
+
+	a.Info.Title = "Streetlights Events"
+	a.DefaultContentType = pointer.From("application/cloudevents+json")
+	require.NoError(t, a.Sync(t.Context()), "sync should succeed")
+
+	c := a.GetCore()
+	assert.Equal(t, "Streetlights Events", c.Info.Value.Title.Value, "core info title should be synced")
+	assert.Equal(t, "application/cloudevents+json", *c.DefaultContentType.Value, "core default content type should be synced")
+	assert.Equal(t, "application/cloudevents+json", c.DefaultContentType.ValueNode.Value, "yaml node should be synced")
 }
 
 func TestIsSupportedVersion_Success(t *testing.T) {
