@@ -119,10 +119,8 @@ func (s *Schema) GetType() []string {
 	if s.Type.IsLeft() {
 		return s.Type.LeftValue()
 	}
-	if s.Type.Right != nil {
-		return []string{*s.Type.Right}
-	}
-	return nil
+	// IsLeft is only false when Right is set.
+	return []string{*s.Type.Right}
 }
 
 // GetRequired returns the required property names, or nil if not set.
