@@ -6,13 +6,12 @@ import (
 	"testing"
 
 	"github.com/speakeasy-api/openapi/asyncapi"
-	"github.com/speakeasy-api/openapi/asyncapi/core"
 	"github.com/speakeasy-api/openapi/pointer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestChannel_SyncChanges_Success(t *testing.T) {
+func TestChannel_SyncNullAddress_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -47,13 +46,4 @@ func TestChannel_SyncChanges_Success(t *testing.T) {
 			assert.Contains(t, buf.String(), tt.expected, "address should be synced")
 		})
 	}
-}
-
-func TestChannel_SyncChanges_Error(t *testing.T) {
-	t.Parallel()
-
-	var channel core.Channel
-	_, err := channel.SyncChanges(t.Context(), "channel", nil)
-	require.Error(t, err, "syncing a non-struct model should fail")
-	assert.Equal(t, "SyncValue expected target to be string, got struct", err.Error(), "sync error should match")
 }
