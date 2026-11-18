@@ -142,11 +142,13 @@ func (m *merger) patch(target, patch *yaml.Node, doc string) *yaml.Node {
 		return m.copy(patch, doc)
 	}
 
+	// A merged mapping takes the position of the patch, the latest contributor, whose values win. The target is
+	// always merged last, so diagnostics on a mapping both it and a trait supply point at the target's mapping.
 	result := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Style: patch.Style, Line: patch.Line, Column: patch.Column}
 	if target != nil && target.Kind == yaml.MappingNode {
 		result.Content = append(result.Content, target.Content...)
-		result.Line, result.Column = target.Line, target.Column
 	}
+	m.nodeDocs[result] = doc
 
 	for i := 0; i+1 < len(patch.Content); i += 2 {
 		key, value := patch.Content[i], patch.Content[i+1]
