@@ -56,10 +56,10 @@ workflows:
 			expectedView: []string{"adoptPet", "findPet", "registerOwner", "Pet adoption v1.0.0 · Arazzo 1.1.0 · 2 workflows"},
 		},
 		{
-			name:           "stdin",
-			inputFile:      "-",
-			stdin:          stdinDoc,
-			expectedView:   []string{"piped", "only", "Arazzo vunknown · Arazzo 1.1.0 · 1 workflows"},
+			name:         "stdin",
+			inputFile:    "-",
+			stdin:        stdinDoc,
+			expectedView: []string{"piped", "only", "Arazzo vunknown · Arazzo 1.1.0 · 1 workflows"},
 			expectedStderr: "Note: reading document from stdin; interactive TUI requires /dev/tty for keyboard input.\n" +
 				"⚠️  Found 2 validation errors in document:\n" +
 				"  1. [3:10] error validation-required-field `info.title` is required\n" +

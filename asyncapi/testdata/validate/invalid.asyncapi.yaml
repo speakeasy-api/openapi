@@ -1,0 +1,11 @@
+asyncapi: 3.0.0
+info:
+  title: Orders
+channels:
+  orders:
+    address: orders
+operations:
+  placeOrder:
+    action: publish
+    channel:
+      $ref: "#/channels/missing"

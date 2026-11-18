@@ -22,7 +22,7 @@ var validateCmd = &cobra.Command{
 		}
 		return fmt.Errorf("overlay file is required (use --overlay flag, provide as argument, or pipe to stdin)")
 	},
-	Run:   RunValidateOverlay,
+	Run: RunValidateOverlay,
 	Example: `  # Validate overlay using positional argument
   openapi overlay validate overlay.yaml
 

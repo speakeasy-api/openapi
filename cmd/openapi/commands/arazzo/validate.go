@@ -28,16 +28,17 @@ This command will parse and validate the provided Arazzo document, checking for:
   expressions reference steps, outputs and inputs that exist
 - Source description references
 
-By default the OpenAPI and Arazzo documents referenced by sourceDescriptions are
-loaded (relative URLs are resolved against $self, or the document's location) and
-the workflows are checked against them:
-- operationId, operationPath and workflowId targets exist
+By default the OpenAPI, AsyncAPI and Arazzo documents referenced by
+sourceDescriptions are loaded (relative URLs are resolved against $self, or the
+document's location) and the workflows are checked against them:
+- operationId, operationPath, channelPath and workflowId targets exist
 - step parameters match the target operation's parameters by name and location
 - required parameters and request bodies are supplied
 - parameters passed to workflows match their inputs
+- AsyncAPI steps only send headers their messages declare
 
-Sources that can't be loaded are reported as warnings, and AsyncAPI sources are
-not checked. Use --skip-sources to only validate the document itself, for example
+Sources that can't be loaded, including AsyncAPI 2.x sources, are reported as
+warnings. Use --skip-sources to only validate the document itself, for example
 when working offline. Only errors cause validation to fail.
 
 Stdin is supported — either pipe data directly or use '-' explicitly:
