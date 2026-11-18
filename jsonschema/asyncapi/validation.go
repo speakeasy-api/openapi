@@ -26,21 +26,14 @@ import (
 const draft07MetaschemaURL = "http://json-schema.org/draft-07/schema"
 
 var (
-	draft07Once      sync.Once
-	draft07Validator *jsValidator.Schema
-	errDraft07       error
+	// draft07Metaschema returns the compiled JSON Schema Draft 07 metaschema. It is bundled with the validator
+	// library, so compiling it needs no network access and can't fail.
+	draft07Metaschema = sync.OnceValue(func() *jsValidator.Schema {
+		return jsValidator.NewCompiler().MustCompile(draft07MetaschemaURL)
+	})
 
 	defaultPrinter = message.NewPrinter(language.English)
 )
-
-// draft07Metaschema returns the compiled JSON Schema Draft 07 metaschema. It is bundled with the validator
-// library, so no network access is required.
-func draft07Metaschema() (*jsValidator.Schema, error) {
-	draft07Once.Do(func() {
-		draft07Validator, errDraft07 = jsValidator.NewCompiler().Compile(draft07MetaschemaURL)
-	})
-	return draft07Validator, errDraft07
-}
 
 // schemaFormatOption carries the schema format being validated through validation options.
 type schemaFormatOption struct {
@@ -331,17 +324,16 @@ func (u *SchemaUnion) Validate(ctx context.Context, opts ...validation.Option) [
 // validateAgainstDraft07 validates a schema node against the Draft 07 metaschema, reporting errors at the
 // corresponding locations in node.
 func validateAgainstDraft07(node *yaml.Node) []error {
-	meta, err := draft07Metaschema()
-	if err != nil {
-		return []error{validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSchema, fmt.Errorf("failed to load the JSON Schema Draft 07 metaschema: %w", err), node)}
-	}
-
 	instance, err := schemaNodeToJSON(node)
 	if err != nil {
 		return []error{validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSyntax, fmt.Errorf("schema is not valid json: %w", err), node)}
 	}
 
-	err = meta.Validate(instance)
+	return draft07Errors(draft07Metaschema().Validate(instance), node)
+}
+
+// draft07Errors converts the result of validating node against the Draft 07 metaschema into validation errors.
+func draft07Errors(err error, node *yaml.Node) []error {
 	if err == nil {
 		return nil
 	}

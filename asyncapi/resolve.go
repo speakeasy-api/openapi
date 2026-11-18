@@ -630,15 +630,7 @@ func absoluteReference(ref references.Reference, base string) (string, error) {
 }
 
 func unmarshalReference[T any, V interfaces.Validator[T], C marshaller.CoreModeler](ctx context.Context, node *yaml.Node, skipValidation bool) (*Reference[T, V, C], []error, error) {
-	var ref Reference[T, V, C]
-	validationErrs, err := marshaller.UnmarshalNode(ctx, "reference", node, &ref)
-	if err != nil {
-		return nil, validationErrs, err
-	}
-	if skipValidation {
-		validationErrs = nil
-	}
-	return &ref, validationErrs, nil
+	return unmarshalModel[Reference[T, V, C], core.Reference[C]]("reference")(ctx, node, skipValidation)
 }
 
 // nextReference continues a chain through a Reference Object, unless it was already resolved. A wrapper from another

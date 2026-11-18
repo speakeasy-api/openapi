@@ -23,6 +23,15 @@ func TestDedupeErrors_Success(t *testing.T) {
 	assert.Equal(t, []error{first, second}, actual, "duplicate messages should be removed while keeping order")
 }
 
+func TestDraft07Errors_NotValidationError_Error(t *testing.T) {
+	t.Parallel()
+
+	node := &yaml.Node{Kind: yaml.MappingNode, Line: 2, Column: 3}
+	actual := draft07Errors(errors.New("unexpected"), node)
+	require.Len(t, actual, 1, "an unexpected error should be reported")
+	assert.Equal(t, "[2:3] error validation-invalid-schema schema invalid: unexpected", actual[0].Error(), "error should match")
+}
+
 func TestFilterBranchTypeMismatches_Success(t *testing.T) {
 	t.Parallel()
 

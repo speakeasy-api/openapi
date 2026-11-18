@@ -171,17 +171,14 @@ func (d *SchemaDefinition) Populate(source any) error {
 
 	d.Schema = nil
 	d.Raw = c.Raw
-
-	if c.Schema != nil {
-		d.Schema = &JSONSchema{}
-		if err := marshaller.PopulateWithContext(c.Schema, d.Schema, nil); err != nil {
-			return err
-		}
-	}
-
 	d.core = c
 
-	return nil
+	if c.Schema == nil {
+		return nil
+	}
+	var err error
+	d.Schema, err = populateNested[JSONSchema](c.Schema)
+	return err
 }
 
 // SchemaUnion is a value AsyncAPI accepts wherever a schema is expected (for example message payloads and
@@ -293,21 +290,14 @@ func (u *SchemaUnion) Populate(source any) error {
 
 	u.Schema = nil
 	u.MultiFormat = nil
-
-	switch {
-	case c.Schema != nil:
-		u.Schema = &JSONSchema{}
-		if err := marshaller.PopulateWithContext(c.Schema, u.Schema, nil); err != nil {
-			return err
-		}
-	case c.MultiFormat != nil:
-		u.MultiFormat = &MultiFormatSchema{}
-		if err := marshaller.PopulateWithContext(c.MultiFormat, u.MultiFormat, nil); err != nil {
-			return err
-		}
-	}
-
 	u.core = c
 
-	return nil
+	var err error
+	switch {
+	case c.Schema != nil:
+		u.Schema, err = populateNested[JSONSchema](c.Schema)
+	case c.MultiFormat != nil:
+		u.MultiFormat, err = populateNested[MultiFormatSchema](c.MultiFormat)
+	}
+	return err
 }

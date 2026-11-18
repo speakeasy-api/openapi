@@ -1,6 +1,7 @@
 package asyncapi
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/speakeasy-api/openapi/jsonschema/asyncapi/core"
@@ -71,27 +72,32 @@ func (i *Items) Populate(source any) error {
 
 	i.Schema = nil
 	i.Schemas = nil
+	i.core = c
 
+	var errs []error
 	if c.IsList {
 		i.Schemas = make([]*JSONSchema, 0, len(c.Schemas))
 		for _, cs := range c.Schemas {
 			js := &JSONSchema{}
 			if cs != nil {
-				if err := marshaller.PopulateWithContext(cs, js, nil); err != nil {
-					return err
-				}
+				var err error
+				js, err = populateNested[JSONSchema](cs)
+				errs = append(errs, err)
 			}
 			i.Schemas = append(i.Schemas, js)
 		}
 	} else if c.Schema != nil {
-		i.Schema = &JSONSchema{}
-		if err := marshaller.PopulateWithContext(c.Schema, i.Schema, nil); err != nil {
-			return err
-		}
+		var err error
+		i.Schema, err = populateNested[JSONSchema](c.Schema)
+		errs = append(errs, err)
 	}
+	return errors.Join(errs...)
+}
 
-	i.core = c
-	return nil
+// populateNested populates a nested model from its core.
+func populateNested[T any](source any) (*T, error) {
+	target := new(T)
+	return target, marshaller.PopulateWithContext(source, target, nil)
 }
 
 // Dependency is a value of the `dependencies` keyword: either a list of property names that are required when
@@ -158,19 +164,16 @@ func (d *Dependency) Populate(source any) error {
 
 	d.Schema = nil
 	d.Properties = nil
+	d.core = c
 
+	var err error
 	if c.IsList {
 		d.Properties = make([]string, 0, len(c.Properties))
 		for _, p := range c.Properties {
 			d.Properties = append(d.Properties, p.Value)
 		}
 	} else if c.Schema != nil {
-		d.Schema = &JSONSchema{}
-		if err := marshaller.PopulateWithContext(c.Schema, d.Schema, nil); err != nil {
-			return err
-		}
+		d.Schema, err = populateNested[JSONSchema](c.Schema)
 	}
-
-	d.core = c
-	return nil
+	return err
 }

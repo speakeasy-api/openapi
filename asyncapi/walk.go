@@ -213,11 +213,9 @@ func (w *walker) walkInfo(info *Info, loc Locations) bool {
 	return w.walkExtensions(info.Extensions, loc, mf)
 }
 
-// walkSimple visits a model with no children other than its extensions.
+// walkSimple visits a model with no children other than its extensions. Callers pass a non-nil model, as they
+// read its extensions.
 func walkSimple[T any](w *walker, model *T, ext *extensions.Extensions, loc Locations) bool {
-	if model == nil {
-		return true
-	}
 	mf := getMatchFunc(model)
 	if !w.visit(mf, loc) {
 		return false

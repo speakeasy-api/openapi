@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/speakeasy-api/openapi/validation"
 	"github.com/speakeasy-api/openapi/yml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -109,4 +110,18 @@ func TestInheritedErrors_NotValidationError_Success(t *testing.T) {
 	rc := traitsInternalCall(nil)
 	rc.inheritedErrors([]error{errors.New("plain")}, diagnosticSet{}, map[*yaml.Node]string{}, "", rc.root)
 	assert.Empty(t, rc.errs, "errors without a location should not be attributed to the effective view")
+}
+
+func TestInheritedErrors_UnknownNode_Success(t *testing.T) {
+	t.Parallel()
+
+	rc := traitsInternalCall(nil)
+	node := &yaml.Node{Kind: yaml.ScalarNode, Line: 3, Column: 4}
+	err := validation.NewValidationError(validation.SeverityError, validation.RuleValidationInvalidSchema, errors.New("inherited"), node)
+	rc.inheritedErrors([]error{err}, diagnosticSet{}, map[*yaml.Node]string{}, "target.yaml", rc.root)
+
+	require.Len(t, rc.errs, 1, "the inherited error should be reported")
+	var vErr *validation.Error
+	require.ErrorAs(t, rc.errs[0], &vErr, "the error should be a validation error")
+	assert.Equal(t, "target.yaml", vErr.DocumentLocation, "a node from no known document should be attributed to the target's document")
 }
