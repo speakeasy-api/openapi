@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/speakeasy-api/openapi/hashing"
@@ -424,13 +425,13 @@ func joinOtherComponents(resultComponents, srcComponents *Components, srcPath st
 		createNew func() interface{},
 	) error {
 		srcMap := getSrc()
-		if srcMap == nil {
+		if srcMap == nil || reflect.ValueOf(srcMap).IsNil() {
 			return nil
 		}
 
 		// Ensure result has this component type
 		resultMap := getResult()
-		if resultMap == nil {
+		if resultMap == nil || reflect.ValueOf(resultMap).IsNil() {
 			resultMap = createNew()
 			setResult(resultMap)
 		}
