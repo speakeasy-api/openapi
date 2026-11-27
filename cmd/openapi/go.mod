@@ -4,8 +4,8 @@ go 1.26.7
 
 require (
 	charm.land/bubbles/v2 v2.2.1
-	charm.land/bubbletea/v2 v2.1.1
-	charm.land/lipgloss/v2 v2.1.0
+	charm.land/bubbletea/v2 v2.1.2
+	charm.land/lipgloss/v2 v2.1.1
 	github.com/speakeasy-api/openapi v1.27.1-0.20261118213526-794666622d57
 	github.com/speakeasy-api/openapi/openapi/linter/customrules v0.0.0-20261118213526-794666622d57
 	github.com/spf13/cobra v1.10.2
