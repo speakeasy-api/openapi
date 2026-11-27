@@ -8,8 +8,8 @@ replace (
 )
 
 require (
-	github.com/speakeasy-api/openapi v1.27.1-0.20261118213526-794666622d57
-	github.com/speakeasy-api/openapi/openapi/linter/customrules v0.0.0-20261118213526-794666622d57
+	github.com/speakeasy-api/openapi v1.28.1-0.20261127065451-b3daea0e6500
+	github.com/speakeasy-api/openapi/openapi/linter/customrules v0.0.0-20261127065451-b3daea0e6500
 	github.com/stretchr/testify v1.12.1
 )
 
