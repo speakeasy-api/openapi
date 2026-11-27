@@ -394,3 +394,46 @@ func TestJoin_ComponentConflictsRewriteLocalReferences_Success(t *testing.T) {
 		}
 	}
 }
+
+func TestJoin_MissingComponentSectionInMain_Success(t *testing.T) {
+	t.Parallel()
+
+	components := []struct {
+		section    string
+		definition string
+	}{
+		{section: "responses", definition: "{description: source}"},
+		{section: "parameters", definition: "{name: id, in: query, description: source, schema: {type: string}}"},
+		{section: "examples", definition: "{description: source, value: example}"},
+		{section: "requestBodies", definition: "{description: source, content: {application/json: {schema: {type: string}}}}"},
+		{section: "headers", definition: "{description: source, schema: {type: string}}"},
+		{section: "securitySchemes", definition: "{type: apiKey, in: header, name: X-API-Key}"},
+		{section: "links", definition: "{description: source, operationId: getItem}"},
+		{section: "callbacks", definition: "{'{$request.query.callbackUrl}': {post: {responses: {'200': {description: source}}}}}"},
+		{section: "pathItems", definition: "{description: source, get: {responses: {'200': {description: source}}}}"},
+	}
+
+	for _, component := range components {
+		t.Run(component.section, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+
+			mainDoc := unmarshalOpenAPI(t, ctx, "openapi: 3.1.0\ninfo: {title: Main API, version: 1.0.0}\npaths: {}\n")
+			sourceDoc := unmarshalOpenAPI(t, ctx, "openapi: 3.1.0\ninfo: {title: Source API, version: 1.0.0}\npaths: {}\ncomponents:\n  "+component.section+":\n    Item: "+component.definition+"\n")
+
+			err := openapi.Join(ctx, mainDoc, []openapi.JoinDocumentInfo{
+				{Document: sourceDoc, FilePath: "source.yaml"},
+			}, openapi.JoinOptions{ConflictStrategy: openapi.JoinConflictCounter})
+			require.NoError(t, err)
+
+			var output bytes.Buffer
+			require.NoError(t, openapi.Marshal(ctx, mainDoc, &output))
+
+			var joined struct {
+				Components map[string]map[string]map[string]any `yaml:"components"`
+			}
+			require.NoError(t, yaml.Unmarshal(output.Bytes(), &joined))
+			assert.Contains(t, joined.Components[component.section], "Item")
+		})
+	}
+}
